@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a0d14" />
+  <title>⚡ NxTGen Trading Journal — Sign In</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-deep:#07090f; --border:rgba(255,255,255,0.08); --border-glow:rgba(99,179,237,0.35);
+      --accent:#63b3ed; --accent-dim:#3b82c4; --gold:#f6ad55; --green:#68d391;
+      --text-primary:#e8edf5; --text-secondary:#8899aa; --text-muted:#4a5568;
+      --danger:#fc8181; --radius-md:10px; --radius-xl:22px;
+    }
+    html,body { height:100%; font-family:'Space Grotesk',sans-serif; background:var(--bg-deep); color:var(--text-primary); overflow-x:hidden; }
+
+    .bg-canvas { position:fixed; inset:0; z-index:0; overflow:hidden; }
+    .bg-canvas::before { content:''; position:absolute; inset:0; background: radial-gradient(ellipse 800px 600px at 15% 20%,rgba(99,179,237,0.06) 0%,transparent 65%), radial-gradient(ellipse 600px 500px at 85% 75%,rgba(246,173,85,0.04) 0%,transparent 65%), radial-gradient(ellipse 500px 400px at 50% 100%,rgba(104,211,145,0.03) 0%,transparent 60%); }
+    .grid-lines { position:absolute; inset:0; background-image:linear-gradient(rgba(99,179,237,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(99,179,237,0.025) 1px,transparent 1px); background-size:48px 48px; mask-image:radial-gradient(ellipse 90% 80% at 50% 40%,black 30%,transparent 100%); }
+    .orb { position:absolute; border-radius:50%; filter:blur(80px); pointer-events:none; animation:float 8s ease-in-out infinite; }
+    .orb-1 { width:340px;height:340px;top:-80px;left:-60px;background:rgba(99,179,237,0.07); }
+    .orb-2 { width:280px;height:280px;bottom:-60px;right:-40px;background:rgba(246,173,85,0.05);animation-delay:3s; }
+    .orb-3 { width:200px;height:200px;top:50%;right:10%;background:rgba(104,211,145,0.04);animation-delay:5.5s; }
+    @keyframes float { 0%,100%{transform:translateY(0) scale(1);} 50%{transform:translateY(-24px) scale(1.04);} }
+
+    .ticker { position:fixed;top:0;left:0;right:0;z-index:10;height:30px;background:rgba(7,9,15,0.92);border-bottom:1px solid var(--border);overflow:hidden;display:flex;align-items:center; }
+    .ticker-track { display:flex;gap:48px;white-space:nowrap;animation:scroll-ticker 28s linear infinite;font-family:'JetBrains Mono',monospace;font-size:11px; }
+    .ticker-item { display:flex;gap:8px;align-items:center; }
+    .ticker-pair { color:var(--text-secondary); } .ticker-val { font-weight:600; }
+    .up{color:var(--green);} .dn{color:var(--danger);}
+    @keyframes scroll-ticker { 0%{transform:translateX(0);} 100%{transform:translateX(-50%);} }
+
+    .page { position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px 40px; }
+
+    .card { width:100%;max-width:430px;background:rgba(255,255,255,0.035);border:1px solid var(--border);border-radius:var(--radius-xl);padding:36px 36px 32px;backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);box-shadow:0 0 0 1px rgba(255,255,255,0.04) inset,0 32px 80px rgba(0,0,0,0.5);animation:card-in 0.6s cubic-bezier(0.22,1,0.36,1) both; }
+    @keyframes card-in { from{opacity:0;transform:translateY(20px) scale(0.97);} to{opacity:1;transform:none;} }
+
+    .brand { text-align:center;margin-bottom:26px; }
+    .brand-logo { display:inline-flex;align-items:center;gap:10px;margin-bottom:4px; }
+    .bolt { width:36px;height:36px;background:linear-gradient(135deg,var(--accent) 0%,var(--gold) 100%);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 0 20px rgba(99,179,237,0.25); }
+    .brand-name { font-size:22px;font-weight:700;letter-spacing:-0.5px;background:linear-gradient(135deg,#e8edf5 30%,var(--accent) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text; }
+    .brand-sub { font-size:12px;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;font-weight:500; }
+
+    .stats-strip { display:flex;gap:1px;margin-bottom:26px;background:var(--border);border-radius:var(--radius-md);overflow:hidden;border:1px solid var(--border); }
+    .stat-cell { flex:1;padding:10px 8px;text-align:center;background:rgba(255,255,255,0.02); }
+    .stat-val { font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600; }
+    .stat-lbl { font-size:10px;color:var(--text-muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.06em; }
+
+    .tabs { display:flex;gap:4px;margin-bottom:26px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:var(--radius-md);padding:4px; }
+    .tab { flex:1;padding:9px 0;border:none;border-radius:8px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background 0.2s,color 0.2s;background:transparent;color:var(--text-muted); }
+    .tab.active { background:rgba(99,179,237,0.15);color:var(--accent);border:1px solid rgba(99,179,237,0.25); }
+
+    .panel { display:none; } .panel.active { display:block; }
+
+    .field { margin-bottom:14px; }
+    .field label { display:block;font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;letter-spacing:0.06em;text-transform:uppercase; }
+    .input-wrap { position:relative; }
+    .input-wrap .ico { position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;transition:color 0.2s;width:15px;height:15px; }
+    .field input { width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:var(--radius-md);padding:11px 42px 11px 40px;font-family:'Space Grotesk',sans-serif;font-size:14px;color:var(--text-primary);outline:none;transition:border-color 0.2s,background 0.2s,box-shadow 0.2s; }
+    .field input::placeholder { color:var(--text-muted); }
+    .field input:focus { border-color:var(--border-glow);background:rgba(99,179,237,0.05);box-shadow:0 0 0 3px rgba(99,179,237,0.08); }
+    .input-wrap:focus-within .ico { color:var(--accent); }
+    .eye-btn { position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;transition:color 0.2s; }
+    .eye-btn:hover { color:var(--text-secondary); }
+
+    .row-meta { display:flex;justify-content:space-between;align-items:center;margin-bottom:20px; }
+    .remember { display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer; }
+    .remember input { accent-color:var(--accent);width:15px;height:15px;cursor:pointer; }
+    .link-btn { background:none;border:none;font-family:inherit;font-size:13px;color:var(--accent);cursor:pointer;padding:0;transition:color 0.2s; }
+    .link-btn:hover { color:var(--text-primary); }
+
+    .btn-primary { width:100%;padding:13px;background:linear-gradient(135deg,var(--accent-dim) 0%,#2563a8 100%);border:1px solid rgba(99,179,237,0.3);border-radius:var(--radius-md);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:#fff;cursor:pointer;letter-spacing:0.02em;transition:transform 0.15s,box-shadow 0.15s;position:relative;overflow:hidden; }
+    .btn-primary::before { content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.1) 0%,transparent 60%);pointer-events:none; }
+    .btn-primary:hover { transform:translateY(-1px);box-shadow:0 8px 24px rgba(99,179,237,0.25); }
+    .btn-primary:active { transform:none; }
+    .btn-primary:disabled { opacity:0.55;cursor:default;transform:none; }
+
+    .divider { display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--text-muted);font-size:12px; }
+    .divider::before,.divider::after { content:'';flex:1;height:1px;background:var(--border); }
+
+    .btn-google { width:100%;padding:11px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:var(--radius-md);font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:500;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:background 0.2s,border-color 0.2s,color 0.2s; }
+    .btn-google:hover { background:rgba(255,255,255,0.07);color:var(--text-primary);border-color:rgba(255,255,255,0.15); }
+    .btn-google:disabled { opacity:0.55;cursor:default; }
+
+    .alert { border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px;display:none; }
+    .alert.show { display:block; }
+    .alert.error { background:rgba(252,129,129,0.1);border:1px solid rgba(252,129,129,0.25);color:var(--danger);animation:shake 0.4s ease; }
+    .alert.success { background:rgba(104,211,145,0.1);border:1px solid rgba(104,211,145,0.25);color:var(--green); }
+    @keyframes shake { 0%,100%{transform:translateX(0);} 20%,60%{transform:translateX(-4px);} 40%,80%{transform:translateX(4px);} }
+
+    .strength-bar { display:flex;gap:3px;margin-top:6px; }
+    .strength-seg { flex:1;height:3px;border-radius:2px;background:var(--border);transition:background 0.3s; }
+    .strength-lbl { font-size:11px;margin-top:4px; }
+
+    .session-info { margin-top:20px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace; }
+    .session-dot { width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+    .bottom-bar { margin-top:22px;text-align:center;font-size:11px;color:var(--text-muted); }
+
+    .loader { position:fixed;inset:0;z-index:100;background:var(--bg-deep);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px; }
+    .loader-bolt { font-size:40px;animation:pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
+    @keyframes pop { from{transform:scale(0);opacity:0;} to{transform:scale(1);opacity:1;} }
+    .loader-bar { width:140px;height:2px;background:var(--border);border-radius:2px;overflow:hidden; }
+    .loader-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--gold));animation:fill-bar 1s ease forwards; }
+    @keyframes fill-bar { from{width:0;} to{width:100%;} }
+  </style>
+</head>
+<body>
+
+<div class="loader" id="loader"><div class="loader-bolt">⚡</div><div class="loader-bar"><div class="loader-fill"></div></div></div>
+
+<div class="bg-canvas"><div class="grid-lines"></div><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
+
+<div class="ticker"><div class="ticker-track" id="tickerTrack"></div></div>
+
+<main class="page">
+  <div class="card">
+
+    <div class="brand">
+      <div class="brand-logo"><div class="bolt">⚡</div><span class="brand-name">NxTGen Journal</span></div>
+      <div class="brand-sub">ICT Trading · Lagos, WAT</div>
+    </div>
+
+    <div class="stats-strip">
+      <div class="stat-cell"><div class="stat-val up">75.8%</div><div class="stat-lbl">Win Rate</div></div>
+      <div class="stat-cell"><div class="stat-val up">+59.8%</div><div class="stat-lbl">Net PnL</div></div>
+      <div class="stat-cell"><div class="stat-val" style="color:var(--gold)">3.96×</div><div class="stat-lbl">Profit Factor</div></div>
+      <div class="stat-cell"><div class="stat-val up">8</div><div class="stat-lbl">Best Streak</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" id="tabLogin"    onclick="switchTab('login')">Sign In</button>
+      <button class="tab"        id="tabRegister" onclick="switchTab('register')">Create Account</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div class="panel active" id="panelLogin">
+      <div class="alert error"   id="loginErr"></div>
+      <div class="alert success" id="loginOk"></div>
+
+      <div class="field">
+        <label>Email address</label>
+        <div class="input-wrap">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <div class="input-wrap">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <input type="password" id="loginPw" placeholder="••••••••" autocomplete="current-password" />
+          <button class="eye-btn" onclick="toggleEye('loginPw','eyeLogin')" type="button">
+            <svg id="eyeLogin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="row-meta">
+        <label class="remember"><input type="checkbox" id="remember" /> Remember me</label>
+        <button class="link-btn" onclick="handleForgot()">Forgot password?</button>
+      </div>
+
+      <button class="btn-primary" id="btnLogin" onclick="handleLogin()">Sign In to Dashboard</button>
+
+      <div class="divider">or</div>
+
+      <button class="btn-google" id="btnGoogleLogin" onclick="handleGoogle()">
+        <svg style="width:16px;height:16px" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Continue with Google
+      </button>
+    </div>
+
+    <!-- REGISTER -->
+    <div class="panel" id="panelRegister">
+      <div class="alert error"   id="regErr"></div>
+      <div class="alert success" id="regOk"></div>
+
+      <div class="field">
+        <label>Full name</label>
+        <div class="input-wrap">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <input type="text" id="regName" placeholder="e.g. John Doe" autocomplete="name" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Email address</label>
+        <div class="input-wrap">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          <input type="email" id="regEmail" placeholder="you@example.com" autocomplete="email" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <div class="input-wrap">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <input type="password" id="regPw" placeholder="Min. 8 characters" autocomplete="new-password" oninput="checkStrength(this.value)" />
+          <button class="eye-btn" onclick="toggleEye('regPw','eyeReg')" type="button">
+            <svg id="eyeReg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="strength-bar"><div class="strength-seg" id="s1"></div><div class="strength-seg" id="s2"></div><div class="strength-seg" id="s3"></div><div class="strength-seg" id="s4"></div></div>
+        <div class="strength-lbl" id="strengthLbl" style="color:var(--text-muted)"></div>
+      </div>
+
+      <div class="field" style="margin-bottom:20px">
+        <label>Confirm password</label>
+        <div class="input-wrap">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <input type="password" id="regPwConfirm" placeholder="Re-enter password" autocomplete="new-password" />
+        </div>
+      </div>
+
+      <button class="btn-primary" id="btnRegister" onclick="handleRegister()">Create My Account</button>
+
+      <div class="divider">or</div>
+
+      <button class="btn-google" id="btnGoogleReg" onclick="handleGoogle()">
+        <svg style="width:16px;height:16px" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Sign up with Google
+      </button>
+    </div>
+
+    <div class="session-info"><div class="session-dot"></div><span>Secured by Supabase · WAT <span id="clock"></span></span></div>
+  </div>
+  <div class="bottom-bar">NxTGen Trading Journal · ICT Strategy · All traders welcome</div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  /* ══════════════════════════════════════
+     CONFIG — paste your full key below
+  ══════════════════════════════════════ */
+  const SUPABASE_URL  = 'https://jlqgdwfbwdiieafhwisy.supabase.co';
+  const SUPABASE_ANON = 'PASTE_YOUR_FULL_PUBLISHABLE_KEY_HERE';
+  const BASE          = 'https://dabossmira.github.io/NxTGen-Journal';
+
+  const { createClient } = supabase;
+  const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  /* Check session on load */
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) { window.location.replace('./index.html'); return; }
+    document.getElementById('loader').style.display = 'none';
+    const tab = new URLSearchParams(location.search).get('tab');
+    if (tab === 'register') switchTab('register');
+  })();
+
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN' && session) window.location.replace('./index.html');
+  });
+
+  /* Ticker */
+  const pairs = [{p:'GBPUSD',v:'1.2734',c:'+0.0018',up:true},{p:'XAUUSD',v:'2341.50',c:'+4.20',up:true},{p:'EURUSD',v:'1.0892',c:'-0.0011',up:false},{p:'GBPJPY',v:'198.34',c:'+0.72',up:true},{p:'NASDAQ',v:'18,420',c:'+62',up:true},{p:'DXY',v:'104.21',c:'-0.18',up:false},{p:'USDCAD',v:'1.3612',c:'+0.0024',up:false},{p:'US30',v:'38,740',c:'+110',up:true},{p:'GBPUSD',v:'1.2734',c:'+0.0018',up:true},{p:'XAUUSD',v:'2341.50',c:'+4.20',up:true},{p:'EURUSD',v:'1.0892',c:'-0.0011',up:false},{p:'GBPJPY',v:'198.34',c:'+0.72',up:true},{p:'NASDAQ',v:'18,420',c:'+62',up:true},{p:'DXY',v:'104.21',c:'-0.18',up:false},{p:'USDCAD',v:'1.3612',c:'+0.0024',up:false},{p:'US30',v:'38,740',c:'+110',up:true}];
+  document.getElementById('tickerTrack').innerHTML = pairs.map(({p,v,c,up})=>`<span class="ticker-item"><span class="ticker-pair">${p}</span><span class="ticker-val ${up?'up':'dn'}">${v}</span><span class="${up?'up':'dn'}" style="font-size:10px">${up?'▲':'▼'} ${c}</span></span>`).join('');
+
+  /* Clock */
+  function tick(){const d=new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Lagos'}));document.getElementById('clock').textContent=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
+  tick(); setInterval(tick,30000);
+
+  /* Tab */
+  function switchTab(t){
+    ['login','register'].forEach(n=>{
+      document.getElementById('tab'+n.charAt(0).toUpperCase()+n.slice(1)).classList.toggle('active',t===n);
+      document.getElementById('panel'+n.charAt(0).toUpperCase()+n.slice(1)).classList.toggle('active',t===n);
+    });
+    clearAlerts();
+  }
+  function clearAlerts(){['loginErr','loginOk','regErr','regOk'].forEach(id=>{const e=document.getElementById(id);e.classList.remove('show');e.textContent='';});}
+  function showAlert(id,msg,type='error'){const e=document.getElementById(id);e.textContent=msg;e.className=`alert ${type}`;void e.offsetWidth;e.classList.add('show');}
+
+  /* Eye toggle */
+  function toggleEye(inputId,iconId){
+    const input=document.getElementById(inputId),icon=document.getElementById(iconId);
+    if(input.type==='password'){input.type='text';icon.innerHTML='<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';}
+    else{input.type='password';icon.innerHTML='<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>';}
+  }
+
+  /* Strength */
+  function checkStrength(pw){
+    const colors=['','#fc8181','#f6ad55','#68d391','#63b3ed'],labels=['','Weak','Fair','Strong','Very strong'];
+    let s=0;if(pw.length>=8)s++;if(/[A-Z]/.test(pw))s++;if(/[0-9]/.test(pw))s++;if(/[^A-Za-z0-9]/.test(pw))s++;
+    ['s1','s2','s3','s4'].forEach((id,i)=>document.getElementById(id).style.background=i<s?colors[s]:'var(--border)');
+    const lbl=document.getElementById('strengthLbl');lbl.textContent=pw.length?labels[s]:'';lbl.style.color=colors[s]||'var(--text-muted)';
+  }
+
+  /* SIGN IN */
+  async function handleLogin(){
+    const email=document.getElementById('loginEmail').value.trim(),pw=document.getElementById('loginPw').value,btn=document.getElementById('btnLogin');
+    clearAlerts();
+    if(!email||!pw){showAlert('loginErr','Please fill in both fields.');return;}
+    btn.disabled=true;btn.textContent='Signing in…';
+    const{error}=await sb.auth.signInWithPassword({email,password:pw});
+    if(error){
+      const map={'Invalid login credentials':'Incorrect email or password.','Email not confirmed':'Please confirm your email — check your inbox for a verification link.','Too many requests':'Too many attempts. Wait a moment and try again.'};
+      showAlert('loginErr',map[error.message]||error.message);
+      btn.disabled=false;btn.textContent='Sign In to Dashboard';
+    }
+  }
+
+  /* REGISTER */
+  async function handleRegister(){
+    const name=document.getElementById('regName').value.trim(),email=document.getElementById('regEmail').value.trim(),pw=document.getElementById('regPw').value,pw2=document.getElementById('regPwConfirm').value,btn=document.getElementById('btnRegister');
+    clearAlerts();
+    if(!name){showAlert('regErr','Please enter your full name.');return;}
+    if(!email){showAlert('regErr','Please enter your email address.');return;}
+    if(pw.length<8){showAlert('regErr','Password must be at least 8 characters.');return;}
+    if(pw!==pw2){showAlert('regErr','Passwords do not match.');return;}
+    btn.disabled=true;btn.textContent='Creating account…';
+    const{error}=await sb.auth.signUp({email,password:pw,options:{data:{full_name:name},emailRedirectTo:BASE+'/index.html'}});
+    if(error){
+      const map={'User already registered':'An account with this email already exists. Try signing in.'};
+      showAlert('regErr',map[error.message]||error.message);
+      btn.disabled=false;btn.textContent='Create My Account';
+    } else {
+      showAlert('regOk','✓ Account created! Check your email to confirm, then sign in here.','success');
+      btn.disabled=false;btn.textContent='Create My Account';
+      ['regName','regEmail','regPw','regPwConfirm'].forEach(id=>document.getElementById(id).value='');
+      checkStrength('');
+      setTimeout(()=>switchTab('login'),3500);
+    }
+  }
+
+  /* FORGOT PASSWORD */
+  async function handleForgot(){
+    const email=document.getElementById('loginEmail').value.trim();
+    clearAlerts();
+    if(!email){showAlert('loginErr','Enter your email above first, then click Forgot password.');return;}
+    const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:BASE+'/login.html'});
+    if(error){showAlert('loginErr','Could not send reset email: '+error.message);}
+    else{showAlert('loginOk','✓ Password reset email sent — check your inbox (and spam folder).','success');}
+  }
+
+  /* GOOGLE */
+  async function handleGoogle(){
+    document.getElementById('btnGoogleLogin').disabled=true;
+    document.getElementById('btnGoogleReg').disabled=true;
+    const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:BASE+'/index.html'}});
+    if(error){showAlert('loginErr','Google sign-in failed: '+error.message);document.getElementById('btnGoogleLogin').disabled=false;document.getElementById('btnGoogleReg').disabled=false;}
+  }
+
+  /* Enter key */
+  document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;document.getElementById('panelLogin').classList.contains('active')?handleLogin():handleRegister();});
+</script>
+</body>
+</html>
