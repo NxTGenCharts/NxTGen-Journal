@@ -8,7 +8,7 @@
 // SUPABASE CONFIG — paste your full publishable key below
 // ══════════════════════════════════════════════════════
 const SUPABASE_URL  = 'https://jlqgdwfbwdiieafhwisy.supabase.co';
-const SUPABASE_ANON = 'sb_publishable_t_Bu9PTxcykClDo-_hvO5w_avgOKCDt_'; // ← YOUR KEY — replace with full key from Supabase → Settings → API
+const SUPABASE_ANON = 'sb_publishable_t_Bu9PTxcykClDo-_hvO5w_avgOKCDt'; // ← YOUR KEY — replace with full key from Supabase → Settings → API
 const BASE_URL      = 'https://dabossmira.github.io/NxTGen-Journal';
 
 const { createClient } = supabase;
