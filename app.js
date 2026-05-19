@@ -883,7 +883,7 @@ function buildEntryForm() {
       <div class="form-field"><label class="form-label">R:R</label><input type="text" class="form-input" placeholder="1:3"></div>
       <div class="form-field"><label class="form-label">PnL %</label><input type="number" class="form-input" step="0.1" placeholder="3.5"></div>
       <div class="form-field"><label class="form-label">Outcome</label><select class="form-select"><option>Win</option><option>Loss</option><option>B.E</option></select></div>
-      <div class="form-field"><label class="form-label">Killzone</label><select class="form-select"><option>London</option><option>New York</option><option>Asian</option><option>Tokyo</option></select></div>
+      <div class="form-field"><label class="form-label">Killzone</label><select class="form-select"><option>London</option><option>New York</option><option>Asian</option></option></select></div>
       <div class="form-field"><label class="form-label">Strategy</label><select class="form-select"><option>NxtGen - Mod</option><option>IRL > ERL</option><option>ERL > IRL</option><option>SMT Divergence</option></select></div>
       <div class="form-field"><label class="form-label">TF Alignment</label><select class="form-select"><option>30m > 3m</option><option>1h > 5m</option><option>1h > 3m</option></select></div>
       <div class="form-field"><label class="form-label">Account</label><select class="form-select"><option>PaperTrading</option><option>GFT $5k - P1</option><option>GFT $10k - P1</option></select></div>
