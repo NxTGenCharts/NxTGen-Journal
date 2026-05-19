@@ -41,7 +41,7 @@ const SEED_TRADES = [
   {id:20,date:"2026-04-09",pair:"XAUUSD",pos:"Buy",rr:"1:4",pnl:4,outcome:"Win",kz:"London",strategy:"IRL > ERL",tf:"1h > 3m",account:"GFT $10k - P1",rating:5,notes:"Strong week for gold. Daily IRL into previous week low swept. 1h OB entry. Clean delivery.",pretrade:"Daily bullish gold bias",emotion:"Confident",risk:"1%",checklist:[0,1,2,3,4,5,6,7],charts:[]},
 ];
 
-const CHECKLIST_ITEMS=["HTF PDA confirmed","4h Profiling","Liquidity Sweep","SMT Divergence","CISD Confirmed","R:R ≥ 1:2","Active Killzone","No FOMO / Calm"];
+const CHECKLIST_ITEMS=["HTF PDA confirmed","4h Profiling","Liquidity Sweep","SMT Divergence","CISD Confirmed","R:R ≥ 1:2","Active Killzone"];
 const EMOTIONS=["Calm","Relaxed","Confident","Focused","Neutral","Anxious","Impatient","Fearful","Greedy","Revenge"];
 const CHART_LABELS=["Daily HTF","4h Structure","1h Confirm","30m Trigger","3m/5m Entry","Result"];
 const RULES=["Never trade without HTF bias confirmed","Never enter without an active killzone","Never risk more than 1% on funded accounts","Never chase price — missed entry = no entry","Never move SL before 30% of target is hit","Never trade 15 min before/after red news","Never skip the entry checklist","Never take more than 2 trades per day","Never take a 3★ or below setup","Never trade while angry, fearful or revenge-seeking"];
