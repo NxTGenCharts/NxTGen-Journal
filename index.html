@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="">
+<head>
+<meta charset="UTF-8">
+<meta name="description" content="NxTGen Trading Journal — Premium ICT Trading Dashboard with glassmorphism design">
+<meta name="theme-color" content="#080b12" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f1f5fb" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚡ NxTGen Trading Journal — Premium Fintech Dashboard</title>
+
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
+
+<!-- App Stylesheet -->
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ══ Background noise texture mesh ══ -->
+<div style="position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22300%22 height=%22300%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/><feColorMatrix type=%22saturate%22 values=%220%22/></filter><rect width=%22300%22 height=%22300%22 filter=%22url(%23n)%22 opacity=%220.03%22/></svg>');
+  opacity:.6;mix-blend-mode:overlay;"></div>
+
+<!-- ══ TOPBAR ══ -->
+<div class="topbar">
+  <div class="topbar-left">
+    <button class="mob-ham" id="mob-ham-btn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+    <span class="brand"><span class="brand-icon">⚡</span>NxTGen Trading Journal</span>
+    <span class="sep">›</span>
+    <span class="page-name" id="topbar-page">Dashboard</span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="theme-btn">🌙</button>
+    <button class="btn">Share</button>
+    <button class="btn btn-primary" onclick="openModal()">+ New Trade</button>
+    <span class="topbar-clock" id="topbar-clock"></span>
+  </div>
+</div>
+
+<!-- ══ MOBILE SIDEBAR OVERLAY ══ -->
+<div class="mob-overlay" id="mob-overlay" onclick="closeSidebar()"></div>
+
+<!-- ══ LAYOUT ══ -->
+<div class="layout">
+
+  <!-- ══ SIDEBAR ══ -->
+  <div class="sidebar" id="sidebar">
+    <div class="sb-close-btn"><button onclick="closeSidebar()" aria-label="Close menu">✕</button></div>
+    <div class="sb-section">
+      <div class="sb-section-label">Journal</div>
+      <div class="sb-item active" onclick="nav('dashboard',this,'Dashboard')"><span class="ico">📊</span><span class="lbl">Dashboard</span></div>
+      <div class="sb-item" onclick="nav('tradelog',this,'Trade Log')"><span class="ico">☰</span><span class="lbl">Trade Log</span></div>
+      <div class="sb-item" onclick="nav('watchlist',this,'Weekly Watchlist')"><span class="ico">📅</span><span class="lbl">Weekly Watchlist</span></div>
+      <div class="sb-item" onclick="nav('entry',this,'Trade Entry')"><span class="ico">✏️</span><span class="lbl">Trade Entry</span></div>
+      <div class="sb-item" onclick="nav('accounts',this,'Account Tracker')"><span class="ico">💰</span><span class="lbl">Account Tracker</span></div>
+    </div>
+    <div class="sb-sep"></div>
+    <div id="sb-years"></div>
+    <div class="sb-sep"></div>
+    <div class="sb-section">
+      <div class="sb-section-label">Resources</div>
+      <div class="sb-item" onclick="nav('playbook',this,'Trading Playbook')"><span class="ico">📖</span><span class="lbl">Playbook</span></div>
+      <div class="sb-item" onclick="nav('goals',this,'Goals & Milestones')"><span class="ico">🎯</span><span class="lbl">Goals</span></div>
+      <div class="sb-item" onclick="nav('monthly',this,'Monthly Review')"><span class="ico">📈</span><span class="lbl">Monthly Review</span></div>
+      <div class="sb-item" onclick="nav('trash',this,'Trash')"><span class="ico">🗑</span><span class="lbl">Trash</span><span class="sb-badge" id="trash-sb-badge" style="display:none">0</span></div>
+    </div>
+  </div>
+
+  <!-- ══ MAIN ══ -->
+  <div class="main">
+
+    <!-- TABS -->
+    <div class="tabs">
+      <div class="tab active" id="tab-dashboard" onclick="nav('dashboard',null,'Dashboard')">Dashboard</div>
+      <div class="tab" id="tab-tradelog" onclick="nav('tradelog',null,'Trade Log')">Trade Log</div>
+      <div class="tab" id="tab-watchlist" onclick="nav('watchlist',null,'Watchlist')">Watchlist</div>
+      <div class="tab" id="tab-entry" onclick="nav('entry',null,'Trade Entry')">Trade Entry</div>
+      <div class="tab" id="tab-accounts" onclick="nav('accounts',null,'Accounts')">Accounts</div>
+      <div class="tab" id="tab-calendar" onclick="nav('calendar',null,'Calendar')">📅 Calendar</div>
+      <div class="tab" id="tab-trash" onclick="nav('trash',null,'Trash')">🗑 Trash</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         DASHBOARD PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-inner">
+        <div class="cover" id="dash-cover">
+          <div class="cover-label" id="dash-cover-period">QUARTERLY PERFORMANCE · 2026</div>
+          <div class="cover-title" id="dash-cover-title">Loading…</div>
+          <div class="cover-sub" id="dash-cover-sub"><span id="dash-cover-sub-text">Loading…</span> · <span id="dash-last-updated" style="opacity:.7">Loading...</span></div>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi-card"><div class="kpi-label">Total trades</div><div class="kpi-value blue" id="kpi-total">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Win rate</div><div class="kpi-value green" id="kpi-wr">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Net PnL</div><div class="kpi-value green" id="kpi-pnl">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Profit factor</div><div class="kpi-value gold" id="kpi-pf">—</div></div>
+        </div>
+        <div class="kpi-grid" style="margin-bottom:16px">
+          <div class="kpi-card"><div class="kpi-label">Avg win</div><div class="kpi-value green" id="kpi-aw">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Avg loss</div><div class="kpi-value red" id="kpi-al">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Risk:reward</div><div class="kpi-value blue" id="kpi-rr">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Win streak</div><div class="kpi-value teal" id="kpi-ws">—</div></div>
+        </div>
+
+        <div class="insight">
+          <span class="insight-ico">💡</span>
+          <span class="insight-text">London session is your strongest edge at <strong>81.8%</strong> win rate — consider reducing Asian session exposure (33.3% win rate). Only <strong>4★ and 5★</strong> setups → your data shows 3★ underperforms by 2%+ avg PnL.</span>
+        </div>
+
+        <div class="sec-head">Pair Performance</div>
+        <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Pair</th><th>Trades</th><th>Win%</th><th>Net PnL</th><th>Win rate bar</th></tr></thead>
+          <tbody id="pair-table-body"></tbody>
+        </table>
+        </div>
+
+        <div class="sec-head">Killzone Breakdown</div>
+        <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Session</th><th>Trades</th><th>Win%</th><th>Avg PnL</th><th>Grade</th></tr></thead>
+          <tbody>
+            <tr><td class="bold">🇬🇧 London</td><td>22</td><td><span class="pill pill-green">81.8%</span></td><td class="green outcome-win">+3.2%</td><td><span class="pill pill-green">A</span></td></tr>
+            <tr><td class="bold">🗽 New York</td><td>7</td><td><span class="pill pill-green">71.4%</span></td><td class="outcome-win">+2.8%</td><td><span class="pill pill-green">A</span></td></tr>
+            <tr><td class="bold">🌏 Asian</td><td>3</td><td><span class="pill pill-red">33.3%</span></td><td class="outcome-win">+1.2%</td><td><span class="pill pill-red">C</span></td></tr>
+            <tr><td class="bold">🗼 Tokyo</td><td>1</td><td><span class="pill pill-green">100%</span></td><td class="outcome-win">+2.9%</td><td><span class="pill pill-green">A+</span></td></tr>
+          </tbody>
+        </table>
+        </div>
+
+        <div class="sec-head">Strategy Performance</div>
+        <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Strategy</th><th>Trades</th><th>Win%</th><th>Avg PnL</th></tr></thead>
+          <tbody>
+            <tr><td class="bold">NxtGen - Mod</td><td>11</td><td><span class="pill pill-green">81.8%</span></td><td class="outcome-win">+3.1%</td></tr>
+            <tr><td class="bold">ERL &gt; IRL</td><td>6</td><td><span class="pill pill-green">83.3%</span></td><td class="outcome-win">+3.0%</td></tr>
+            <tr><td class="bold">IRL &gt; ERL</td><td>12</td><td><span class="pill pill-green">75.0%</span></td><td class="outcome-win">+3.4%</td></tr>
+            <tr><td class="bold" style="color:var(--text2)">Untagged</td><td>4</td><td><span class="pill pill-red">50.0%</span></td><td class="outcome-loss">+1.2%</td></tr>
+          </tbody>
+        </table>
+        </div>
+
+        <div class="sec-head">Monthly PnL</div>
+        <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Month</th><th>Trades</th><th>Win%</th><th>Net PnL</th><th>Streak</th><th>Grade</th></tr></thead>
+          <tbody>
+            <tr><td class="bold">March 2026</td><td>21</td><td><span class="pill pill-green">76.2%</span></td><td class="outcome-win mono">+35.1%</td><td>8W</td><td><span class="pill pill-green">A</span></td></tr>
+            <tr><td class="bold">April 2026</td><td>12</td><td><span class="pill pill-green">75.0%</span></td><td class="outcome-win mono">+24.7%</td><td>5W</td><td><span class="pill pill-green">A</span></td></tr>
+            <tr><td style="color:var(--text3)">May 2026</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         TRADE LOG PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-tradelog">
+      <div class="page-inner">
+        <div class="cover">
+          <div class="cover-label">Trade Database · All accounts</div>
+          <div class="cover-title">Trade Log</div>
+          <div class="cover-sub">Click any row to view details, upload charts and add notes</div>
+        </div>
+        <div class="filter-bar" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+          <input type="text" class="form-input" id="search-input" placeholder="Search pair, date, killzone…" oninput="filterTable()" style="flex:1;min-width:140px">
+          <select class="form-select" id="filter-outcome" onchange="filterTable()" style="flex:1;min-width:110px">
+            <option value="">All outcomes</option>
+            <option value="Win">Win</option>
+            <option value="Loss">Loss</option>
+            <option value="B.E">B.E</option>
+          </select>
+          <select class="form-select" id="filter-kz" onchange="filterTable()" style="flex:1;min-width:120px">
+            <option value="">All killzones</option>
+            <option value="London">London</option>
+            <option value="New York">New York</option>
+            <option value="Asian">Asian</option>
+          </select>
+          <select class="form-select" id="filter-pair" onchange="filterTable()" style="flex:1;min-width:100px">
+            <option value="">All pairs</option>
+          </select>
+        </div>
+        <div class="data-table-wrap">
+        <table class="data-table" id="trade-table">
+          <thead><tr><th>Date</th><th>Pair</th><th>Pos</th><th>R:R</th><th>PnL</th><th>Outcome</th><th>Killzone</th><th>Strategy</th><th>Account</th><th>★</th><th></th></tr></thead>
+          <tbody id="trade-table-body"></tbody>
+        </table>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:var(--text3)" id="trade-count"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         WATCHLIST PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-watchlist">
+      <div class="page-inner">
+        <div class="cover">
+          <div class="cover-label" id="wl-cover-label">Analysis Journal · Weekly Prep</div>
+          <div class="cover-title">Market Watchlist</div>
+          <div class="cover-sub">HTF → Daily → 4h → 1h → 30m → LTF Entry · Complete every Sunday</div>
+        </div>
+
+        <!-- Quarter Navigator -->
+        <div class="wl-quarter-nav" id="wl-quarter-nav"></div>
+
+        <!-- Week selector bar -->
+        <div class="wl-week-bar" id="wl-week-bar">
+          <div class="wl-week-scroll" id="wl-week-scroll"></div>
+          <button class="wl-add-week-btn" onclick="wlAddWeek()" title="Add new week">＋ New Week</button>
+        </div>
+
+        <!-- Active week content -->
+        <div id="wl-week-content">
+          <div class="wl-empty-state" id="wl-empty-state">
+            <div class="wl-empty-icon">📊</div>
+            <div class="wl-empty-title">No analysis yet</div>
+            <div class="wl-empty-sub">Click <strong>+ New Week</strong> to start your first weekly watchlist for this quarter.</div>
+          </div>
+        </div>
+
+        <!-- Modals -->
+        <div class="wl-modal-overlay" id="wl-modal-overlay" onclick="wlCloseModal()"></div>
+        <div class="wl-modal" id="wl-modal">
+          <div class="wl-modal-head">
+            <div class="wl-modal-title" id="wl-modal-title">New Week</div>
+            <button class="wl-modal-close" onclick="wlCloseModal()">✕</button>
+          </div>
+          <div class="wl-modal-body" id="wl-modal-body"></div>
+        </div>
+
+        <!-- Pair modal -->
+        <div class="wl-modal-overlay" id="wl-pair-modal-overlay" onclick="wlClosePairModal()"></div>
+        <div class="wl-modal wl-modal-wide" id="wl-pair-modal">
+          <div class="wl-modal-head">
+            <div class="wl-modal-title" id="wl-pair-modal-title">Pair Analysis</div>
+            <button class="wl-modal-close" onclick="wlClosePairModal()">✕</button>
+          </div>
+          <div class="wl-modal-body" id="wl-pair-modal-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         TRADE ENTRY PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-entry">
+      <div class="page-inner">
+        <div class="cover">
+          <div class="cover-label">New Trade Entry</div>
+          <div class="cover-title">Trade Entry Form</div>
+          <div class="cover-sub">Fill every field · Checklist must be complete · Duplicate for every trade</div>
+        </div>
+        <div id="entry-form-content"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         ACCOUNTS PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-accounts">
+      <div class="page-inner">
+        <div class="cover">
+          <div class="cover-label">Funded &amp; Paper Accounts</div>
+          <div class="cover-title">Account Tracker</div>
+          <div class="cover-sub">Track drawdown, targets, and payouts across all accounts</div>
+        </div>
+
+        <!-- Account cards grid -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="sec-head" style="margin-bottom:0">Accounts</div>
+          <button class="wl-add-week-btn" onclick="_openManageAccounts()">⚙ Manage Accounts</button>
+        </div>
+        <div class="acc-grid" id="accounts-grid"></div>
+
+        <!-- Account detail drawer -->
+        <div class="acc-detail-drawer" id="acc-detail-drawer" style="display:none">
+          <div class="acc-detail-header">
+            <div class="acc-detail-title" id="acc-detail-title"></div>
+            <button class="wl-modal-close" onclick="accCloseDetail()">✕</button>
+          </div>
+          <div class="acc-detail-body" id="acc-detail-body"></div>
+        </div>
+
+        <!-- Payout Log -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:24px">
+          <div class="sec-head" style="margin-bottom:0">Payout Log</div>
+          <button class="wl-add-week-btn" onclick="accAddPayout()">＋ Add Payout</button>
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Account</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+            <tbody id="payout-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Milestones -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:24px">
+          <div class="sec-head" style="margin-bottom:0">Milestones</div>
+          <button class="wl-add-week-btn" onclick="accAddMilestone()">＋ Add Milestone</button>
+        </div>
+        <div class="checklist-grid" id="milestones-list"></div>
+
+        <!-- Payout modal -->
+        <div class="wl-modal-overlay" id="acc-payout-overlay" onclick="accClosePayoutModal()"></div>
+        <div class="wl-modal" id="acc-payout-modal">
+          <div class="wl-modal-head">
+            <div class="wl-modal-title" id="acc-payout-modal-title">Add Payout</div>
+            <button class="wl-modal-close" onclick="accClosePayoutModal()">✕</button>
+          </div>
+          <div class="wl-modal-body" id="acc-payout-modal-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         PLAYBOOK PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-playbook">
+      <div class="page-inner">
+        <div class="cover">
+          <div class="cover-label">Your Rules · Your Edge · Your System</div>
+          <div class="cover-title">Trading Playbook</div>
+          <div class="cover-sub">Read this every morning before trading</div>
+        </div>
+        <div class="sec-head">Entry Models</div>
+        <div id="model-cards"></div>
+        <div class="sec-head">10 Rules Never Broken</div>
+        <div id="rules-list"></div>
+        <div class="sec-head">Trading Schedule — WAT (Lagos)</div>
+        <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Session</th><th>WAT Time</th><th>Priority</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Asian Open</td><td class="mono">1:00–5:00 AM</td><td><span class="pill pill-gold">Monitor</span></td><td>Range forms, 3am sweep</td></tr>
+            <tr><td class="bold">London Open</td><td class="mono">8:00–12:00 PM</td><td><span class="pill pill-red">PRIMARY</span></td><td>1am manipulation plays out</td></tr>
+            <tr><td class="bold">London/NY Overlap</td><td class="mono">1:00–5:00 PM</td><td><span class="pill pill-red">PRIMARY</span></td><td>Highest volume, best entries</td></tr>
+            <tr><td>NY Afternoon</td><td class="mono">5:00–8:00 PM</td><td><span class="pill pill-gold">Monitor</span></td><td>Continuation only</td></tr>
+            <tr><td style="color:var(--text3)">No Trade Zone</td><td class="mono">8PM–1AM</td><td><span class="pill pill-grey">AVOID</span></td><td>Low liquidity</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         GOALS PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-goals">
+      <div class="page-inner">
+        <div class="cover">
+          <div class="cover-label">Set It · Track It · Achieve It</div>
+          <div class="cover-title">Goals & Milestones</div>
+          <div class="cover-sub">Review every quarter · 2026 Trading Plan</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div class="sec-head" style="margin-bottom:0" id="goals-section-head">Goals</div>
+          <button class="wl-add-week-btn" onclick="goalsAddGroup()">＋ Add Group</button>
+        </div>
+        <div id="goals-list"></div>
+        <div class="sec-head">Personal Bests <span style="font-size:10px;color:var(--text3);font-weight:400;font-family:var(--font-mono)">· computed from your trades</span></div>
+        <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Metric</th><th>Record</th><th>Date</th><th>Pair</th></tr></thead>
+          <tbody id="goals-pb-tbody"></tbody>
+        </table>
+        </div>
+        <div class="sec-head">Morning Affirmations</div>
+        <div id="affirmations"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         QUARTER PAGE (dynamic)
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-quarter">
+      <div class="page-inner" id="quarter-page-inner">
+        <div style="color:var(--text2);padding:40px;text-align:center">Select a quarter from the sidebar</div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         MONTHLY REVIEW PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-monthly">
+      <div class="page-inner">
+        <!-- Dynamic header -->
+        <div class="cover">
+          <div class="cover-label" id="mr-cover-label">Deep Performance Review</div>
+          <div class="cover-title" id="mr-cover-title">Monthly Review</div>
+          <div class="cover-sub" id="mr-cover-sub"></div>
+        </div>
+
+        <!-- Month navigator -->
+        <div class="mr-nav">
+          <button class="mr-nav-btn" onclick="mrNav(-1)">‹</button>
+          <span class="mr-nav-label" id="mr-nav-label">Loading…</span>
+          <button class="mr-nav-btn" onclick="mrNav(1)">›</button>
+        </div>
+
+        <!-- KPI grid -->
+        <div class="month-summary-grid" id="mr-stats-grid"></div>
+
+        <!-- Loss Audit -->
+        <div class="sec-head">Loss Audit</div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Pair</th><th>Strategy</th><th>PnL</th><th>Notes</th></tr></thead>
+            <tbody id="mr-loss-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Pair breakdown -->
+        <div class="sec-head">Pair Breakdown</div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Pair</th><th>Trades</th><th>Win%</th><th>Net PnL</th></tr></thead>
+            <tbody id="mr-pair-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Reflection Journal -->
+        <div class="sec-head">Reflection Journal</div>
+        <div id="mr-reflections">
+          <div class="mr-reflect-block">
+            <div class="mr-reflect-label">What went well this month?</div>
+            <textarea class="notes-area mr-reflect-ta" id="mr-r1" placeholder="Discipline, executions, patterns that worked…" oninput="mrReflectDirty()"></textarea>
+          </div>
+          <div class="mr-reflect-block">
+            <div class="mr-reflect-label">Key mistakes &amp; root causes</div>
+            <textarea class="notes-area mr-reflect-ta" id="mr-r2" placeholder="What went wrong and why?" oninput="mrReflectDirty()"></textarea>
+          </div>
+          <div class="mr-reflect-block">
+            <div class="mr-reflect-label">Focus for next month</div>
+            <textarea class="notes-area mr-reflect-ta" id="mr-r3" placeholder="One or two things to lock in next month…" oninput="mrReflectDirty()"></textarea>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:10px">
+            <button class="wl-btn-primary" id="mr-save-btn" onclick="mrSaveReflections()" style="display:none">💾 Save Reflections</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         CALENDAR PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-calendar">
+      <div style="display:flex;flex-direction:column;height:100%;padding:16px 20px;overflow:hidden">
+        <div class="acc-size-bar">
+          <span class="acc-size-label">Account size for USD calc:</span>
+          <input type="number" class="acc-size-input" id="cal-acc-size" value="5000" oninput="renderCalendar()">
+          <span class="acc-size-hint">PnL % × account size = daily USD</span>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <select class="form-select" id="cal-acc-filter" onchange="renderCalendar()" style="width:160px;font-size:12px">
+              <option value="">All accounts</option>
+              <option>PaperTrading</option>
+              <option>GFT $5k - P1</option>
+              <option>GFT $10k - P1</option>
+            </select>
+          </div>
+        </div>
+        <div class="cal-wrap">
+          <div class="cal-header">
+            <div class="cal-nav" onclick="calNav(-1)">‹</div>
+            <div class="cal-month-label" id="cal-month-label">May 2026</div>
+            <div class="cal-nav" onclick="calNav(1)">›</div>
+          </div>
+          <div class="cal-kpi-row" id="cal-kpi-row"></div>
+          <div class="cal-grid-wrap">
+            <div class="cal-dow-row">
+              <div class="cal-dow">MON</div><div class="cal-dow">TUE</div><div class="cal-dow">WED</div>
+              <div class="cal-dow">THU</div><div class="cal-dow">FRI</div><div class="cal-dow">SAT</div><div class="cal-dow">SUN</div>
+            </div>
+            <div class="cal-days" id="cal-days"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         TRASH PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-trash">
+      <div class="page-inner">
+        <div class="cover" style="background:linear-gradient(135deg,#1a0a0a 0%,#2a1010 100%)">
+          <div class="cover-label" style="color:#e63946">Deleted Trades · Recycle Bin</div>
+          <div class="cover-title">Trash</div>
+          <div class="cover-sub">Deleted trades are kept here. Restore anytime or permanently delete.</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div id="trash-count" style="font-size:13px;color:var(--text2)"></div>
+          <button id="empty-trash-btn" class="btn" onclick="openEmptyTrashModal()" style="border-color:rgba(230,57,70,.3);color:var(--red);display:none">🗑 Empty Trash</button>
+        </div>
+        <div id="trash-list"></div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- ══ TRADE DETAIL PANEL ══ -->
+<div class="detail-panel" id="detail-panel">
+  <div id="detail-content"></div>
+  <input type="file" id="img-input" accept="image/*" style="display:none" onchange="handleImg(event)">
+</div>
+
+<!-- ══ NEW TRADE MODAL ══ -->
+<div class="modal-overlay" id="modal">
+  <div class="modal modal-box">
+    <div class="modal-head">
+      <div class="modal-title" style="display:flex;align-items:center;gap:10px">
+        <span style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,rgba(96,165,250,0.25),rgba(96,165,250,0.12));border:1px solid rgba(96,165,250,0.3);display:flex;align-items:center;justify-content:center;font-size:14px">+</span>
+        New Trade
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+    <div class="form-grid modal-form-grid">
+      <div class="form-field"><label class="form-label">Date</label><input type="date" class="form-input" id="m-date"></div>
+      <div class="form-field"><label class="form-label">Pair</label>
+        <div style="display:flex;gap:6px">
+          <select class="form-select" id="m-pair" onchange="syncCustomPair(this.value)" style="flex:1">
+            <option>GBPUSD</option><option>XAUUSD</option><option>EURUSD</option><option>GBPJPY</option>
+            <option>USDCAD</option><option>ES</option><option>EURGBP</option><option>USDJPY</option>
+            <option>NASDAQ</option><option>BTCUSDT</option><option>ETHUSDT</option><option>GBPAUD</option>
+            <option>AUDUSD</option><option>NZDUSD</option><option>EURJPY</option><option>CADJPY</option>
+            <option>GBPCAD</option><option>EURCAD</option><option>XAGUSD</option><option>US30</option>
+            <option value="__custom__">✏️ Custom pair…</option>
+          </select>
+          <input type="text" class="form-input" id="m-pair-custom" placeholder="e.g. AUDCAD" style="width:110px;display:none">
+        </div>
+      </div>
+      <div class="form-field"><label class="form-label">Position</label>
+        <select class="form-select" id="m-pos"><option>Buy</option><option>Sell</option></select>
+      </div>
+      <div class="form-field"><label class="form-label">R:R</label><input type="text" class="form-input" id="m-rr" placeholder="1:3"></div>
+      <div class="form-field"><label class="form-label">PnL %</label><input type="number" class="form-input" id="m-pnl" step="0.1" placeholder="3.5"></div>
+      <div class="form-field"><label class="form-label">Outcome</label>
+        <select class="form-select" id="m-outcome"><option>Win</option><option>Loss</option><option>B.E</option></select>
+      </div>
+      <div class="form-field"><label class="form-label">Killzone</label>
+        <select class="form-select" id="m-kz"><option>London</option><option>New York</option><option>Asian</option></select>
+      </div>
+      <div class="form-field"><label class="form-label">Strategy</label>
+        <select class="form-select" id="m-strat" onchange="syncCustomStrategy(this.value)">
+          <option>NxtGen - Mod</option>
+          <option>IRL &gt; ERL</option>
+          <option>ERL &gt; IRL</option>
+          <option value="__custom__">＋ Custom…</option>
+        </select>
+        <input type="text" class="form-input" id="m-strat-custom" placeholder="Enter strategy name…" style="display:none;margin-top:6px">
+      </div>
+      <div class="form-field"><label class="form-label">TF Alignment</label>
+        <select class="form-select" id="m-tf" onchange="syncCustomTF(this.value)">
+          <option>30m &gt; 3m</option>
+          <option>1h &gt; 5m</option>
+          <option>1h &gt; 3m</option>
+          <option>4h &gt; 15m</option>
+          <option>4h &gt; 5m</option>
+          <option>4h &gt; 3m</option>
+          <option>15m &gt; 3m</option>
+          <option value="__custom__">＋ Custom…</option>
+        </select>
+        <input type="text" class="form-input" id="m-tf-custom" placeholder="e.g. 2h &gt; 5m" style="display:none;margin-top:6px">
+      </div>
+      <div class="form-field"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Account <button type="button" onclick="_openManageAccounts()" style="font-size:10px;padding:2px 8px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);color:var(--blue);border-radius:4px;cursor:pointer;font-family:inherit;line-height:1.6">⚙ Manage</button></label>
+        <select class="form-select" id="m-acc"></select>
+      </div>
+      <div class="form-field"><label class="form-label">Rating</label>
+        <select class="form-select" id="m-rating"><option>★★★★★</option><option>★★★★☆</option><option>★★★☆☆</option><option>★★☆☆☆</option></select>
+      </div>
+      <div class="form-field"><label class="form-label">Risk Used</label>
+        <select class="form-select" id="m-risk"><option>0.5%</option><option>0.8%</option><option>1%</option><option>1.5%</option><option>2%</option></select>
+      </div>
+      <div class="form-field full"><label class="form-label">Pre-Trade Notes</label><textarea class="form-textarea" id="m-pretrade" placeholder="Brief bias, setup thesis…"></textarea></div>
+      <div class="form-field full"><label class="form-label">Post-Trade Reflection</label><textarea class="form-textarea" id="m-notes" placeholder="What happened? What did you learn?"></textarea></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTrade()">Save Trade</button>
+    </div>
+    </div><!-- /modal-body -->
+  </div>
+</div>
+
+<!-- ══ CALENDAR POPUP & TOOLTIP ══ -->
+<div class="cal-popup" id="cal-popup" style="display:none"></div>
+<div class="cal-tooltip" id="cal-tooltip" style="display:none"></div>
+
+<!-- ══ GLASS CONFIRM MODAL ══ -->
+<div class="glass-modal-overlay" id="glass-modal-overlay">
+  <div class="glass-modal" id="glass-modal">
+    <div class="glass-modal-icon" id="gm-icon">⚠️</div>
+    <div class="glass-modal-title" id="gm-title">Confirm</div>
+    <div class="glass-modal-body" id="gm-body"></div>
+    <div class="glass-modal-actions" id="gm-actions"></div>
+  </div>
+</div>
+
+<!-- ══ APP TOAST ══ -->
+<div class="app-toast" id="app-toast"></div>
+
+<!-- ══ Supabase SDK ══ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- ══ Mobile sidebar toggle ══ -->
+<script>
+  function toggleSidebar() {
+    const sb = document.getElementById('sidebar');
+    const ov = document.getElementById('mob-overlay');
+    const isOpen = sb.classList.toggle('mob-open');
+    ov.classList.toggle('show', isOpen);
+    document.body.style.overflow = isOpen ? 'hidden' : '';
+  }
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('mob-open');
+    document.getElementById('mob-overlay').classList.remove('show');
+    document.body.style.overflow = '';
+  }
+  // Close sidebar on any nav item click on mobile
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.sb-item').forEach(function(item) {
+      item.addEventListener('click', function() {
+        if (window.innerWidth <= 768) closeSidebar();
+      });
+    });
+  });
+  // Close on resize back to desktop
+  window.addEventListener('resize', function() {
+    if (window.innerWidth > 768) closeSidebar();
+  });
+</script>
+
+<!-- ══ App Script ══ -->
+<script src="app.js"></script>
+
+<!-- Share Modal — injected dynamically by openShareModal() -->
+<div id="share-modal-overlay"></div>
+</body>
+</html>
