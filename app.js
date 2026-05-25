@@ -1708,8 +1708,251 @@ function _wlRenderWeekContent(week, container) {
       </div>
     </div>
 
-
+    <!-- Economic Calendar -->
+    <div class="wl-cal-section">
+      <div class="wl-cal-header">
+        <div class="wl-cal-title">
+          <span class="wl-cal-icon">📅</span>
+          Economic Calendar
+          <span class="wl-cal-week-range">${week.weekDate}${week.weekDateEnd ? ' – ' + week.weekDateEnd : ''}</span>
+        </div>
+        <div class="wl-cal-controls">
+          <div class="wl-cal-filter-wrap" id="wl-cal-filter-wrap-${week.id}">
+            <button class="wl-cal-filter-btn active" data-impact="all"   onclick="_wlCalFilter('${week.id}','all',this)">All</button>
+            <button class="wl-cal-filter-btn"         data-impact="high"  onclick="_wlCalFilter('${week.id}','high',this)">🔴 High</button>
+            <button class="wl-cal-filter-btn"         data-impact="med"   onclick="_wlCalFilter('${week.id}','med',this)">🟡 Med</button>
+            <button class="wl-cal-filter-btn"         data-impact="pairs" onclick="_wlCalFilter('${week.id}','pairs',this)">My Pairs</button>
+          </div>
+          <button class="wl-cal-refresh-btn" onclick="_wlCalLoad('${week.id}','${week.weekDate}','${week.weekDateEnd||week.weekDate}',true)" title="Refresh">↻</button>
+        </div>
+      </div>
+      <div class="wl-cal-body" id="wl-cal-body-${week.id}">
+        <div class="wl-cal-loading"><span></span><span></span><span></span></div>
+      </div>
+    </div>
   `;
+
+  // Kick off calendar fetch after DOM is ready
+  requestAnimationFrame(() => {
+    _wlCalLoad('${week.id}', '${week.weekDate}', '${week.weekDateEnd || week.weekDate}');
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  WATCHLIST ECONOMIC CALENDAR
+//  Source: Forex Factory RSS (no API key needed)
+//  Proxy: allorigins.win (bypasses CORS on RSS endpoint)
+//  Cache: in-memory per week ID to avoid re-fetching
+// ═══════════════════════════════════════════════════════════════════
+
+const _WL_CAL_CACHE   = {};   // weekId → { events, ts }
+const _WL_CAL_FILTER  = {};   // weekId → 'all'|'high'|'med'|'pairs'
+const _WL_CAL_TTL     = 15 * 60 * 1000; // 15 min cache
+
+// Currency extracted from pair name
+function _wlPairCurrencies(pairs) {
+  const curs = new Set();
+  (pairs || []).forEach(p => {
+    const name = (p.name || '').toUpperCase();
+    // Standard 6-char forex pairs
+    if (name.length >= 6) { curs.add(name.slice(0,3)); curs.add(name.slice(3,6)); }
+    // Indices / commodities
+    if (name.includes('XAU') || name.includes('GOLD')) { curs.add('XAU'); curs.add('USD'); }
+    if (name.includes('NAS') || name.includes('US100')) curs.add('USD');
+    if (name.includes('ES') || name.includes('SPX'))    curs.add('USD');
+    if (name.includes('DXY'))  curs.add('USD');
+    if (name.includes('OIL') || name.includes('WTI'))   curs.add('USD');
+  });
+  return curs;
+}
+
+// Build Forex Factory calendar URL for the given week
+function _wlCalUrl(startDate) {
+  // FF calendar week URL format: forexfactory.com/calendar?week=may26.2026
+  const d   = new Date(startDate + 'T00:00:00');
+  const mon = d.toLocaleDateString('en-US', { month: 'short' }).toLowerCase();
+  const day = d.getDate();
+  const yr  = d.getFullYear();
+  const ffUrl = `https://nfs.faireconomy.media/ff_calendar_thisweek.json`;
+  return ffUrl;
+}
+
+async function _wlCalLoad(weekId, startDate, endDate, forceRefresh) {
+  const body = document.getElementById(`wl-cal-body-${weekId}`);
+  if (!body) return;
+
+  // Check cache
+  const cached = _WL_CAL_CACHE[weekId];
+  if (!forceRefresh && cached && (Date.now() - cached.ts) < _WL_CAL_TTL) {
+    _wlCalRender(weekId, cached.events, startDate, endDate);
+    return;
+  }
+
+  body.innerHTML = '<div class="wl-cal-loading"><span></span><span></span><span></span></div>';
+
+  try {
+    // Try Fair Economy FF mirror (JSON, no CORS issues)
+    const today = new Date().toISOString().slice(0,10);
+    const isCurrentWeek = startDate <= today && today <= (endDate || startDate);
+
+    // For current week use thisweek, otherwise use next week endpoint
+    // Fair Economy provides public FF data in JSON
+    const urls = [
+      'https://nfs.faireconomy.media/ff_calendar_thisweek.json',
+      'https://nfs.faireconomy.media/ff_calendar_nextweek.json',
+    ];
+
+    let events = [];
+    let fetched = false;
+
+    for (const url of urls) {
+      try {
+        const res  = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) continue;
+        const data = await res.json();
+        // Filter to the target week date range
+        const start = new Date(startDate + 'T00:00:00');
+        const end   = new Date((endDate || startDate) + 'T23:59:59');
+        const weekEvents = (Array.isArray(data) ? data : []).filter(e => {
+          const ed = new Date(e.date);
+          return ed >= start && ed <= end;
+        });
+        if (weekEvents.length > 0) { events = weekEvents; fetched = true; break; }
+        // Even if empty for this week, try next URL
+        events = [...events, ...(Array.isArray(data) ? data : [])];
+      } catch (_) { continue; }
+    }
+
+    if (!fetched && events.length > 0) {
+      // Use whatever we have, filter by date
+      const start = new Date(startDate + 'T00:00:00');
+      const end   = new Date((endDate || startDate) + 'T23:59:59');
+      events = events.filter(e => { const ed = new Date(e.date); return ed >= start && ed <= end; });
+    }
+
+    // Normalise fields from Fair Economy JSON schema
+    // { title, country, date, impact, forecast, previous }
+    events = events.map(e => ({
+      title:    e.title    || e.name    || 'Event',
+      country:  (e.country || e.currency || '').toUpperCase(),
+      date:     e.date     || '',
+      impact:   (e.impact  || e.volatility || 'low').toLowerCase(),
+      forecast: e.forecast || '',
+      previous: e.previous || '',
+      actual:   e.actual   || '',
+    })).filter(e => e.date);
+
+    _WL_CAL_CACHE[weekId] = { events, ts: Date.now() };
+    _wlCalRender(weekId, events, startDate, endDate);
+
+  } catch (err) {
+    body.innerHTML = `
+      <div class="wl-cal-error">
+        <span>⚠</span>
+        <span>Could not load calendar data. <button class="wl-cal-retry" onclick="_wlCalLoad('${weekId}','${startDate}','${endDate}',true)">Retry</button></span>
+      </div>`;
+  }
+}
+
+function _wlCalFilter(weekId, impact, btn) {
+  _WL_CAL_FILTER[weekId] = impact;
+  const wrap = document.getElementById(`wl-cal-filter-wrap-${weekId}`);
+  if (wrap) wrap.querySelectorAll('.wl-cal-filter-btn').forEach(b => b.classList.toggle('active', b === btn));
+  // Re-render from cache
+  const cached = _WL_CAL_CACHE[weekId];
+  const week   = _wlData.find(w => w.id === weekId);
+  if (cached && week) _wlCalRender(weekId, cached.events, week.weekDate, week.weekDateEnd || week.weekDate);
+}
+
+function _wlCalRender(weekId, events, startDate, endDate) {
+  const body   = document.getElementById(`wl-cal-body-${weekId}`);
+  if (!body) return;
+
+  const week   = _wlData.find(w => w.id === weekId);
+  const pairCurs = _wlPairCurrencies(week?.pairs || []);
+  const filter = _WL_CAL_FILTER[weekId] || 'all';
+
+  // Apply filter
+  let filtered = events.filter(e => {
+    if (filter === 'high')  return e.impact === 'high';
+    if (filter === 'med')   return e.impact === 'high' || e.impact === 'medium' || e.impact === 'med';
+    if (filter === 'pairs') return pairCurs.has(e.country);
+    return true;
+  });
+
+  if (!filtered.length) {
+    body.innerHTML = `<div class="wl-cal-empty">
+      <span>📭</span>
+      <span>${filter === 'pairs' ? 'No events for your watched pairs this week' : 'No events found for this week'}</span>
+    </div>`;
+    return;
+  }
+
+  // Group by day
+  const dayMap = {};
+  filtered.forEach(e => {
+    const d = e.date ? e.date.slice(0,10) : 'Unknown';
+    if (!dayMap[d]) dayMap[d] = [];
+    dayMap[d].push(e);
+  });
+
+  const today = new Date().toISOString().slice(0,10);
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  const daysHtml = Object.keys(dayMap).sort().map(day => {
+    const dt       = new Date(day + 'T00:00:00');
+    const dayName  = dayNames[dt.getDay()];
+    const dayNum   = dt.getDate();
+    const isToday  = day === today;
+    const isPast   = day < today;
+    const dayEvents = dayMap[day];
+    const hasHigh  = dayEvents.some(e => e.impact === 'high');
+
+    const eventsHtml = dayEvents.map(e => {
+      const impactClass = e.impact === 'high' ? 'high'
+        : (e.impact === 'medium' || e.impact === 'med') ? 'med' : 'low';
+      const isMyPair = pairCurs.has(e.country);
+      const timeStr  = e.date && e.date.includes('T')
+        ? new Date(e.date).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Lagos' }) + ' WAT'
+        : 'All day';
+
+      return `
+        <div class="wl-cal-event ${impactClass}${isMyPair ? ' my-pair' : ''}${e.actual ? ' released' : ''}">
+          <div class="wl-cal-event-impact ${impactClass}"></div>
+          <div class="wl-cal-event-body">
+            <div class="wl-cal-event-row">
+              <span class="wl-cal-currency">${e.country}</span>
+              <span class="wl-cal-event-name">${e.title}</span>
+              ${isMyPair ? '<span class="wl-cal-pair-tag">★</span>' : ''}
+            </div>
+            <div class="wl-cal-event-meta">
+              <span class="wl-cal-time">${timeStr}</span>
+              ${e.forecast ? `<span class="wl-cal-meta-val">F: ${e.forecast}</span>` : ''}
+              ${e.previous ? `<span class="wl-cal-meta-val">P: ${e.previous}</span>` : ''}
+              ${e.actual   ? `<span class="wl-cal-meta-val actual">A: ${e.actual}</span>` : ''}
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="wl-cal-day${isToday ? ' today' : ''}${isPast ? ' past' : ''}">
+        <div class="wl-cal-day-head">
+          <div class="wl-cal-day-label${isToday ? ' today' : ''}">
+            <span class="wl-cal-day-name">${dayName}</span>
+            <span class="wl-cal-day-num">${dayNum}</span>
+          </div>
+          <div class="wl-cal-day-count">
+            ${hasHigh ? '<span class="wl-cal-high-dot"></span>' : ''}
+            ${dayEvents.length} event${dayEvents.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+        <div class="wl-cal-events">${eventsHtml}</div>
+      </div>`;
+  }).join('');
+
+  body.innerHTML = daysHtml;
 }
 
 /* ── Checklist toggle ── */
