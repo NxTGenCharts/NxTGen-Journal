@@ -792,6 +792,32 @@ function aiClear() {
 function buildAI() {
   _aiRenderContextPanel('daily');
   aiSetMode('daily');
+  // Init chat on first load
+  if (!_chatInitialised) { chatInit(); _chatInitialised = true; }
+}
+
+function aiPageTab(tab) {
+  const coachPanel = document.getElementById('ai-coach-panel');
+  const chatPanel  = document.getElementById('ai-chat-panel');
+  const tabCoach   = document.getElementById('ai-tab-coach');
+  const tabChat    = document.getElementById('ai-tab-chat');
+  if (!coachPanel || !chatPanel) return;
+  if (tab === 'chat') {
+    coachPanel.style.display = 'none';
+    chatPanel.style.display  = '';
+    tabCoach.classList.remove('active');
+    tabChat.classList.add('active');
+    // Focus input
+    setTimeout(() => document.getElementById('chat-input')?.focus(), 100);
+    // Clear unread badge
+    const badge = document.getElementById('ai-chat-badge');
+    if (badge) badge.style.display = 'none';
+  } else {
+    coachPanel.style.display = '';
+    chatPanel.style.display  = 'none';
+    tabCoach.classList.add('active');
+    tabChat.classList.remove('active');
+  }
 }
 
 function _aiRenderContextPanel(mode) {
@@ -908,6 +934,498 @@ function _aiRenderContextPanel(mode) {
 // Patch aiSetMode to also update context panel
 const _origAiSetMode = aiSetMode;
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  NXTGEN AI CHATBOT ENGINE
+//  Full persistent chat with: streaming bubbles, image upload,
+//  slash commands, conversation memory, drag-drop, auto-resize,
+//  export, and all AI Coach modes as commands.
+// ═══════════════════════════════════════════════════════════════════
+
+let _chatInitialised = false;
+let _chatHistory     = [];   // { role, content, ts, images? }
+let _chatImages      = [];   // pending images for next message { dataUrl, mimeType, name }
+let _chatStreaming    = false;
+let _chatMsgCount    = 0;
+
+const _CHAT_COMMANDS = [
+  { cmd: '/daily',    icon: '📅', label: 'Daily Brief',       desc: 'Get your daily trading brief' },
+  { cmd: '/weekly',   icon: '📊', label: 'Weekly Review',     desc: 'Full week performance review' },
+  { cmd: '/monthly',  icon: '🗓', label: 'Monthly Review',    desc: 'Deep monthly analysis' },
+  { cmd: '/pattern',  icon: '🔬', label: 'Pattern Analysis',  desc: 'Find your statistical edges' },
+  { cmd: '/psych',    icon: '🧠', label: 'Psychology',        desc: 'Emotional pattern analysis' },
+  { cmd: '/plan',     icon: '🗺', label: 'Trading Plan',      desc: 'Review & improve your plan' },
+  { cmd: '/chart',    icon: '📸', label: 'Chart Read',        desc: 'Analyse uploaded charts' },
+  { cmd: '/stats',    icon: '📈', label: 'Quick Stats',       desc: 'Your key trading numbers' },
+  { cmd: '/clear',    icon: '🗑', label: 'Clear Chat',        desc: 'Start a fresh conversation' },
+  { cmd: '/export',   icon: '⬇', label: 'Export Chat',       desc: 'Download conversation as text' },
+];
+
+const _CHAT_WELCOME = `Hey! I'm your NxTGen AI Coach — I have full access to your trade journal, performance data, and trading models.
+
+Here's what I can do:
+• **Analyse your charts** — just attach an image
+• **Review your trades** — ask about any pair, session, or timeframe  
+• **Psychology coaching** — I track your emotional patterns
+• **Answer anything** — about trading, strategy, setups, or your data
+
+Type **/** to see all commands, or just ask me anything.`;
+
+function chatInit() {
+  const msgs = document.getElementById('chat-messages');
+  if (!msgs) return;
+
+  // Restore from sessionStorage
+  const saved = sessionStorage.getItem('nxtgen_chat');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      _chatHistory = parsed.history || [];
+      _chatMsgCount = parsed.count || 0;
+      _chatRebuildFromHistory();
+      return;
+    } catch (_) {}
+  }
+
+  // Welcome message
+  _chatAddBubble('assistant', _CHAT_WELCOME, Date.now(), true);
+
+  // Quick-start chips
+  _chatAddQuickChips();
+
+  // Setup drag-drop on chat container
+  _chatSetupDragDrop();
+}
+
+function _chatSetupDragDrop() {
+  const wrap = document.getElementById('ai-chat-panel');
+  if (!wrap) return;
+  wrap.addEventListener('dragover', e => { e.preventDefault(); document.getElementById('chat-drop-overlay')?.style.setProperty('display','flex'); });
+  wrap.addEventListener('dragleave', e => { if (!wrap.contains(e.relatedTarget)) document.getElementById('chat-drop-overlay')?.style.setProperty('display','none'); });
+  wrap.addEventListener('drop', e => {
+    e.preventDefault();
+    document.getElementById('chat-drop-overlay').style.display = 'none';
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (files.length) _chatLoadImageFiles(files);
+  });
+}
+
+function _chatRebuildFromHistory() {
+  const msgs = document.getElementById('chat-messages');
+  if (!msgs) return;
+  msgs.innerHTML = '';
+  _chatHistory.forEach(m => {
+    _chatAddBubble(m.role, m.content, m.ts, false, m.images);
+  });
+  _chatScrollBottom();
+  _chatAddQuickChips();
+  _chatSetupDragDrop();
+}
+
+function _chatAddQuickChips() {
+  const msgs = document.getElementById('chat-messages');
+  if (!msgs) return;
+  const existing = document.getElementById('chat-quick-chips');
+  if (existing) existing.remove();
+  const div = document.createElement('div');
+  div.id = 'chat-quick-chips';
+  div.className = 'chat-quick-chips';
+  div.innerHTML = [
+    'Give me a daily brief', 'Analyse my psychology', 'What\'s my strongest edge?',
+    'Review this week', 'How is my risk management?'
+  ].map(q => `<button class="chat-quick-chip" onclick="chatQuickSend(this,'${q.replace(/'/g,"\\'")}'">${q}</button>`).join('');
+  msgs.appendChild(div);
+}
+
+function chatQuickSend(btn, text) {
+  const existing = document.getElementById('chat-quick-chips');
+  if (existing) existing.remove();
+  const inp = document.getElementById('chat-input');
+  if (inp) inp.value = text;
+  chatSend();
+}
+
+/* ── Input auto-resize & slash command palette ── */
+function chatInputChange(ta) {
+  // Auto-resize
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+
+  // Slash command palette
+  const val = ta.value;
+  const palette = document.getElementById('chat-cmd-palette');
+  if (!palette) return;
+  if (val.startsWith('/') && !val.includes(' ')) {
+    const search = val.slice(1).toLowerCase();
+    const matches = _CHAT_COMMANDS.filter(c => c.cmd.slice(1).startsWith(search));
+    if (matches.length) {
+      palette.style.display = '';
+      palette.innerHTML = matches.map(c => `
+        <div class="chat-cmd-item" onclick="chatCmdSelect('${c.cmd}')">
+          <span class="chat-cmd-icon">${c.icon}</span>
+          <span class="chat-cmd-name">${c.cmd}</span>
+          <span class="chat-cmd-desc">${c.desc}</span>
+        </div>`).join('');
+      return;
+    }
+  }
+  palette.style.display = 'none';
+}
+
+function chatCmdSelect(cmd) {
+  const inp = document.getElementById('chat-input');
+  if (inp) { inp.value = cmd + ' '; inp.focus(); }
+  const palette = document.getElementById('chat-cmd-palette');
+  if (palette) palette.style.display = 'none';
+}
+
+function chatKeyDown(e) {
+  // Send on Enter (not shift+Enter)
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    // If palette open, select first
+    const palette = document.getElementById('chat-cmd-palette');
+    if (palette && palette.style.display !== 'none') {
+      const first = palette.querySelector('.chat-cmd-item');
+      if (first) { first.click(); return; }
+    }
+    chatSend();
+    return;
+  }
+  // Escape closes palette
+  if (e.key === 'Escape') {
+    const palette = document.getElementById('chat-cmd-palette');
+    if (palette) palette.style.display = 'none';
+  }
+}
+
+/* ── File handling ── */
+function chatHandleFiles(input) {
+  const files = Array.from(input.files).filter(f => f.type.startsWith('image/'));
+  if (files.length) _chatLoadImageFiles(files);
+  input.value = '';
+}
+
+async function _chatLoadImageFiles(files) {
+  for (const file of files) {
+    const dataUrl = await new Promise(res => {
+      const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file);
+    });
+    _chatImages.push({ dataUrl, mimeType: file.type || 'image/jpeg', name: file.name });
+  }
+  _chatRenderImagePreview();
+  // Auto-focus input
+  document.getElementById('chat-input')?.focus();
+}
+
+function _chatRenderImagePreview() {
+  const wrap = document.getElementById('chat-image-preview');
+  if (!wrap) return;
+  if (!_chatImages.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  wrap.innerHTML = _chatImages.map((img, i) => `
+    <div class="chat-img-thumb">
+      <img src="${img.dataUrl}" alt="chart">
+      <button class="chat-img-del" onclick="chatRemoveImage(${i})">✕</button>
+    </div>`).join('');
+}
+
+function chatRemoveImage(i) {
+  _chatImages.splice(i, 1);
+  _chatRenderImagePreview();
+}
+
+/* ── Main send ── */
+async function chatSend() {
+  if (_chatStreaming) return;
+  const inp  = document.getElementById('chat-input');
+  const text = inp?.value?.trim() || '';
+  const imgs = [..._chatImages];
+
+  if (!text && !imgs.length) return;
+
+  // Handle built-in commands
+  if (text === '/clear') { chatClearHistory(); inp.value = ''; return; }
+  if (text === '/export') { chatExport(); inp.value = ''; return; }
+
+  // Map slash commands to AI mode prompts
+  const cmdMap = {
+    '/daily': 'daily', '/weekly': 'weekly', '/monthly': 'monthly',
+    '/pattern': 'pattern', '/psych': 'psych', '/plan': 'plan', '/chart': 'chart',
+  };
+  let effectiveText = text;
+  let modeOverride  = null;
+  for (const [cmd, mode] of Object.entries(cmdMap)) {
+    if (text.startsWith(cmd)) {
+      modeOverride  = mode;
+      effectiveText = text.slice(cmd.length).trim() || null;
+      break;
+    }
+  }
+
+  // Clear input immediately
+  inp.value = '';
+  inp.style.height = 'auto';
+  _chatImages = [];
+  _chatRenderImagePreview();
+  const palette = document.getElementById('chat-cmd-palette');
+  if (palette) palette.style.display = 'none';
+  const chips = document.getElementById('chat-quick-chips');
+  if (chips) chips.remove();
+
+  // Show user bubble
+  const userText = modeOverride && !effectiveText
+    ? _CHAT_COMMANDS.find(c => c.cmd === Object.keys(cmdMap).find(k => cmdMap[k] === modeOverride))?.label || text
+    : (effectiveText || text);
+
+  _chatAddBubble('user', userText, Date.now(), false, imgs.length ? imgs : null);
+  _chatHistory.push({ role: 'user', content: userText, ts: Date.now(), images: imgs.length ? imgs : null });
+
+  // Typing indicator
+  const typingId = _chatAddTypingIndicator();
+  _chatStreaming = true;
+  _chatUpdateSendBtn(true);
+  _chatScrollBottom();
+
+  // Build API messages
+  const apiMessages = _chatBuildApiMessages(modeOverride, effectiveText, imgs);
+
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-coach`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token || SUPABASE_ANON}`,
+      },
+      body: JSON.stringify({
+        system:   _aiSystemPrompt(),
+        messages: apiMessages,
+      }),
+    });
+
+    _chatRemoveTyping(typingId);
+
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    const data = await res.json();
+    const reply = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+
+    _chatAddBubble('assistant', reply, Date.now(), true);
+    _chatHistory.push({ role: 'assistant', content: reply, ts: Date.now() });
+    _chatSaveSession();
+
+  } catch (err) {
+    _chatRemoveTyping(typingId);
+    _chatAddBubble('error', `⚠ ${err.message || 'Connection error'}. Check your Edge Function is deployed.`, Date.now());
+  }
+
+  _chatStreaming = false;
+  _chatUpdateSendBtn(false);
+  _chatScrollBottom();
+  inp.focus();
+}
+
+/* Build API message array from chat history + pending images */
+function _chatBuildApiMessages(modeOverride, customText, imgs) {
+  // Keep last 10 turns for context (to stay within token limits)
+  const historyTurns = _chatHistory.slice(-10).map(m => {
+    if (m.images && m.images.length) {
+      return {
+        role: m.role,
+        content: [
+          ...m.images.map(img => ({
+            type: 'image',
+            source: { type: 'base64', media_type: img.mimeType, data: img.dataUrl.split(',')[1] }
+          })),
+          { type: 'text', text: m.content || '' }
+        ]
+      };
+    }
+    return { role: m.role, content: m.content };
+  });
+
+  // Build the current user message
+  let userPrompt = modeOverride
+    ? _aiUserPrompt(modeOverride, customText)
+    : (customText || 'Help me with my trading.');
+
+  let userContent;
+  if (imgs.length) {
+    userContent = [
+      ...imgs.map(img => ({
+        type: 'image',
+        source: { type: 'base64', media_type: img.mimeType, data: img.dataUrl.split(',')[1] }
+      })),
+      { type: 'text', text: userPrompt }
+    ];
+  } else {
+    userContent = userPrompt;
+  }
+
+  return [...historyTurns, { role: 'user', content: userContent }];
+}
+
+/* ── Bubble rendering ── */
+function _chatAddBubble(role, content, ts, animate, images) {
+  const msgs = document.getElementById('chat-messages');
+  if (!msgs) return;
+
+  const id     = `chat-msg-${++_chatMsgCount}`;
+  const isUser = role === 'user';
+  const isErr  = role === 'error';
+  const time   = new Date(ts).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Lagos' });
+
+  const imgHtml = images ? images.map(img =>
+    `<div class="chat-bubble-img-wrap">
+      <img class="chat-bubble-img" src="${img.dataUrl}" alt="chart"
+           onclick="_chatLightbox('${img.dataUrl}')">
+    </div>`).join('') : '';
+
+  const contentHtml = isUser
+    ? `<span>${_chatEscapeHtml(content)}</span>`
+    : (isErr
+      ? `<span class="chat-err-text">${content}</span>`
+      : _aiFormatResponse(content));
+
+  const bubble = document.createElement('div');
+  bubble.className = `chat-msg-row ${isUser ? 'user' : 'assistant'}${animate ? ' animate-in' : ''}`;
+  bubble.id = id;
+  bubble.innerHTML = `
+    ${!isUser ? `<div class="chat-avatar-sm">✦</div>` : ''}
+    <div class="chat-bubble ${isUser ? 'user' : isErr ? 'error' : 'assistant'}">
+      ${imgHtml}
+      <div class="chat-bubble-content">${contentHtml}</div>
+      <div class="chat-bubble-meta">
+        <span class="chat-bubble-time">${time} WAT</span>
+        ${!isUser && !isErr ? `<button class="chat-bubble-copy" onclick="_chatCopyBubble('${id}')" title="Copy">⎘</button>` : ''}
+      </div>
+    </div>
+    ${isUser ? `<div class="chat-avatar-sm user">👤</div>` : ''}
+  `;
+
+  // Insert before quick-chips if they exist
+  const chips = document.getElementById('chat-quick-chips');
+  if (chips) msgs.insertBefore(bubble, chips);
+  else msgs.appendChild(bubble);
+
+  if (animate) {
+    requestAnimationFrame(() => bubble.classList.add('visible'));
+  }
+  return id;
+}
+
+function _chatAddTypingIndicator() {
+  const id = `chat-typing-${Date.now()}`;
+  const msgs = document.getElementById('chat-messages');
+  if (!msgs) return id;
+  const div = document.createElement('div');
+  div.className = 'chat-msg-row assistant';
+  div.id = id;
+  div.innerHTML = `
+    <div class="chat-avatar-sm">✦</div>
+    <div class="chat-bubble assistant typing">
+      <div class="chat-typing-dots"><span></span><span></span><span></span></div>
+    </div>`;
+  const chips = document.getElementById('chat-quick-chips');
+  if (chips) msgs.insertBefore(div, chips);
+  else msgs.appendChild(div);
+  _chatScrollBottom();
+  return id;
+}
+
+function _chatRemoveTyping(id) {
+  document.getElementById(id)?.remove();
+}
+
+function _chatScrollBottom() {
+  const msgs = document.getElementById('chat-messages');
+  if (msgs) setTimeout(() => { msgs.scrollTop = msgs.scrollHeight; }, 60);
+}
+
+function _chatUpdateSendBtn(loading) {
+  const btn = document.getElementById('chat-send-btn');
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.classList.toggle('loading', loading);
+}
+
+function _chatCopyBubble(id) {
+  const bubble = document.getElementById(id);
+  if (!bubble) return;
+  const content = bubble.querySelector('.chat-bubble-content');
+  if (content) navigator.clipboard.writeText(content.innerText).then(() => showToast('Copied ✓', 'restore'));
+}
+
+function _chatEscapeHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ── Lightbox ── */
+function _chatLightbox(src) {
+  let lb = document.getElementById('chat-lightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'chat-lightbox';
+    lb.className = 'wl-lightbox';
+    lb.innerHTML = `<button class="wl-lightbox-close" onclick="document.getElementById('chat-lightbox').classList.remove('open')">✕</button><img id="chat-lb-img" src="" alt="chart">`;
+    lb.addEventListener('click', e => { if (e.target === lb) lb.classList.remove('open'); });
+    document.body.appendChild(lb);
+  }
+  document.getElementById('chat-lb-img').src = src;
+  lb.classList.add('open');
+}
+
+/* ── Utils ── */
+function chatClearHistory() {
+  if (_chatHistory.length && !confirm('Clear all chat history?')) return;
+  _chatHistory = [];
+  _chatMsgCount = 0;
+  sessionStorage.removeItem('nxtgen_chat');
+  const msgs = document.getElementById('chat-messages');
+  if (msgs) msgs.innerHTML = '';
+  _chatAddBubble('assistant', _CHAT_WELCOME, Date.now(), true);
+  _chatAddQuickChips();
+}
+
+function chatExport() {
+  if (!_chatHistory.length) { showToast('No chat to export', 'danger'); return; }
+  const lines = _chatHistory.map(m => {
+    const role = m.role === 'user' ? 'You' : 'AI Coach';
+    const time = new Date(m.ts).toLocaleString('en-GB', { timeZone: 'Africa/Lagos' });
+    return `[${time} WAT] ${role}:\n${m.content}\n`;
+  });
+  const blob = new Blob([lines.join('\n---\n\n')], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `nxtgen-chat-${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+}
+
+function _chatSaveSession() {
+  try {
+    // Save text-only history (skip large image data to stay under storage limit)
+    const lightweight = _chatHistory.map(m => ({
+      role: m.role, content: m.content, ts: m.ts
+    }));
+    sessionStorage.setItem('nxtgen_chat', JSON.stringify({ history: lightweight, count: _chatMsgCount }));
+  } catch (_) {}
+}
+
+/* ── Stats command ── */
+function _chatHandleStats() {
+  const total = trades.length;
+  const wins  = trades.filter(t => t.outcome === 'Win').length;
+  const wr    = total ? ((wins / total) * 100).toFixed(1) : 0;
+  const pnl   = trades.reduce((a, t) => a + t.pnl, 0).toFixed(1);
+  const today = new Date().toISOString().slice(0,10);
+  const todayT = trades.filter(t => t.date === today);
+  return `**Quick Stats — ${today}**\n\n` +
+    `• Total trades: ${total}\n` +
+    `• Win rate: ${wr}%\n` +
+    `• Net PnL: ${pnl >= 0 ? '+' : ''}${pnl}%\n` +
+    `• Today: ${todayT.length} trade${todayT.length !== 1 ? 's' : ''}\n` +
+    `• Wins: ${wins} | Losses: ${trades.filter(t => t.outcome === 'Loss').length}`;
+}
 // ── NAVIGATION ────────────────────────────────────────
 function nav(pageId, sbEl, label, extra) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
