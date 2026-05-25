@@ -663,16 +663,27 @@ async function aiRun() {
   _aiHistory.push({ role: 'user', content: userContent });
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        system: _aiSystemPrompt(),
-        messages: _aiHistory,
-      })
-    });
+    // Route through Supabase Edge Function to avoid CORS + keep API key server-side
+    const { data: { session } } = await sb.auth.getSession();
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/ai-coach`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || SUPABASE_ANON}`,
+        },
+        body: JSON.stringify({
+          system:   _aiSystemPrompt(),
+          messages: _aiHistory,
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Server error ${response.status}: ${errText}`);
+    }
 
     const data = await response.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
@@ -692,7 +703,16 @@ async function aiRun() {
     document.querySelectorAll('.ai-chip').forEach(c => c.classList.remove('active'));
 
   } catch (err) {
-    if (responseBody) responseBody.innerHTML = `<div class="ai-error">⚠ Connection error: ${err.message}<br>Check your internet connection and try again.</div>`;
+    const msg = err.message || 'Unknown error';
+    const isAuth = msg.includes('401') || msg.includes('403');
+    const isSetup = msg.includes('404') || msg.includes('relay');
+    if (responseBody) responseBody.innerHTML = `
+      <div class="ai-error">
+        <strong>⚠ ${isSetup ? 'Edge Function not deployed yet' : isAuth ? 'Auth error' : 'Error'}</strong><br>
+        ${isSetup
+          ? 'The AI proxy function needs to be deployed to Supabase once. See the setup instructions in your journal.'
+          : msg}
+      </div>`;
     _aiHistory.pop();
   }
 
