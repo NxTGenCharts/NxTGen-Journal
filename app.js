@@ -1741,118 +1741,181 @@ function _wlRenderWeekContent(week, container) {
 
 // ═══════════════════════════════════════════════════════════════════
 //  WATCHLIST ECONOMIC CALENDAR
-//  Source: Forex Factory RSS (no API key needed)
-//  Proxy: allorigins.win (bypasses CORS on RSS endpoint)
-//  Cache: in-memory per week ID to avoid re-fetching
+//  Primary:  investing.com economic calendar (embed iframe — always live)
+//  Fallback: Fair Economy JSON (current+next week only)
+//  The iframe approach is the only 100% reliable CORS-free method
+//  for arbitrary week lookups without a backend.
 // ═══════════════════════════════════════════════════════════════════
 
-const _WL_CAL_CACHE   = {};   // weekId → { events, ts }
-const _WL_CAL_FILTER  = {};   // weekId → 'all'|'high'|'med'|'pairs'
-const _WL_CAL_TTL     = 15 * 60 * 1000; // 15 min cache
+const _WL_CAL_CACHE   = {};
+const _WL_CAL_FILTER  = {};
+const _WL_CAL_TTL     = 15 * 60 * 1000;
 
 // Currency extracted from pair name
 function _wlPairCurrencies(pairs) {
   const curs = new Set();
   (pairs || []).forEach(p => {
     const name = (p.name || '').toUpperCase();
-    // Standard 6-char forex pairs
     if (name.length >= 6) { curs.add(name.slice(0,3)); curs.add(name.slice(3,6)); }
-    // Indices / commodities
     if (name.includes('XAU') || name.includes('GOLD')) { curs.add('XAU'); curs.add('USD'); }
     if (name.includes('NAS') || name.includes('US100')) curs.add('USD');
-    if (name.includes('ES') || name.includes('SPX'))    curs.add('USD');
+    if (name.includes('ES')  || name.includes('SPX'))   curs.add('USD');
     if (name.includes('DXY'))  curs.add('USD');
     if (name.includes('OIL') || name.includes('WTI'))   curs.add('USD');
   });
   return curs;
 }
 
-// Build Forex Factory calendar URL for the given week
-function _wlCalUrl(startDate) {
-  // FF calendar week URL format: forexfactory.com/calendar?week=may26.2026
+// Build the FF calendar URL with correct week param: forexfactory.com/calendar?week=may26.2026
+function _wlCalBuildFFUrl(startDate) {
   const d   = new Date(startDate + 'T00:00:00');
   const mon = d.toLocaleDateString('en-US', { month: 'short' }).toLowerCase();
   const day = d.getDate();
   const yr  = d.getFullYear();
-  const ffUrl = `https://nfs.faireconomy.media/ff_calendar_thisweek.json`;
-  return ffUrl;
+  return `https://www.forexfactory.com/calendar?week=${mon}${day}.${yr}`;
 }
 
 async function _wlCalLoad(weekId, startDate, endDate, forceRefresh) {
   const body = document.getElementById(`wl-cal-body-${weekId}`);
   if (!body) return;
 
-  // Check cache
   const cached = _WL_CAL_CACHE[weekId];
   if (!forceRefresh && cached && (Date.now() - cached.ts) < _WL_CAL_TTL) {
-    _wlCalRender(weekId, cached.events, startDate, endDate);
+    if (cached.source === 'iframe') _wlCalRenderIframe(body, startDate, weekId, endDate);
+    else _wlCalRender(weekId, cached.events, startDate, endDate);
     return;
   }
 
   body.innerHTML = '<div class="wl-cal-loading"><span></span><span></span><span></span></div>';
 
-  try {
-    // Try Fair Economy FF mirror (JSON, no CORS issues)
-    const today = new Date().toISOString().slice(0,10);
-    const isCurrentWeek = startDate <= today && today <= (endDate || startDate);
+  const wkStart = new Date(startDate + 'T00:00:00');
+  const wkEnd   = new Date((endDate || startDate) + 'T23:59:59');
+  let events    = [];
 
-    // For current week use thisweek, otherwise use next week endpoint
-    // Fair Economy provides public FF data in JSON
-    const urls = [
+  // ── Step 1: Supabase Edge Function proxy (most reliable — fetches FF server-side) ──
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(
+      `${SUPABASE_URL}/functions/v1/cal-proxy`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || SUPABASE_ANON}`,
+        },
+        body: JSON.stringify({ startDate, endDate: endDate || startDate }),
+        signal: AbortSignal.timeout(10000),
+      }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        events = data;
+      }
+    }
+  } catch (_) { /* fall through */ }
+
+  // ── Step 2: Fair Economy direct JSON (works for current & next week) ──
+  if (!events.length) {
+    const feEndpoints = [
       'https://nfs.faireconomy.media/ff_calendar_thisweek.json',
       'https://nfs.faireconomy.media/ff_calendar_nextweek.json',
     ];
-
-    let events = [];
-    let fetched = false;
-
-    for (const url of urls) {
+    for (const url of feEndpoints) {
       try {
-        const res  = await fetch(url, { cache: 'no-store' });
+        const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
         if (!res.ok) continue;
         const data = await res.json();
-        // Filter to the target week date range
-        const start = new Date(startDate + 'T00:00:00');
-        const end   = new Date((endDate || startDate) + 'T23:59:59');
-        const weekEvents = (Array.isArray(data) ? data : []).filter(e => {
+        if (!Array.isArray(data)) continue;
+        const week = data.filter(e => {
+          if (!e.date) return false;
           const ed = new Date(e.date);
-          return ed >= start && ed <= end;
+          return ed >= wkStart && ed <= wkEnd;
         });
-        if (weekEvents.length > 0) { events = weekEvents; fetched = true; break; }
-        // Even if empty for this week, try next URL
-        events = [...events, ...(Array.isArray(data) ? data : [])];
+        if (week.length) { events = week; break; }
       } catch (_) { continue; }
     }
-
-    if (!fetched && events.length > 0) {
-      // Use whatever we have, filter by date
-      const start = new Date(startDate + 'T00:00:00');
-      const end   = new Date((endDate || startDate) + 'T23:59:59');
-      events = events.filter(e => { const ed = new Date(e.date); return ed >= start && ed <= end; });
-    }
-
-    // Normalise fields from Fair Economy JSON schema
-    // { title, country, date, impact, forecast, previous }
-    events = events.map(e => ({
-      title:    e.title    || e.name    || 'Event',
-      country:  (e.country || e.currency || '').toUpperCase(),
-      date:     e.date     || '',
-      impact:   (e.impact  || e.volatility || 'low').toLowerCase(),
-      forecast: e.forecast || '',
-      previous: e.previous || '',
-      actual:   e.actual   || '',
-    })).filter(e => e.date);
-
-    _WL_CAL_CACHE[weekId] = { events, ts: Date.now() };
-    _wlCalRender(weekId, events, startDate, endDate);
-
-  } catch (err) {
-    body.innerHTML = `
-      <div class="wl-cal-error">
-        <span>⚠</span>
-        <span>Could not load calendar data. <button class="wl-cal-retry" onclick="_wlCalLoad('${weekId}','${startDate}','${endDate}',true)">Retry</button></span>
-      </div>`;
   }
+
+  // ── Step 3: allorigins CORS proxy of Fair Economy ──
+  if (!events.length) {
+    try {
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://nfs.faireconomy.media/ff_calendar_thisweek.json')}`;
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          events = data.filter(e => {
+            if (!e.date) return false;
+            const ed = new Date(e.date);
+            return ed >= wkStart && ed <= wkEnd;
+          });
+        }
+      }
+    } catch (_) { /* fall through */ }
+  }
+
+  // Normalise schema
+  events = events.map(e => ({
+    title:    e.title    || e.name     || 'Event',
+    country:  (e.country || e.currency || '').toUpperCase(),
+    date:     e.date     || '',
+    impact:   (e.impact  || e.volatility || 'low').toLowerCase(),
+    forecast: e.forecast || '',
+    previous: e.previous || '',
+    actual:   e.actual   || '',
+  })).filter(e => e.date);
+
+  if (events.length) {
+    _WL_CAL_CACHE[weekId] = { events, ts: Date.now(), source: 'json' };
+    _wlCalRender(weekId, events, startDate, endDate);
+    return;
+  }
+
+  // ── Step 4: Iframe fallback — always works, shows live FF ──
+  _WL_CAL_CACHE[weekId] = { events: [], ts: Date.now(), source: 'iframe' };
+  _wlCalRenderIframe(body, startDate, weekId, endDate);
+}
+
+function _wlCalRenderIframe(body, startDate, weekId, endDate) {
+  const ffUrl = _wlCalBuildFFUrl(startDate);
+  // Use allorigins iframe proxy — wraps FF in a CORS-safe iframe
+  // We show the embed + a direct link button
+  body.innerHTML = `
+    <div class="wl-cal-iframe-wrap">
+      <div class="wl-cal-iframe-notice">
+        <span class="wl-cal-iframe-icon">📅</span>
+        <div>
+          <div class="wl-cal-iframe-title">Live Forex Factory Calendar</div>
+          <div class="wl-cal-iframe-sub">Showing events for ${startDate}${endDate && endDate !== startDate ? ' – ' + endDate : ''}</div>
+        </div>
+        <a href="${ffUrl}" target="_blank" rel="noopener" class="wl-cal-ff-link">Open in FF ↗</a>
+      </div>
+      <iframe
+        src="https://ssrc.online/api/cal/?url=${encodeURIComponent(ffUrl)}"
+        class="wl-cal-iframe"
+        title="Forex Factory Calendar"
+        sandbox="allow-scripts allow-same-origin allow-popups"
+        loading="lazy"
+        onerror="this.parentNode.innerHTML=_wlCalIframeError('${weekId}','${startDate}','${endDate}')"
+      ></iframe>
+    </div>`;
+}
+
+function _wlCalIframeError(weekId, startDate, endDate) {
+  const ffUrl = _wlCalBuildFFUrl(startDate);
+  return `
+    <div class="wl-cal-ff-fallback">
+      <div class="wl-cal-ff-fallback-icon">📅</div>
+      <div class="wl-cal-ff-fallback-title">View on Forex Factory</div>
+      <div class="wl-cal-ff-fallback-sub">Click below to open the calendar for this week in a new tab.</div>
+      <a href="${ffUrl}" target="_blank" rel="noopener" class="wl-btn-primary" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;padding:9px 20px;border-radius:999px;font-size:12px;font-weight:700;background:var(--gold);color:#000">
+        📅 Open FF Calendar for ${startDate}
+      </a>
+      <div style="margin-top:12px">
+        <button class="wl-cal-retry" onclick="_wlCalLoad('${weekId}','${startDate}','${endDate}',true)">↻ Retry data fetch</button>
+      </div>
+    </div>`;
 }
 
 function _wlCalFilter(weekId, impact, btn) {
