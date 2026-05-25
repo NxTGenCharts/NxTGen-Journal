@@ -366,6 +366,528 @@ function getTS(id) {
   return tradeState[id];
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  AI COACH ENGINE — Powered by Anthropic Claude
+//  Modes: daily · weekly · monthly · pattern · psych · plan · chart
+// ═══════════════════════════════════════════════════════════════════
+
+let _aiMode        = 'daily';
+let _aiChartImages = [];   // { dataUrl, mimeType, name }
+let _aiHistory     = [];   // { role, content } conversation turns
+let _aiStreaming    = false;
+
+/* ── Suggestion chips per mode ── */
+const _AI_CHIPS = {
+  daily:   ['What should I focus on today?', 'Am I ready to trade today?', 'What pairs suit my edge today?', 'Give me a morning brief'],
+  weekly:  ['Review my week', 'What patterns emerged this week?', 'Where did I lose discipline?', 'Best and worst trades this week'],
+  monthly: ['Full month review', 'How did my psychology affect PnL?', 'Which strategy is working best?', 'Am I on track for my goals?'],
+  pattern: ['Find my biggest edge', 'Which sessions are most profitable?', 'What is hurting my win rate?', 'Show me my loss patterns'],
+  psych:   ['Analyse my emotional patterns', 'When do I trade best?', 'What emotions cost me most?', 'Help me build better discipline'],
+  plan:    ['Review my trading plan', 'How can I improve my models?', 'Suggest rule adjustments', 'Build a stronger playbook'],
+  chart:   ['Analyse this chart', 'Is this a valid setup?', 'What bias does this suggest?', 'Rate this trade setup'],
+};
+
+const _AI_MODE_LABELS = {
+  daily: 'Daily Brief', weekly: 'Weekly Review', monthly: 'Monthly Review',
+  pattern: 'Pattern Analysis', psych: 'Psychology', plan: 'Trading Plan', chart: 'Chart Analysis',
+};
+
+/* ── Build the system prompt from live data ── */
+function _aiSystemPrompt() {
+  const totalTrades = trades.length;
+  const wins  = trades.filter(t => t.outcome === 'Win').length;
+  const losses = trades.filter(t => t.outcome === 'Loss').length;
+  const wr    = totalTrades ? ((wins / totalTrades) * 100).toFixed(1) : 0;
+  const netPnl = trades.reduce((a, t) => a + t.pnl, 0).toFixed(1);
+
+  // Emotion breakdown
+  const emotionMap = {};
+  trades.forEach(t => { if(t.emotion) emotionMap[t.emotion] = (emotionMap[t.emotion]||0) + 1; });
+  const emotionSummary = Object.entries(emotionMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([e,c])=>`${e}(${c})`).join(', ');
+
+  // Strategy breakdown
+  const stratMap = {};
+  trades.forEach(t => { if(t.strategy) stratMap[t.strategy] = (stratMap[t.strategy]||0) + 1; });
+  const stratSummary = Object.entries(stratMap).sort((a,b)=>b[1]-a[1]).map(([s,c])=>`${s}:${c}trades`).join(', ');
+
+  // Session breakdown
+  const kzMap = {};
+  trades.forEach(t => { if(t.kz) kzMap[t.kz] = (kzMap[t.kz]||0) + 1; });
+
+  // Recent 10 trades summary
+  const recent = [...trades].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).map(t =>
+    `${t.date} ${t.pair} ${t.pos} ${t.outcome} PnL:${t.pnl>0?'+':''}${t.pnl}% Emotion:${t.emotion||'?'} Strategy:${t.strategy||'?'} Notes:"${(t.notes||'').slice(0,80)}"`
+  ).join('\n');
+
+  // Today's and this week's trades
+  const today = new Date().toISOString().slice(0,10);
+  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().slice(0,10); })();
+  const todayTrades = trades.filter(t => t.date === today);
+  const weekTrades  = trades.filter(t => t.date >= weekStart);
+  const monthKey    = today.slice(0,7);
+  const monthTrades = trades.filter(t => t.date.startsWith(monthKey));
+
+  // Per-emotion PnL to spot psychology patterns
+  const emotionPnl = {};
+  trades.forEach(t => {
+    if (!t.emotion) return;
+    if (!emotionPnl[t.emotion]) emotionPnl[t.emotion] = { pnl: 0, n: 0, wins: 0 };
+    emotionPnl[t.emotion].pnl  += t.pnl;
+    emotionPnl[t.emotion].n    += 1;
+    if (t.outcome === 'Win') emotionPnl[t.emotion].wins += 1;
+  });
+  const emotionPnlSummary = Object.entries(emotionPnl).map(([e,d]) =>
+    `${e}: ${d.n}trades wr=${((d.wins/d.n)*100).toFixed(0)}% avgPnl=${(d.pnl/d.n).toFixed(2)}%`
+  ).join('; ');
+
+  // Rating vs outcome
+  const ratingMap = {};
+  trades.forEach(t => {
+    const r = t.rating || 5;
+    if (!ratingMap[r]) ratingMap[r] = { n:0, wins:0 };
+    ratingMap[r].n++; if(t.outcome==='Win') ratingMap[r].wins++;
+  });
+  const ratingSummary = Object.entries(ratingMap).sort((a,b)=>a[0]-b[0]).map(([r,d]) =>
+    `${r}★: wr=${((d.wins/d.n)*100).toFixed(0)}% (${d.n}trades)`
+  ).join(', ');
+
+  return `You are the NxTGen AI Trading Coach — an elite, precision-focused coach for a professional forex and futures prop trader based in Lagos, Nigeria (WAT timezone).
+
+TRADER PROFILE:
+- Platform: NxTGen Trading Journal
+- Style: ICT-based methodology (IRL>ERL, ERL>IRL, SMT divergence, CISD, NxtGen Modified model)
+- Sessions: London Open (8am–12pm WAT) PRIMARY, London/NY Overlap (1–5pm WAT) PRIMARY, Asian (1–5am WAT) secondary
+- Accounts: Paper + multiple GFT prop funded accounts (Phase 1 & 2 challenges)
+- Risk: 0.5–1% per trade, max 2 trades/day, no trades below 3★ rating
+- Rules include: HTF bias required, active killzone required, never trade red news ±15min
+
+FULL TRADING DATA (${totalTrades} total trades):
+- Overall: WR=${wr}% | Net PnL=+${netPnl}% | Wins=${wins} | Losses=${losses}
+- Strategies: ${stratSummary}
+- Sessions: ${JSON.stringify(kzMap)}
+- Emotion frequency: ${emotionSummary}
+- Emotion vs PnL: ${emotionPnlSummary}
+- Rating vs WR: ${ratingSummary}
+- Today's trades (${todayTrades.length}): ${todayTrades.map(t=>`${t.pair} ${t.outcome} ${t.pnl>0?'+':''}${t.pnl}%`).join(', ')||'none'}
+- This week (${weekTrades.length} trades): WR=${weekTrades.length?((weekTrades.filter(t=>t.outcome==='Win').length/weekTrades.length)*100).toFixed(0):0}%
+- This month (${monthTrades.length} trades): WR=${monthTrades.length?((monthTrades.filter(t=>t.outcome==='Win').length/monthTrades.length)*100).toFixed(0):0}%
+
+RECENT 10 TRADES:
+${recent}
+
+TRADING MODELS:
+${(_pbData?.models||MODELS).map(m=>`- ${m.title}: ${m.sub}`).join('\n')}
+
+TRADING RULES (${(_pbData?.rules||RULES).length}):
+${(_pbData?.rules||RULES).map((r,i)=>`${i+1}. ${r}`).join('\n')}
+
+RESPONSE STYLE:
+- Be direct, specific, and actionable. No generic advice.
+- Reference actual trade data, dates, pairs, and patterns from the data above.
+- Use NxTGen/ICT terminology naturally (IRL, ERL, OB, FVG, SMT, CISD, killzone, manipulation, etc.)
+- Format with clear sections using **bold headers**, bullet points, and emoji where appropriate.
+- Be a coach, not a cheerleader — call out weaknesses clearly but constructively.
+- Keep responses concise but complete. Prioritize insight over length.
+- When analysing psychology, be honest about emotional patterns in the data.`;
+}
+
+/* ── Build user prompt per mode ── */
+function _aiUserPrompt(mode, customQuestion) {
+  if (customQuestion) return customQuestion;
+  const today     = new Date().toISOString().slice(0,10);
+  const dayName   = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
+  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().slice(0,10); })();
+  const monthKey  = today.slice(0,7);
+
+  const todayTrades  = trades.filter(t => t.date === today);
+  const weekTrades   = trades.filter(t => t.date >= weekStart);
+  const monthTrades  = trades.filter(t => t.date.startsWith(monthKey));
+
+  switch (mode) {
+    case 'daily':
+      return `Give me a complete daily trading brief for today, ${dayName} ${today}.
+I have traded ${todayTrades.length} times today${todayTrades.length ? ': ' + todayTrades.map(t=>`${t.pair} ${t.outcome} ${t.pnl>0?'+':''}${t.pnl}%`).join(', ') : ''}.
+Cover: (1) Assessment of today's session so far, (2) Psychological readiness check based on my emotion history, (3) Key reminders from my rules most relevant right now, (4) What I should focus on for the rest of today or tomorrow's session.`;
+
+    case 'weekly':
+      const weekWins = weekTrades.filter(t=>t.outcome==='Win').length;
+      const weekPnl  = weekTrades.reduce((a,t)=>a+t.pnl,0).toFixed(1);
+      return `Give me a comprehensive weekly review.
+This week so far: ${weekTrades.length} trades, ${weekWins} wins, WR=${weekTrades.length?((weekWins/weekTrades.length)*100).toFixed(0):0}%, Net PnL=${weekPnl>0?'+':''}${weekPnl}%
+Trades this week: ${weekTrades.map(t=>`${t.date} ${t.pair} ${t.outcome} ${t.pnl>0?'+':''}${t.pnl}% emotion:${t.emotion}`).join(' | ')||'none'}
+Cover: (1) Week performance grade and summary, (2) Best trade and why, (3) Worst trade and root cause, (4) Psychological patterns this week, (5) Rule violations if any, (6) What to focus on next week.`;
+
+    case 'monthly':
+      const mWins = monthTrades.filter(t=>t.outcome==='Win').length;
+      const mPnl  = monthTrades.reduce((a,t)=>a+t.pnl,0).toFixed(1);
+      return `Give me a deep monthly review for ${monthKey}.
+Month stats: ${monthTrades.length} trades, WR=${monthTrades.length?((mWins/monthTrades.length)*100).toFixed(0):0}%, Net PnL=${mPnl>0?'+':''}${mPnl}%
+Full trade list: ${monthTrades.map(t=>`${t.date} ${t.pair} ${t.pos} ${t.outcome} PnL:${t.pnl>0?'+':''}${t.pnl}% strategy:${t.strategy} emotion:${t.emotion} notes:"${(t.notes||'').slice(0,60)}"`).join('\n')}
+Cover: (1) Month grade and verdict, (2) Strategy performance breakdown, (3) Session breakdown, (4) Psychology and emotional analysis, (5) Loss audit — root causes, (6) Plan adjustments for next month, (7) Progress toward quarterly goals.`;
+
+    case 'pattern':
+      return `Perform a deep pattern analysis across ALL my ${trades.length} trades.
+Find: (1) My strongest statistical edges (pair + session + strategy combinations with highest WR and PnL), (2) My worst performing patterns and what's common between them, (3) Optimal trade rating threshold — at what star rating does my performance drop sharply?, (4) Time-of-day/session patterns, (5) Streak patterns — when do I go on losing streaks and what precedes them?, (6) The 3 most actionable insights from the data.`;
+
+    case 'psych':
+      return `Give me a deep psychological analysis of my trading behaviour.
+Using all ${trades.length} trades with emotion tags, analyse: (1) Which emotions correlate with wins vs losses, (2) My worst psychological state — when am I most likely to break rules?, (3) Pre-trade mental state patterns (use pretrade notes if available), (4) Revenge trading or FOMO signals in the data, (5) Specific psychological weaknesses I need to address, (6) A personalised mental framework and morning routine recommendation based on my actual patterns.`;
+
+    case 'plan':
+      return `Review and improve my trading plan based on all my actual performance data.
+(1) Assess how well my current 3 models (IRL>ERL, ERL>IRL, NxtGen Modified) are performing — which is strongest?, (2) Rule violations visible in the data and suggested additions, (3) Risk management assessment — is my 0.5–1% risk appropriate for my win rate?, (4) Session allocation — should I trade Asian more or less based on data?, (5) Specific model adjustments or additions that the data supports, (6) A revised trading plan summary I can add to my playbook.`;
+
+    case 'chart':
+      return _aiChartImages.length
+        ? `Analyse the ${_aiChartImages.length} chart image(s) I've uploaded. For each: (1) Identify the timeframe and instrument if visible, (2) Key levels — OB, FVG, liquidity pools, swing high/low, (3) Market structure bias — bullish or bearish, (4) Which of my models (IRL>ERL, ERL>IRL, NxtGen Modified, SMT+CISD) applies, (5) Entry trigger to watch for, (6) Suggested SL and TP zones, (7) Rating out of 5 stars for trade quality. Be specific about price levels if visible.`
+        : 'Please upload one or more chart screenshots above, then press Analyse.';
+
+    default:
+      return 'Provide a comprehensive trading analysis based on my data.';
+  }
+}
+
+/* ── Mode switch ── */
+function aiSetMode(mode) {
+  _aiMode = mode;
+  document.querySelectorAll('.ai-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+
+  // Update context panel
+  _aiRenderContextPanel(mode);
+
+  // Show/hide chart upload
+  const chartWrap = document.getElementById('ai-chart-upload-wrap');
+  if (chartWrap) chartWrap.style.display = mode === 'chart' ? '' : 'none';
+
+  // Update placeholder
+  const inp = document.getElementById('ai-prompt-input');
+  if (inp) inp.placeholder = mode === 'chart'
+    ? 'Upload chart(s) above, then ask a specific question or press Analyse…'
+    : 'Ask anything specific, or press Analyse for an automatic deep-dive…';
+
+  // Rebuild chips
+  _aiRenderChips(mode);
+
+  // Update button label
+  const lbl = document.getElementById('ai-btn-label');
+  if (lbl) lbl.textContent = mode === 'chart' ? 'Read Chart' : 'Analyse';
+}
+
+function _aiRenderChips(mode) {
+  const wrap = document.getElementById('ai-prompt-chips');
+  if (!wrap) return;
+  wrap.innerHTML = (_AI_CHIPS[mode] || []).map(q =>
+    `<button class="ai-chip" onclick="aiChipClick(this)">${q}</button>`
+  ).join('');
+}
+
+function aiChipClick(btn) {
+  document.querySelectorAll('.ai-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('ai-prompt-input').value = btn.textContent;
+}
+
+/* ── Chart upload handling ── */
+async function aiHandleChartUpload(input) {
+  const files = Array.from(input.files);
+  for (const file of files) {
+    const dataUrl = await new Promise(resolve => {
+      const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(file);
+    });
+    const mimeType = file.type || 'image/jpeg';
+    _aiChartImages.push({ dataUrl, mimeType, name: file.name });
+  }
+  input.value = '';
+  _aiRenderChartThumbs();
+}
+
+function _aiRenderChartThumbs() {
+  const wrap = document.getElementById('ai-chart-thumbs');
+  if (!wrap) return;
+  wrap.innerHTML = _aiChartImages.map((img, i) => `
+    <div class="ai-chart-thumb">
+      <img src="${img.dataUrl}" alt="${img.name}">
+      <button class="ai-chart-thumb-del" onclick="aiRemoveChart(${i})">✕</button>
+      <div class="ai-chart-thumb-name">${img.name.replace(/\.[^.]+$/,'').slice(0,18)}</div>
+    </div>`).join('');
+}
+
+function aiRemoveChart(i) {
+  _aiChartImages.splice(i, 1);
+  _aiRenderChartThumbs();
+}
+
+/* ── Main run ── */
+async function aiRun() {
+  if (_aiStreaming) return;
+  const customQ = document.getElementById('ai-prompt-input')?.value?.trim() || '';
+
+  if (_aiMode === 'chart' && !_aiChartImages.length && !customQ) {
+    showToast('Upload at least one chart screenshot first', 'danger'); return;
+  }
+
+  _aiStreaming = true;
+  const btn  = document.getElementById('ai-analyse-btn');
+  const lbl  = document.getElementById('ai-btn-label');
+  if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+  if (lbl) lbl.textContent = 'Thinking…';
+
+  // Show response area
+  const responseWrap = document.getElementById('ai-response-wrap');
+  const responseBody = document.getElementById('ai-response-body');
+  const modeLabel    = document.getElementById('ai-response-mode-label');
+  const metaEl       = document.getElementById('ai-response-meta');
+  if (responseWrap) responseWrap.style.display = '';
+  if (modeLabel)    modeLabel.textContent = _AI_MODE_LABELS[_aiMode];
+  if (metaEl)       metaEl.textContent = new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Lagos' }) + ' WAT';
+  if (responseBody) { responseBody.innerHTML = '<div class="ai-thinking"><span></span><span></span><span></span></div>'; }
+
+  const userPrompt = _aiUserPrompt(_aiMode, customQ);
+
+  // Build messages — include chart images if in chart mode
+  let userContent;
+  if (_aiMode === 'chart' && _aiChartImages.length) {
+    userContent = [
+      ..._aiChartImages.map(img => ({
+        type: 'image',
+        source: { type: 'base64', media_type: img.mimeType, data: img.dataUrl.split(',')[1] }
+      })),
+      { type: 'text', text: userPrompt }
+    ];
+  } else {
+    userContent = userPrompt;
+  }
+
+  // Add to history for multi-turn
+  _aiHistory.push({ role: 'user', content: userContent });
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        system: _aiSystemPrompt(),
+        messages: _aiHistory,
+      })
+    });
+
+    const data = await response.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+
+    // Add assistant reply to history
+    _aiHistory.push({ role: 'assistant', content: text });
+
+    // Render with markdown-like formatting
+    if (responseBody) responseBody.innerHTML = _aiFormatResponse(text);
+
+    // Show history if multi-turn
+    if (_aiHistory.length > 2) _aiRenderHistory();
+
+    // Clear prompt input after use
+    const inp = document.getElementById('ai-prompt-input');
+    if (inp) inp.value = '';
+    document.querySelectorAll('.ai-chip').forEach(c => c.classList.remove('active'));
+
+  } catch (err) {
+    if (responseBody) responseBody.innerHTML = `<div class="ai-error">⚠ Connection error: ${err.message}<br>Check your internet connection and try again.</div>`;
+    _aiHistory.pop();
+  }
+
+  _aiStreaming = false;
+  if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+  if (lbl) lbl.textContent = _aiMode === 'chart' ? 'Read Chart' : 'Analyse';
+
+  // Scroll to response
+  responseWrap?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ── Format response text → HTML ── */
+function _aiFormatResponse(text) {
+  return text
+    // Bold headers: **text**
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // Italic: *text*
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    // Section headers: lines starting with # or ##
+    .replace(/^#{1,3}\s+(.+)$/gm, '<div class="ai-section-head">$1</div>')
+    // Numbered lists
+    .replace(/^(\d+)\.\s+(.+)$/gm, '<div class="ai-list-item numbered"><span class="ai-list-num">$1</span><span>$2</span></div>')
+    // Bullet points
+    .replace(/^[-•]\s+(.+)$/gm, '<div class="ai-list-item"><span class="ai-bullet">▸</span><span>$1</span></div>')
+    // Emoji lines that look like headers (start with emoji)
+    .replace(/^([\u{1F300}-\u{1FAFF}📊📅🧠🗺🔬💡⚠✦])\s+(.+)$/gmu, '<div class="ai-emoji-head"><span>$1</span><span>$2</span></div>')
+    // Horizontal rules
+    .replace(/^---$/gm, '<hr class="ai-hr">')
+    // Line breaks
+    .replace(/\n\n/g, '</p><p class="ai-p">')
+    .replace(/\n/g, '<br>')
+    // Wrap in paragraph
+    .replace(/^/, '<p class="ai-p">')
+    .replace(/$/, '</p>');
+}
+
+/* ── Conversation history ── */
+function _aiRenderHistory() {
+  const wrap   = document.getElementById('ai-history-wrap');
+  const histEl = document.getElementById('ai-history');
+  if (!wrap || !histEl) return;
+  wrap.style.display = '';
+
+  // Show only user turns (skip latest — already shown in main response)
+  const turns = _aiHistory.slice(0, -2); // exclude last user+assistant pair
+  if (!turns.length) { wrap.style.display = 'none'; return; }
+
+  histEl.innerHTML = turns.map((m, i) => {
+    const isUser = m.role === 'user';
+    const content = typeof m.content === 'string' ? m.content
+      : (m.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    return `<div class="ai-history-turn ${isUser ? 'user' : 'assistant'}">
+      <div class="ai-history-role">${isUser ? '👤 You' : '🤖 AI Coach'}</div>
+      <div class="ai-history-content">${isUser ? content.slice(0,200) + (content.length>200?'…':'') : _aiFormatResponse(content)}</div>
+    </div>`;
+  }).reverse().join('');
+}
+
+/* ── Utilities ── */
+function aiCopyResponse() {
+  const body = document.getElementById('ai-response-body');
+  if (!body) return;
+  navigator.clipboard.writeText(body.innerText).then(() => showToast('Copied ✓', 'restore'));
+}
+
+function aiClear() {
+  _aiHistory = [];
+  const responseWrap = document.getElementById('ai-response-wrap');
+  const historyWrap  = document.getElementById('ai-history-wrap');
+  if (responseWrap) responseWrap.style.display = 'none';
+  if (historyWrap)  historyWrap.style.display = 'none';
+  const inp = document.getElementById('ai-prompt-input');
+  if (inp) inp.value = '';
+}
+
+/* ── Init AI page on nav ── */
+function buildAI() {
+  _aiRenderContextPanel('daily');
+  aiSetMode('daily');
+}
+
+function _aiRenderContextPanel(mode) {
+  const panel = document.getElementById('ai-context-panel');
+  if (!panel) return;
+
+  const today     = new Date().toISOString().slice(0,10);
+  const dayName   = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
+  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().slice(0,10); })();
+  const monthKey  = today.slice(0,7);
+  const curQ      = getQuarter(today);
+  const curQKey   = `${today.slice(0,4)}-Q${curQ}`;
+
+  const total      = trades.length;
+  const wins       = trades.filter(t => t.outcome === 'Win').length;
+  const wr         = total ? ((wins / total) * 100).toFixed(1) : 0;
+  const netPnl     = trades.reduce((a, t) => a + t.pnl, 0).toFixed(1);
+  const todayTrades = trades.filter(t => t.date === today);
+  const weekTrades  = trades.filter(t => t.date >= weekStart);
+  const monthTrades = trades.filter(t => t.date.startsWith(monthKey));
+  const qTrades     = trades.filter(t => {
+    const tq = getQuarter(t.date); const ty = t.date.slice(0,4);
+    return `${ty}-Q${tq}` === curQKey;
+  });
+
+  const weekWins  = weekTrades.filter(t => t.outcome === 'Win').length;
+  const monthWins = monthTrades.filter(t => t.outcome === 'Win').length;
+  const qWins     = qTrades.filter(t => t.outcome === 'Win').length;
+  const qPnl      = qTrades.reduce((a, t) => a + t.pnl, 0).toFixed(1);
+
+  // Last emotion
+  const lastEmotion = [...trades].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,1)[0]?.emotion || '—';
+  const emotionColor = ['Calm','Confident','Relaxed','Focused'].includes(lastEmotion) ? 'green'
+    : ['Anxious','Fearful','Greedy','Revenge','Impatient'].includes(lastEmotion) ? 'red' : 'blue';
+
+  const stat = (label, val, cls='') =>
+    `<span class="ai-context-stat ${cls}">${label}: <strong>${val}</strong></span>`;
+
+  const contexts = {
+    daily: `
+      <strong style="color:var(--text);font-size:12px">${dayName}, ${today}</strong><br>
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">
+        ${stat('Today', todayTrades.length + ' trades', todayTrades.length > 0 ? 'blue' : '')}
+        ${stat('Week WR', weekTrades.length ? ((weekWins/weekTrades.length)*100).toFixed(0)+'%' : '—', weekTrades.length && weekWins/weekTrades.length >= 0.6 ? 'green' : 'red')}
+        ${stat('Week trades', weekTrades.length, 'blue')}
+        ${stat('Last emotion', lastEmotion, emotionColor)}
+        ${stat('All-time WR', wr + '%', parseFloat(wr) >= 65 ? 'green' : 'red')}
+      </div>`,
+
+    weekly: `
+      <strong style="color:var(--text);font-size:12px">Week of ${weekStart}</strong><br>
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">
+        ${stat('Trades', weekTrades.length, 'blue')}
+        ${stat('WR', weekTrades.length ? ((weekWins/weekTrades.length)*100).toFixed(0)+'%' : '—', weekTrades.length && weekWins/weekTrades.length >= 0.6 ? 'green' : 'red')}
+        ${stat('Net PnL', weekTrades.length ? (weekTrades.reduce((a,t)=>a+t.pnl,0)>=0?'+':'')+weekTrades.reduce((a,t)=>a+t.pnl,0).toFixed(1)+'%' : '—', weekTrades.reduce((a,t)=>a+t.pnl,0) >= 0 ? 'green' : 'red')}
+        ${stat('Losses', weekTrades.filter(t=>t.outcome==='Loss').length)}
+      </div>`,
+
+    monthly: `
+      <strong style="color:var(--text);font-size:12px">${monthKey}</strong><br>
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">
+        ${stat('Trades', monthTrades.length, 'blue')}
+        ${stat('WR', monthTrades.length ? ((monthWins/monthTrades.length)*100).toFixed(0)+'%' : '—', monthTrades.length && monthWins/monthTrades.length >= 0.6 ? 'green' : 'red')}
+        ${stat('PnL', monthTrades.length ? (monthTrades.reduce((a,t)=>a+t.pnl,0)>=0?'+':'')+monthTrades.reduce((a,t)=>a+t.pnl,0).toFixed(1)+'%' : '—', monthTrades.reduce((a,t)=>a+t.pnl,0) >= 0 ? 'green' : 'red')}
+        ${stat('Q' + curQ + ' trades', qTrades.length, 'purple')}
+        ${stat('Q' + curQ + ' PnL', (parseFloat(qPnl)>=0?'+':'')+qPnl+'%', parseFloat(qPnl)>=0?'green':'red')}
+      </div>`,
+
+    pattern: `
+      <strong style="color:var(--text);font-size:12px">Pattern Analysis — ${total} total trades</strong><br>
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">
+        ${stat('Overall WR', wr + '%', parseFloat(wr) >= 65 ? 'green' : 'red')}
+        ${stat('Net PnL', (parseFloat(netPnl)>=0?'+':'')+netPnl+'%', parseFloat(netPnl)>=0?'green':'red')}
+        ${stat('Wins', wins, 'green')}
+        ${stat('Losses', trades.filter(t=>t.outcome==='Loss').length, 'red')}
+        ${stat('B.E', trades.filter(t=>t.outcome==='B.E').length)}
+      </div>`,
+
+    psych: (() => {
+      const emotionMap = {};
+      trades.forEach(t => { if(t.emotion) emotionMap[t.emotion] = (emotionMap[t.emotion]||0)+1; });
+      const topEmotion = Object.entries(emotionMap).sort((a,b)=>b[1]-a[1])[0];
+      const negCount = trades.filter(t => ['Anxious','Fearful','Greedy','Revenge','Impatient'].includes(t.emotion)).length;
+      const negPnl = trades.filter(t => ['Anxious','Fearful','Greedy','Revenge','Impatient'].includes(t.emotion)).reduce((a,t)=>a+t.pnl,0).toFixed(1);
+      return `
+        <strong style="color:var(--text);font-size:12px">Psychology Snapshot</strong><br>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">
+          ${stat('Top emotion', topEmotion ? topEmotion[0] : '—', 'blue')}
+          ${stat('Negative-state trades', negCount, negCount > 5 ? 'red' : '')}
+          ${stat('Neg-state PnL', (parseFloat(negPnl)>=0?'+':'')+negPnl+'%', parseFloat(negPnl)>=0?'green':'red')}
+          ${stat('Last emotion', lastEmotion, emotionColor)}
+        </div>`;
+    })(),
+
+    plan: `
+      <strong style="color:var(--text);font-size:12px">Trading Plan Review</strong><br>
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">
+        ${stat('Models', (_pbData?.models||MODELS).length, 'purple')}
+        ${stat('Rules', (_pbData?.rules||RULES).length, 'blue')}
+        ${stat('Overall WR', wr + '%', parseFloat(wr) >= 65 ? 'green' : 'red')}
+        ${stat('All-time PnL', (parseFloat(netPnl)>=0?'+':'')+netPnl+'%', parseFloat(netPnl)>=0?'green':'red')}
+      </div>`,
+
+    chart: `
+      <strong style="color:var(--text);font-size:12px">Chart Analysis Mode</strong><br>
+      <div style="margin-top:8px;color:var(--text2);font-size:12px">
+        Upload one or more chart screenshots below. The AI will identify levels, structure, applicable models (IRL&gt;ERL, ERL&gt;IRL, NxtGen Modified, SMT+CISD), entry triggers, and rate the setup quality.
+      </div>`,
+  };
+
+  panel.innerHTML = contexts[mode] || '';
+}
+
+// Patch aiSetMode to also update context panel
+const _origAiSetMode = aiSetMode;
+
 // ── NAVIGATION ────────────────────────────────────────
 function nav(pageId, sbEl, label, extra) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -383,6 +905,7 @@ function nav(pageId, sbEl, label, extra) {
   if (pageId === 'calendar') { setTimeout(renderCalendar, 0); }
   if (pageId === 'trash') { setTimeout(renderTrash, 0); }
   if (pageId === 'monthly') { buildMonthlyReview(); }
+  if (pageId === 'ai') { buildAI(); }
 }
 
 // ── DASHBOARD: PAIR TABLE ────────────────────────────

@@ -64,6 +64,7 @@
     <div class="sb-sep"></div>
     <div class="sb-section">
       <div class="sb-section-label">Resources</div>
+      <div class="sb-item ai-glow" onclick="nav('ai',this,'AI Coach')"><span class="ico">🤖</span><span class="lbl">AI Coach</span></div>
       <div class="sb-item" onclick="nav('playbook',this,'Trading Playbook')"><span class="ico">📖</span><span class="lbl">Playbook</span></div>
       <div class="sb-item" onclick="nav('goals',this,'Goals & Milestones')"><span class="ico">🎯</span><span class="lbl">Goals</span></div>
       <div class="sb-item" onclick="nav('monthly',this,'Monthly Review')"><span class="ico">📈</span><span class="lbl">Monthly Review</span></div>
@@ -490,7 +491,84 @@
     <!-- ═══════════════════════════════════════════════
          TRASH PAGE
     ═══════════════════════════════════════════════ -->
-    <div class="page" id="page-trash">
+    <!-- ═══════════════════════════════════════════════
+         AI COACH PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-ai">
+      <div class="page-inner">
+
+        <!-- Cover -->
+        <div class="cover ai-cover">
+          <div class="cover-label">NxTGen Intelligence · Powered by Claude</div>
+          <div class="cover-title">AI Trading Coach</div>
+          <div class="cover-sub">Chart analysis · Pattern recognition · Psychology · Daily, weekly &amp; monthly reviews</div>
+        </div>
+
+        <!-- Mode selector tabs -->
+        <div class="ai-mode-bar">
+          <button class="ai-mode-btn active" data-mode="daily"   onclick="aiSetMode('daily')">📅 Daily Brief</button>
+          <button class="ai-mode-btn"         data-mode="weekly"  onclick="aiSetMode('weekly')">📊 Weekly Review</button>
+          <button class="ai-mode-btn"         data-mode="monthly" onclick="aiSetMode('monthly')">🗓 Monthly Review</button>
+          <button class="ai-mode-btn"         data-mode="pattern" onclick="aiSetMode('pattern')">🔬 Pattern Analysis</button>
+          <button class="ai-mode-btn"         data-mode="psych"   onclick="aiSetMode('psych')">🧠 Psychology</button>
+          <button class="ai-mode-btn"         data-mode="plan"    onclick="aiSetMode('plan')">🗺 Trading Plan</button>
+          <button class="ai-mode-btn"         data-mode="chart"   onclick="aiSetMode('chart')">📸 Chart Read</button>
+        </div>
+
+        <!-- Context panel — changes per mode -->
+        <div class="ai-context-panel" id="ai-context-panel"></div>
+
+        <!-- Chart upload (only visible in chart mode) -->
+        <div class="ai-chart-upload-wrap" id="ai-chart-upload-wrap" style="display:none">
+          <div class="ai-chart-upload-zone" id="ai-chart-upload-zone"
+               onclick="document.getElementById('ai-chart-file').click()">
+            <div class="ai-upload-icon">📸</div>
+            <div class="ai-upload-text">Drop chart screenshots here or click to upload</div>
+            <div class="ai-upload-hint">Supports PNG, JPG, WebP · Multiple files OK</div>
+          </div>
+          <input type="file" id="ai-chart-file" accept="image/*" multiple style="display:none"
+                 onchange="aiHandleChartUpload(this)">
+          <div class="ai-chart-thumbs" id="ai-chart-thumbs"></div>
+        </div>
+
+        <!-- Question / prompt area -->
+        <div class="ai-prompt-wrap">
+          <textarea class="ai-prompt-input" id="ai-prompt-input"
+            placeholder="Ask anything… or press Analyse to get an automatic deep-dive based on your trade data."
+            rows="3"></textarea>
+          <div class="ai-prompt-actions">
+            <div class="ai-prompt-chips" id="ai-prompt-chips"></div>
+            <button class="ai-analyse-btn" id="ai-analyse-btn" onclick="aiRun()">
+              <span class="ai-btn-icon">✦</span>
+              <span id="ai-btn-label">Analyse</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Response area -->
+        <div class="ai-response-wrap" id="ai-response-wrap" style="display:none">
+          <div class="ai-response-header">
+            <div class="ai-response-badge">
+              <span class="ai-badge-dot"></span>
+              <span id="ai-response-mode-label">Analysis</span>
+            </div>
+            <div class="ai-response-meta" id="ai-response-meta"></div>
+            <button class="wl-week-btn" onclick="aiCopyResponse()" style="font-size:10px">⎘ Copy</button>
+            <button class="wl-week-btn" onclick="aiClear()" style="font-size:10px">✕ Clear</button>
+          </div>
+          <div class="ai-response-body" id="ai-response-body"></div>
+        </div>
+
+        <!-- Chat history -->
+        <div class="ai-history-wrap" id="ai-history-wrap" style="display:none">
+          <div class="sec-head" style="margin-bottom:10px">Conversation</div>
+          <div class="ai-history" id="ai-history"></div>
+        </div>
+
+      </div>
+    </div>
+
+        <div class="page" id="page-trash">
       <div class="page-inner">
         <div class="cover" style="background:linear-gradient(135deg,#1a0a0a 0%,#2a1010 100%)">
           <div class="cover-label" style="color:#e63946">Deleted Trades · Recycle Bin</div>
