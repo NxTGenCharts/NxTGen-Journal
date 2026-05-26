@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>⚡ NxTGen Trading Journal — Premium Fintech Dashboard</title>
+<title>NxTGen Trading Journal</title>
 
 <!-- Google Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -30,7 +30,9 @@
 <div class="topbar">
   <div class="topbar-left">
     <button class="mob-ham" id="mob-ham-btn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
-    <span class="brand"><span class="brand-icon">⚡</span>NxTGen Trading Journal</span>
+    <span class="brand" onclick="nav('dashboard',null,'Dashboard')" style="cursor:pointer">
+      <img class="brand-logo-img" src="logo.svg" alt="NxTGen Trading Journal" draggable="false">
+    </span>
     <span class="sep">›</span>
     <span class="page-name" id="topbar-page">Dashboard</span>
   </div>
@@ -51,6 +53,9 @@
   <!-- ══ SIDEBAR ══ -->
   <div class="sidebar" id="sidebar">
     <div class="sb-close-btn"><button onclick="closeSidebar()" aria-label="Close menu">✕</button></div>
+    <div class="sb-logo-header">
+      <img class="sb-logo-img" src="logo.svg" alt="NxTGen Trading Journal" draggable="false">
+    </div>
     <div class="sb-section">
       <div class="sb-section-label">Journal</div>
       <div class="sb-item active" onclick="nav('dashboard',this,'Dashboard')"><span class="ico">📊</span><span class="lbl">Dashboard</span></div>

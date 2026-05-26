@@ -216,18 +216,46 @@ body{
     rgba(167,139,250,0.020) 100%);
 }
 .topbar-left{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
-.topbar-left .brand{
-  font-family:var(--font-head);font-weight:800;font-size:14px;
-  color:var(--text);letter-spacing:-0.4px;
-  display:flex;align-items:center;gap:7px;
+/* ── NxTGen Logo Brand ── */
+.topbar-left .brand {
+  display: flex; align-items: center;
+  cursor: pointer; flex-shrink: 0;
+  transition: opacity .15s;
 }
-.brand-icon{
-  width:26px;height:26px;border-radius:7px;
-  background:linear-gradient(135deg,rgba(251,191,36,0.25),rgba(251,191,36,0.12));
-  border:1px solid rgba(251,191,36,0.25);
-  display:flex;align-items:center;justify-content:center;
-  font-size:14px;flex-shrink:0;
-  box-shadow:0 0 12px rgba(251,191,36,0.15);
+.topbar-left .brand:hover { opacity: .85; }
+
+.brand-logo-img {
+  height: 36px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+  /* Dark mode default: NxTGen wordmark white, text dark→inverted */
+  filter: none;
+  transition: filter .25s ease;
+}
+
+/* Light mode: invert the whole logo so white wordmark becomes dark,
+   and dark text stays readable (double-invert = back to dark = correct) */
+[data-theme="light"] .brand-logo-img {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Also fix the SVG internal filters for light mode via CSS variables */
+[data-theme="light"] .logo-dark {
+  filter: invert(1);
+}
+[data-theme="light"] .logo-light-text {
+  filter: none;
+}
+
+/* Legacy .brand-icon — keep for any edge case */
+.brand-icon {
+  width: 26px; height: 26px; border-radius: 7px;
+  background: linear-gradient(135deg, rgba(251,191,36,0.25), rgba(251,191,36,0.12));
+  border: 1px solid rgba(251,191,36,0.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; flex-shrink: 0;
+  box-shadow: 0 0 12px rgba(251,191,36,0.15);
 }
 .topbar-left .sep{color:var(--text3);font-weight:300;font-size:16px;opacity:0.5}
 .topbar-left .page-name{color:var(--text2);font-size:12px;font-weight:400}
@@ -326,6 +354,24 @@ body{
 .layout{display:flex;flex:1;overflow:hidden}
 
 /* ════════════ SIDEBAR ══════════════════════════════ */
+
+/* ── Sidebar logo header ── */
+.sb-logo-header {
+  padding: 16px 16px 10px;
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 6px;
+  display: flex; align-items: center; justify-content: center;
+}
+.sb-logo-img {
+  height: 40px; width: auto;
+  object-fit: contain; display: block;
+  filter: none;
+  transition: filter .25s ease;
+}
+[data-theme="light"] .sb-logo-img {
+  filter: invert(1) hue-rotate(180deg);
+}
+
 .sidebar{
   width:var(--sidebar);
   background:var(--glass-2);
@@ -2914,7 +2960,7 @@ body{
 
   /* ── Topbar ── */
   .topbar{ padding:0 12px; gap:8px }
-  .topbar-left .brand{ font-size:12px }
+  .brand-logo-img { height: 24px; }
   .topbar-left .sep,
   .topbar-left .page-name{ display:none }
   .topbar-clock{ display:none }
@@ -4329,7 +4375,19 @@ body{
 
 .sm-top-bar { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 0; }
 .sm-brand { display: flex; align-items: center; gap: 9px; }
-.sm-brand-icon { width: 32px; height: 32px; background: linear-gradient(135deg,#fbbf24,#d97706); border-radius: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 4px 16px rgba(251,191,36,0.3); }
+.sm-brand-icon {
+  width: 32px; height: 32px; border-radius: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+}
+.sm-brand-logo {
+  width: 80px; height: auto;
+  object-fit: contain;
+  filter: none;
+}
+[data-theme="light"] .sm-brand-logo {
+  filter: invert(1) hue-rotate(180deg);
+}
 .sm-brand-text { display: flex; flex-direction: column; gap: 1px; }
 .sm-brand-name { font-size: 14px; font-weight: 800; letter-spacing: -0.3px; line-height: 1; }
 .sm-brand-sub  { font-size: 10px; opacity: 0.45; letter-spacing: 0.2px; }
