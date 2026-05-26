@@ -4774,7 +4774,56 @@ function smSetFmt(fmt,btn){_shareFmt=fmt;document.querySelectorAll('.sm-fmt-btn'
 function smToggleTheme(){_shareCardTheme=_shareCardTheme==='dark'?'light':'dark';const c=document.getElementById('sm-card');if(c)c.className='sm-card '+_shareCardTheme;const b=document.getElementById('sm-theme-btn');if(b)b.textContent=_shareCardTheme==='dark'?'☀️':'🌙';}
 function closeShareModal(){const o=document.getElementById('share-modal-overlay');if(!o)return;o.classList.remove('open');setTimeout(()=>o.remove(),260);}
 function _smSetLoading(btnId,spinId,lblId,on,lbl){const btn=document.getElementById(btnId),sp=document.getElementById(spinId),lb=document.getElementById(lblId);if(!btn)return;btn.disabled=on;if(sp)sp.classList.toggle('active',on);if(lb){lb.style.opacity=on?'0':'1';if(lbl&&!on)lb.textContent=lbl;}}
-async function _smCapture(){const card=document.getElementById('sm-card');return await html2canvas(card,{scale:5,useCORS:true,backgroundColor:null,logging:false,allowTaint:true,imageTimeout:0});}
+
+// Pre-load the logo as a base64 data URL so html2canvas can embed it
+let _smLogoDataUrl = null;
+async function _smGetLogoDataUrl() {
+  if (_smLogoDataUrl) return _smLogoDataUrl;
+  try {
+    const res  = await fetch('logo.svg');
+    const blob = await res.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => { _smLogoDataUrl = reader.result; resolve(reader.result); };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.warn('Logo pre-load failed:', e);
+    return null;
+  }
+}
+
+async function _smCapture() {
+  const card = document.getElementById('sm-card');
+
+  // Swap all logo img src to base64 so html2canvas can render them
+  const logoUrl  = await _smGetLogoDataUrl();
+  const logoImgs = card.querySelectorAll('img[src="logo.svg"]');
+  const origSrcs = [];
+  if (logoUrl) {
+    logoImgs.forEach(img => {
+      origSrcs.push(img.src);
+      img.src = logoUrl;
+    });
+    // Wait one frame for images to settle
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  }
+
+  const canvas = await html2canvas(card, {
+    scale: 5,
+    useCORS: true,
+    backgroundColor: null,
+    logging: false,
+    allowTaint: true,
+    imageTimeout: 3000,
+  });
+
+  // Restore original src values
+  logoImgs.forEach((img, i) => { img.src = origSrcs[i] || 'logo.svg'; });
+
+  return canvas;
+}
 async function smDownload(){
   _smSetLoading('sm-dl-btn','sm-dl-spin','sm-dl-lbl',true);
   try{const t=trades.find(x=>x.id===_shareTradeId),filename=`NxTGen_${(t||{pair:'Trade'}).pair}_${(t||{date:'trade'}).date}`,canvas=await _smCapture();
