@@ -4667,15 +4667,19 @@ function openShareModal(id) {
     <div class="sm-body">
       <div class="sm-card-wrap">
         <div class="sm-card ${_shareCardTheme}" id="sm-card">
-          <svg class="sm-chart-bg" viewBox="0 0 600 260" preserveAspectRatio="none" aria-hidden="true">
-            <defs><linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity="0.18"/><stop offset="100%" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
-            <polyline id="sm-chartline" points="0,220 70,175 140,195 210,120 280,140 350,75 420,95 490,38 600,60" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-            <polygon id="sm-chartfill" points="0,220 70,175 140,195 210,120 280,140 350,75 420,95 490,38 600,60 600,260 0,260" fill="url(#chartGrad)"/>
-          </svg>
-          <div class="sm-card-noise"></div>
-          <div class="sm-glow-blob" id="sm-glow"></div>
+          <div class="sm-bg-layer">
+            <svg class="sm-chart-bg" viewBox="0 0 600 260" preserveAspectRatio="none" aria-hidden="true">
+              <defs><linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity="0.18"/><stop offset="100%" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
+              <polyline id="sm-chartline" points="0,220 70,175 140,195 210,120 280,140 350,75 420,95 490,38 600,60" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+              <polygon id="sm-chartfill" points="0,220 70,175 140,195 210,120 280,140 350,75 420,95 490,38 600,60 600,260 0,260" fill="url(#chartGrad)"/>
+            </svg>
+            <div class="sm-card-noise"></div>
+            <div class="sm-glow-blob" id="sm-glow"></div>
+          </div>
           <div class="sm-top-bar">
-            <div class="sm-brand"><div class="sm-brand-icon">⚡</div><div class="sm-brand-text"><span class="sm-brand-name">NxTGen</span><span class="sm-brand-sub">Trading Journal</span></div></div>
+            <div class="sm-brand">
+              <img class="sm-card-logo" src="logo.svg" alt="NxTGen Trading Journal">
+            </div>
             <div class="sm-badge" id="sm-badge"></div>
           </div>
           <div class="sm-hero">
@@ -4699,7 +4703,7 @@ function openShareModal(id) {
           </div>
           <div class="sm-notes-row" id="sm-notes-row"><div class="sm-notes" id="sm-notes"></div></div>
           <div class="sm-bottom-row"><div class="sm-stars" id="sm-stars"></div><div class="sm-risk-tag">${t.risk || '—'} risk</div></div>
-          <div class="sm-footer"><span class="sm-footer-url">dabossmira.github.io/NxTGen-Journal</span><span class="sm-footer-brand">⚡ NxTGen</span></div>
+          <div class="sm-footer"><span class="sm-footer-url">dabossmira.github.io/NxTGen-Journal</span><img class="sm-footer-logo" src="logo.svg" alt="NxTGen"></div>
         </div>
       </div>
       <div class="sm-section">

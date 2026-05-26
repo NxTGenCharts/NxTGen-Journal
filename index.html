@@ -29,7 +29,11 @@
 <!-- ══ TOPBAR ══ -->
 <div class="topbar">
   <div class="topbar-left">
-    <button class="mob-ham" id="mob-ham-btn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+    <button class="sb-toggle-btn" id="sb-toggle-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar" title="Toggle sidebar">
+      <span class="sb-toggle-icon">
+        <span></span><span></span><span></span>
+      </span>
+    </button>
     <span class="brand" onclick="nav('dashboard',null,'Dashboard')" style="cursor:pointer">
       <img class="brand-logo-img" src="logo.svg" alt="NxTGen Trading Journal" draggable="false">
     </span>
@@ -48,7 +52,7 @@
 <div class="mob-overlay" id="mob-overlay" onclick="closeSidebar()"></div>
 
 <!-- ══ LAYOUT ══ -->
-<div class="layout">
+<div class="layout" id="main-layout">
 
   <!-- ══ SIDEBAR ══ -->
   <div class="sidebar" id="sidebar">
@@ -781,17 +785,44 @@
 <!-- ══ Mobile sidebar toggle ══ -->
 <script>
   function toggleSidebar() {
-    const sb = document.getElementById('sidebar');
-    const ov = document.getElementById('mob-overlay');
-    const isOpen = sb.classList.toggle('mob-open');
-    ov.classList.toggle('show', isOpen);
-    document.body.style.overflow = isOpen ? 'hidden' : '';
+    const sb  = document.getElementById('sidebar');
+    const ov  = document.getElementById('mob-overlay');
+    const btn = document.getElementById('sb-toggle-btn');
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+      const isOpen = sb.classList.toggle('mob-open');
+      ov.classList.toggle('show', isOpen);
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+      if (btn) btn.classList.toggle('active', isOpen);
+    } else {
+      const isCollapsed = sb.classList.toggle('sb-collapsed');
+      document.getElementById('main-layout').classList.toggle('sidebar-hidden', isCollapsed);
+      if (btn) btn.classList.toggle('active', !isCollapsed);
+      localStorage.setItem('sb_collapsed', isCollapsed ? '1' : '0');
+    }
   }
   function closeSidebar() {
-    document.getElementById('sidebar').classList.remove('mob-open');
-    document.getElementById('mob-overlay').classList.remove('show');
+    const sb  = document.getElementById('sidebar');
+    const ov  = document.getElementById('mob-overlay');
+    const btn = document.getElementById('sb-toggle-btn');
+    sb.classList.remove('mob-open');
+    ov.classList.remove('show');
     document.body.style.overflow = '';
+    if (btn) btn.classList.remove('active');
   }
+  // Restore sidebar collapsed state on desktop
+  (function() {
+    const collapsed = localStorage.getItem('sb_collapsed') === '1';
+    if (collapsed && window.innerWidth > 768) {
+      document.getElementById('sidebar').classList.add('sb-collapsed');
+      document.getElementById('main-layout').classList.add('sidebar-hidden');
+    } else if (window.innerWidth > 768) {
+      // Start with sidebar open on desktop by default
+      const btn = document.getElementById('sb-toggle-btn');
+      if (btn) btn.classList.add('active');
+    }
+  })();
+
   // Close sidebar on any nav item click on mobile
   document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.sb-item').forEach(function(item) {

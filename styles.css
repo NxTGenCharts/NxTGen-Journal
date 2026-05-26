@@ -221,21 +221,19 @@ body{
   display: flex; align-items: center;
   cursor: pointer; flex-shrink: 0;
   transition: opacity .15s;
+  max-width: 200px;
 }
 .topbar-left .brand:hover { opacity: .85; }
 
 .brand-logo-img {
-  height: 36px;
+  height: 30px;
   width: auto;
   display: block;
   object-fit: contain;
-  /* Dark mode default: NxTGen wordmark white, text dark→inverted */
   filter: none;
   transition: filter .25s ease;
+  max-width: 190px;
 }
-
-/* Light mode: invert the whole logo so white wordmark becomes dark,
-   and dark text stays readable (double-invert = back to dark = correct) */
 [data-theme="light"] .brand-logo-img {
   filter: invert(1) hue-rotate(180deg);
 }
@@ -2927,9 +2925,60 @@ body{
 
 /* ════════════ RESPONSIVE ════════════════════ */
 /* ── Mobile hamburger — hidden on desktop ── */
-.mob-ham{ display:none }
+/* ── Sidebar toggle button (desktop + mobile) ── */
+.mob-ham { display: none; } /* legacy — hidden */
+.sb-toggle-btn {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-1);
+  cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--t-fast);
+  padding: 0;
+}
+.sb-toggle-btn:hover { background: var(--glass-2); border-color: var(--glass-border-h); }
+.sb-toggle-icon {
+  display: flex; flex-direction: column; gap: 4px;
+  width: 16px;
+}
+.sb-toggle-icon span {
+  display: block; height: 2px; border-radius: 1px;
+  background: var(--text2); transition: all .22s ease;
+  transform-origin: center;
+}
+/* Active (sidebar open) state — animate to X */
+.sb-toggle-btn.active .sb-toggle-icon span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+  background: var(--text);
+}
+.sb-toggle-btn.active .sb-toggle-icon span:nth-child(2) {
+  opacity: 0; transform: scaleX(0);
+}
+.sb-toggle-btn.active .sb-toggle-icon span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+  background: var(--text);
+}
 .mob-overlay{ display:none }
 .sb-close-btn{ display:none }
+
+/* ── Desktop sidebar collapse ── */
+.sidebar {
+  transition: width .28s cubic-bezier(0.4,0,0.2,1),
+              opacity .2s ease,
+              transform .28s cubic-bezier(0.4,0,0.2,1);
+}
+.sidebar.sb-collapsed {
+  width: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  border-right-width: 0;
+  opacity: 0;
+}
+/* Main content expands when sidebar collapses */
+.layout.sidebar-hidden .main-content {
+  /* handled by sidebar width going to 0 — flex does the rest */
+}
 
 /* ── Table scroll wrapper ── */
 .data-table-wrap{
@@ -2960,7 +3009,8 @@ body{
 
   /* ── Topbar ── */
   .topbar{ padding:0 12px; gap:8px }
-  .brand-logo-img { height: 24px; }
+  .brand-logo-img { height: 22px; max-width: 140px; }
+  .sb-toggle-btn { width: 32px; height: 32px; border-radius: 8px; }
   .topbar-left .sep,
   .topbar-left .page-name{ display:none }
   .topbar-clock{ display:none }
@@ -4358,7 +4408,7 @@ body{
   color: rgba(15,23,42,0.95);
 }
 
-.sm-chart-bg { position: absolute; right: 0; bottom: 0; width: 65%; height: 55%; pointer-events: none; z-index: 0; opacity: 0.85; }
+.sm-chart-bg { width: 100%; height: 100%; pointer-events: none; opacity: 0.85; }
 .sm-card.light .sm-chart-bg { opacity: 0.35; }
 .sm-card-noise {
   position: absolute; inset: 0;
@@ -4366,12 +4416,18 @@ body{
   z-index: 0; pointer-events: none; opacity: 0.5;
 }
 .sm-card.light .sm-card-noise { display: none; }
-.sm-glow-blob { position: absolute; top: -60px; right: -60px; width: 260px; height: 260px; border-radius: 50%; filter: blur(70px); pointer-events: none; z-index: 0; opacity: 0.55; transition: background 0.3s; }
+.sm-glow-blob { width: 260px; height: 260px; border-radius: 50%; filter: blur(70px); pointer-events: none; opacity: 0.55; transition: background 0.3s; }
 .sm-card.light .sm-glow-blob { opacity: 0.22; }
 .glow-win  { background: radial-gradient(circle, rgba(52,211,153,0.45) 0%, transparent 65%); }
 .glow-loss { background: radial-gradient(circle, rgba(248,113,113,0.45) 0%, transparent 65%); }
 .glow-be   { background: radial-gradient(circle, rgba(251,191,36,0.40) 0%, transparent 65%); }
-.sm-card > *:not(.sm-chart-bg):not(.sm-card-noise):not(.sm-glow-blob) { position: relative; z-index: 1; }
+.sm-bg-layer {
+  position: absolute; inset: 0; z-index: 0;
+  pointer-events: none; overflow: hidden;
+}
+.sm-bg-layer .sm-chart-bg { position: absolute; right: 0; bottom: 0; width: 65%; height: 55%; }
+.sm-bg-layer .sm-glow-blob { position: absolute; top: -60px; right: -60px; }
+.sm-card > *:not(.sm-bg-layer) { position: relative; z-index: 1; }
 
 .sm-top-bar { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 0; }
 .sm-brand { display: flex; align-items: center; gap: 9px; }
@@ -4384,6 +4440,24 @@ body{
   width: 80px; height: auto;
   object-fit: contain;
   filter: none;
+}
+/* Logo in the share card — adapts to card theme (dark/light) */
+.sm-card-logo {
+  height: 32px; width: auto;
+  object-fit: contain; display: block;
+  filter: none; /* dark card: white logo fine */
+}
+.sm-card.light .sm-card-logo {
+  filter: invert(1) hue-rotate(180deg); /* light card: invert to dark */
+}
+/* Footer logo in share card */
+.sm-footer-logo {
+  height: 18px; width: auto;
+  object-fit: contain; display: block;
+  opacity: 0.35; filter: none;
+}
+.sm-card.light .sm-footer-logo {
+  filter: invert(1) hue-rotate(180deg);
 }
 [data-theme="light"] .sm-brand-logo {
   filter: invert(1) hue-rotate(180deg);
