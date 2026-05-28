@@ -2475,7 +2475,7 @@ body{
 
 /* Detail drawer */
 .acc-detail-drawer{background:var(--glass-1);border:1px solid var(--glass-border);
-  border-radius:var(--r-lg);margin-bottom:20px;overflow:hidden;
+  border-radius:var(--r-lg);margin-bottom:20px;overflow-x:visible;overflow-y:hidden;
   max-height:0;transition:max-height .3s ease, opacity .25s ease;opacity:0}
 .acc-detail-drawer.open{max-height:600px;opacity:1}
 .acc-detail-header{display:flex;align-items:center;justify-content:space-between;
@@ -3382,7 +3382,7 @@ body{
   .insight{ font-size:12px; padding:12px 14px }
 
   /* ── Pair performance table ── */
-  #pair-table-body .win-bar-wrap{ display:none }
+  .col-winbar{ display:none }
 
   /* ── Sidebar close button inside sidebar ── */
   .sb-close-btn{

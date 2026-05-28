@@ -1678,7 +1678,7 @@ function buildPairTable() {
     const wrClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
     const pnlClass = netPnl > 0 ? 'outcome-win' : 'outcome-loss';
     const barColor = wr >= 70 ? 'green' : 'red';
-    return `<tr><td class="bold">${p}</td><td>${pt.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass} mono">${netPnl > 0 ? '+' : ''}${netPnl}%</td><td><div class="win-bar-wrap"><div class="win-bar-bg"><div class="win-bar-fill ${barColor}" style="width:${wr}%"></div></div></div></td></tr>`;
+    return `<tr><td class="bold">${p}</td><td>${pt.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass} mono">${netPnl > 0 ? '+' : ''}${netPnl}%</td><td class="col-winbar"><div class="win-bar-wrap"><div class="win-bar-bg"><div class="win-bar-fill ${barColor}" style="width:${wr}%"></div></div></div></td></tr>`;
   }).join('');
 }
 
@@ -3392,38 +3392,8 @@ function _wlCloseLightbox() {
 }
 
 
-// ── ENTRY FORM ────────────────────────────────────────
-function buildEntryForm() {
-  document.getElementById('entry-form-content').innerHTML = `
-    <div class="form-grid">
-      <div class="form-field"><label class="form-label">Date</label><input type="date" class="form-input" value="${new Date().toISOString().slice(0,10)}"></div>
-      <div class="form-field"><label class="form-label">Pair</label><select class="form-select"><option>GBPUSD</option><option>XAUUSD</option><option>EURUSD</option><option>GBPJPY</option><option>USDCAD</option><option>ES</option></select></div>
-      <div class="form-field"><label class="form-label">Position</label><select class="form-select"><option>Buy</option><option>Sell</option></select></div>
-      <div class="form-field"><label class="form-label">R:R</label><input type="text" class="form-input" placeholder="1:3"></div>
-      <div class="form-field"><label class="form-label">PnL %</label><input type="number" class="form-input" step="0.1" placeholder="3.5"></div>
-      <div class="form-field"><label class="form-label">Outcome</label><select class="form-select"><option>Win</option><option>Loss</option><option>B.E</option></select></div>
-      <div class="form-field"><label class="form-label">Killzone</label><select class="form-select"><option>London</option><option>New York</option><option>Asian</option></select></div>
-      <div class="form-field"><label class="form-label">Strategy</label><select class="form-select"><option>NxtGen - Mod</option><option>IRL > ERL</option><option>ERL > IRL</option><option value="__custom__">＋ Custom…</option></select></div>
-      <div class="form-field"><label class="form-label">TF Alignment</label><select class="form-select"><option>30m > 3m</option><option>1h > 5m</option><option>1h > 3m</option><option>4h > 15m</option><option>W > 4h</option><option>D1 > 1h</option><option>15m > 3m</option><option value="__custom__">＋ Custom…</option></select></div>
-      <div class="form-field"><label class="form-label">Account</label><select class="form-select"><option>PaperTrading</option><option>GFT $5k - P1</option></select></div>
-      <div class="form-field"><label class="form-label">Rating</label><select class="form-select"><option>★★★★★</option><option>★★★★☆</option><option>★★★☆☆</option></select></div>
-      <div class="form-field"><label class="form-label">Risk</label><select class="form-select"><option>0.5%</option><option>0.8%</option><option>1%</option><option>1.5%</option></select></div>
-    </div>
-    <div class="sec-head" style="margin-top:20px">Entry Checklist</div>
-    <div class="checklist-grid">${CHECKLIST_ITEMS.map(item => `<div class="cl-item" onclick="this.classList.toggle('checked');this.querySelector('.cl-box').textContent=this.classList.contains('checked')?'✓':''"><div class="cl-box"></div><span class="cl-text">${item}</span></div>`).join('')}</div>
-    <div class="sec-head">Bias</div>
-    <div style="display:flex;gap:8px;margin-bottom:16px">
-      <div class="cl-item" onclick="this.classList.toggle('checked')"><div class="cl-box"></div><span class="cl-text">Bullish</span></div>
-      <div class="cl-item" onclick="this.classList.toggle('checked')"><div class="cl-box"></div><span class="cl-text">Bearish</span></div>
-    </div>
-    <div class="form-field" style="margin-bottom:12px"><label class="form-label">HTF Analysis</label><textarea class="form-textarea" placeholder="What is price doing on the daily?"></textarea></div>
-    <div class="form-field" style="margin-bottom:12px"><label class="form-label">LTF Entry</label><textarea class="form-textarea" placeholder="CHoCH, BOS, OB, FVG, SMT?"></textarea></div>
-    <div class="form-field" style="margin-bottom:12px"><label class="form-label">Pre-Trade Talk</label><textarea class="form-textarea" placeholder="Your mindset and thesis."></textarea></div>
-    <div class="form-field" style="margin-bottom:12px"><label class="form-label">Mistakes Made</label><textarea class="form-textarea" placeholder="What mistakes, if any?"></textarea></div>
-    <div class="form-field" style="margin-bottom:20px"><label class="form-label">Post-Trade Notes</label><textarea class="form-textarea" style="min-height:120px" placeholder="Full narrative."></textarea></div>
-    <button class="save-btn" onclick="alert('Use the + New Trade button in the topbar to save trades to the cloud.')">📋 Reference Only — Use + New Trade to Save</button>
-  `;
-}
+// ── ENTRY FORM (removed) ───────────────────────────────
+
 function previewSlot(input) {
   if (!input.files[0]) return;
   const r = new FileReader();
@@ -3545,7 +3515,7 @@ function accShowDetail(name) {
     </div>
     ${at.length === 0
       ? '<div style="color:var(--text3);text-align:center;padding:30px;font-style:italic">No trades logged under this account yet.</div>'
-      : `<div class="data-table-wrap" style="max-height:340px;overflow-y:auto">
+      : `<div class="data-table-wrap" style="max-height:340px;overflow-y:auto;overflow-x:auto">
           <table class="data-table">
             <thead><tr><th>Date</th><th>Pair</th><th>Pos</th><th>Outcome</th><th>PnL</th><th>R:R</th><th>Strategy</th></tr></thead>
             <tbody>${at.map(t => `
@@ -4247,9 +4217,9 @@ function renderQuarterPage(year, q) {
     </div>
     ${qt.length === 0 ? `<div style="text-align:center;padding:40px;color:var(--text3)">No trades logged for Q${q} ${year} yet.<br><br><button class="btn btn-primary" onclick="openModal()" style="margin-top:10px">+ Add Trade</button></div>` : `
     <div class="sec-head">Month Breakdown</div>
-    <table class="data-table" style="margin-bottom:20px"><thead><tr><th>Month</th><th>Trades</th><th>Win%</th><th>Net PnL</th><th>W/L/BE</th></tr></thead><tbody>${monthRows}</tbody></table>
+    <div class="data-table-wrap"><table class="data-table" style="margin-bottom:20px"><thead><tr><th>Month</th><th>Trades</th><th>Win%</th><th>Net PnL</th><th>W/L/BE</th></tr></thead><tbody>${monthRows}</tbody></table></div>
     <div class="sec-head" style="display:flex;align-items:center;justify-content:space-between"><span>All Trades — Q${q} ${year}</span><button class="btn" onclick="openModal()" style="font-size:11px;padding:4px 10px">+ Add Trade</button></div>
-    <table class="data-table"><thead><tr><th>Date</th><th>Pair</th><th>Pos</th><th>R:R</th><th>PnL</th><th>Outcome</th><th>Killzone</th><th>Strategy</th><th>★</th></tr></thead><tbody>${tradeRows}</tbody></table>
+    <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Pair</th><th>Pos</th><th>R:R</th><th>PnL</th><th>Outcome</th><th>Killzone</th><th>Strategy</th><th>★</th></tr></thead><tbody>${tradeRows}</tbody></table></div>
     <div style="margin-top:10px;font-size:12px;color:var(--text3)">${qt.length} trades · Click any row to view details</div>
     `}`;
 }
@@ -4827,7 +4797,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   refreshPairFilter();
   updateTrashBadge();
   buildWatchlist();
-  buildEntryForm();
   buildAccounts();
   buildPlaybook();
   buildGoals();
