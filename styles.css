@@ -3382,6 +3382,7 @@ body{
   .insight{ font-size:12px; padding:12px 14px }
 
   /* ── Pair performance table ── */
+  /* ── Pair performance table — hide win-bar column (header + cell together) ── */
   .col-winbar{ display:none }
 
   /* ── Sidebar close button inside sidebar ── */
@@ -3428,13 +3429,17 @@ body{
 .kpi-card-accent.gold{background:linear-gradient(90deg,transparent,var(--gold),transparent)}
 .kpi-card-accent.red{background:linear-gradient(90deg,transparent,var(--red),transparent)}
 
-/* Table row left accent on hover */
-.data-table tbody tr:hover td:first-child{
+/* Table row left accent on hover — via td:first-child (tr::before causes column shift in tables) */
+.data-table tbody tr td:first-child{
   position:relative;
 }
-.data-table tbody tr:hover td:first-child::before{
-  content:'';position:absolute;left:0;top:0;bottom:0;width:2px;
+.data-table tbody tr td:first-child::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:0;
   background:var(--blue);border-radius:0 2px 2px 0;opacity:.6;
+  transition:width .18s ease;
+}
+.data-table tbody tr:hover td:first-child::before{
+  width:3px;
 }
 
 /* Glass card shimmer on hover */
@@ -4050,13 +4055,7 @@ body{
 .cover{background-size:200% 200%!important;animation:coverPulse 12s ease infinite}
 
 /* ════ TABLE top-left accent on hover ═══════════════ */
-.data-table tbody tr{position:relative}
-.data-table tbody tr::before{
-  content:'';position:absolute;left:0;top:0;bottom:0;width:0;
-  background:var(--blue);transition:width .18s ease;border-radius:0 2px 2px 0;
-  opacity:.55;pointer-events:none;
-}
-.data-table tbody tr:hover::before{width:3px}
+/* accent handled via td:first-child::before below — tr::before removed (caused column shift) */
 
 /* ════ MONTH STAT VAL text-shadow ════════════════════ */
 .month-stat-val.blue{text-shadow:0 0 20px rgba(96,165,250,0.3)}

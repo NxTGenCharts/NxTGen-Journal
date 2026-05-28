@@ -3392,8 +3392,6 @@ function _wlCloseLightbox() {
 }
 
 
-// ── ENTRY FORM (removed) ───────────────────────────────
-
 function previewSlot(input) {
   if (!input.files[0]) return;
   const r = new FileReader();
