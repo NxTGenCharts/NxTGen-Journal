@@ -2607,11 +2607,28 @@ async function _wlCalLoad(weekId, startDate, endDate, forceRefresh) {
 
   body.innerHTML = '<div class="wl-cal-loading"><span></span><span></span><span></span></div>';
 
-  const wkStart = new Date(startDate + 'T00:00:00');
-  const wkEnd   = new Date((endDate || startDate) + 'T23:59:59');
-  let events    = [];
+  const wkStart  = new Date(startDate + 'T00:00:00');
+  const wkEnd    = new Date((endDate || startDate) + 'T23:59:59');
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const isPastWeek = (endDate || startDate) < todayStr;
 
-  // ── Step 1: Supabase Edge Function proxy (most reliable — fetches FF server-side) ──
+  // Helper: get monday of current week (YYYY-MM-DD)
+  function _thisMonday() {
+    const d = new Date(); const day = d.getDay();
+    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+    return d.toISOString().slice(0, 10);
+  }
+  const thisMonday = _thisMonday();
+  // Check if the requested week is exactly last week
+  const lastMonday = new Date(thisMonday + 'T00:00:00');
+  lastMonday.setDate(lastMonday.getDate() - 7);
+  const isLastWeek = startDate === lastMonday.toISOString().slice(0, 10)
+    || (wkStart >= new Date(lastMonday.toISOString().slice(0,10) + 'T00:00:00')
+        && wkEnd  <= new Date(lastMonday.toISOString().slice(0,10) + 'T00:00:00').setDate(lastMonday.getDate() + 6));
+
+  let events = [];
+
+  // ── Step 1: Supabase Edge Function proxy (handles any week server-side) ──
   try {
     const { data: { session } } = await sb.auth.getSession();
     const res = await fetch(
@@ -2634,12 +2651,16 @@ async function _wlCalLoad(weekId, startDate, endDate, forceRefresh) {
     }
   } catch (_) { /* fall through */ }
 
-  // ── Step 2: Fair Economy direct JSON (works for current & next week) ──
+  // ── Step 2: Fair Economy JSON — current week, next week, AND last week ──
+  // Note: lastweek endpoint only available for the immediately prior week.
+  // For older past weeks, skip straight to iframe (no JSON source available).
   if (!events.length) {
-    const feEndpoints = [
-      'https://nfs.faireconomy.media/ff_calendar_thisweek.json',
-      'https://nfs.faireconomy.media/ff_calendar_nextweek.json',
-    ];
+    const feEndpoints = isPastWeek
+      ? (isLastWeek ? ['https://nfs.faireconomy.media/ff_calendar_lastweek.json'] : [])
+      : [
+          'https://nfs.faireconomy.media/ff_calendar_thisweek.json',
+          'https://nfs.faireconomy.media/ff_calendar_nextweek.json',
+        ];
     for (const url of feEndpoints) {
       try {
         const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
@@ -2656,8 +2677,8 @@ async function _wlCalLoad(weekId, startDate, endDate, forceRefresh) {
     }
   }
 
-  // ── Step 3: allorigins CORS proxy of Fair Economy ──
-  if (!events.length) {
+  // ── Step 3: allorigins proxy — only useful for current week fallback ──
+  if (!events.length && !isPastWeek) {
     try {
       const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://nfs.faireconomy.media/ff_calendar_thisweek.json')}`;
       const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
@@ -2692,45 +2713,103 @@ async function _wlCalLoad(weekId, startDate, endDate, forceRefresh) {
     return;
   }
 
-  // ── Step 4: Iframe fallback — always works, shows live FF ──
+  // ── Step 4: Iframe fallback — always works, shows live FF for any week ──
+  // For past weeks this is reached immediately (after Step 1 fails) since
+  // Fair Economy JSON only carries current/next/lastweek data.
   _WL_CAL_CACHE[weekId] = { events: [], ts: Date.now(), source: 'iframe' };
   _wlCalRenderIframe(body, startDate, weekId, endDate);
 }
 
 function _wlCalRenderIframe(body, startDate, weekId, endDate) {
   const ffUrl = _wlCalBuildFFUrl(startDate);
-  // Use allorigins iframe proxy — wraps FF in a CORS-safe iframe
-  // We show the embed + a direct link button
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const isPastWeek = (endDate || startDate) < todayStr;
+  const weekLabel = endDate && endDate !== startDate ? `${startDate} – ${endDate}` : startDate;
+
   body.innerHTML = `
     <div class="wl-cal-iframe-wrap">
       <div class="wl-cal-iframe-notice">
         <span class="wl-cal-iframe-icon">📅</span>
         <div>
-          <div class="wl-cal-iframe-title">Live Forex Factory Calendar</div>
-          <div class="wl-cal-iframe-sub">Showing events for ${startDate}${endDate && endDate !== startDate ? ' – ' + endDate : ''}</div>
+          <div class="wl-cal-iframe-title">${isPastWeek ? 'Historical Calendar' : 'Live Forex Factory Calendar'}</div>
+          <div class="wl-cal-iframe-sub">${isPastWeek ? 'Events for week of ' : 'Showing events for '}${weekLabel}</div>
         </div>
         <a href="${ffUrl}" target="_blank" rel="noopener" class="wl-cal-ff-link">Open in FF ↗</a>
       </div>
       <iframe
-        src="https://ssrc.online/api/cal/?url=${encodeURIComponent(ffUrl)}"
+        src="${ffUrl}"
         class="wl-cal-iframe"
         title="Forex Factory Calendar"
-        sandbox="allow-scripts allow-same-origin allow-popups"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
         loading="lazy"
-        onerror="this.parentNode.innerHTML=_wlCalIframeError('${weekId}','${startDate}','${endDate}')"
+        onload="_wlCalIframeLoaded(this)"
+        onerror="_wlCalIframeFailed('${weekId}','${startDate}','${endDate || startDate}',this)"
       ></iframe>
+      <div class="wl-cal-iframe-blocked" id="wl-cal-iframe-blocked-${weekId}" style="display:none">
+        ${_wlCalIframeError(weekId, startDate, endDate || startDate)}
+      </div>
     </div>`;
+
+  // FF blocks iframes — show fallback after short timeout if still blank
+  setTimeout(() => {
+    const blocked = document.getElementById(`wl-cal-iframe-blocked-${weekId}`);
+    const iframe  = body.querySelector('.wl-cal-iframe');
+    if (blocked && iframe) {
+      try {
+        // If iframe is cross-origin blocked, doc will throw or be empty
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!iframeDoc || iframeDoc.body?.innerHTML?.trim() === '') {
+          iframe.style.display = 'none';
+          blocked.style.display = '';
+        }
+      } catch (_) {
+        iframe.style.display = 'none';
+        blocked.style.display = '';
+      }
+    }
+  }, 4000);
+}
+
+function _wlCalIframeLoaded(iframe) {
+  // If FF blocked embedding, the iframe will load but with empty body
+  try {
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc || doc.body?.innerHTML?.trim() === '') {
+      const weekId = iframe.closest('.wl-cal-body')?.id?.replace('wl-cal-body-','');
+      if (weekId) {
+        iframe.style.display = 'none';
+        const blocked = document.getElementById(`wl-cal-iframe-blocked-${weekId}`);
+        if (blocked) blocked.style.display = '';
+      }
+    }
+  } catch (_) {
+    // Cross-origin — means it actually loaded (FF served it), so leave visible
+  }
+}
+
+function _wlCalIframeFailed(weekId, startDate, endDate, iframe) {
+  if (iframe) iframe.style.display = 'none';
+  const blocked = document.getElementById(`wl-cal-iframe-blocked-${weekId}`);
+  if (blocked) blocked.style.display = '';
 }
 
 function _wlCalIframeError(weekId, startDate, endDate) {
   const ffUrl = _wlCalBuildFFUrl(startDate);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const isPastWeek = (endDate || startDate) < todayStr;
+  const weekLabel = endDate && endDate !== startDate ? `${startDate} – ${endDate}` : startDate;
+
+  const note = isPastWeek
+    ? `<div class="wl-cal-ff-fallback-sub">Historical calendar data is only available directly on Forex Factory. Click below to view past events for this week.</div>`
+    : `<div class="wl-cal-ff-fallback-sub">Click below to open the calendar for this week in a new tab.</div>`;
+
   return `
     <div class="wl-cal-ff-fallback">
       <div class="wl-cal-ff-fallback-icon">📅</div>
-      <div class="wl-cal-ff-fallback-title">View on Forex Factory</div>
-      <div class="wl-cal-ff-fallback-sub">Click below to open the calendar for this week in a new tab.</div>
+      <div class="wl-cal-ff-fallback-title">${isPastWeek ? 'View Past Week on Forex Factory' : 'View on Forex Factory'}</div>
+      ${note}
       <a href="${ffUrl}" target="_blank" rel="noopener" class="wl-btn-primary" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;padding:9px 20px;border-radius:999px;font-size:12px;font-weight:700;background:var(--gold);color:#000">
-        📅 Open FF Calendar for ${startDate}
+        📅 Open FF Calendar — ${weekLabel}
       </a>
       <div style="margin-top:12px">
         <button class="wl-cal-retry" onclick="_wlCalLoad('${weekId}','${startDate}','${endDate}',true)">↻ Retry data fetch</button>
