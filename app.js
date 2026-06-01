@@ -121,6 +121,7 @@ async function loadTrades() {
   const { data, error } = await sb
     .from('journal_trades')
     .select('*')
+    .eq('user_id', _currentUser.id)
     .order('trade_date', { ascending: false });
 
   if (error) {
@@ -156,6 +157,7 @@ async function loadDeletedTrades() {
   const { data, error } = await sb
     .from('journal_deleted_trades')
     .select('*')
+    .eq('user_id', _currentUser.id)
     .order('deleted_at', { ascending: false });
 
   if (error) { console.error('loadDeletedTrades error:', error.message); return; }
@@ -283,7 +285,7 @@ async function _cloudSoftDelete(t) {
   };
 
   const [del, ins] = await Promise.all([
-    sb.from('journal_trades').delete().eq('id', t.id),
+    sb.from('journal_trades').delete().eq('id', t.id).eq('user_id', _currentUser.id),
     sb.from('journal_deleted_trades').insert(deletedRow),
   ]);
 
