@@ -1671,6 +1671,11 @@ function buildPairTable() {
     return lb - la;
   });
   const tbody = document.getElementById('pair-table-body');
+  if (!tbody) return;
+  if (!pairs.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text3);text-align:center;font-style:italic;padding:16px">No trades logged yet</td></tr>';
+    return;
+  }
   tbody.innerHTML = pairs.map(p => {
     const pt = trades.filter(t => t.pair === p);
     if (!pt.length) return '';
@@ -1681,6 +1686,109 @@ function buildPairTable() {
     const pnlClass = netPnl > 0 ? 'outcome-win' : 'outcome-loss';
     const barColor = wr >= 70 ? 'green' : 'red';
     return `<tr><td class="bold">${p}</td><td>${pt.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass} mono">${netPnl > 0 ? '+' : ''}${netPnl}%</td><td class="col-winbar"><div class="win-bar-wrap"><div class="win-bar-bg"><div class="win-bar-fill ${barColor}" style="width:${wr}%"></div></div></div></td></tr>`;
+  }).join('');
+}
+
+function buildKillzoneTable() {
+  const tbody = document.getElementById('kz-table-body');
+  if (!tbody) return;
+  const KZ_META = {
+    'London':   { icon: '🇬🇧' },
+    'New York': { icon: '🗽' },
+    'Asian':    { icon: '🌏' },
+    'Tokyo':    { icon: '🗼' },
+  };
+  const sessions = [...new Set(trades.map(t => t.kz))].filter(Boolean)
+    .sort((a, b) => trades.filter(t => t.kz === b).length - trades.filter(t => t.kz === a).length);
+
+  if (!sessions.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text3);text-align:center;font-style:italic;padding:16px">No trades logged yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sessions.map(s => {
+    const st   = trades.filter(t => t.kz === s);
+    const wins = st.filter(t => t.outcome === 'Win').length;
+    const wr   = Math.round((wins / st.length) * 100);
+    const pnls = st.reduce((a, t) => a + t.pnl, 0);
+    const avg  = (pnls / st.length).toFixed(1);
+    const wrClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
+    const pnlClass = avg >= 0 ? 'outcome-win' : 'outcome-loss';
+    const grade = wr >= 80 ? 'A+' : wr >= 70 ? 'A' : wr >= 60 ? 'B' : wr >= 50 ? 'C' : 'D';
+    const gradeClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
+    const icon = (KZ_META[s] || {}).icon || '🕐';
+    return `<tr><td class="bold">${icon} ${s}</td><td>${st.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}">${avg >= 0 ? '+' : ''}${avg}%</td><td><span class="pill ${gradeClass}">${grade}</span></td></tr>`;
+  }).join('');
+}
+
+function buildStrategyTable() {
+  const tbody = document.getElementById('strategy-table-body');
+  if (!tbody) return;
+  const tagged   = trades.filter(t => t.strategy && t.strategy.trim());
+  const untagged = trades.filter(t => !t.strategy || !t.strategy.trim());
+  const strategies = [...new Set(tagged.map(t => t.strategy))]
+    .sort((a, b) => tagged.filter(t => t.strategy === b).length - tagged.filter(t => t.strategy === a).length);
+
+  if (!trades.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text3);text-align:center;font-style:italic;padding:16px">No trades logged yet</td></tr>';
+    return;
+  }
+  const rows = strategies.map(s => {
+    const st   = tagged.filter(t => t.strategy === s);
+    const wins = st.filter(t => t.outcome === 'Win').length;
+    const wr   = Math.round((wins / st.length) * 100);
+    const avg  = (st.reduce((a, t) => a + t.pnl, 0) / st.length).toFixed(1);
+    const wrClass  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
+    const pnlClass = avg >= 0 ? 'outcome-win' : 'outcome-loss';
+    return `<tr><td class="bold">${s}</td><td>${st.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}">${avg >= 0 ? '+' : ''}${avg}%</td></tr>`;
+  });
+  if (untagged.length) {
+    const uw = untagged.filter(t => t.outcome === 'Win').length;
+    const uwr = Math.round((uw / untagged.length) * 100);
+    const uavg = (untagged.reduce((a, t) => a + t.pnl, 0) / untagged.length).toFixed(1);
+    const uwc = uwr >= 70 ? 'pill-green' : uwr >= 50 ? 'pill-gold' : 'pill-red';
+    const upc = uavg >= 0 ? 'outcome-win' : 'outcome-loss';
+    rows.push(`<tr><td class="bold" style="color:var(--text2)">Untagged</td><td>${untagged.length}</td><td><span class="pill ${uwc}">${uwr}%</span></td><td class="${upc}">${uavg >= 0 ? '+' : ''}${uavg}%</td></tr>`);
+  }
+  tbody.innerHTML = rows.join('');
+}
+
+function buildMonthlyTable() {
+  const tbody = document.getElementById('monthly-table-body');
+  if (!tbody) return;
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  if (!trades.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text3);text-align:center;font-style:italic;padding:16px">No trades logged yet</td></tr>';
+    return;
+  }
+
+  // Collect all year-month keys that have trades
+  const monthKeys = [...new Set(trades.map(t => t.date.slice(0, 7)))].sort().reverse();
+
+  tbody.innerHTML = monthKeys.map(key => {
+    const [yr, mo] = key.split('-').map(Number);
+    const mt    = trades.filter(t => t.date.startsWith(key));
+    const wins  = mt.filter(t => t.outcome === 'Win').length;
+    const wr    = Math.round((wins / mt.length) * 100);
+    const net   = mt.reduce((a, t) => a + t.pnl, 0).toFixed(1);
+    const wrClass  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
+    const pnlClass = net >= 0 ? 'outcome-win' : 'outcome-loss';
+    const grade = wr >= 80 ? 'A+' : wr >= 70 ? 'A' : wr >= 60 ? 'B' : wr >= 50 ? 'C' : 'D';
+    const gradeClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
+
+    // Compute current win streak for this month
+    const sorted = [...mt].sort((a, b) => a.date.localeCompare(b.date));
+    let bestStreak = 0, cur = 0;
+    sorted.forEach(t => { if (t.outcome === 'Win') { cur++; if (cur > bestStreak) bestStreak = cur; } else cur = 0; });
+
+    return `<tr>
+      <td class="bold">${MONTH_NAMES[mo - 1]} ${yr}</td>
+      <td>${mt.length}</td>
+      <td><span class="pill ${wrClass}">${wr}%</span></td>
+      <td class="${pnlClass} mono">${net >= 0 ? '+' : ''}${net}%</td>
+      <td>${bestStreak > 0 ? bestStreak + 'W' : '—'}</td>
+      <td><span class="pill ${gradeClass}">${grade}</span></td>
+    </tr>`;
   }).join('');
 }
 
@@ -3488,7 +3596,7 @@ function previewSlot(input) {
 // ACCOUNTS — full CRUD + per-user Supabase persistence
 // Table: journal_account_data { id, user_id, payouts jsonb, milestones jsonb }
 // ═══════════════════════════════════════════════════
-let _accData   = { payouts: [], milestones: [...MILESTONES.map(m => ({ t: m, done: false }))] };
+let _accData   = { payouts: [], milestones: [] };
 let _accRowId  = null;
 
 async function _accLoad() {
@@ -3502,7 +3610,7 @@ async function _accLoad() {
   if (data) {
     _accRowId = data.id;
     _accData.payouts    = data.payouts    || [];
-    _accData.milestones = data.milestones || MILESTONES.map(m => ({ t: m, done: false }));
+    _accData.milestones = data.milestones || [];
   }
 }
 
@@ -4872,7 +4980,7 @@ async function handleLogout() {
 
 // ── REFRESH ALL VIEWS ─────────────────────────────────
 function _refreshAll() {
-  updateKPIs(); buildPairTable(); refreshPairFilter();
+  updateKPIs(); buildPairTable(); buildKillzoneTable(); buildStrategyTable(); buildMonthlyTable(); refreshPairFilter();
   buildSidebarYears(); renderCalendar(); renderTradeTable(trades); updateTrashBadge();
   buildAccounts();
 }
@@ -4928,6 +5036,9 @@ document.addEventListener('DOMContentLoaded', async function () {
   // 6. Render all UI
   updateKPIs();
   buildPairTable();
+  buildKillzoneTable();
+  buildStrategyTable();
+  buildMonthlyTable();
   buildSidebarYears();
   // Auto-highlight current quarter in sidebar on first load
   const _bootYear = new Date().getFullYear();
@@ -4950,11 +5061,15 @@ document.addEventListener('DOMContentLoaded', async function () {
 });
 
 // ── CUSTOM ACCOUNTS (localStorage) ───────────────────────────────────────
-const _DEFAULT_ACCOUNTS = ['PaperTrading', 'GFT $5k - P1'];
+const _DEFAULT_ACCOUNTS = [];
 function _getCustomAccounts() {
-  try { return JSON.parse(localStorage.getItem('nxtgen_custom_accounts') || 'null') || [..._DEFAULT_ACCOUNTS]; } catch { return [..._DEFAULT_ACCOUNTS]; }
+  if (!_currentUser) return [];
+  try { return JSON.parse(localStorage.getItem(`nxtgen_accounts_${_currentUser.id}`) || 'null') || []; } catch { return []; }
 }
-function _saveCustomAccounts(list) { try { localStorage.setItem('nxtgen_custom_accounts', JSON.stringify(list)); } catch {} }
+function _saveCustomAccounts(list) {
+  if (!_currentUser) return;
+  try { localStorage.setItem(`nxtgen_accounts_${_currentUser.id}`, JSON.stringify(list)); } catch {}
+}
 function _buildAccountOptions(current) {
   return _getCustomAccounts().map(a => `<option${a === current ? ' selected' : ''}>${a}</option>`).join('');
 }
