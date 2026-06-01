@@ -4191,6 +4191,67 @@ function updateKPIs() {
   const subEl = document.getElementById('dash-last-updated');
   if (subEl) { const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' }); subEl.textContent = 'Last updated ' + now + ' WAT'; }
 
+  // ── Dashboard insight bar — computed from this user's actual data ──
+  const insightEl = document.getElementById('dash-insight-text');
+  if (insightEl) {
+    if (total < 5) {
+      // New user / insufficient data
+      insightEl.innerHTML = 'Log at least <strong>5 trades</strong> to unlock personalised insights about your edge, sessions, and setup quality.';
+    } else {
+      // Session win rates
+      const sessions = ['London', 'New York', 'Asian'];
+      const sessionStats = sessions.map(s => {
+        const st = trades.filter(t => t.kz === s);
+        const sw = st.filter(t => t.outcome === 'Win').length;
+        return { name: s, n: st.length, wr: st.length ? (sw / st.length) * 100 : null };
+      }).filter(s => s.n >= 3);
+      sessionStats.sort((a, b) => b.wr - a.wr);
+      const bestSession  = sessionStats[0] || null;
+      const worstSession = sessionStats.length > 1 ? sessionStats[sessionStats.length - 1] : null;
+
+      // Rating performance
+      const ratingStats = [3, 4, 5].map(r => {
+        const rt = trades.filter(t => t.rating === r);
+        const rw = rt.filter(t => t.outcome === 'Win').length;
+        const rpnl = rt.reduce((a, t) => a + t.pnl, 0);
+        return { r, n: rt.length, wr: rt.length ? (rw / rt.length) * 100 : null, avgPnl: rt.length ? rpnl / rt.length : null };
+      }).filter(r => r.n >= 2);
+
+      const parts = [];
+
+      if (bestSession) {
+        const bsWr = bestSession.wr.toFixed(1);
+        let msg = `<strong>${bestSession.name}</strong> session is your strongest edge at <strong>${bsWr}%</strong> win rate`;
+        if (worstSession && worstSession.wr < bestSession.wr - 15) {
+          msg += ` — consider reducing <strong>${worstSession.name}</strong> exposure (${worstSession.wr.toFixed(1)}% win rate)`;
+        }
+        parts.push(msg);
+      }
+
+      // Rating insight — find where performance drops
+      if (ratingStats.length >= 2) {
+        const highRatings = ratingStats.filter(r => r.r >= 4);
+        const lowRatings  = ratingStats.filter(r => r.r <= 3);
+        if (highRatings.length && lowRatings.length) {
+          const avgHighWr = highRatings.reduce((a, r) => a + r.wr, 0) / highRatings.length;
+          const avgLowWr  = lowRatings.reduce((a, r) => a + r.wr, 0)  / lowRatings.length;
+          if (avgHighWr - avgLowWr > 10) {
+            const highLabels = highRatings.map(r => `<strong>${r.r}★</strong>`).join(' and ');
+            const diff = (avgHighWr - avgLowWr).toFixed(0);
+            parts.push(`Only ${highLabels} setups → your data shows lower-rated trades underperform by ~${diff}% win rate`);
+          }
+        }
+      }
+
+      if (parts.length === 0) {
+        // Fallback: just show overall stats
+        parts.push(`<strong>${total}</strong> trades logged · <strong>${wr}%</strong> win rate · Net <strong>${netPnl > 0 ? '+' : ''}${netPnl}%</strong> PnL — keep building your edge`);
+      }
+
+      insightEl.innerHTML = parts.join('. ') + '.';
+    }
+  }
+
   // ── Dashboard cover: current quarter summary ──
   const _cqYear = new Date().getFullYear();
   const _cqQ    = getQuarter(new Date().toISOString().slice(0, 10));
