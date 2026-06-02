@@ -1661,6 +1661,7 @@ function nav(pageId, sbEl, label, extra) {
   if (pageId === 'trash') { setTimeout(renderTrash, 0); }
   if (pageId === 'monthly') { buildMonthlyReview(); }
   if (pageId === 'ai') { buildAI(); }
+  if (pageId === 'profile') { setTimeout(buildProfile, 0); }
 }
 
 // ── DASHBOARD: PAIR TABLE ────────────────────────────
@@ -5340,3 +5341,335 @@ async function smShareNative(){
 }
 function _smClipboardFallback(canvas){canvas.toBlob(async blob=>{try{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);showToast('Copied to clipboard! 📋','success');}catch{const l=document.createElement('a');l.download='NxTGen_Trade.jpg';l.href=canvas.toDataURL('image/jpeg',0.96);l.click();showToast('Saved! 🖼','success');};},'image/png');}
 function _smEnsureLibs(cb){if(typeof html2canvas!=='undefined'&&typeof window.jspdf!=='undefined'){cb();return;}const h2c=document.createElement('script');h2c.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';h2c.onload=()=>{const jpdf=document.createElement('script');jpdf.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';jpdf.onload=cb;document.head.appendChild(jpdf);};document.head.appendChild(h2c);}
+
+// ════════════════════════════════════════════════════════════════════
+//  PROFILE PAGE
+// ════════════════════════════════════════════════════════════════════
+
+// ── Profile local store keys ──
+const _PK = {
+  fname:       'pf_fname',
+  lname:       'pf_lname',
+  display:     'pf_display',
+  phone:       'pf_phone',
+  timezone:    'pf_timezone',
+  bio:         'pf_bio',
+  exp:         'pf_exp',
+  market:      'pf_market',
+  session:     'pf_session',
+  risk:        'pf_risk',
+  daterange:   'pf_daterange',
+  currency:    'pf_currency',
+  weekstart:   'pf_weekstart',
+  defaultview: 'pf_defaultview',
+  affirmation: 'pf_affirmation',
+  sounds:      'pf_sounds',
+  compact:     'pf_compact',
+  autosave:    'pf_autosave',
+  avatarData:  'pf_avatar_data',
+};
+
+// ── Switch between Account / Billing / Settings / Security ──
+function profileTab(id, btn) {
+  document.querySelectorAll('.profile-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+  const section = document.getElementById('profile-tab-' + id);
+  if (section) section.classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+// ── Boot: populate fields and hero from stored data ──
+function buildProfile() {
+  // Account fields
+  _pfSet('pf-fname',    _PK.fname,    '');
+  _pfSet('pf-lname',    _PK.lname,    '');
+  _pfSet('pf-display',  _PK.display,  '');
+  _pfSet('pf-phone',    _PK.phone,    '');
+  _pfSelect('pf-timezone', _PK.timezone, 'Africa/Lagos');
+  _pfSet('pf-bio',      _PK.bio,      '');
+
+  // Trading profile fields
+  _pfSelect('pf-exp',     _PK.exp,     'Intermediate (1–3 yrs)');
+  _pfSelect('pf-market',  _PK.market,  'Forex');
+  _pfSelect('pf-session', _PK.session, 'London');
+  _pfSelect('pf-risk',    _PK.risk,    '1%');
+
+  // Settings fields
+  _pfSelect('pf-daterange',   _PK.daterange,   'This Quarter');
+  _pfSelect('pf-currency',    _PK.currency,    '% (Percentage)');
+  _pfSelect('pf-weekstart',   _PK.weekstart,   'Monday');
+  _pfSelect('pf-defaultview', _PK.defaultview, 'Quarterly');
+  _pfCheck('pf-affirmation', _PK.affirmation, true);
+  _pfCheck('pf-sounds',      _PK.sounds,      false);
+  _pfCheck('pf-compact',     _PK.compact,     false);
+  _pfCheck('pf-autosave',    _PK.autosave,    true);
+
+  // Sync email from Supabase session
+  if (_currentUser && _currentUser.email) {
+    const emailEl = document.getElementById('pf-email');
+    if (emailEl && !emailEl.value) emailEl.value = _currentUser.email;
+  }
+
+  _profileRefreshHero();
+  _profileRefreshAvatar();
+  _profileSessionMeta();
+}
+
+// ── Helper setters ──
+function _pfSet(elId, storageKey, fallback) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.value = localStorage.getItem(storageKey) || fallback;
+}
+function _pfSelect(elId, storageKey, fallback) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const stored = localStorage.getItem(storageKey) || fallback;
+  // Try to match option value or text
+  const opt = Array.from(el.options).find(o => o.value === stored || o.text === stored);
+  if (opt) el.value = opt.value;
+}
+function _pfCheck(elId, storageKey, defaultVal) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const stored = localStorage.getItem(storageKey);
+  el.checked = stored !== null ? stored === '1' : defaultVal;
+}
+
+// ── Refresh the hero banner name / email / initials ──
+function _profileRefreshHero() {
+  const fname   = localStorage.getItem(_PK.fname)   || '';
+  const lname   = localStorage.getItem(_PK.lname)   || '';
+  const display = localStorage.getItem(_PK.display) || '';
+  const email   = (_currentUser && _currentUser.email) || localStorage.getItem('pf_email') || '—';
+
+  const heroName  = document.getElementById('profile-hero-name');
+  const heroEmail = document.getElementById('profile-hero-email');
+  if (heroName) {
+    heroName.textContent = display || (fname + (lname ? ' ' + lname : '')) || 'Trader';
+  }
+  if (heroEmail) heroEmail.textContent = email;
+
+  // Update topbar avatar initials
+  _profileRefreshInitials(fname, lname, display);
+}
+
+function _profileRefreshInitials(fname, lname, display) {
+  let initials = 'TJ';
+  if (display && display.trim()) {
+    const parts = display.trim().split(/\s+/);
+    initials = parts.length >= 2
+      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      : parts[0].slice(0, 2).toUpperCase();
+  } else if (fname || lname) {
+    initials = ((fname[0] || '') + (lname[0] || '')).toUpperCase() || 'TJ';
+  }
+  document.querySelectorAll('#topbar-avatar-initials').forEach(el => el.textContent = initials);
+}
+
+// ── Avatar upload & render ──
+function profileHandleAvatar(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const dataUrl = ev.target.result;
+    localStorage.setItem(_PK.avatarData, dataUrl);
+    _profileApplyAvatar(dataUrl);
+    showToast('Avatar updated ✓', 'success');
+  };
+  reader.readAsDataURL(file);
+}
+
+function _profileRefreshAvatar() {
+  const data = localStorage.getItem(_PK.avatarData);
+  if (data) _profileApplyAvatar(data);
+}
+
+function _profileApplyAvatar(dataUrl) {
+  // Page avatar
+  const pageAvatar = document.getElementById('profile-avatar-display');
+  if (pageAvatar) {
+    pageAvatar.innerHTML = `<img src="${dataUrl}" alt="Avatar">`;
+  }
+  // Topbar avatar
+  const topbarBtn = document.getElementById('topbar-avatar-btn');
+  if (topbarBtn) {
+    const span = document.getElementById('topbar-avatar-initials');
+    if (span) {
+      topbarBtn.innerHTML = `<img src="${dataUrl}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    }
+  }
+}
+
+// ── Session meta ──
+function _profileSessionMeta() {
+  const meta = document.getElementById('profile-session-meta');
+  if (!meta) return;
+  const ua = navigator.userAgent;
+  const browser = ua.includes('Chrome') ? 'Chrome'
+    : ua.includes('Firefox') ? 'Firefox'
+    : ua.includes('Safari') ? 'Safari'
+    : ua.includes('Edge') ? 'Edge' : 'Browser';
+  const os = ua.includes('Win') ? 'Windows'
+    : ua.includes('Mac') ? 'macOS'
+    : ua.includes('Linux') ? 'Linux'
+    : ua.includes('Android') ? 'Android'
+    : ua.includes('iPhone') ? 'iOS' : 'Unknown OS';
+  meta.textContent = `${browser} on ${os} · Active now`;
+}
+
+// ── Save handlers ──
+function profileSaveAccount() {
+  const fname   = document.getElementById('pf-fname')?.value.trim()   || '';
+  const lname   = document.getElementById('pf-lname')?.value.trim()   || '';
+  const display = document.getElementById('pf-display')?.value.trim() || '';
+  const email   = document.getElementById('pf-email')?.value.trim()   || '';
+  const phone   = document.getElementById('pf-phone')?.value.trim()   || '';
+  const tz      = document.getElementById('pf-timezone')?.value       || '';
+  const bio     = document.getElementById('pf-bio')?.value.trim()     || '';
+
+  localStorage.setItem(_PK.fname,    fname);
+  localStorage.setItem(_PK.lname,    lname);
+  localStorage.setItem(_PK.display,  display);
+  localStorage.setItem('pf_email',   email);
+  localStorage.setItem(_PK.phone,    phone);
+  localStorage.setItem(_PK.timezone, tz);
+  localStorage.setItem(_PK.bio,      bio);
+
+  _profileRefreshHero();
+  showToast('Account info saved ✓', 'success');
+}
+
+function profileSaveTrading() {
+  localStorage.setItem(_PK.exp,     document.getElementById('pf-exp')?.value     || '');
+  localStorage.setItem(_PK.market,  document.getElementById('pf-market')?.value  || '');
+  localStorage.setItem(_PK.session, document.getElementById('pf-session')?.value || '');
+  localStorage.setItem(_PK.risk,    document.getElementById('pf-risk')?.value    || '');
+  showToast('Trading profile saved ✓', 'success');
+}
+
+function profileSaveSettings() {
+  localStorage.setItem(_PK.daterange,   document.getElementById('pf-daterange')?.value   || '');
+  localStorage.setItem(_PK.currency,    document.getElementById('pf-currency')?.value    || '');
+  localStorage.setItem(_PK.weekstart,   document.getElementById('pf-weekstart')?.value   || '');
+  localStorage.setItem(_PK.defaultview, document.getElementById('pf-defaultview')?.value || '');
+  localStorage.setItem(_PK.affirmation, document.getElementById('pf-affirmation')?.checked ? '1' : '0');
+  localStorage.setItem(_PK.sounds,      document.getElementById('pf-sounds')?.checked      ? '1' : '0');
+  localStorage.setItem(_PK.compact,     document.getElementById('pf-compact')?.checked     ? '1' : '0');
+  localStorage.setItem(_PK.autosave,    document.getElementById('pf-autosave')?.checked    ? '1' : '0');
+  showToast('Settings saved ✓', 'success');
+}
+
+// ── Password change ──
+async function profileChangePassword() {
+  const curr    = document.getElementById('pf-pw-current')?.value  || '';
+  const newPw   = document.getElementById('pf-pw-new')?.value      || '';
+  const confirm = document.getElementById('pf-pw-confirm')?.value  || '';
+
+  if (!newPw || newPw.length < 8) {
+    showToast('New password must be at least 8 characters', 'danger'); return;
+  }
+  if (newPw !== confirm) {
+    showToast('Passwords do not match', 'danger'); return;
+  }
+
+  showToast('Updating password…', 'restore');
+
+  const { error } = await sb.auth.updateUser({ password: newPw });
+  if (error) {
+    showToast('Password update failed: ' + error.message, 'danger');
+  } else {
+    showToast('Password updated successfully ✓', 'success');
+    ['pf-pw-current','pf-pw-new','pf-pw-confirm'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+  }
+}
+
+// ── Sign out ──
+function profileSignOut() {
+  openGlassModal({
+    icon: '🚪',
+    title: 'Sign Out',
+    body: 'Are you sure you want to sign out of NxTGen Journal?',
+    confirmLabel: 'Sign Out',
+    confirmClass: 'glass-btn-danger',
+    onConfirm: async () => {
+      await sb.auth.signOut();
+      window.location.href = 'login.html';
+    }
+  });
+}
+
+// ── Export JSON ──
+function profileExportJSON() {
+  if (!trades.length) { showToast('No trades to export', 'danger'); return; }
+  const data = JSON.stringify({ exported: new Date().toISOString(), trades }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `NxTGen_Trades_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Exported ' + trades.length + ' trades as JSON ✓', 'success');
+}
+
+// ── Export CSV ──
+function profileExportCSV() {
+  if (!trades.length) { showToast('No trades to export', 'danger'); return; }
+  const headers = ['Date','Pair','Position','R:R','PnL%','Outcome','Killzone','Strategy','TF','Account','Rating','Risk','Notes'];
+  const rows = trades.map(t => [
+    t.date, t.pair, t.pos, t.rr,
+    t.pnl, t.outcome, t.kz, t.strategy || '',
+    t.tf || '', t.account || '', t.rating || '',
+    t.risk || '', (t.notes || '').replace(/"/g, '""')
+  ].map(v => `"${v}"`).join(','));
+  const csv  = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `NxTGen_Trades_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Exported ' + trades.length + ' trades as CSV ✓', 'success');
+}
+
+// ── Confirm clear all trades ──
+function profileConfirmClearData() {
+  openGlassModal({
+    icon: '🗑️',
+    title: 'Clear All Trades',
+    body: `This will permanently delete all ${trades.length} trade records from your account. This action cannot be undone.`,
+    confirmLabel: 'Delete All',
+    confirmClass: 'glass-btn-danger',
+    onConfirm: async () => {
+      showToast('Deleting all trades…', 'restore');
+      const { error } = await sb.from('journal_trades')
+        .delete()
+        .eq('user_id', _currentUser.id);
+      if (error) { showToast('Failed: ' + error.message, 'danger'); return; }
+      trades = [];
+      tradeState = {};
+      renderAll();
+      showToast('All trades deleted', 'danger');
+    }
+  });
+}
+
+// ── Confirm delete account ──
+function profileConfirmDeleteAccount() {
+  openGlassModal({
+    icon: '⚠️',
+    title: 'Delete Account',
+    body: 'This will permanently delete your account and all data. This cannot be undone. Are you absolutely sure?',
+    confirmLabel: 'Delete My Account',
+    confirmClass: 'glass-btn-danger',
+    onConfirm: () => showToast('Please contact support to delete your account.', 'restore')
+  });
+}
+
+// ── end of profile module ──

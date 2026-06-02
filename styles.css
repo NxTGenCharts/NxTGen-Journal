@@ -4905,3 +4905,319 @@ body{
   border-radius: 99px;
   transition: width 0.12s ease;
 }
+
+/* ════════════════════════════════════════════════════════
+   PROFILE PAGE
+   ════════════════════════════════════════════════════════ */
+
+/* ── Topbar avatar ── */
+.topbar-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(96,165,250,0.28), rgba(52,211,153,0.20));
+  border: 1.5px solid rgba(96,165,250,0.35);
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--t-fast);
+  flex-shrink: 0;
+  overflow: hidden;
+  padding: 0;
+}
+.topbar-avatar:hover {
+  border-color: rgba(96,165,250,0.65);
+  box-shadow: 0 0 0 3px rgba(96,165,250,0.12);
+  transform: scale(1.06);
+}
+.topbar-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+
+/* ── Profile hero banner ── */
+.profile-hero {
+  position: relative;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  margin-bottom: 20px;
+  border: 1px solid var(--glass-border);
+}
+.profile-hero-bg {
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg,
+    rgba(96,165,250,0.15) 0%,
+    rgba(52,211,153,0.08) 40%,
+    rgba(167,139,250,0.12) 100%);
+  backdrop-filter: var(--blur-md);
+}
+[data-theme="light"] .profile-hero-bg {
+  background: linear-gradient(135deg,
+    rgba(96,165,250,0.12) 0%,
+    rgba(52,211,153,0.07) 40%,
+    rgba(167,139,250,0.10) 100%);
+}
+.profile-hero-content {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 20px;
+  padding: 28px 28px;
+}
+@media (max-width: 520px) {
+  .profile-hero-content { flex-direction: column; align-items: flex-start; padding: 20px 16px; }
+}
+
+/* Avatar */
+.profile-avatar-wrap { position: relative; flex-shrink: 0; }
+.profile-avatar-ring {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  padding: 3px;
+  background: linear-gradient(135deg, var(--blue), var(--teal));
+}
+.profile-avatar {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  background: var(--bg2);
+  border: 2px solid var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 700;
+  color: var(--blue);
+  letter-spacing: .5px;
+  overflow: hidden;
+}
+.profile-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.profile-avatar-edit-btn {
+  position: absolute; bottom: -2px; right: -2px;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--bg3);
+  border: 1.5px solid var(--glass-border-h);
+  font-size: 10px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text2);
+  transition: var(--t-fast);
+}
+.profile-avatar-edit-btn:hover { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+/* Hero info */
+.profile-hero-info { flex: 1; min-width: 0; }
+.profile-hero-name {
+  font-size: 22px; font-weight: 700;
+  color: var(--text); line-height: 1.2;
+  margin-bottom: 4px;
+}
+.profile-hero-email { font-size: 13px; color: var(--text2); margin-bottom: 10px; }
+.profile-hero-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.profile-badge {
+  padding: 3px 10px; border-radius: var(--r-full);
+  font-size: 11px; font-weight: 600; letter-spacing: .3px;
+}
+.profile-badge.blue { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(96,165,250,0.2); }
+.profile-badge.green { background: var(--green-dim); color: var(--green); border: 1px solid rgba(52,211,153,0.2); }
+
+/* ── Profile section tabs ── */
+.profile-tabs {
+  display: flex; gap: 4px;
+  margin-bottom: 20px;
+  padding: 4px;
+  background: var(--glass-1);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  width: fit-content;
+  flex-wrap: wrap;
+}
+.profile-tab {
+  padding: 7px 18px;
+  border-radius: calc(var(--r-lg) - 2px);
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  font-size: 13px; font-weight: 500;
+  cursor: pointer;
+  transition: var(--t-fast);
+  font-family: var(--font-body);
+}
+.profile-tab:hover { color: var(--text); background: var(--glass-2); }
+.profile-tab.active {
+  background: var(--glass-3);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+  border: 1px solid var(--glass-border-h);
+}
+
+/* ── Profile section panels ── */
+.profile-section { display: none; }
+.profile-section.active { display: block; }
+
+/* ── Profile card ── */
+.profile-card {
+  background: var(--glass-1);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-xl);
+  padding: 22px 24px;
+  margin-bottom: 16px;
+  transition: border-color 0.2s;
+}
+.profile-card:hover { border-color: var(--glass-border-h); }
+.profile-card-head {
+  display: flex; align-items: flex-start; gap: 14px;
+  margin-bottom: 20px;
+}
+.profile-card-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.profile-card-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+.profile-card-sub { font-size: 12px; color: var(--text3); }
+.profile-save-btn { margin-left: auto; white-space: nowrap; flex-shrink: 0; }
+
+/* ── Profile form grid ── */
+.profile-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.profile-field { display: flex; flex-direction: column; gap: 6px; }
+.profile-field.full { grid-column: 1 / -1; }
+.profile-label { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: .5px; text-transform: uppercase; }
+.profile-input,
+.profile-select,
+.profile-textarea {
+  background: var(--glass-2);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 9px 12px;
+  transition: var(--t-fast);
+  outline: none;
+  width: 100%;
+}
+.profile-input:focus,
+.profile-select:focus,
+.profile-textarea:focus {
+  border-color: var(--border-focus);
+  background: var(--glass-3);
+  box-shadow: 0 0 0 3px rgba(96,165,250,0.08);
+}
+.profile-textarea { resize: vertical; min-height: 72px; }
+
+@media (max-width: 600px) {
+  .profile-form-grid { grid-template-columns: 1fr; }
+  .profile-field.full { grid-column: 1; }
+}
+
+/* ── Toggle switches ── */
+.profile-toggle-row {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border2);
+  gap: 16px;
+}
+.profile-toggle-row:last-child { border-bottom: none; }
+.profile-toggle-label { font-size: 13px; font-weight: 500; color: var(--text); }
+.profile-toggle-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.profile-toggle-switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; cursor: pointer; }
+.profile-toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.profile-toggle-track {
+  position: absolute; inset: 0;
+  background: var(--glass-3);
+  border: 1px solid var(--glass-border-h);
+  border-radius: var(--r-full);
+  transition: var(--t-med);
+}
+.profile-toggle-track::after {
+  content: '';
+  position: absolute;
+  left: 3px; top: 50%; transform: translateY(-50%);
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--text3);
+  transition: var(--t-med);
+}
+.profile-toggle-switch input:checked + .profile-toggle-track {
+  background: rgba(52,211,153,0.20);
+  border-color: rgba(52,211,153,0.35);
+}
+.profile-toggle-switch input:checked + .profile-toggle-track::after {
+  left: calc(100% - 17px);
+  background: var(--green);
+}
+
+/* ── Billing plans ── */
+.billing-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+.billing-plan {
+  position: relative;
+  padding: 20px;
+  border-radius: var(--r-lg);
+  border: 1.5px solid var(--glass-border);
+  background: var(--glass-1);
+  transition: var(--t-med);
+}
+.billing-plan.active {
+  border-color: rgba(96,165,250,0.35);
+  background: var(--blue-dim);
+}
+.billing-plan:hover { border-color: var(--glass-border-h); transform: translateY(-1px); }
+.billing-plan-name { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.billing-plan-price { font-size: 26px; font-weight: 800; color: var(--text); margin-bottom: 14px; }
+.billing-plan-price span { font-size: 13px; font-weight: 400; color: var(--text2); }
+.billing-plan-features { list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+.billing-plan-current-badge {
+  margin-top: 12px;
+  text-align: center; font-size: 11px;
+  color: var(--blue); font-weight: 600;
+  letter-spacing: .5px;
+}
+.billing-plan-badge {
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+  background: linear-gradient(90deg, var(--blue), var(--teal));
+  color: var(--bg);
+  font-size: 10px; font-weight: 700;
+  padding: 2px 10px; border-radius: var(--r-full);
+  white-space: nowrap;
+}
+.billing-empty-state {
+  text-align: center;
+  padding: 28px 0;
+}
+
+/* ── Data management buttons ── */
+.profile-data-actions { display: flex; flex-direction: column; gap: 8px; }
+.profile-data-btn {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px;
+  background: var(--glass-2);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-size: 13px; font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: var(--t-fast);
+  font-family: var(--font-body);
+}
+.profile-data-btn:hover { background: var(--glass-3); border-color: var(--glass-border-h); }
+.profile-data-btn.danger { color: var(--red); border-color: rgba(248,113,113,0.18); }
+.profile-data-btn.danger:hover { background: var(--red-dim); border-color: rgba(248,113,113,0.35); }
+.profile-data-btn span { font-size: 18px; flex-shrink: 0; }
+.profile-data-btn-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+/* ── Security sessions ── */
+.profile-session-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border2);
+}
+.profile-session-row:last-child { border-bottom: none; }
+.profile-session-icon { font-size: 20px; flex-shrink: 0; }
+.profile-session-name { font-size: 13px; font-weight: 500; color: var(--text); }
+.profile-session-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+/* ── Danger zone ── */
+.danger-zone { border-color: rgba(248,113,113,0.15) !important; }
+.danger-zone:hover { border-color: rgba(248,113,113,0.30) !important; }
+
