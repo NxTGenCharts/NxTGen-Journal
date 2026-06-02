@@ -472,26 +472,14 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const SUPABASE_URL  = 'https://jlqgdwfbwdiieafhwisy.supabase.co';
-  const SUPABASE_ANON = 'sb_publishable_t_Bu9PTxcykClDo-_hvO5w_avgOKCDt'; // ← Replace this with your real anon key from Supabase Dashboard → Settings → API
+  const SUPABASE_ANON = 'sb_publishable_t_Bu9PTxcykClDo-_hvO5w_avgOKCDt';
 
-  // Guard: show helpful error if key hasn't been replaced
-  if (SUPABASE_ANON === 'sb_publishable_t_Bu9PTxcykClDo-_hvO5w_avgOKCDt') {
-    const banner = document.createElement('div');
-    banner.style.cssText = 'position:fixed;top:32px;left:0;right:0;z-index:999;background:#f97878;color:#fff;font-family:monospace;font-size:13px;padding:10px 16px;text-align:center;';
-    banner.innerHTML = '⚠️ <strong>Setup required:</strong> Open login.html, find <code>sb_publishable_t_Bu9PTxcykClDo-_hvO5w_avgOKCDt</code> and replace it with your Supabase anon key from <strong>supabase.com → Project Settings → API → anon public</strong>';
-    document.body.appendChild(banner);
-  }
+
   const BASE = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '');
   const { createClient } = supabase;
   const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-  // Guard: show setup banner if API key is still placeholder
-  if (SUPABASE_ANON.startsWith('PASTE_YOUR')) {
-    const b = document.createElement('div');
-    b.style.cssText = 'position:fixed;top:32px;left:0;right:0;z-index:9999;background:#c53030;color:#fff;font-family:monospace;font-size:12px;padding:10px 14px;text-align:center;line-height:1.5;';
-    b.innerHTML = '&#9888; <strong>API key missing!</strong> Open login.html &rarr; find <code style="background:rgba(0,0,0,0.3);padding:1px 6px;border-radius:3px;">sb_publishable_t_Bu9PTxcykClDo-_hvO5w_avgOKCDt</code> &rarr; replace with your key from <strong>Supabase Dashboard &rarr; Project Settings &rarr; API &rarr; anon public</strong>';
-    document.body.prepend(b);
-  }
+
 
   window.addEventListener('load', () => {
     setTimeout(() => {
