@@ -3630,8 +3630,7 @@ async function _accSave() {
     milestones: _accData.milestones,
     accounts:   _accData.accounts,
   };
-  // Always upsert by user_id — works on first save, on any device, and after
-  // the unique-constraint would have blocked a plain insert on a second device.
+  // Always upsert - works on first device, second device, any device
   const { data, error } = await sb
     .from('journal_account_data')
     .upsert(row, { onConflict: 'user_id' })
@@ -5055,15 +5054,17 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (event === 'SIGNED_OUT') window.location.replace('./login.html');
   });
 
-  // 5. Load data from Supabase
+  // 5. Load data from Supabase - fire all requests in parallel for speed
   loadTrashSettings();
-  await loadTrades();
-  await loadDeletedTrades();
-  await _wlLoad();
-  await _goalsLoad();
-  await _pbLoad();
-  await _accLoad();
-  await _profileLoad();
+  await Promise.all([
+    loadTrades(),
+    loadDeletedTrades(),
+    _wlLoad(),
+    _goalsLoad(),
+    _pbLoad(),
+    _accLoad(),
+    _profileLoad(),
+  ]);
   await runAutoCleanup();
 
   // 6. Render all UI
@@ -5190,10 +5191,17 @@ function _rebuildAccMgrList() {
         ${a.type ? `<span class="acc-mgr-type-badge">${a.type}</span>` : ''}
       </div>
       <div class="acc-mgr-actions">
-        <button onclick="_editAccount(${i})" class="acc-mgr-btn edit" title="Edit">✏</button>
-        <button onclick="_toggleArchiveAccount(${i})" class="acc-mgr-btn ${a.status === 'archived' ? 'restore' : 'archive'}"
-          title="${a.status === 'archived' ? 'Restore' : 'Archive'}">${a.status === 'archived' ? '↩' : '📦'}</button>
-        <button onclick="_deleteAccount(${i})" class="acc-mgr-btn del" title="Delete permanently">🗑</button>
+        <button onclick="_editAccount(${i})" class="acc-mgr-btn edit" title="Edit">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button onclick="_toggleArchiveAccount(${i})" class="acc-mgr-btn ${a.status === 'archived' ? 'restore' : 'archive'}" title="${a.status === 'archived' ? 'Restore' : 'Archive'}">
+          ${a.status === 'archived'
+            ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.28"/></svg>`
+            : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`}
+        </button>
+        <button onclick="_deleteAccount(${i})" class="acc-mgr-btn del" title="Delete permanently">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
       </div>
     </div>`;
 
