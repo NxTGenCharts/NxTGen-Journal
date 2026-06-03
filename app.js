@@ -3627,11 +3627,19 @@ async function _accSave() {
     accounts:   _accData.accounts,
   };
   if (_accRowId) {
-    await sb.from('journal_account_data').update(row).eq('id', _accRowId);
+    const { error } = await sb.from('journal_account_data').update(row).eq('id', _accRowId);
+    if (error) { showToast('Account save failed: ' + error.message, 'danger'); return false; }
   } else {
-    const { data } = await sb.from('journal_account_data').insert(row).select('id').single();
+    // Use upsert so a row created on another device doesn't cause a duplicate-key error
+    const { data, error } = await sb
+      .from('journal_account_data')
+      .upsert(row, { onConflict: 'user_id' })
+      .select('id')
+      .single();
+    if (error) { showToast('Account save failed: ' + error.message, 'danger'); return false; }
     if (data) _accRowId = data.id;
   }
+  return true;
 }
 
 // ── ACCOUNTS ──────────────────────────────────────────
