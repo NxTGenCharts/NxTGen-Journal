@@ -1657,7 +1657,7 @@ function nav(pageId, sbEl, label, extra) {
   if (pageId === 'tradelog') renderTradeTable(trades);
   renderCalendar();
   if (pageId === 'quarter' && extra) { renderQuarterPage(extra.year, extra.q); }
-  if (pageId === 'calendar') { setTimeout(renderCalendar, 0); }
+  if (pageId === 'calendar') { _refreshCalendarAccountFilter(); setTimeout(renderCalendar, 0); }
   if (pageId === 'trash') { setTimeout(renderTrash, 0); }
   if (pageId === 'monthly') { buildMonthlyReview(); }
   if (pageId === 'ai') { buildAI(); }
@@ -3595,16 +3595,16 @@ function previewSlot(input) {
 
 // ═══════════════════════════════════════════════════
 // ACCOUNTS — full CRUD + per-user Supabase persistence
-// Table: journal_account_data { id, user_id, payouts jsonb, milestones jsonb }
+// Table: journal_account_data { id, user_id, payouts jsonb, milestones jsonb, accounts jsonb }
 // ═══════════════════════════════════════════════════
-let _accData   = { payouts: [], milestones: [] };
+let _accData   = { payouts: [], milestones: [], accounts: [] };
 let _accRowId  = null;
 
 async function _accLoad() {
   if (!_currentUser) return;
   const { data, error } = await sb
     .from('journal_account_data')
-    .select('id, payouts, milestones')
+    .select('id, payouts, milestones, accounts')
     .eq('user_id', _currentUser.id)
     .maybeSingle();
   if (error) { console.error('accLoad:', error.message); return; }
@@ -3612,12 +3612,20 @@ async function _accLoad() {
     _accRowId = data.id;
     _accData.payouts    = data.payouts    || [];
     _accData.milestones = data.milestones || [];
+    _accData.accounts   = (data.accounts  || []).map(a =>
+      typeof a === 'string' ? { name: a, status: 'active', type: '', notes: '' } : a
+    );
   }
 }
 
 async function _accSave() {
   if (!_currentUser) return;
-  const row = { user_id: _currentUser.id, payouts: _accData.payouts, milestones: _accData.milestones };
+  const row = {
+    user_id:    _currentUser.id,
+    payouts:    _accData.payouts,
+    milestones: _accData.milestones,
+    accounts:   _accData.accounts,
+  };
   if (_accRowId) {
     await sb.from('journal_account_data').update(row).eq('id', _accRowId);
   } else {
@@ -3635,42 +3643,53 @@ function buildAccounts() {
 
 /* ── Account cards ── */
 function _renderAccGrid() {
-  const accountNames = _getCustomAccounts();
+  const accounts = _getCustomAccounts();
   const grid = document.getElementById('accounts-grid');
   if (!grid) return;
 
-  if (!accountNames.length) {
+  if (!accounts.length) {
     grid.innerHTML = `<div class="acc-empty">No accounts yet — click <strong>⚙ Manage Accounts</strong> to add one.</div>`;
     return;
   }
 
-  grid.innerHTML = accountNames.map((name, idx) => {
+  // Separate active and archived
+  const active   = accounts.filter(a => a.status !== 'archived');
+  const archived = accounts.filter(a => a.status === 'archived');
+
+  const renderCard = (a) => {
+    const name = a.name;
     const at   = trades.filter(t => t.account === name);
     const wins = at.filter(t => t.outcome === 'Win').length;
     const wr   = at.length ? ((wins / at.length) * 100).toFixed(1) : null;
-    const pnl  = at.reduce((a, t) => a + t.pnl, 0);
-    const pnlStr = at.length ? (pnl >= 0 ? '+' : '') + pnl.toFixed(1) + '%' : null;
+    const pnl  = at.reduce((s, t) => s + t.pnl, 0);
+    const pnlStr   = at.length ? (pnl >= 0 ? '+' : '') + pnl.toFixed(1) + '%' : null;
     const pnlColor = pnl > 0 ? 'var(--green)' : pnl < 0 ? 'var(--red)' : 'var(--text2)';
     const wrColor  = wr !== null ? (parseFloat(wr) >= 60 ? 'var(--green)' : 'var(--red)') : 'var(--text3)';
-
-    // Last 5 trade outcomes as mini dots
-    const last5 = [...at].sort((a,b) => b.date.localeCompare(a.date)).slice(0,5).reverse();
+    const last5 = [...at].sort((x,y) => y.date.localeCompare(x.date)).slice(0,5).reverse();
     const dots  = last5.map(t =>
-      `<span class="acc-dot ${t.outcome === 'Win' ? 'w' : t.outcome === 'Loss' ? 'l' : 'b'}"></span>`
+      `<span class="acc-dot ${t.outcome==='Win'?'w':t.outcome==='Loss'?'l':'b'}"></span>`
     ).join('');
-
+    const isArchived = a.status === 'archived';
     return `
-    <div class="acc-card" onclick="accShowDetail('${name.replace(/'/g,"\\'")}')">
+    <div class="acc-card${isArchived ? ' acc-card-archived' : ''}" onclick="${isArchived ? '' : `accShowDetail('${name.replace(/'/g,"\\'")}')` }">
       <div class="acc-card-head">
-        <div class="acc-name">${name}</div>
-        <span class="acc-status active">Active</span>
+        <div class="acc-name">${name}${a.type ? `<span class="acc-type-badge">${a.type}</span>` : ''}</div>
+        <span class="acc-status ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span>
       </div>
       <div class="acc-row"><span class="k">Trades</span><span class="v">${at.length || '—'}</span></div>
       <div class="acc-row"><span class="k">Win Rate</span><span class="v" style="color:${wrColor}">${wr !== null ? wr + '%' : '—'}</span></div>
       <div class="acc-row"><span class="k">Net PnL</span><span class="v" style="color:${pnlColor}">${pnlStr || '—'}</span></div>
       ${last5.length ? `<div class="acc-recent-dots">${dots}<span class="acc-recent-label">Recent</span></div>` : ''}
+      ${isArchived ? `<button class="acc-restore-btn" onclick="event.stopPropagation();_restoreAccountByName('${name.replace(/'/g,"\\'")}')">↩ Restore</button>` : ''}
     </div>`;
-  }).join('');
+  };
+
+  let html = active.map(renderCard).join('');
+  if (archived.length) {
+    html += `<div class="acc-archived-divider"><span>Archived (${archived.length})</span></div>`;
+    html += archived.map(renderCard).join('');
+  }
+  grid.innerHTML = html;
 }
 
 /* ── Account detail drawer ── */
@@ -5032,6 +5051,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   await _goalsLoad();
   await _pbLoad();
   await _accLoad();
+  await _profileLoad();
   await runAutoCleanup();
 
   // 6. Render all UI
@@ -5054,26 +5074,55 @@ document.addEventListener('DOMContentLoaded', async function () {
   buildGoals();
   buildMonthlyReview();
   renderTradeTable(trades);
+  _refreshCalendarAccountFilter();
   renderCalendar();
+  _injectTopbarAvatar();
 
   // 7. Live clock
   updateClock();
   setInterval(updateClock, 1000);
 });
 
-// ── CUSTOM ACCOUNTS (localStorage) ───────────────────────────────────────
-const _DEFAULT_ACCOUNTS = [];
-function _getCustomAccounts() {
-  if (!_currentUser) return [];
-  try { return JSON.parse(localStorage.getItem(`nxtgen_accounts_${_currentUser.id}`) || 'null') || []; } catch { return []; }
+// ── CUSTOM ACCOUNTS — Cloud-synced via journal_account_data ──────────────
+// Accounts stored as: { name, status:'active'|'archived', type:'', notes:'' }
+// They live in the same journal_account_data row alongside payouts/milestones.
+
+function _getCustomAccounts()  {
+  // Returns full account objects
+  return (_accData.accounts || []);
 }
-function _saveCustomAccounts(list) {
+function _getActiveAccounts() {
+  return _getCustomAccounts().filter(a => a.status !== 'archived');
+}
+function _getArchivedAccounts() {
+  return _getCustomAccounts().filter(a => a.status === 'archived');
+}
+function _getAccountNames() {
+  // For backward-compat: returns names of ALL accounts (active + archived)
+  return _getCustomAccounts().map(a => a.name);
+}
+function _getActiveAccountNames() {
+  return _getActiveAccounts().map(a => a.name);
+}
+
+async function _saveCustomAccounts(list) {
   if (!_currentUser) return;
-  try { localStorage.setItem(`nxtgen_accounts_${_currentUser.id}`, JSON.stringify(list)); } catch {}
+  _accData.accounts = list;
+  await _accSave();
 }
+
 function _buildAccountOptions(current) {
-  return _getCustomAccounts().map(a => `<option${a === current ? ' selected' : ''}>${a}</option>`).join('');
+  return _getCustomAccounts().map(a =>
+    `<option value="${a.name}"${a.name === current ? ' selected' : ''}>${a.name}${a.status === 'archived' ? ' (archived)' : ''}</option>`
+  ).join('');
 }
+
+function _buildActiveAccountOptions(current) {
+  return _getActiveAccounts().map(a =>
+    `<option value="${a.name}"${a.name === current ? ' selected' : ''}>${a.name}</option>`
+  ).join('');
+}
+
 function _openManageAccounts() {
   const existing = document.getElementById('acc-manager-overlay');
   if (existing) existing.remove();
@@ -5083,11 +5132,23 @@ function _openManageAccounts() {
   overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
   overlay.innerHTML = `
   <div class="acc-manager-modal">
-    <div class="acc-manager-header"><span>⚙ Manage Accounts</span><button onclick="document.getElementById('acc-manager-overlay').remove()" class="acc-mgr-close">✕</button></div>
+    <div class="acc-manager-header">
+      <span>⚙ Manage Accounts</span>
+      <button onclick="document.getElementById('acc-manager-overlay').remove()" class="acc-mgr-close">✕</button>
+    </div>
     <div class="acc-manager-body">
-      <div id="acc-mgr-list" class="acc-mgr-list"></div>
+      <div class="acc-mgr-tabs">
+        <button class="acc-mgr-tab active" onclick="_accMgrTab('active',this)">Active</button>
+        <button class="acc-mgr-tab" onclick="_accMgrTab('archived',this)">Archived</button>
+      </div>
+      <div id="acc-mgr-list-active" class="acc-mgr-list"></div>
+      <div id="acc-mgr-list-archived" class="acc-mgr-list" style="display:none"></div>
       <div class="acc-mgr-add-row">
-        <input type="text" id="acc-mgr-input" class="acc-mgr-input" placeholder="New account name…" onkeydown="if(event.key==='Enter')_addAccount()">
+        <input type="text" id="acc-mgr-input" class="acc-mgr-input" placeholder="Account name (e.g. GFT $5k – P1)…" onkeydown="if(event.key==='Enter')_addAccount()">
+        <select id="acc-mgr-type" class="acc-mgr-input" style="max-width:130px">
+          <option value="">Type…</option>
+          <option>Funded</option><option>Paper</option><option>Live</option><option>Challenge</option>
+        </select>
         <button onclick="_addAccount()" class="acc-mgr-add-btn">＋ Add</button>
       </div>
     </div>
@@ -5096,47 +5157,137 @@ function _openManageAccounts() {
   _rebuildAccMgrList();
   requestAnimationFrame(() => overlay.classList.add('open'));
 }
-function _rebuildAccMgrList() {
-  const list = _getCustomAccounts();
-  const el = document.getElementById('acc-mgr-list');
-  if (!el) return;
-  el.innerHTML = list.map((a, i) => `
-    <div class="acc-mgr-item" id="acc-mgr-item-${i}">
-      <span class="acc-mgr-name">${a}</span>
-      <div class="acc-mgr-actions">
-        <button onclick="_editAccount(${i})" class="acc-mgr-btn edit">✏</button>
-        ${i < 2 ? '<button class="acc-mgr-btn del" disabled title="Default">🗑</button>' : `<button onclick="_deleteAccount(${i})" class="acc-mgr-btn del">🗑</button>`}
-      </div>
-    </div>`).join('');
+
+function _accMgrTab(tab, btn) {
+  document.querySelectorAll('.acc-mgr-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('acc-mgr-list-active').style.display    = tab === 'active'   ? '' : 'none';
+  document.getElementById('acc-mgr-list-archived').style.display  = tab === 'archived' ? '' : 'none';
 }
-function _addAccount() {
-  const inp = document.getElementById('acc-mgr-input'); if (!inp) return;
+
+function _rebuildAccMgrList() {
+  const list     = _getCustomAccounts();
+  const active   = document.getElementById('acc-mgr-list-active');
+  const archived = document.getElementById('acc-mgr-list-archived');
+  if (!active || !archived) return;
+
+  const renderItem = (a, i) => `
+    <div class="acc-mgr-item" id="acc-mgr-item-${i}">
+      <div class="acc-mgr-item-left">
+        <span class="acc-mgr-name">${a.name}</span>
+        ${a.type ? `<span class="acc-mgr-type-badge">${a.type}</span>` : ''}
+      </div>
+      <div class="acc-mgr-actions">
+        <button onclick="_editAccount(${i})" class="acc-mgr-btn edit" title="Edit">✏</button>
+        <button onclick="_toggleArchiveAccount(${i})" class="acc-mgr-btn ${a.status === 'archived' ? 'restore' : 'archive'}"
+          title="${a.status === 'archived' ? 'Restore' : 'Archive'}">${a.status === 'archived' ? '↩' : '📦'}</button>
+        <button onclick="_deleteAccount(${i})" class="acc-mgr-btn del" title="Delete permanently">🗑</button>
+      </div>
+    </div>`;
+
+  const activeItems   = list.filter(a => a.status !== 'archived');
+  const archivedItems = list.filter(a => a.status === 'archived');
+
+  active.innerHTML   = activeItems.length
+    ? list.map((a,i) => a.status !== 'archived' ? renderItem(a,i) : '').join('')
+    : '<div class="acc-mgr-empty">No active accounts yet.</div>';
+
+  archived.innerHTML = archivedItems.length
+    ? list.map((a,i) => a.status === 'archived' ? renderItem(a,i) : '').join('')
+    : '<div class="acc-mgr-empty">No archived accounts.</div>';
+}
+
+async function _addAccount() {
+  const inp  = document.getElementById('acc-mgr-input'); if (!inp) return;
+  const type = document.getElementById('acc-mgr-type')?.value || '';
   const name = inp.value.trim(); if (!name) return;
   const list = _getCustomAccounts();
-  if (list.includes(name)) { showToast('Already exists','danger'); return; }
-  list.push(name); _saveCustomAccounts(list); inp.value = '';
-  _rebuildAccMgrList(); _refreshAccountDropdown(); showToast('Account added ✓','restore');
+  if (list.find(a => a.name === name)) { showToast('Account already exists', 'danger'); return; }
+  list.push({ name, type, status: 'active', notes: '' });
+  await _saveCustomAccounts(list);
+  inp.value = '';
+  if (document.getElementById('acc-mgr-type')) document.getElementById('acc-mgr-type').value = '';
+  _rebuildAccMgrList();
+  _refreshAccountDropdowns();
+  showToast('Account added ✓', 'restore');
+  buildAccounts();
 }
-function _deleteAccount(i) {
-  if (i < 2) return;
-  const list = _getCustomAccounts(); list.splice(i,1); _saveCustomAccounts(list);
-  _rebuildAccMgrList(); _refreshAccountDropdown(); showToast('Account removed','restore');
+
+async function _deleteAccount(i) {
+  const list = _getCustomAccounts();
+  if (!confirm(`Delete "${list[i]?.name}" permanently? This cannot be undone.`)) return;
+  list.splice(i, 1);
+  await _saveCustomAccounts(list);
+  _rebuildAccMgrList();
+  _refreshAccountDropdowns();
+  showToast('Account deleted', 'restore');
+  buildAccounts();
 }
+
+async function _toggleArchiveAccount(i) {
+  const list = _getCustomAccounts();
+  list[i].status = list[i].status === 'archived' ? 'active' : 'archived';
+  await _saveCustomAccounts(list);
+  _rebuildAccMgrList();
+  _refreshAccountDropdowns();
+  showToast(list[i].status === 'archived' ? 'Account archived' : 'Account restored', 'restore');
+  buildAccounts();
+  _refreshCalendarAccountFilter();
+}
+
 function _editAccount(i) {
   const list = _getCustomAccounts();
+  const a    = list[i];
   const item = document.getElementById('acc-mgr-item-'+i); if (!item) return;
-  item.innerHTML = `<input type="text" class="acc-mgr-input" id="acc-edit-${i}" value="${list[i]}" style="flex:1;margin-right:8px" onkeydown="if(event.key==='Enter')_saveEditAccount(${i})"><div class="acc-mgr-actions"><button onclick="_saveEditAccount(${i})" class="acc-mgr-btn edit">✓</button><button onclick="_rebuildAccMgrList()" class="acc-mgr-btn">✕</button></div>`;
+  item.innerHTML = `
+    <input type="text" class="acc-mgr-input" id="acc-edit-${i}" value="${a.name}" style="flex:1;margin-right:6px"
+      onkeydown="if(event.key==='Enter')_saveEditAccount(${i})">
+    <select id="acc-edit-type-${i}" class="acc-mgr-input" style="max-width:120px;margin-right:6px">
+      <option value="">Type…</option>
+      ${['Funded','Paper','Live','Challenge'].map(t => `<option${a.type===t?' selected':''}>${t}</option>`).join('')}
+    </select>
+    <div class="acc-mgr-actions">
+      <button onclick="_saveEditAccount(${i})" class="acc-mgr-btn edit">✓</button>
+      <button onclick="_rebuildAccMgrList()" class="acc-mgr-btn">✕</button>
+    </div>`;
   document.getElementById('acc-edit-'+i)?.focus();
 }
-function _saveEditAccount(i) {
-  const inp = document.getElementById('acc-edit-'+i); if (!inp) return;
+
+async function _saveEditAccount(i) {
+  const inp  = document.getElementById('acc-edit-'+i);
+  const typE = document.getElementById('acc-edit-type-'+i);
+  if (!inp) return;
   const name = inp.value.trim(); if (!name) return;
-  const list = _getCustomAccounts(); list[i] = name; _saveCustomAccounts(list);
-  _rebuildAccMgrList(); _refreshAccountDropdown(); showToast('Updated ✓','restore');
+  const list = _getCustomAccounts();
+  list[i].name = name;
+  if (typE) list[i].type = typE.value;
+  await _saveCustomAccounts(list);
+  _rebuildAccMgrList();
+  _refreshAccountDropdowns();
+  showToast('Updated ✓', 'restore');
+  buildAccounts();
 }
-function _refreshAccountDropdown() {
-  const sel = document.getElementById('e-acc'); if (!sel) return;
-  const cur = sel.value; sel.innerHTML = _buildAccountOptions(cur);
+
+function _refreshAccountDropdowns() {
+  // New trade modal
+  ['m-acc', 'e-acc'].forEach(id => {
+    const sel = document.getElementById(id); if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = _buildAccountOptions(cur);
+  });
+}
+
+function _refreshCalendarAccountFilter() {
+  const sel = document.getElementById('cal-acc-filter'); if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All active accounts</option>' +
+    _getActiveAccounts().map(a =>
+      `<option value="${a.name}"${a.name === cur ? ' selected' : ''}>${a.name}</option>`
+    ).join('') +
+    ((_getArchivedAccounts().length) ? '<optgroup label="Archived">' +
+      _getArchivedAccounts().map(a =>
+        `<option value="${a.name}"${a.name === cur ? ' selected' : ''}>${a.name} (archived)</option>`
+      ).join('') + '</optgroup>' : '');
 }
 
 // ── SHARE MODAL ────────────────────────────────────────────────────────────
@@ -5342,21 +5493,144 @@ async function smShareNative(){
 function _smClipboardFallback(canvas){canvas.toBlob(async blob=>{try{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);showToast('Copied to clipboard! 📋','success');}catch{const l=document.createElement('a');l.download='NxTGen_Trade.jpg';l.href=canvas.toDataURL('image/jpeg',0.96);l.click();showToast('Saved! 🖼','success');};},'image/png');}
 function _smEnsureLibs(cb){if(typeof html2canvas!=='undefined'&&typeof window.jspdf!=='undefined'){cb();return;}const h2c=document.createElement('script');h2c.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';h2c.onload=()=>{const jpdf=document.createElement('script');jpdf.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';jpdf.onload=cb;document.head.appendChild(jpdf);};document.head.appendChild(h2c);}
 
-// ════════════════════════════════════════════════════════════════
-//  PROFILE PAGE
-// ════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════
+//  ACCOUNTS — extra helpers
+// ════════════════════════════════════════════════════════════════════
 
-const _PK = {
-  fname:'pf_fname', lname:'pf_lname', display:'pf_display',
-  phone:'pf_phone', timezone:'pf_timezone', bio:'pf_bio',
-  exp:'pf_exp', market:'pf_market', session:'pf_session', risk:'pf_risk',
-  daterange:'pf_daterange', currency:'pf_currency',
-  weekstart:'pf_weekstart', defaultview:'pf_defaultview',
-  affirmation:'pf_affirmation', sounds:'pf_sounds',
-  compact:'pf_compact', autosave:'pf_autosave',
-  avatarData:'pf_avatar_data',
-};
+async function _restoreAccountByName(name) {
+  const list = _getCustomAccounts();
+  const acc  = list.find(a => a.name === name);
+  if (!acc) return;
+  acc.status = 'active';
+  await _saveCustomAccounts(list);
+  _refreshAccountDropdowns();
+  _refreshCalendarAccountFilter();
+  buildAccounts();
+  showToast(`"${name}" restored ✓`, 'restore');
+}
 
+// ════════════════════════════════════════════════════════════════════
+//  PROFILE — Cloud-synced via journal_profiles Supabase table
+//  Table DDL (run once in Supabase SQL editor):
+//
+//  CREATE TABLE IF NOT EXISTS journal_profiles (
+//    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+//    user_id     uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
+//    fname       text, lname text, display_name text, phone text,
+//    timezone    text, bio text, address text,
+//    exp         text, market text, session text, risk text,
+//    daterange   text, currency text, weekstart text, defaultview text,
+//    affirmation boolean DEFAULT true,
+//    sounds      boolean DEFAULT false,
+//    compact     boolean DEFAULT false,
+//    autosave    boolean DEFAULT true,
+//    avatar_url  text,
+//    updated_at  timestamptz DEFAULT now()
+//  );
+//  ALTER TABLE journal_profiles ENABLE ROW LEVEL SECURITY;
+//  CREATE POLICY "Users manage own profile"
+//    ON journal_profiles FOR ALL USING (auth.uid() = user_id);
+// ════════════════════════════════════════════════════════════════════
+
+let _profileData  = {};
+let _profileRowId = null;
+
+async function _profileLoad() {
+  if (!_currentUser) return;
+  const { data, error } = await sb
+    .from('journal_profiles')
+    .select('*')
+    .eq('user_id', _currentUser.id)
+    .maybeSingle();
+  if (error) { console.error('profileLoad:', error.message); return; }
+
+  if (data) {
+    _profileRowId = data.id;
+    _profileData  = data;
+  } else {
+    // First login — seed from auth metadata
+    const meta = _currentUser.user_metadata || {};
+    const fullName = meta.full_name || '';
+    const parts    = fullName.trim().split(/\s+/);
+    _profileData = {
+      fname:        parts[0] || '',
+      lname:        parts.slice(1).join(' ') || '',
+      display_name: fullName,
+      phone:        meta.phone || '',
+      timezone:     'Africa/Lagos',
+      bio:          '',
+      address:      '',
+      exp:          'Intermediate (1–3 yrs)',
+      market:       'Forex',
+      session:      'London',
+      risk:         '1%',
+      daterange:    'This Quarter',
+      currency:     '% (Percentage)',
+      weekstart:    'Monday',
+      defaultview:  'Quarterly',
+      affirmation:  true,
+      sounds:       false,
+      compact:      false,
+      autosave:     true,
+      avatar_url:   meta.avatar_url || '',
+    };
+    // Persist the seed immediately
+    await _profileSave();
+  }
+}
+
+async function _profileSave() {
+  if (!_currentUser) return;
+  const row = {
+    user_id:      _currentUser.id,
+    ..._profileData,
+    updated_at:   new Date().toISOString(),
+  };
+  delete row.id; // don't send PK in payload
+  if (_profileRowId) {
+    const { error } = await sb.from('journal_profiles').update(row).eq('id', _profileRowId);
+    if (error) { showToast('Save failed: ' + error.message, 'danger'); return false; }
+  } else {
+    const { data, error } = await sb.from('journal_profiles').insert(row).select('id').single();
+    if (error) { showToast('Save failed: ' + error.message, 'danger'); return false; }
+    if (data) _profileRowId = data.id;
+  }
+  return true;
+}
+
+// ── Topbar avatar — uses cloud profile data ──
+function _injectTopbarAvatar() {
+  // Remove the old _injectUserBar div if present
+  const oldBar = document.querySelector('.topbar-right > div[style*="display:flex"]');
+  if (oldBar) oldBar.remove();
+
+  const btn = document.getElementById('topbar-avatar-btn');
+  if (!btn) return;
+
+  const email = _currentUser.email || '';
+  // If an email span already injected by _injectUserBar, remove it
+  const emailSpan = document.querySelector('.topbar-user-email');
+  if (emailSpan) emailSpan.remove();
+
+  // Apply avatar image or initials
+  _profileApplyAvatar(_profileData.avatar_url || localStorage.getItem('pf_avatar_data') || '');
+  _profileRefreshInitials(
+    _profileData.fname || '',
+    _profileData.lname || '',
+    _profileData.display_name || ''
+  );
+
+  // Show email in topbar (desktop only)
+  const topbarRight = document.querySelector('.topbar-right');
+  if (topbarRight && email) {
+    const sp = document.createElement('span');
+    sp.className = 'topbar-user-email';
+    sp.textContent = email;
+    topbarRight.prepend(sp);
+  }
+}
+
+// ── Profile tab switcher ──
 function profileTab(id, btn) {
   document.querySelectorAll('.profile-section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
@@ -5365,68 +5639,65 @@ function profileTab(id, btn) {
   if (btn) btn.classList.add('active');
 }
 
+// ── Populate profile page from cloud data ──
 function buildProfile() {
-  _pfSet('pf-fname', _PK.fname, '');
-  _pfSet('pf-lname', _PK.lname, '');
-  _pfSet('pf-display', _PK.display, '');
-  _pfSet('pf-phone', _PK.phone, '');
-  _pfSelect('pf-timezone', _PK.timezone, 'Africa/Lagos');
-  _pfSet('pf-bio', _PK.bio, '');
-  _pfSelect('pf-exp', _PK.exp, 'Intermediate (1–3 yrs)');
-  _pfSelect('pf-market', _PK.market, 'Forex');
-  _pfSelect('pf-session', _PK.session, 'London');
-  _pfSelect('pf-risk', _PK.risk, '1%');
-  _pfSelect('pf-daterange', _PK.daterange, 'This Quarter');
-  _pfSelect('pf-currency', _PK.currency, '% (Percentage)');
-  _pfSelect('pf-weekstart', _PK.weekstart, 'Monday');
-  _pfSelect('pf-defaultview', _PK.defaultview, 'Quarterly');
-  _pfCheck('pf-affirmation', _PK.affirmation, true);
-  _pfCheck('pf-sounds', _PK.sounds, false);
-  _pfCheck('pf-compact', _PK.compact, false);
-  _pfCheck('pf-autosave', _PK.autosave, true);
-  if (_currentUser && _currentUser.email) {
-    const el = document.getElementById('pf-email');
-    if (el && !el.value) el.value = _currentUser.email;
-  }
+  const d = _profileData;
+  const email = _currentUser?.email || '';
+
+  _pfSet2('pf-fname',    d.fname        || '');
+  _pfSet2('pf-lname',    d.lname        || '');
+  _pfSet2('pf-display',  d.display_name || '');
+  _pfSet2('pf-email',    email);
+  _pfSet2('pf-phone',    d.phone        || '');
+  _pfSet2('pf-address',  d.address      || '');
+  _pfSet2('pf-bio',      d.bio          || '');
+  _pfSel2('pf-timezone', d.timezone     || 'Africa/Lagos');
+  _pfSel2('pf-exp',      d.exp          || 'Intermediate (1–3 yrs)');
+  _pfSel2('pf-market',   d.market       || 'Forex');
+  _pfSel2('pf-session',  d.session      || 'London');
+  _pfSel2('pf-risk',     d.risk         || '1%');
+  _pfSel2('pf-daterange',  d.daterange  || 'This Quarter');
+  _pfSel2('pf-currency',   d.currency   || '% (Percentage)');
+  _pfSel2('pf-weekstart',  d.weekstart  || 'Monday');
+  _pfSel2('pf-defaultview',d.defaultview|| 'Quarterly');
+  _pfChk2('pf-affirmation', d.affirmation !== false);
+  _pfChk2('pf-sounds',      !!d.sounds);
+  _pfChk2('pf-compact',     !!d.compact);
+  _pfChk2('pf-autosave',    d.autosave  !== false);
+
   _profileRefreshHero();
   _profileRefreshAvatar();
   _profileSessionMeta();
 }
 
-function _pfSet(id, key, fb) {
-  const el = document.getElementById(id);
-  if (el) el.value = localStorage.getItem(key) || fb;
+function _pfSet2(id, val) {
+  const el = document.getElementById(id); if (el) el.value = val;
 }
-function _pfSelect(id, key, fb) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const v = localStorage.getItem(key) || fb;
-  const opt = Array.from(el.options).find(o => o.value === v || o.text === v);
+function _pfSel2(id, val) {
+  const el = document.getElementById(id); if (!el) return;
+  const opt = Array.from(el.options).find(o => o.value === val || o.text === val);
   if (opt) el.value = opt.value;
 }
-function _pfCheck(id, key, def) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const v = localStorage.getItem(key);
-  el.checked = v !== null ? v === '1' : def;
+function _pfChk2(id, val) {
+  const el = document.getElementById(id); if (el) el.checked = !!val;
 }
 
 function _profileRefreshHero() {
-  const fname   = localStorage.getItem(_PK.fname)   || '';
-  const lname   = localStorage.getItem(_PK.lname)   || '';
-  const display = localStorage.getItem(_PK.display) || '';
-  const email   = (_currentUser && _currentUser.email) || localStorage.getItem('pf_email') || '—';
+  const d = _profileData;
+  const display = d.display_name || ((d.fname || '') + (d.lname ? ' ' + d.lname : '')) || 'Trader';
+  const email   = _currentUser?.email || '—';
   const nameEl  = document.getElementById('profile-hero-name');
   const emailEl = document.getElementById('profile-hero-email');
-  if (nameEl)  nameEl.textContent  = display || (fname + (lname ? ' ' + lname : '')) || 'Trader';
+  if (nameEl)  nameEl.textContent  = display;
   if (emailEl) emailEl.textContent = email;
-  _profileRefreshInitials(fname, lname, display);
+  _profileRefreshInitials(d.fname || '', d.lname || '', d.display_name || '');
 }
 
 function _profileRefreshInitials(fname, lname, display) {
   let initials = 'TJ';
-  if (display && display.trim()) {
-    const p = display.trim().split(/\s+/);
+  const d = display.trim();
+  if (d) {
+    const p = d.split(/\s+/);
     initials = p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : p[0].slice(0,2).toUpperCase();
   } else if (fname || lname) {
     initials = ((fname[0]||'') + (lname[0]||'')).toUpperCase() || 'TJ';
@@ -5435,21 +5706,36 @@ function _profileRefreshInitials(fname, lname, display) {
 }
 
 function profileHandleAvatar(e) {
-  const file = e.target.files[0];
-  if (!file) return;
+  const file = e.target.files[0]; if (!file) return;
+  // Upload to Supabase storage
   const reader = new FileReader();
-  reader.onload = ev => {
-    localStorage.setItem(_PK.avatarData, ev.target.result);
-    _profileApplyAvatar(ev.target.result);
+  reader.onload = async ev => {
+    const dataUrl = ev.target.result;
+    // Try Supabase storage upload first
+    const ext  = file.name.split('.').pop();
+    const path = `avatars/${_currentUser.id}/avatar.${ext}`;
+    const { error } = await sb.storage.from('trade-charts').upload(path, file, { upsert: true });
+    if (!error) {
+      const { data: urlData } = sb.storage.from('trade-charts').getPublicUrl(path);
+      _profileData.avatar_url = urlData.publicUrl;
+    } else {
+      // Fall back to base64 stored in profile data
+      _profileData.avatar_url = dataUrl;
+    }
+    await _profileSave();
+    _profileApplyAvatar(_profileData.avatar_url);
     showToast('Avatar updated ✓', 'success');
   };
   reader.readAsDataURL(file);
 }
+
 function _profileRefreshAvatar() {
-  const d = localStorage.getItem(_PK.avatarData);
-  if (d) _profileApplyAvatar(d);
+  const url = _profileData.avatar_url || '';
+  if (url) _profileApplyAvatar(url);
 }
+
 function _profileApplyAvatar(url) {
+  if (!url) return;
   const pa = document.getElementById('profile-avatar-display');
   if (pa) pa.innerHTML = `<img src="${url}" alt="Avatar">`;
   const tb = document.getElementById('topbar-avatar-btn');
@@ -5457,8 +5743,7 @@ function _profileApplyAvatar(url) {
 }
 
 function _profileSessionMeta() {
-  const meta = document.getElementById('profile-session-meta');
-  if (!meta) return;
+  const meta = document.getElementById('profile-session-meta'); if (!meta) return;
   const ua = navigator.userAgent;
   const browser = ua.includes('Chrome') ? 'Chrome' : ua.includes('Firefox') ? 'Firefox'
     : ua.includes('Safari') ? 'Safari' : ua.includes('Edge') ? 'Edge' : 'Browser';
@@ -5468,35 +5753,43 @@ function _profileSessionMeta() {
   meta.textContent = `${browser} on ${os} · Active now`;
 }
 
-function profileSaveAccount() {
-  const fields = { fname:'pf-fname', lname:'pf-lname', display:'pf-display',
-                   email:'pf-email', phone:'pf-phone', timezone:'pf-timezone', bio:'pf-bio' };
-  Object.entries(fields).forEach(([k, id]) => {
-    const el = document.getElementById(id);
-    if (el) localStorage.setItem(k === 'email' ? 'pf_email' : _PK[k], el.value.trim());
-  });
-  _profileRefreshHero();
-  showToast('Account info saved ✓', 'success');
+// ── Save handlers ──
+async function profileSaveAccount() {
+  _profileData.fname        = document.getElementById('pf-fname')?.value.trim()   || '';
+  _profileData.lname        = document.getElementById('pf-lname')?.value.trim()   || '';
+  _profileData.display_name = document.getElementById('pf-display')?.value.trim() || '';
+  _profileData.phone        = document.getElementById('pf-phone')?.value.trim()   || '';
+  _profileData.address      = document.getElementById('pf-address')?.value.trim() || '';
+  _profileData.timezone     = document.getElementById('pf-timezone')?.value       || '';
+  _profileData.bio          = document.getElementById('pf-bio')?.value.trim()     || '';
+  const ok = await _profileSave();
+  if (ok !== false) {
+    _profileRefreshHero();
+    _injectTopbarAvatar();
+    showToast('Account info saved ✓', 'success');
+  }
 }
 
-function profileSaveTrading() {
-  ['exp','market','session','risk'].forEach(k => {
-    const el = document.getElementById('pf-' + k);
-    if (el) localStorage.setItem(_PK[k], el.value);
-  });
-  showToast('Trading profile saved ✓', 'success');
+async function profileSaveTrading() {
+  _profileData.exp     = document.getElementById('pf-exp')?.value     || '';
+  _profileData.market  = document.getElementById('pf-market')?.value  || '';
+  _profileData.session = document.getElementById('pf-session')?.value || '';
+  _profileData.risk    = document.getElementById('pf-risk')?.value    || '';
+  const ok = await _profileSave();
+  if (ok !== false) showToast('Trading profile saved ✓', 'success');
 }
 
-function profileSaveSettings() {
-  ['daterange','currency','weekstart','defaultview'].forEach(k => {
-    const el = document.getElementById('pf-' + k);
-    if (el) localStorage.setItem(_PK[k], el.value);
-  });
-  ['affirmation','sounds','compact','autosave'].forEach(k => {
-    const el = document.getElementById('pf-' + k);
-    if (el) localStorage.setItem(_PK[k], el.checked ? '1' : '0');
-  });
-  showToast('Settings saved ✓', 'success');
+async function profileSaveSettings() {
+  _profileData.daterange    = document.getElementById('pf-daterange')?.value    || '';
+  _profileData.currency     = document.getElementById('pf-currency')?.value     || '';
+  _profileData.weekstart    = document.getElementById('pf-weekstart')?.value    || '';
+  _profileData.defaultview  = document.getElementById('pf-defaultview')?.value  || '';
+  _profileData.affirmation  = !!document.getElementById('pf-affirmation')?.checked;
+  _profileData.sounds       = !!document.getElementById('pf-sounds')?.checked;
+  _profileData.compact      = !!document.getElementById('pf-compact')?.checked;
+  _profileData.autosave     = !!document.getElementById('pf-autosave')?.checked;
+  const ok = await _profileSave();
+  if (ok !== false) showToast('Settings saved ✓', 'success');
 }
 
 async function profileChangePassword() {
@@ -5525,7 +5818,10 @@ function profileSignOut() {
 function profileExportJSON() {
   if (!trades.length) { showToast('No trades to export', 'danger'); return; }
   const blob = new Blob([JSON.stringify({ exported: new Date().toISOString(), trades }, null, 2)], { type:'application/json' });
-  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `NxTGen_Trades_${new Date().toISOString().slice(0,10)}.json` });
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: `NxTGen_Trades_${new Date().toISOString().slice(0,10)}.json`
+  });
   a.click(); URL.revokeObjectURL(a.href);
   showToast(`Exported ${trades.length} trades as JSON ✓`, 'success');
 }
@@ -5533,9 +5829,16 @@ function profileExportJSON() {
 function profileExportCSV() {
   if (!trades.length) { showToast('No trades to export', 'danger'); return; }
   const hdr  = ['Date','Pair','Position','R:R','PnL%','Outcome','Killzone','Strategy','TF','Account','Rating','Risk','Notes'];
-  const rows = trades.map(t => [t.date,t.pair,t.pos,t.rr,t.pnl,t.outcome,t.kz,t.strategy||'',t.tf||'',t.account||'',t.rating||'',t.risk||'',(t.notes||'').replace(/"/g,'""')].map(v=>`"${v}"`).join(','));
+  const rows = trades.map(t => [
+    t.date,t.pair,t.pos,t.rr,t.pnl,t.outcome,t.kz,
+    t.strategy||'',t.tf||'',t.account||'',t.rating||'',t.risk||'',
+    (t.notes||'').replace(/"/g,'""')
+  ].map(v=>`"${v}"`).join(','));
   const blob = new Blob([[hdr.join(','),...rows].join('\n')], { type:'text/csv' });
-  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `NxTGen_Trades_${new Date().toISOString().slice(0,10)}.csv` });
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: `NxTGen_Trades_${new Date().toISOString().slice(0,10)}.csv`
+  });
   a.click(); URL.revokeObjectURL(a.href);
   showToast(`Exported ${trades.length} trades as CSV ✓`, 'success');
 }
@@ -5549,7 +5852,8 @@ function profileConfirmClearData() {
       showToast('Deleting all trades…','restore');
       const { error } = await sb.from('journal_trades').delete().eq('user_id', _currentUser.id);
       if (error) { showToast('Failed: ' + error.message, 'danger'); return; }
-      trades = []; tradeState = {}; renderAll();
+      trades = []; if (typeof tradeState !== 'undefined') tradeState = {};
+      if (typeof renderAll === 'function') renderAll(); else _refreshAll();
       showToast('All trades deleted', 'danger');
     }
   });
@@ -5560,6 +5864,6 @@ function profileConfirmDeleteAccount() {
     icon:'⚠️', title:'Delete Account',
     body:'This permanently deletes your account and all data. Are you absolutely sure?',
     confirmLabel:'Delete My Account', confirmClass:'glass-btn-danger',
-    onConfirm: () => showToast('Please contact support to delete your account.', 'restore')
+    onConfirm: () => showToast('Please contact support at support@nxtgen.app to delete your account.', 'restore')
   });
 }
