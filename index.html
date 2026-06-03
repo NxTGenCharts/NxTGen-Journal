@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#f1f5fb" media="(prefers-color-scheme: light)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NxTGen Trading Journal</title>
 
 <!-- Google Fonts -->
@@ -35,9 +35,7 @@
       </span>
     </button>
     <span class="brand" onclick="nav('dashboard',null,'Dashboard')" style="cursor:pointer">
-      <img class="brand-logo-img" id="brand-logo-img" src="logo.svg" alt="NxTGen" draggable="false"
-           onerror="this.style.display='none';document.getElementById('brand-text-fallback').style.display='block'">
-      <span id="brand-text-fallback" style="display:none;font-family:var(--font-head);font-size:15px;font-weight:800;letter-spacing:-.5px;background:linear-gradient(135deg,#60a5fa,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;white-space:nowrap">NxTGen</span>
+      <img class="brand-logo-img" src="logo.svg" alt="NxTGen Trading Journal" draggable="false">
     </span>
     <span class="sep">›</span>
     <span class="page-name" id="topbar-page">Dashboard</span>
@@ -455,10 +453,7 @@
           <span class="acc-size-hint">PnL % × account size = daily USD</span>
           <div style="margin-left:auto;display:flex;gap:6px">
             <select class="form-select" id="cal-acc-filter" onchange="renderCalendar()" style="width:160px;font-size:12px">
-              <option value="">All accounts</option>
-              <option>PaperTrading</option>
-              <option>GFT $5k - P1</option>
-              <option>GFT $10k - P1</option>
+              <option value="">All active accounts</option>
             </select>
           </div>
         </div>
@@ -658,7 +653,7 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════
-         PROFILE PAGE
+         PROFILE PAGE — Cloud synced
     ═══════════════════════════════════════════════════════════ -->
     <div class="page" id="page-profile">
       <div class="page-inner">
@@ -678,15 +673,15 @@
               <div class="profile-hero-name" id="profile-hero-name">Trader</div>
               <div class="profile-hero-email" id="profile-hero-email">—</div>
               <div class="profile-hero-badges">
-                <span class="profile-badge blue" id="profile-plan-badge">Free Plan</span>
-                <span class="profile-badge green" id="profile-member-badge">Member</span>
+                <span class="profile-badge blue">Free Plan</span>
+                <span class="profile-badge green">☁ Cloud Synced</span>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Tabs -->
-        <div class="profile-tabs" id="profile-tabs">
+        <div class="profile-tabs">
           <button class="profile-tab active" onclick="profileTab('account',this)">Account</button>
           <button class="profile-tab" onclick="profileTab('billing',this)">Billing</button>
           <button class="profile-tab" onclick="profileTab('settings',this)">Settings</button>
@@ -700,7 +695,7 @@
               <span class="profile-card-icon">👤</span>
               <div>
                 <div class="profile-card-title">Personal Information</div>
-                <div class="profile-card-sub">Update your name, username and contact details</div>
+                <div class="profile-card-sub">Auto-filled from your registration — edit and save to sync across all devices</div>
               </div>
               <button class="btn btn-primary profile-save-btn" onclick="profileSaveAccount()">Save Changes</button>
             </div>
@@ -708,7 +703,7 @@
               <div class="profile-field"><label class="profile-label">First Name</label><input class="profile-input" type="text" id="pf-fname" placeholder="e.g. Jordan"></div>
               <div class="profile-field"><label class="profile-label">Last Name</label><input class="profile-input" type="text" id="pf-lname" placeholder="e.g. Williams"></div>
               <div class="profile-field"><label class="profile-label">Display Name</label><input class="profile-input" type="text" id="pf-display" placeholder="How you appear in the app"></div>
-              <div class="profile-field"><label class="profile-label">Email</label><input class="profile-input" type="email" id="pf-email" placeholder="your@email.com"></div>
+              <div class="profile-field"><label class="profile-label">Email</label><input class="profile-input" type="email" id="pf-email" placeholder="your@email.com" readonly style="opacity:.6;cursor:not-allowed"></div>
               <div class="profile-field"><label class="profile-label">Phone (optional)</label><input class="profile-input" type="tel" id="pf-phone" placeholder="+1 234 567 8900"></div>
               <div class="profile-field">
                 <label class="profile-label">Timezone</label>
@@ -722,7 +717,8 @@
                   <option value="Asia/Singapore">Singapore (SGT, UTC+8)</option>
                 </select>
               </div>
-              <div class="profile-field full"><label class="profile-label">Bio / Trading Goal</label><textarea class="profile-textarea" id="pf-bio" placeholder="e.g. ICT trader aiming for funded accounts…"></textarea></div>
+              <div class="profile-field full"><label class="profile-label">Address</label><input class="profile-input" type="text" id="pf-address" placeholder="e.g. 12 Baker St, London, UK"></div>
+              <div class="profile-field full"><label class="profile-label">Bio / Trading Goal</label><textarea class="profile-textarea" id="pf-bio" placeholder="e.g. ICT trader aiming for funded accounts and consistent growth…"></textarea></div>
             </div>
           </div>
 
@@ -731,7 +727,7 @@
               <span class="profile-card-icon">📊</span>
               <div>
                 <div class="profile-card-title">Trading Profile</div>
-                <div class="profile-card-sub">Your style, experience level and preferred markets</div>
+                <div class="profile-card-sub">Your style, experience level and preferred markets — synced to cloud</div>
               </div>
               <button class="btn btn-primary profile-save-btn" onclick="profileSaveTrading()">Save</button>
             </div>
@@ -772,10 +768,7 @@
           <div class="profile-card">
             <div class="profile-card-head">
               <span class="profile-card-icon">💳</span>
-              <div>
-                <div class="profile-card-title">Current Plan</div>
-                <div class="profile-card-sub">Manage your subscription and billing cycle</div>
-              </div>
+              <div><div class="profile-card-title">Current Plan</div><div class="profile-card-sub">Manage your subscription and billing cycle</div></div>
             </div>
             <div class="billing-plans">
               <div class="billing-plan active">
@@ -783,8 +776,8 @@
                 <div class="billing-plan-price">$0 <span>/mo</span></div>
                 <ul class="billing-plan-features">
                   <li>✅ Unlimited trade logging</li><li>✅ Dashboard analytics</li>
-                  <li>✅ Trade log &amp; calendar</li><li>❌ Unlimited AI Coach</li>
-                  <li>❌ Cloud sync backup</li><li>❌ Priority support</li>
+                  <li>✅ Trade log &amp; calendar</li><li>✅ Cloud sync (all devices)</li>
+                  <li>❌ Unlimited AI Coach</li><li>❌ Priority support</li>
                 </ul>
                 <div class="billing-plan-current-badge">Current Plan</div>
               </div>
@@ -794,8 +787,8 @@
                 <div class="billing-plan-price">$12 <span>/mo</span></div>
                 <ul class="billing-plan-features">
                   <li>✅ Everything in Free</li><li>✅ Unlimited AI Coach</li>
-                  <li>✅ Advanced pattern analysis</li><li>✅ Cloud sync &amp; backup</li>
-                  <li>✅ Custom report export</li><li>✅ Priority support</li>
+                  <li>✅ Advanced pattern analysis</li><li>✅ Custom report export</li>
+                  <li>✅ Priority support</li><li>✅ White-label trade cards</li>
                 </ul>
                 <button class="btn btn-primary" style="width:100%;margin-top:12px">Upgrade to Pro</button>
               </div>
@@ -804,20 +797,12 @@
                 <div class="billing-plan-price">$29 <span>/mo</span></div>
                 <ul class="billing-plan-features">
                   <li>✅ Everything in Pro</li><li>✅ Multi-account tracking</li>
-                  <li>✅ Team / prop firm access</li><li>✅ White-label export</li>
-                  <li>✅ 1-on-1 coaching session</li><li>✅ Dedicated support</li>
+                  <li>✅ Team / prop firm access</li><li>✅ 1-on-1 coaching session</li>
+                  <li>✅ White-label export</li><li>✅ Dedicated support</li>
                 </ul>
                 <button class="btn" style="width:100%;margin-top:12px">Upgrade to Elite</button>
               </div>
             </div>
-          </div>
-          <div class="profile-card">
-            <div class="profile-card-head">
-              <span class="profile-card-icon">💰</span>
-              <div><div class="profile-card-title">Payment Method</div><div class="profile-card-sub">Add or manage your payment methods</div></div>
-              <button class="btn" onclick="showToast('Payment gateway coming soon!','restore')">+ Add Card</button>
-            </div>
-            <div class="billing-empty-state"><div style="font-size:32px;margin-bottom:8px">💳</div><div style="color:var(--text2);font-size:13px">No payment method added yet</div></div>
           </div>
           <div class="profile-card">
             <div class="profile-card-head">
@@ -833,7 +818,7 @@
           <div class="profile-card">
             <div class="profile-card-head">
               <span class="profile-card-icon">⚙️</span>
-              <div><div class="profile-card-title">App Preferences</div><div class="profile-card-sub">Customize how the journal looks and behaves</div></div>
+              <div><div class="profile-card-title">App Preferences</div><div class="profile-card-sub">Synced to your account — same on every device</div></div>
               <button class="btn btn-primary profile-save-btn" onclick="profileSaveSettings()">Save</button>
             </div>
             <div class="profile-form-grid">
@@ -868,12 +853,12 @@
           <div class="profile-card">
             <div class="profile-card-head">
               <span class="profile-card-icon">🗄️</span>
-              <div><div class="profile-card-title">Data Management</div><div class="profile-card-sub">Export your data or manage your journal</div></div>
+              <div><div class="profile-card-title">Data Management</div><div class="profile-card-sub">Export your journal or manage your trade data</div></div>
             </div>
             <div class="profile-data-actions">
               <button class="profile-data-btn" onclick="profileExportJSON()"><span>📥</span><div><div>Export Trades (JSON)</div><div class="profile-data-btn-sub">Full backup of all your trade data</div></div></button>
               <button class="profile-data-btn" onclick="profileExportCSV()"><span>📊</span><div><div>Export Trades (CSV)</div><div class="profile-data-btn-sub">Open in Excel, Google Sheets, etc.</div></div></button>
-              <button class="profile-data-btn danger" onclick="profileConfirmClearData()"><span>🗑️</span><div><div>Clear All Trades</div><div class="profile-data-btn-sub">Permanently deletes all trade records</div></div></button>
+              <button class="profile-data-btn danger" onclick="profileConfirmClearData()"><span>🗑️</span><div><div>Clear All Trades</div><div class="profile-data-btn-sub">Permanently deletes all trade records from cloud</div></div></button>
             </div>
           </div>
         </div>
@@ -883,7 +868,7 @@
           <div class="profile-card">
             <div class="profile-card-head">
               <span class="profile-card-icon">🔐</span>
-              <div><div class="profile-card-title">Change Password</div><div class="profile-card-sub">Update your account password</div></div>
+              <div><div class="profile-card-title">Change Password</div><div class="profile-card-sub">Update your Supabase account password</div></div>
             </div>
             <div class="profile-form-grid" style="max-width:480px">
               <div class="profile-field full"><label class="profile-label">Current Password</label><input class="profile-input" type="password" id="pf-pw-current" placeholder="Enter current password"></div>
