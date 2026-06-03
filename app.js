@@ -8,7 +8,7 @@
 // SUPABASE CONFIG — paste your full publishable key below
 // ══════════════════════════════════════════════════════
 const SUPABASE_URL  = 'https://jlqgdwfbwdiieafhwisy.supabase.co';
-const SUPABASE_ANON = 'sb_publishable_t_Bu9PTxcykClDo-_hvO5w_avgOKCDt'; // ← YOUR KEY — replace with full key from Supabase → Settings → API
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpscWdkd2Zid2RpaWVhZmh3aXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5OTIwNTIsImV4cCI6MjA5NDU2ODA1Mn0.5Z8wZ2X7zTvz8CeGy5cBF8b4vs21YVoj-ZGr-jvSXaw';
 const BASE_URL      = 'https://dabossmira.github.io/NxTGen-Journal';
 
 const { createClient } = supabase;
@@ -3607,7 +3607,11 @@ async function _accLoad() {
     .select('id, payouts, milestones, accounts')
     .eq('user_id', _currentUser.id)
     .maybeSingle();
-  if (error) { console.error('accLoad:', error.message); return; }
+  if (error) {
+    console.error('accLoad:', error.message);
+    showToast('Could not load account data: ' + error.message, 'danger');
+    return;
+  }
   if (data) {
     _accRowId = data.id;
     _accData.payouts    = data.payouts    || [];
@@ -3619,26 +3623,26 @@ async function _accLoad() {
 }
 
 async function _accSave() {
-  if (!_currentUser) return;
+  if (!_currentUser) return false;
   const row = {
     user_id:    _currentUser.id,
     payouts:    _accData.payouts,
     milestones: _accData.milestones,
     accounts:   _accData.accounts,
   };
-  if (_accRowId) {
-    const { error } = await sb.from('journal_account_data').update(row).eq('id', _accRowId);
-    if (error) { showToast('Account save failed: ' + error.message, 'danger'); return false; }
-  } else {
-    // Use upsert so a row created on another device doesn't cause a duplicate-key error
-    const { data, error } = await sb
-      .from('journal_account_data')
-      .upsert(row, { onConflict: 'user_id' })
-      .select('id')
-      .single();
-    if (error) { showToast('Account save failed: ' + error.message, 'danger'); return false; }
-    if (data) _accRowId = data.id;
+  // Always upsert by user_id — works on first save, on any device, and after
+  // the unique-constraint would have blocked a plain insert on a second device.
+  const { data, error } = await sb
+    .from('journal_account_data')
+    .upsert(row, { onConflict: 'user_id' })
+    .select('id')
+    .single();
+  if (error) {
+    console.error('accSave error:', error);
+    showToast('Account save failed: ' + error.message, 'danger');
+    return false;
   }
+  if (data) _accRowId = data.id;
   return true;
 }
 
