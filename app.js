@@ -3607,11 +3607,7 @@ async function _accLoad() {
     .select('id, payouts, milestones, accounts')
     .eq('user_id', _currentUser.id)
     .maybeSingle();
-  if (error) {
-    console.error('accLoad:', error.message);
-    showToast('Could not load account data: ' + error.message, 'danger');
-    return;
-  }
+  if (error) { console.error('accLoad:', error.message); return; }
   if (data) {
     _accRowId = data.id;
     _accData.payouts    = data.payouts    || [];
@@ -3630,17 +3626,12 @@ async function _accSave() {
     milestones: _accData.milestones,
     accounts:   _accData.accounts,
   };
-  // Always upsert - works on first device, second device, any device
   const { data, error } = await sb
     .from('journal_account_data')
     .upsert(row, { onConflict: 'user_id' })
     .select('id')
     .single();
-  if (error) {
-    console.error('accSave error:', error);
-    showToast('Account save failed: ' + error.message, 'danger');
-    return false;
-  }
+  if (error) { showToast('Account save failed: ' + error.message, 'danger'); return false; }
   if (data) _accRowId = data.id;
   return true;
 }
@@ -5018,16 +5009,9 @@ function _refreshAll() {
 
 // ── USER BAR (shows logged-in user + sign out button) ──
 function _injectUserBar(user) {
-  const topbarRight = document.querySelector('.topbar-right');
-  if (!topbarRight) return;
-  const name = user.user_metadata?.full_name || user.email;
-  const bar = document.createElement('div');
-  bar.style.cssText = 'display:flex;align-items:center;gap:10px;margin-right:4px';
-  bar.innerHTML = `
-    <span style="font-size:12px;color:var(--text2);font-family:var(--font-mono)">👤 ${name}</span>
-    <button onclick="handleLogout()" style="padding:5px 12px;background:rgba(252,129,129,0.1);border:1px solid rgba(252,129,129,0.25);border-radius:6px;font-family:var(--font-body);font-size:12px;font-weight:600;color:#fc8181;cursor:pointer" onmouseover="this.style.background='rgba(252,129,129,0.2)'" onmouseout="this.style.background='rgba(252,129,129,0.1)'">Sign Out</button>`;
-  topbarRight.prepend(bar);
+  // Name/email span removed - avatar dropdown handles profile access
 }
+
 
 // ══════════════════════════════════════════════════════
 // BOOT — runs after DOM is ready
@@ -5191,17 +5175,10 @@ function _rebuildAccMgrList() {
         ${a.type ? `<span class="acc-mgr-type-badge">${a.type}</span>` : ''}
       </div>
       <div class="acc-mgr-actions">
-        <button onclick="_editAccount(${i})" class="acc-mgr-btn edit" title="Edit">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </button>
-        <button onclick="_toggleArchiveAccount(${i})" class="acc-mgr-btn ${a.status === 'archived' ? 'restore' : 'archive'}" title="${a.status === 'archived' ? 'Restore' : 'Archive'}">
-          ${a.status === 'archived'
-            ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.28"/></svg>`
-            : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`}
-        </button>
-        <button onclick="_deleteAccount(${i})" class="acc-mgr-btn del" title="Delete permanently">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-        </button>
+        <button onclick="_editAccount(${i})" class="acc-mgr-btn edit" title="Edit">✏</button>
+        <button onclick="_toggleArchiveAccount(${i})" class="acc-mgr-btn ${a.status === 'archived' ? 'restore' : 'archive'}"
+          title="${a.status === 'archived' ? 'Restore' : 'Archive'}">${a.status === 'archived' ? '↩' : '📦'}</button>
+        <button onclick="_deleteAccount(${i})" class="acc-mgr-btn del" title="Delete permanently">🗑</button>
       </div>
     </div>`;
 
@@ -5620,15 +5597,14 @@ async function _profileSave() {
 
 // ── Topbar avatar — uses cloud profile data ──
 function _injectTopbarAvatar() {
-  // Remove the old _injectUserBar div if present
+  // Remove old injected user bar if present
   const oldBar = document.querySelector('.topbar-right > div[style*="display:flex"]');
   if (oldBar) oldBar.remove();
 
   const btn = document.getElementById('topbar-avatar-btn');
   if (!btn) return;
 
-  const email = _currentUser.email || '';
-  // If an email span already injected by _injectUserBar, remove it
+  // Clean up leftover email span
   const emailSpan = document.querySelector('.topbar-user-email');
   if (emailSpan) emailSpan.remove();
 
@@ -5640,14 +5616,50 @@ function _injectTopbarAvatar() {
     _profileData.display_name || ''
   );
 
-  // Show email in topbar (desktop only)
-  const topbarRight = document.querySelector('.topbar-right');
-  if (topbarRight && email) {
-    const sp = document.createElement('span');
-    sp.className = 'topbar-user-email';
-    sp.textContent = email;
-    topbarRight.prepend(sp);
+  // Wire up avatar button to toggle dropdown (not navigate directly)
+  btn.onclick = function(e) {
+    e.stopPropagation();
+    _toggleAvatarDropdown();
+  };
+
+  // Close dropdown when clicking anywhere else
+  document.addEventListener('click', function _avatarOutsideClick(e) {
+    const drop = document.getElementById('avatar-dropdown');
+    if (drop && !drop.contains(e.target) && e.target !== btn) {
+      drop.classList.remove('open');
+    }
+  });
+}
+
+function _toggleAvatarDropdown() {
+  let drop = document.getElementById('avatar-dropdown');
+  if (!drop) {
+    // Build it once
+    drop = document.createElement('div');
+    drop.id = 'avatar-dropdown';
+    drop.className = 'avatar-dropdown';
+    const displayName = _profileData.display_name || _profileData.fname || _currentUser?.email || '';
+    const email = _currentUser?.email || '';
+    drop.innerHTML = `
+      <div class="avd-header">
+        <div class="avd-name">${displayName}</div>
+        <div class="avd-email">${email}</div>
+      </div>
+      <div class="avd-sep"></div>
+      <button class="avd-item" onclick="nav('profile',null,'My Profile');document.getElementById('avatar-dropdown').classList.remove('open')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        My Profile
+      </button>
+      <div class="avd-sep"></div>
+      <button class="avd-item danger" onclick="handleLogout()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign Out
+      </button>
+    `;
+    drop.addEventListener('click', e => e.stopPropagation());
+    document.querySelector('.topbar-right').appendChild(drop);
   }
+  drop.classList.toggle('open');
 }
 
 // ── Profile tab switcher ──

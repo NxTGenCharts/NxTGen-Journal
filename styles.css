@@ -4377,7 +4377,7 @@ body{
 
 .acc-manager-modal {
   width: 100%;
-  max-width: 460px;
+  max-width: 400px;
   background: var(--bg2);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-lg, 14px);
@@ -4385,8 +4385,6 @@ body{
   box-shadow: 0 32px 80px rgba(0,0,0,0.60);
   transform: translateY(16px) scale(0.97);
   transition: transform 0.22s cubic-bezier(0.22,1,0.36,1);
-  max-height: 90vh;
-  display: flex; flex-direction: column;
 }
 .acc-manager-overlay.open .acc-manager-modal { transform: translateY(0) scale(1); }
 
@@ -4415,7 +4413,7 @@ body{
 }
 .acc-mgr-close:hover { background: rgba(248,113,113,0.15); color: var(--red); border-color: rgba(248,113,113,0.3); }
 
-.acc-manager-body { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.acc-manager-body { padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 10px; }
 .acc-mgr-list { display: flex; flex-direction: column; gap: 6px; }
 .acc-mgr-item {
   display: flex;
@@ -4432,45 +4430,38 @@ body{
 .acc-mgr-name { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
 .acc-mgr-actions { display: flex; gap: 5px; flex-shrink: 0; }
 .acc-mgr-btn {
-  width: 30px; height: 30px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 7px;
+  padding: 4px 9px;
+  border-radius: 5px;
   border: 1px solid var(--glass-border);
   background: var(--glass-2);
+  font-size: 12px;
   cursor: pointer;
   color: var(--text2);
+  font-family: inherit;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
-  flex-shrink: 0;
+  line-height: 1.4;
 }
 .acc-mgr-btn:disabled { opacity: 0.30; cursor: not-allowed; }
-/* Blue edit button */
-.acc-mgr-btn.edit { background: rgba(96,165,250,0.10); color: #60a5fa; border-color: rgba(96,165,250,0.25); }
-.acc-mgr-btn.edit:not(:disabled):hover { background: rgba(96,165,250,0.22); border-color: rgba(96,165,250,0.45); }
-/* Red delete button */
-.acc-mgr-btn.del { background: rgba(248,113,113,0.10); color: #f87171; border-color: rgba(248,113,113,0.25); }
-.acc-mgr-btn.del:not(:disabled):hover { background: rgba(248,113,113,0.22); border-color: rgba(248,113,113,0.45); }
+.acc-mgr-btn.edit:not(:disabled):hover { background: rgba(96,165,250,0.12); color: var(--blue); border-color: rgba(96,165,250,0.3); }
+.acc-mgr-btn.del:not(:disabled):hover  { background: rgba(248,113,113,0.12); color: var(--red);  border-color: rgba(248,113,113,0.3); }
 .acc-mgr-add-row {
   display: flex;
-  gap: 6px;
-  margin-top: 2px;
+  gap: 8px;
+  margin-top: 4px;
   padding-top: 10px;
   border-top: 1px solid var(--glass-border);
-  flex-wrap: wrap;
 }
 .acc-mgr-input {
   flex: 1;
-  min-width: 0;
   background: var(--glass-1);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-sm, 6px);
-  padding: 8px 10px;
+  padding: 8px 11px;
   font-size: 13px;
   color: var(--text);
   font-family: inherit;
   outline: none;
   transition: border-color 0.15s;
-  height: 36px;
-  box-sizing: border-box;
 }
 .acc-mgr-input:focus { border-color: rgba(251,191,36,0.50); }
 .acc-mgr-add-btn {
@@ -4493,14 +4484,6 @@ body{
 [data-theme="light"] .acc-mgr-input { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.09); }
 [data-theme="light"] .acc-mgr-add-btn { background: rgba(180,83,9,0.09); border-color: rgba(180,83,9,0.28); color: #b45309; }
 [data-theme="light"] .acc-mgr-add-btn:hover { background: rgba(180,83,9,0.16); }
-/* Responsive: on narrow screens, stack the add row */
-@media (max-width: 480px) {
-  .acc-manager-overlay { padding: 12px; }
-  .acc-mgr-add-row { flex-wrap: wrap; }
-  .acc-mgr-add-row .acc-mgr-input { min-width: 120px; }
-  .acc-mgr-add-btn { width: 100%; justify-content: center; }
-  .acc-mgr-name { font-size: 12px; }
-}
 
 /* ══════════════════════════════════════════════════════
    SHARE MODAL — full styles
@@ -4926,13 +4909,7 @@ body{
 /* ════════════════════════════════════════════════════════
    TOPBAR — user email + avatar
    ════════════════════════════════════════════════════════ */
-.topbar-user-email {
-  font-size: 11px; color: var(--text2);
-  font-family: var(--font-mono);
-  white-space: nowrap; overflow: hidden;
-  text-overflow: ellipsis; max-width: 200px;
-}
-@media(max-width:900px){ .topbar-user-email { display:none; } }
+.topbar-user-email { display: none !important; } /* removed from topbar */
 
 .topbar-avatar {
   width:32px; height:32px; border-radius:50%;
@@ -4948,6 +4925,39 @@ body{
   transform:scale(1.07);
 }
 .topbar-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+
+/* -- Avatar dropdown -- */
+.avatar-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 210px;
+  background: var(--bg2);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.45);
+  z-index: 9999;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-6px) scale(0.97);
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.22,1,0.36,1);
+}
+.avatar-dropdown.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: all;
+}
+.avd-header { padding: 12px 14px 10px; }
+.avd-name { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.avd-email { font-size: 11px; color: var(--text3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-mono); }
+.avd-sep { height: 1px; background: var(--glass-border); margin: 0; }
+.avd-item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px 14px; background: transparent; border: none; font-size: 13px; font-weight: 500; color: var(--text2); cursor: pointer; font-family: var(--font-body); transition: background 0.12s, color 0.12s; text-align: left; }
+.avd-item:hover { background: var(--glass-1); color: var(--text); }
+.avd-item.danger { color: #f87171; }
+.avd-item.danger:hover { background: rgba(248,113,113,0.10); color: #f87171; }
+[data-theme="light"] .avatar-dropdown { background: #fff; box-shadow: 0 12px 40px rgba(0,0,0,0.18); }
+
 @media(max-width:768px){
   .topbar-share-btn { display:none !important; }
   .topbar-avatar { width:30px; height:30px; font-size:10px; }
@@ -5016,16 +5026,10 @@ body{
   border:1px solid rgba(96,165,250,0.2); white-space:nowrap; flex-shrink:0;
 }
 .acc-mgr-btn.archive {
-  background:rgba(148,163,184,0.1); border-color:rgba(148,163,184,0.25); color:var(--text2);
-}
-.acc-mgr-btn.archive:hover {
-  background:rgba(148,163,184,0.2); border-color:rgba(148,163,184,0.4); color:var(--text);
+  background:rgba(251,191,36,0.1); border-color:rgba(251,191,36,0.25); color:#fbbf24;
 }
 .acc-mgr-btn.restore {
   background:rgba(52,211,153,0.1); border-color:rgba(52,211,153,0.25); color:var(--green);
-}
-.acc-mgr-btn.restore:hover {
-  background:rgba(52,211,153,0.2); border-color:rgba(52,211,153,0.4);
 }
 .acc-mgr-empty {
   padding:16px; text-align:center; color:var(--text3);
