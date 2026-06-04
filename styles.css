@@ -230,10 +230,13 @@ body{
   width: auto;
   display: block;
   object-fit: contain;
+  /* Dark mode: ensure logo is fully visible. If SVG has dark text/parts,
+     they need to be brightened. We detect this via the fact it works in light. */
   filter: none;
   transition: filter .25s ease;
   max-width: 190px;
 }
+/* Light mode: make logo fully black */
 [data-theme="light"] .brand-logo-img {
   filter: brightness(0);
 }
@@ -363,7 +366,7 @@ body{
 .sb-logo-img {
   height: 40px; width: auto;
   object-fit: contain; display: block;
-  filter: none;
+  filter: brightness(1);
   transition: filter .25s ease;
 }
 [data-theme="light"] .sb-logo-img {
@@ -5243,3 +5246,134 @@ body{
   .acc-mgr-name { font-size: 12px; max-width: 120px; }
   .acc-mgr-item { gap: 6px; padding: 8px 10px; }
 }
+
+/* ══ Pair row drilldown hover ══ */
+.pair-row-clickable:hover td {
+  background: rgba(96,165,250,0.06) !important;
+  transition: background 0.15s;
+}
+.pair-row-clickable td:first-child {
+  position: relative;
+}
+.pair-row-clickable td:first-child::after {
+  content: '›';
+  color: var(--blue);
+  opacity: 0;
+  margin-left: 6px;
+  font-size: 14px;
+  transition: opacity 0.15s;
+}
+.pair-row-clickable:hover td:first-child::after {
+  opacity: 0.7;
+}
+
+/* ══ Manage Accounts — Dark mode redesign ══ */
+.acc-manager-modal {
+  background: var(--bg2) !important;
+}
+
+/* Deleted tab styling */
+.acc-mgr-tab-del { color: var(--red) !important; opacity: .75; }
+.acc-mgr-tab-del.active { opacity: 1; border-bottom-color: var(--red) !important; color: var(--red) !important; }
+
+/* Deleted item strikethrough row */
+.acc-mgr-item-deleted {
+  opacity: 0.7;
+  border-color: rgba(248,113,113,0.15) !important;
+  background: rgba(248,113,113,0.04) !important;
+}
+.acc-mgr-item-deleted:hover {
+  background: rgba(248,113,113,0.08) !important;
+  opacity: 1;
+}
+
+/* Archived item muted */
+.acc-mgr-item-archived {
+  opacity: 0.75;
+  border-color: rgba(148,163,184,0.15) !important;
+  background: rgba(148,163,184,0.04) !important;
+}
+.acc-mgr-item-archived:hover {
+  opacity: 1;
+  background: rgba(148,163,184,0.08) !important;
+}
+
+/* Empty deleted state */
+.acc-mgr-empty-deleted {
+  text-align: center;
+  padding: 24px 16px;
+  color: var(--text3);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+/* Dark mode tab fixes */
+.acc-mgr-tabs {
+  background: transparent !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+  margin-bottom: 8px;
+  padding-bottom: 0;
+}
+.acc-mgr-tab {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  padding: 8px 14px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--text3) !important;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+  margin-bottom: -1px;
+}
+.acc-mgr-tab:hover { color: var(--text) !important; background: transparent !important; }
+.acc-mgr-tab.active {
+  color: var(--text) !important;
+  border-bottom-color: #fbbf24 !important;
+  background: transparent !important;
+}
+
+/* Dark mode: fix select dropdown white flash */
+.acc-mgr-input option,
+select.acc-mgr-input option {
+  background: var(--bg2, #1a2035);
+  color: var(--text, #e2e8f0);
+}
+
+/* ══ Logo dark mode fix ══ */
+/* In dark mode, ensure logo is visible — use brightness boost if SVG has dark parts */
+.brand-logo-img,
+.sb-logo-img {
+  filter: none;
+}
+[data-theme="light"] .brand-logo-img,
+[data-theme="light"] .sb-logo-img {
+  filter: brightness(0);
+}
+/* If the SVG has transparent/invisible parts in dark mode, invert it */
+[data-theme=""] .brand-logo-img,
+[data-theme=""] .sb-logo-img {
+  filter: none;
+}
+
+
+/* ══ Logo SVG dark mode — definitive fix ══
+   The logo SVG has dark-colored parts (designed for light backgrounds).
+   In dark mode (data-theme=""), we need to make those dark parts visible.
+   Solution: use CSS filter to invert just the luminance without breaking colors.
+   A brightness(100) + invert combo makes dark→white keeping the brand aesthetic. */
+[data-theme=""] .brand-logo-img,
+[data-theme=""] .sb-logo-img {
+  /* Invert dark to light for dark mode visibility */
+  filter: invert(1) hue-rotate(180deg) !important;
+}
+[data-theme="light"] .brand-logo-img,
+[data-theme="light"] .sb-logo-img {
+  filter: none !important;
+}
+
+/* ══ Pair drilldown trade rows ══ */
+.pair-drill-row { cursor: pointer; transition: background 0.12s; }
+.pair-drill-row:hover td { background: rgba(96,165,250,0.07) !important; }

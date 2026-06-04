@@ -1686,9 +1686,94 @@ function buildPairTable() {
     const wrClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
     const pnlClass = netPnl > 0 ? 'outcome-win' : 'outcome-loss';
     const barColor = wr >= 70 ? 'green' : 'red';
-    return `<tr><td class="bold">${p}</td><td>${pt.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass} mono">${netPnl > 0 ? '+' : ''}${netPnl}%</td><td class="col-winbar"><div class="win-bar-wrap"><div class="win-bar-bg"><div class="win-bar-fill ${barColor}" style="width:${wr}%"></div></div></div></td></tr>`;
+    return `<tr class="pair-row-clickable" onclick="openPairDrilldown('${p.replace(/'/g,"\\'")}')" title="View ${p} trades" style="cursor:pointer"><td class="bold">${p}</td><td>${pt.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass} mono">${netPnl > 0 ? '+' : ''}${netPnl}%</td><td class="col-winbar"><div class="win-bar-wrap"><div class="win-bar-bg"><div class="win-bar-fill ${barColor}" style="width:${wr}%"></div></div></div></td></tr>`;
   }).join('');
 }
+
+
+function openPairDrilldown(pair) {
+  const pairTrades = trades.filter(t => t.pair === pair).sort((a,b) => new Date(b.date) - new Date(a.date));
+  const wins   = pairTrades.filter(t => t.outcome === 'Win').length;
+  const losses = pairTrades.filter(t => t.outcome === 'Loss').length;
+  const be     = pairTrades.filter(t => t.outcome === 'B.E').length;
+  const wr     = pairTrades.length ? Math.round(wins / pairTrades.length * 100) : 0;
+  const netPnl = pairTrades.reduce((s, t) => s + t.pnl, 0).toFixed(1);
+  const wrCls  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
+  const pnlColor = parseFloat(netPnl) > 0 ? 'var(--green)' : 'var(--red)';
+
+  const existing = document.getElementById('pair-drilldown-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'pair-drilldown-overlay';
+  overlay.className = 'acc-manager-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  const rows = pairTrades.map(t => {
+    const pnlCls = t.pnl > 0 ? 'outcome-win' : t.pnl < 0 ? 'outcome-loss' : '';
+    const outCls = t.outcome === 'Win' ? 'pill-green' : t.outcome === 'Loss' ? 'pill-red' : 'pill-gold';
+    const tid = t.id;
+    return [
+      '<tr class="pair-drill-row" onclick="pairDrillOpenTrade(' + tid + ')" title="View trade detail">',
+      '<td class="mono" style="font-size:11px">' + t.date + '</td>',
+      '<td>' + (t.pos || '—') + '</td>',
+      '<td class="mono">' + (t.rr || '—') + '</td>',
+      '<td class="' + pnlCls + ' mono">' + (t.pnl > 0 ? '+' : '') + t.pnl + '%</td>',
+      '<td><span class="pill ' + outCls + '" style="font-size:10px">' + t.outcome + '</span></td>',
+      '<td style="font-size:11px;color:var(--text2)">' + (t.kz || '—') + '</td>',
+      '<td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">' + (t.account || '—') + '</td>',
+      '</tr>'
+    ].join('');
+  }).join('');
+
+  // Build modal HTML using DOM manipulation to avoid quote escaping issues
+  overlay.innerHTML =
+    '<div class="acc-manager-modal" style="max-width:640px">' +
+      '<div class="acc-manager-header" style="gap:10px;flex-wrap:wrap">' +
+        '<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;flex-wrap:wrap">' +
+          '<span style="font-size:16px;font-weight:800;letter-spacing:.5px">' + pair + '</span>' +
+          '<span class="pill ' + wrCls + '" style="font-size:11px">' + wr + '% win</span>' +
+          '<span style="font-size:11px;color:var(--text2)">' + pairTrades.length + ' trade' + (pairTrades.length !== 1 ? 's' : '') + '</span>' +
+          '<span style="font-size:11px;color:var(--text2)">' + wins + 'W &middot; ' + losses + 'L &middot; ' + be + 'BE</span>' +
+          '<span style="font-size:11px;font-weight:700;color:' + pnlColor + '">' + (parseFloat(netPnl) > 0 ? '+' : '') + netPnl + '%</span>' +
+        '</div>' +
+        '<button onclick="document.getElementById(\'pair-drilldown-overlay\').remove()" class="acc-mgr-close">&times;</button>' +
+      '</div>' +
+      '<div class="acc-manager-body" style="padding:0;max-height:58vh;overflow-y:auto">' +
+        '<div class="data-table-wrap" style="margin:0;border-radius:0;border:none">' +
+          '<table class="data-table" style="font-size:12px">' +
+            '<thead><tr><th>Date</th><th>Side</th><th>R:R</th><th>PnL</th><th>Outcome</th><th>Session</th><th>Account</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:10px 16px;border-top:1px solid var(--glass-border);display:flex;gap:8px;justify-content:flex-end;background:var(--glass-1)">' +
+        '<button class="wl-week-btn" style="font-size:12px" id="pair-drill-tradelog-btn">Open in Trade Log &rarr;</button>' +
+      '</div>' +
+    '</div>';
+
+  // Attach the tradelog button listener separately to avoid quote issues
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
+
+  overlay.querySelector('#pair-drill-tradelog-btn').addEventListener('click', function() {
+    overlay.remove();
+    nav('tradelog', null, 'Trade Log');
+    setTimeout(function() {
+      const f = document.getElementById('filter-pair');
+      if (f) { f.value = pair; filterTable(); }
+    }, 250);
+  });
+}
+
+// Called from within drilldown rows (avoids inline quote escaping)
+function pairDrillOpenTrade(id) {
+  const ov = document.getElementById('pair-drilldown-overlay');
+  if (ov) ov.remove();
+  openDetail(id);
+}
+
+
 
 function buildKillzoneTable() {
   const tbody = document.getElementById('kz-table-body');
@@ -3659,7 +3744,7 @@ function _renderAccGrid() {
   }
 
   // Separate active and archived
-  const active   = accounts.filter(a => a.status !== 'archived');
+  const active   = accounts.filter(a => a.status !== 'archived' && a.status !== 'deleted');
   const archived = accounts.filter(a => a.status === 'archived');
 
   const renderCard = (a) => {
@@ -5093,7 +5178,7 @@ function _getCustomAccounts()  {
   return (_accData.accounts || []);
 }
 function _getActiveAccounts() {
-  return _getCustomAccounts().filter(a => a.status !== 'archived');
+  return _getCustomAccounts().filter(a => a.status !== 'archived' && a.status !== 'deleted');
 }
 function _getArchivedAccounts() {
   return _getCustomAccounts().filter(a => a.status === 'archived');
@@ -5141,9 +5226,11 @@ function _openManageAccounts() {
       <div class="acc-mgr-tabs">
         <button class="acc-mgr-tab active" onclick="_accMgrTab('active',this)">Active</button>
         <button class="acc-mgr-tab" onclick="_accMgrTab('archived',this)">Archived</button>
+        <button class="acc-mgr-tab acc-mgr-tab-del" onclick="_accMgrTab('deleted',this)">🗑 Deleted</button>
       </div>
       <div id="acc-mgr-list-active" class="acc-mgr-list"></div>
       <div id="acc-mgr-list-archived" class="acc-mgr-list" style="display:none"></div>
+      <div id="acc-mgr-list-deleted" class="acc-mgr-list" style="display:none"></div>
       <div class="acc-mgr-add-row">
         <input type="text" id="acc-mgr-input" class="acc-mgr-input" placeholder="Account name (e.g. GFT $5k – P1)…" onkeydown="if(event.key==='Enter')_addAccount()">
         <select id="acc-mgr-type" class="acc-mgr-input" style="max-width:130px">
@@ -5162,47 +5249,81 @@ function _openManageAccounts() {
 function _accMgrTab(tab, btn) {
   document.querySelectorAll('.acc-mgr-tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('acc-mgr-list-active').style.display    = tab === 'active'   ? '' : 'none';
-  document.getElementById('acc-mgr-list-archived').style.display  = tab === 'archived' ? '' : 'none';
+  document.getElementById('acc-mgr-list-active').style.display   = tab === 'active'   ? '' : 'none';
+  document.getElementById('acc-mgr-list-archived').style.display = tab === 'archived' ? '' : 'none';
+  document.getElementById('acc-mgr-list-deleted').style.display  = tab === 'deleted'  ? '' : 'none';
+  const addRow = document.querySelector('.acc-mgr-add-row');
+  if (addRow) addRow.style.display = tab === 'deleted' ? 'none' : '';
 }
 
 function _rebuildAccMgrList() {
-  const list     = _getCustomAccounts();
-  const active   = document.getElementById('acc-mgr-list-active');
-  const archived = document.getElementById('acc-mgr-list-archived');
-  if (!active || !archived) return;
+  const list    = _getCustomAccounts();
+  const elActive   = document.getElementById('acc-mgr-list-active');
+  const elArchived = document.getElementById('acc-mgr-list-archived');
+  const elDeleted  = document.getElementById('acc-mgr-list-deleted');
+  if (!elActive || !elArchived) return;
 
-  const renderItem = (a, i) => `
+  const ICONS = {
+    edit: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+    archive: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>',
+    restore: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.28"/></svg>',
+    trash: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>',
+  };
+
+  const renderActive = (a, i) => `
     <div class="acc-mgr-item" id="acc-mgr-item-${i}">
       <div class="acc-mgr-item-left">
         <span class="acc-mgr-name">${a.name}</span>
         ${a.type ? `<span class="acc-mgr-type-badge">${a.type}</span>` : ''}
       </div>
       <div class="acc-mgr-actions">
-        <button onclick="_editAccount(${i})" class="acc-mgr-btn edit" title="Edit">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </button>
-        <button onclick="_toggleArchiveAccount(${i})" class="acc-mgr-btn ${a.status === 'archived' ? 'restore' : 'archive'}" title="${a.status === 'archived' ? 'Restore' : 'Archive'}">
-          ${a.status === 'archived'
-            ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.28"/></svg>'
-            : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>'}
-        </button>
-        <button onclick="_deleteAccount(${i})" class="acc-mgr-btn del" title="Delete permanently">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-        </button>
+        <button onclick="_editAccount(${i})" class="acc-mgr-btn edit" title="Edit">${ICONS.edit}</button>
+        <button onclick="_toggleArchiveAccount(${i})" class="acc-mgr-btn archive" title="Archive">${ICONS.archive}</button>
+        <button onclick="_softDeleteAccount(${i})" class="acc-mgr-btn del" title="Move to Deleted">${ICONS.trash}</button>
       </div>
     </div>`;
 
-  const activeItems   = list.filter(a => a.status !== 'archived');
-  const archivedItems = list.filter(a => a.status === 'archived');
+  const renderArchived = (a, i) => `
+    <div class="acc-mgr-item acc-mgr-item-archived" id="acc-mgr-item-${i}">
+      <div class="acc-mgr-item-left">
+        <span class="acc-mgr-name">${a.name}</span>
+        ${a.type ? `<span class="acc-mgr-type-badge">${a.type}</span>` : ''}
+      </div>
+      <div class="acc-mgr-actions">
+        <button onclick="_toggleArchiveAccount(${i})" class="acc-mgr-btn restore" title="Restore to Active">${ICONS.restore}</button>
+        <button onclick="_softDeleteAccount(${i})" class="acc-mgr-btn del" title="Move to Deleted">${ICONS.trash}</button>
+      </div>
+    </div>`;
 
-  active.innerHTML   = activeItems.length
-    ? list.map((a,i) => a.status !== 'archived' ? renderItem(a,i) : '').join('')
+  const renderDeleted = (a, i) => `
+    <div class="acc-mgr-item acc-mgr-item-deleted" id="acc-mgr-item-${i}">
+      <div class="acc-mgr-item-left">
+        <span class="acc-mgr-name" style="text-decoration:line-through;opacity:.55">${a.name}</span>
+        ${a.type ? `<span class="acc-mgr-type-badge">${a.type}</span>` : ''}
+      </div>
+      <div class="acc-mgr-actions">
+        <button onclick="_restoreDeletedAccount(${i})" class="acc-mgr-btn restore" title="Restore account">${ICONS.restore}</button>
+        <button onclick="_permDeleteAccount(${i})" class="acc-mgr-btn del" title="Permanently delete">${ICONS.trash}</button>
+      </div>
+    </div>`;
+
+  const activeItems   = list.filter(a => a.status !== 'archived' && a.status !== 'deleted');
+  const archivedItems = list.filter(a => a.status === 'archived');
+  const deletedItems  = list.filter(a => a.status === 'deleted');
+
+  elActive.innerHTML = activeItems.length
+    ? list.map((a,i) => (a.status !== 'archived' && a.status !== 'deleted') ? renderActive(a,i) : '').join('')
     : '<div class="acc-mgr-empty">No active accounts yet.</div>';
 
-  archived.innerHTML = archivedItems.length
-    ? list.map((a,i) => a.status === 'archived' ? renderItem(a,i) : '').join('')
+  elArchived.innerHTML = archivedItems.length
+    ? list.map((a,i) => a.status === 'archived' ? renderArchived(a,i) : '').join('')
     : '<div class="acc-mgr-empty">No archived accounts.</div>';
+
+  if (elDeleted) {
+    elDeleted.innerHTML = deletedItems.length
+      ? list.map((a,i) => a.status === 'deleted' ? renderDeleted(a,i) : '').join('')
+      : '<div class="acc-mgr-empty acc-mgr-empty-deleted"><span style="font-size:24px">\u2714\ufe0f</span><br>No deleted accounts.</div>';
+  }
 }
 
 async function _addAccount() {
@@ -5221,15 +5342,62 @@ async function _addAccount() {
   buildAccounts();
 }
 
-async function _deleteAccount(i) {
+async function _softDeleteAccount(i) {
   const list = _getCustomAccounts();
-  if (!confirm(`Delete "${list[i]?.name}" permanently? This cannot be undone.`)) return;
-  list.splice(i, 1);
+  const acc = list[i];
+  if (!acc) return;
+  openGlassModal({
+    icon: '\uD83D\uDDD1\uFE0F',
+    title: 'Delete Account?',
+    body: `<strong>${acc.name}</strong> will be moved to the Deleted tab.<br><small style="color:var(--text3)">You can restore or permanently delete it from there.</small>`,
+    confirmLabel: 'Move to Deleted',
+    confirmClass: 'glass-btn-danger',
+    onConfirm: async () => {
+      list[i].status = 'deleted';
+      await _saveCustomAccounts(list);
+      _rebuildAccMgrList();
+      _refreshAccountDropdowns();
+      showToast('Account moved to Deleted', 'restore');
+      buildAccounts();
+    }
+  });
+}
+
+async function _restoreDeletedAccount(i) {
+  const list = _getCustomAccounts();
+  if (!list[i]) return;
+  list[i].status = 'active';
   await _saveCustomAccounts(list);
   _rebuildAccMgrList();
   _refreshAccountDropdowns();
-  showToast('Account deleted', 'restore');
+  showToast('Account restored \u2714', 'restore');
   buildAccounts();
+}
+
+async function _permDeleteAccount(i) {
+  const list = _getCustomAccounts();
+  const acc = list[i];
+  if (!acc) return;
+  openGlassModal({
+    icon: '\u26A0\uFE0F',
+    title: 'Permanently Delete?',
+    body: `<strong>${acc.name}</strong> will be deleted forever.<br><small style="color:var(--red)">This action cannot be undone.</small>`,
+    confirmLabel: 'Delete Forever',
+    confirmClass: 'glass-btn-danger',
+    onConfirm: async () => {
+      list.splice(i, 1);
+      await _saveCustomAccounts(list);
+      _rebuildAccMgrList();
+      _refreshAccountDropdowns();
+      showToast('Account permanently deleted', 'danger');
+      buildAccounts();
+    }
+  });
+}
+
+async function _deleteAccount(i) {
+  // Legacy: now routes to soft-delete
+  _softDeleteAccount(i);
 }
 
 async function _toggleArchiveAccount(i) {
