@@ -4057,7 +4057,7 @@ function _showPayoutModal(editIdx) {
       <div class="wl-form-row">
         <label class="wl-form-label">Account</label>
         <select class="wl-form-select" id="acc-p-account">
-          ${_getCustomAccounts().map(a => `<option${p&&p.account===a?' selected':''}>${a}</option>`).join('')}
+          ${_buildActiveAccountOptions(p ? p.account : '')}
         </select>
       </div>
       <div class="wl-form-row">
@@ -5297,20 +5297,15 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (event === 'SIGNED_OUT') window.location.replace('./login.html');
   });
 
-  // 5. Load data from Supabase - parallel for speed
+  // 5. Load critical data first (trades + accounts), render immediately, defer the rest
   loadTrashSettings();
   await Promise.all([
     loadTrades(),
     loadDeletedTrades(),
-    _wlLoad(),
-    _goalsLoad(),
-    _pbLoad(),
     _accLoad(),
-    _profileLoad(),
   ]);
-  await runAutoCleanup();
 
-  // 6. Render all UI
+  // 6. Render critical UI right away so the dashboard is visible fast
   updateKPIs();
   buildPairTable();
   buildKillzoneTable();
@@ -5324,17 +5319,28 @@ document.addEventListener('DOMContentLoaded', async function () {
   if (_bootSbEl) _bootSbEl.classList.add('active');
   refreshPairFilter();
   updateTrashBadge();
-  buildWatchlist();
   buildAccounts();
-  buildPlaybook();
-  buildGoals();
-  buildMonthlyReview();
   renderTradeTable(trades);
   _refreshCalendarAccountFilter();
   renderCalendar();
   _injectTopbarAvatar();
 
-  // 7. Live clock
+  // 7. Load secondary data in background — watchlist, goals, playbook, profile
+  //    These don't affect the main dashboard view so we defer them
+  Promise.all([
+    _wlLoad(),
+    _goalsLoad(),
+    _pbLoad(),
+    _profileLoad(),
+  ]).then(() => {
+    runAutoCleanup();
+    buildWatchlist();
+    buildPlaybook();
+    buildGoals();
+    buildMonthlyReview();
+  });
+
+  // 8. Live clock
   updateClock();
   setInterval(updateClock, 1000);
 });
