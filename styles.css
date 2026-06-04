@@ -230,13 +230,12 @@ body{
   width: auto;
   display: block;
   object-fit: contain;
-  /* Dark mode: ensure logo is fully visible. If SVG has dark text/parts,
-     they need to be brightened. We detect this via the fact it works in light. */
-  filter: none;
+  /* Dark mode default: logo is white (brightness(0) invert(1) = white) */
+  filter: brightness(0) invert(1);
   transition: filter .25s ease;
   max-width: 190px;
 }
-/* Light mode: make logo fully black */
+/* Light mode: logo is black (brightness(0) = black) */
 [data-theme="light"] .brand-logo-img {
   filter: brightness(0);
 }
@@ -366,10 +365,12 @@ body{
 .sb-logo-img {
   height: 40px; width: auto;
   object-fit: contain; display: block;
-  filter: brightness(1);
+  /* Dark mode: white */
+  filter: brightness(0) invert(1);
   transition: filter .25s ease;
 }
 [data-theme="light"] .sb-logo-img {
+  /* Light mode: black */
   filter: brightness(0);
 }
 
@@ -5342,37 +5343,10 @@ select.acc-mgr-input option {
   color: var(--text, #e2e8f0);
 }
 
-/* ══ Logo dark mode fix ══ */
-/* In dark mode, ensure logo is visible — use brightness boost if SVG has dark parts */
-.brand-logo-img,
-.sb-logo-img {
-  filter: none;
-}
-[data-theme="light"] .brand-logo-img,
-[data-theme="light"] .sb-logo-img {
-  filter: brightness(0);
-}
-/* If the SVG has transparent/invisible parts in dark mode, invert it */
-[data-theme=""] .brand-logo-img,
-[data-theme=""] .sb-logo-img {
-  filter: none;
-}
 
 
-/* ══ Logo SVG dark mode — definitive fix ══
-   The logo SVG has dark-colored parts (designed for light backgrounds).
-   In dark mode (data-theme=""), we need to make those dark parts visible.
-   Solution: use CSS filter to invert just the luminance without breaking colors.
-   A brightness(100) + invert combo makes dark→white keeping the brand aesthetic. */
-[data-theme=""] .brand-logo-img,
-[data-theme=""] .sb-logo-img {
-  /* Invert dark to light for dark mode visibility */
-  filter: invert(1) hue-rotate(180deg) !important;
-}
-[data-theme="light"] .brand-logo-img,
-[data-theme="light"] .sb-logo-img {
-  filter: none !important;
-}
+
+
 
 /* ══ Pair drilldown trade rows ══ */
 .pair-drill-row { cursor: pointer; transition: background 0.12s; }

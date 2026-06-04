@@ -1775,6 +1775,176 @@ function pairDrillOpenTrade(id) {
 
 
 
+
+/* ─────────────────────────────────────────────────────────
+   KILLZONE DRILLDOWN
+───────────────────────────────────────────────────────── */
+function openKzDrilldown(session) {
+  const kzTrades = trades.filter(t => t.kz === session).sort((a,b) => new Date(b.date) - new Date(a.date));
+  const wins   = kzTrades.filter(t => t.outcome === 'Win').length;
+  const losses = kzTrades.filter(t => t.outcome === 'Loss').length;
+  const be     = kzTrades.filter(t => t.outcome === 'B.E').length;
+  const wr     = kzTrades.length ? Math.round(wins / kzTrades.length * 100) : 0;
+  const netPnl = kzTrades.reduce((s,t) => s + t.pnl, 0).toFixed(1);
+  const wrCls  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
+  const pnlColor = parseFloat(netPnl) > 0 ? 'var(--green)' : 'var(--red)';
+  const KZ_ICONS = { 'London':'🇬🇧', 'New York':'🗽', 'Asian':'🌏', 'Tokyo':'🗼' };
+  const icon = KZ_ICONS[session] || '🕐';
+
+  _openDrillModal('kz-drilldown-overlay',
+    icon + ' ' + session,
+    kzTrades.length + ' trade' + (kzTrades.length !== 1 ? 's' : ''),
+    wins + 'W &middot; ' + losses + 'L &middot; ' + be + 'BE',
+    wr + '% win', wrCls, netPnl, pnlColor,
+    _buildDrillRows(kzTrades),
+    function() {
+      nav('tradelog', null, 'Trade Log');
+      setTimeout(function() {
+        const f = document.getElementById('filter-kz');
+        if (f) { f.value = session; filterTable(); }
+      }, 250);
+    }
+  );
+}
+
+/* ─────────────────────────────────────────────────────────
+   STRATEGY DRILLDOWN
+───────────────────────────────────────────────────────── */
+function openStratDrilldown(strategy) {
+  const isUntagged = strategy === 'untagged';
+  const stTrades = isUntagged
+    ? trades.filter(t => !t.strategy || !t.strategy.trim()).sort((a,b) => new Date(b.date) - new Date(a.date))
+    : trades.filter(t => t.strategy === strategy).sort((a,b) => new Date(b.date) - new Date(a.date));
+  const label  = isUntagged ? 'Untagged' : strategy;
+  const wins   = stTrades.filter(t => t.outcome === 'Win').length;
+  const losses = stTrades.filter(t => t.outcome === 'Loss').length;
+  const be     = stTrades.filter(t => t.outcome === 'B.E').length;
+  const wr     = stTrades.length ? Math.round(wins / stTrades.length * 100) : 0;
+  const netPnl = stTrades.reduce((s,t) => s + t.pnl, 0).toFixed(1);
+  const wrCls  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
+  const pnlColor = parseFloat(netPnl) > 0 ? 'var(--green)' : 'var(--red)';
+
+  _openDrillModal('strat-drilldown-overlay',
+    '📋 ' + label,
+    stTrades.length + ' trade' + (stTrades.length !== 1 ? 's' : ''),
+    wins + 'W &middot; ' + losses + 'L &middot; ' + be + 'BE',
+    wr + '% win', wrCls, netPnl, pnlColor,
+    _buildDrillRows(stTrades),
+    function() {
+      nav('tradelog', null, 'Trade Log');
+      setTimeout(function() {
+        const s = document.getElementById('search-input');
+        if (s && !isUntagged) { s.value = strategy; filterTable(); }
+      }, 250);
+    }
+  );
+}
+
+/* ─────────────────────────────────────────────────────────
+   MONTHLY DRILLDOWN
+───────────────────────────────────────────────────────── */
+function openMonthDrilldown(key) {
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const [yr, mo] = key.split('-').map(Number);
+  const label    = MONTH_NAMES[mo - 1] + ' ' + yr;
+  const moTrades = trades.filter(t => t.date.startsWith(key)).sort((a,b) => new Date(b.date) - new Date(a.date));
+  const wins   = moTrades.filter(t => t.outcome === 'Win').length;
+  const losses = moTrades.filter(t => t.outcome === 'Loss').length;
+  const be     = moTrades.filter(t => t.outcome === 'B.E').length;
+  const wr     = moTrades.length ? Math.round(wins / moTrades.length * 100) : 0;
+  const netPnl = moTrades.reduce((s,t) => s + t.pnl, 0).toFixed(1);
+  const wrCls  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
+  const pnlColor = parseFloat(netPnl) > 0 ? 'var(--green)' : 'var(--red)';
+
+  _openDrillModal('month-drilldown-overlay',
+    '📅 ' + label,
+    moTrades.length + ' trade' + (moTrades.length !== 1 ? 's' : ''),
+    wins + 'W &middot; ' + losses + 'L &middot; ' + be + 'BE',
+    wr + '% win', wrCls, netPnl, pnlColor,
+    _buildDrillRows(moTrades),
+    function() {
+      nav('tradelog', null, 'Trade Log');
+      setTimeout(function() {
+        const s = document.getElementById('search-input');
+        if (s) { s.value = label; filterTable(); }
+      }, 250);
+    }
+  );
+}
+
+/* ─────────────────────────────────────────────────────────
+   SHARED DRILLDOWN HELPERS
+───────────────────────────────────────────────────────── */
+function _buildDrillRows(list) {
+  return list.map(function(t) {
+    const pnlCls = t.pnl > 0 ? 'outcome-win' : t.pnl < 0 ? 'outcome-loss' : '';
+    const outCls = t.outcome === 'Win' ? 'pill-green' : t.outcome === 'Loss' ? 'pill-red' : 'pill-gold';
+    const tid = t.id;
+    return [
+      '<tr class="pair-drill-row" onclick="drillOpenTrade(\'' + tid + '\')" title="View trade detail">',
+      '<td class="mono" style="font-size:11px">' + t.date + '</td>',
+      '<td class="bold" style="font-size:11px">' + (t.pair || '—') + '</td>',
+      '<td>' + (t.pos || '—') + '</td>',
+      '<td class="mono">' + (t.rr || '—') + '</td>',
+      '<td class="' + pnlCls + ' mono">' + (t.pnl > 0 ? '+' : '') + t.pnl + '%</td>',
+      '<td><span class="pill ' + outCls + '" style="font-size:10px">' + t.outcome + '</span></td>',
+      '<td style="font-size:11px;color:var(--text2)">' + (t.kz || '—') + '</td>',
+      '<td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">' + (t.account || '—') + '</td>',
+      '</tr>'
+    ].join('');
+  }).join('');
+}
+
+function _openDrillModal(overlayId, title, countLabel, wlbeLabel, wrLabel, wrCls, netPnl, pnlColor, rows, onTradeLog) {
+  const existing = document.getElementById(overlayId);
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = overlayId;
+  overlay.className = 'acc-manager-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  overlay.innerHTML =
+    '<div class="acc-manager-modal" style="max-width:700px">' +
+      '<div class="acc-manager-header" style="gap:10px;flex-wrap:wrap">' +
+        '<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;flex-wrap:wrap">' +
+          '<span style="font-size:15px;font-weight:800;letter-spacing:.4px">' + title + '</span>' +
+          '<span class="pill ' + wrCls + '" style="font-size:11px">' + wrLabel + '</span>' +
+          '<span style="font-size:11px;color:var(--text2)">' + countLabel + '</span>' +
+          '<span style="font-size:11px;color:var(--text2)">' + wlbeLabel + '</span>' +
+          '<span style="font-size:11px;font-weight:700;color:' + pnlColor + '">' + (parseFloat(netPnl) > 0 ? '+' : '') + netPnl + '%</span>' +
+        '</div>' +
+        '<button onclick="document.getElementById(\'' + overlayId + '\').remove()" class="acc-mgr-close">&times;</button>' +
+      '</div>' +
+      '<div class="acc-manager-body" style="padding:0;max-height:58vh;overflow-y:auto">' +
+        '<div class="data-table-wrap" style="margin:0;border-radius:0;border:none">' +
+          '<table class="data-table" style="font-size:12px">' +
+            '<thead><tr><th>Date</th><th>Pair</th><th>Side</th><th>R:R</th><th>PnL</th><th>Outcome</th><th>Session</th><th>Account</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+          '</table>' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:10px 16px;border-top:1px solid var(--glass-border);display:flex;gap:8px;justify-content:flex-end;background:var(--glass-1)">' +
+        '<button class="wl-week-btn drill-tradelog-btn" style="font-size:12px">Open in Trade Log &rarr;</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+  overlay.querySelector('.drill-tradelog-btn').addEventListener('click', function() {
+    overlay.remove();
+    if (onTradeLog) onTradeLog();
+  });
+  requestAnimationFrame(function() { overlay.classList.add('open'); });
+}
+
+function drillOpenTrade(id) {
+  // Close any open drilldown overlays then open trade detail
+  ['kz-drilldown-overlay','strat-drilldown-overlay','month-drilldown-overlay','pair-drilldown-overlay']
+    .forEach(function(oid) { const el = document.getElementById(oid); if (el) el.remove(); });
+  openDetail(Number(id));
+}
+
+
 function buildKillzoneTable() {
   const tbody = document.getElementById('kz-table-body');
   if (!tbody) return;
@@ -1802,7 +1972,7 @@ function buildKillzoneTable() {
     const grade = wr >= 80 ? 'A+' : wr >= 70 ? 'A' : wr >= 60 ? 'B' : wr >= 50 ? 'C' : 'D';
     const gradeClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
     const icon = (KZ_META[s] || {}).icon || '🕐';
-    return `<tr><td class="bold">${icon} ${s}</td><td>${st.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}">${avg >= 0 ? '+' : ''}${avg}%</td><td><span class="pill ${gradeClass}">${grade}</span></td></tr>`;
+    return `<tr class="pair-row-clickable" onclick="openKzDrilldown(this.dataset.s)" data-s="${s}" title="View ${s} trades" style="cursor:pointer"><td class="bold">${icon} ${s}</td><td>${st.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}">${avg >= 0 ? '+' : ''}${avg}%</td><td><span class="pill ${gradeClass}">${grade}</span></td></tr>`;
   }).join('');
 }
 
@@ -1825,7 +1995,7 @@ function buildStrategyTable() {
     const avg  = (st.reduce((a, t) => a + t.pnl, 0) / st.length).toFixed(1);
     const wrClass  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
     const pnlClass = avg >= 0 ? 'outcome-win' : 'outcome-loss';
-    return `<tr><td class="bold">${s}</td><td>${st.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}">${avg >= 0 ? '+' : ''}${avg}%</td></tr>`;
+    return `<tr class="pair-row-clickable" onclick="openStratDrilldown(this.dataset.s)" data-s="${s}" title="View ${s} trades" style="cursor:pointer"><td class="bold">${s}</td><td>${st.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}">${avg >= 0 ? '+' : ''}${avg}%</td></tr>`;
   });
   if (untagged.length) {
     const uw = untagged.filter(t => t.outcome === 'Win').length;
@@ -1833,7 +2003,7 @@ function buildStrategyTable() {
     const uavg = (untagged.reduce((a, t) => a + t.pnl, 0) / untagged.length).toFixed(1);
     const uwc = uwr >= 70 ? 'pill-green' : uwr >= 50 ? 'pill-gold' : 'pill-red';
     const upc = uavg >= 0 ? 'outcome-win' : 'outcome-loss';
-    rows.push(`<tr><td class="bold" style="color:var(--text2)">Untagged</td><td>${untagged.length}</td><td><span class="pill ${uwc}">${uwr}%</span></td><td class="${upc}">${uavg >= 0 ? '+' : ''}${uavg}%</td></tr>`);
+    rows.push(`<tr class="pair-row-clickable" onclick="openStratDrilldown('untagged')" title="View untagged trades" style="cursor:pointer"><td class="bold" style="color:var(--text2)">Untagged</td><td>${untagged.length}</td><td><span class="pill ${uwc}">${uwr}%</span></td><td class="${upc}">${uavg >= 0 ? '+' : ''}${uavg}%</td></tr>`);
   }
   tbody.innerHTML = rows.join('');
 }
@@ -1867,7 +2037,7 @@ function buildMonthlyTable() {
     let bestStreak = 0, cur = 0;
     sorted.forEach(t => { if (t.outcome === 'Win') { cur++; if (cur > bestStreak) bestStreak = cur; } else cur = 0; });
 
-    return `<tr>
+    return `<tr class="pair-row-clickable" onclick="openMonthDrilldown(this.dataset.k)" data-k="${key}" title="View ${MONTH_NAMES[mo-1]} ${yr} trades" style="cursor:pointer">
       <td class="bold">${MONTH_NAMES[mo - 1]} ${yr}</td>
       <td>${mt.length}</td>
       <td><span class="pill ${wrClass}">${wr}%</span></td>
