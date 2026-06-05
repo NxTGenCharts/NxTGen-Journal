@@ -5351,3 +5351,356 @@ select.acc-mgr-input option {
 /* ══ Pair drilldown trade rows ══ */
 .pair-drill-row { cursor: pointer; transition: background 0.12s; }
 .pair-drill-row:hover td { background: rgba(96,165,250,0.07) !important; }
+
+/* ══════════════════════════════════════════════════════
+   MT5 INTEGRATION — MetaTrader 5 Connection UI
+   ══════════════════════════════════════════════════════ */
+
+/* Overlay */
+.mt5-overlay {
+  position: fixed; inset: 0; z-index: 900;
+  background: rgba(8,11,18,0.82);
+  backdrop-filter: var(--blur-sm);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+.mt5-overlay.open { opacity: 1; pointer-events: all; }
+
+/* Modal */
+.mt5-modal {
+  position: fixed; top: 50%; left: 50%; z-index: 901;
+  transform: translate(-50%, -50%) scale(0.96);
+  width: min(540px, 96vw);
+  background: var(--bg2);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-xl), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34,1.56,0.64,1);
+  max-height: 90vh; overflow-y: auto;
+}
+.mt5-modal.open { opacity: 1; pointer-events: all; transform: translate(-50%,-50%) scale(1); }
+
+/* Modal head */
+.mt5-modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--glass-border);
+  background: linear-gradient(135deg, rgba(96,165,250,0.06), rgba(167,139,250,0.04));
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+}
+.mt5-modal-logo { display: flex; align-items: center; gap: 10px; }
+.mt5-logo-icon {
+  width: 34px; height: 34px; border-radius: var(--r-md);
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 900; color: #fff;
+  box-shadow: 0 4px 14px rgba(59,130,246,0.40);
+  flex-shrink: 0;
+}
+.mt5-logo-text {
+  font-family: var(--font-head); font-size: 15px; font-weight: 800;
+  color: var(--text); letter-spacing: -0.3px;
+}
+.mt5-logo-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: var(--blue-dim); color: var(--blue);
+  border: 1px solid rgba(96,165,250,0.25);
+}
+.mt5-modal-body { padding: 20px; }
+
+/* Steps indicator */
+.mt5-steps {
+  display: flex; align-items: center; gap: 0;
+  margin-bottom: 22px; position: relative;
+}
+.mt5-step {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 11px; font-weight: 600;
+  color: var(--text3); transition: color 0.2s;
+  flex: 1; position: relative;
+}
+.mt5-step:not(:last-child)::after {
+  content: ''; position: absolute;
+  top: 13px; left: calc(26px + 7px); right: -7px;
+  height: 1px;
+  background: var(--glass-border);
+  transition: background 0.3s;
+}
+.mt5-step.done:not(:last-child)::after { background: var(--blue); }
+.mt5-step-num {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid var(--glass-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+  transition: all 0.2s;
+}
+.mt5-step.active .mt5-step-num {
+  border-color: var(--blue); background: var(--blue-dim); color: var(--blue);
+}
+.mt5-step.done .mt5-step-num {
+  border-color: var(--green); background: var(--green-dim); color: var(--green);
+}
+.mt5-step.active .mt5-step-label,
+.mt5-step.done .mt5-step-label { color: var(--text2); }
+.mt5-step-label { font-size: 10px; }
+
+/* Form fields */
+.mt5-field { margin-bottom: 14px; }
+.mt5-label {
+  display: block; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.8px;
+  color: var(--text3); margin-bottom: 6px;
+}
+.mt5-label span { font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 4px; color: var(--text3); opacity: 0.7; }
+.mt5-input, .mt5-select {
+  width: 100%; padding: 10px 13px;
+  background: var(--glass-1); border: 1px solid var(--glass-border);
+  border-radius: var(--r-sm); color: var(--text);
+  font-size: 13px; font-family: var(--font-body);
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+.mt5-input:focus, .mt5-select:focus {
+  border-color: rgba(96,165,250,0.5);
+  background: var(--glass-2);
+  box-shadow: 0 0 0 3px rgba(96,165,250,0.10);
+}
+.mt5-input::placeholder { color: var(--text3); }
+.mt5-input.mono { font-family: var(--font-mono); letter-spacing: 0.5px; }
+
+/* Two-col grid */
+.mt5-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* Info alert */
+.mt5-info {
+  background: var(--blue-dim); border: 1px solid rgba(96,165,250,0.20);
+  border-radius: var(--r-sm); padding: 11px 13px;
+  font-size: 12px; color: var(--text2); line-height: 1.55;
+  display: flex; gap: 10px; align-items: flex-start;
+  margin-bottom: 16px;
+}
+.mt5-info-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+.mt5-info strong { color: var(--blue); font-weight: 700; }
+
+/* Warning alert */
+.mt5-warn {
+  background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.22);
+  border-radius: var(--r-sm); padding: 11px 13px;
+  font-size: 12px; color: var(--text2); line-height: 1.55;
+  display: flex; gap: 10px; align-items: flex-start;
+  margin-bottom: 16px;
+}
+.mt5-warn-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+
+/* EA code block */
+.mt5-code-block {
+  background: rgba(8,11,18,0.7); border: 1px solid var(--glass-border);
+  border-radius: var(--r-sm); padding: 12px 14px;
+  margin-bottom: 14px; position: relative;
+}
+.mt5-code-block pre {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--green); line-height: 1.65; overflow-x: auto;
+  white-space: pre-wrap; word-break: break-all;
+}
+.mt5-copy-btn {
+  position: absolute; top: 8px; right: 8px;
+  padding: 3px 9px; font-size: 10px; font-weight: 600;
+  background: var(--glass-2); border: 1px solid var(--glass-border);
+  border-radius: var(--r-sm); color: var(--text2);
+  cursor: pointer; transition: all 0.15s;
+  font-family: var(--font-body);
+}
+.mt5-copy-btn:hover { background: var(--glass-3); color: var(--text); }
+
+/* Action row */
+.mt5-actions {
+  display: flex; gap: 10px; justify-content: flex-end;
+  margin-top: 20px; padding-top: 16px;
+  border-top: 1px solid var(--glass-border);
+}
+.mt5-btn-cancel {
+  padding: 9px 20px; border-radius: var(--r-sm);
+  background: var(--glass-1); border: 1px solid var(--glass-border);
+  color: var(--text2); font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: var(--font-body);
+  transition: all 0.15s;
+}
+.mt5-btn-cancel:hover { background: var(--glass-2); color: var(--text); }
+.mt5-btn-primary {
+  padding: 9px 22px; border-radius: var(--r-sm);
+  background: linear-gradient(135deg, rgba(59,130,246,0.85), rgba(139,92,246,0.85));
+  border: 1px solid rgba(96,165,250,0.35);
+  color: #fff; font-size: 13px; font-weight: 700;
+  cursor: pointer; font-family: var(--font-body);
+  transition: all 0.15s; letter-spacing: 0.1px;
+  box-shadow: 0 4px 14px rgba(59,130,246,0.30);
+}
+.mt5-btn-primary:hover { box-shadow: 0 4px 22px rgba(59,130,246,0.50); filter: brightness(1.1); }
+.mt5-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+.mt5-btn-danger {
+  padding: 9px 22px; border-radius: var(--r-sm);
+  background: rgba(248,113,113,0.10); border: 1px solid rgba(248,113,113,0.30);
+  color: var(--red); font-size: 13px; font-weight: 700;
+  cursor: pointer; font-family: var(--font-body);
+  transition: all 0.15s;
+}
+.mt5-btn-danger:hover { background: rgba(248,113,113,0.20); }
+
+/* Sync status badge on account cards */
+.mt5-sync-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 9px; font-weight: 700; padding: 2px 7px;
+  border-radius: var(--r-full); margin-left: 6px;
+  vertical-align: middle;
+}
+.mt5-sync-badge.connected {
+  background: rgba(52,211,153,0.13); color: var(--green);
+  border: 1px solid rgba(52,211,153,0.25);
+}
+.mt5-sync-badge.pending {
+  background: rgba(251,191,36,0.10); color: var(--gold);
+  border: 1px solid rgba(251,191,36,0.25);
+}
+.mt5-sync-badge.error {
+  background: rgba(248,113,113,0.10); color: var(--red);
+  border: 1px solid rgba(248,113,113,0.25);
+}
+.mt5-sync-badge.syncing {
+  background: rgba(96,165,250,0.10); color: var(--blue);
+  border: 1px solid rgba(96,165,250,0.25);
+}
+.mt5-sync-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: currentColor; flex-shrink: 0;
+}
+.mt5-sync-badge.connected .mt5-sync-dot { animation: mt5-pulse 2.2s ease-in-out infinite; }
+.mt5-sync-badge.syncing .mt5-sync-dot { animation: mt5-pulse 0.8s ease-in-out infinite; }
+@keyframes mt5-pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* MT5 button on account card / manage modal */
+.mt5-connect-btn {
+  width: 100%; margin-top: 10px; padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(59,130,246,0.10), rgba(139,92,246,0.08));
+  border: 1px solid rgba(96,165,250,0.25);
+  border-radius: var(--r-sm); color: var(--blue);
+  font-size: 11px; font-weight: 700; font-family: var(--font-body);
+  cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  letter-spacing: 0.2px;
+}
+.mt5-connect-btn:hover {
+  background: linear-gradient(135deg, rgba(59,130,246,0.18), rgba(139,92,246,0.14));
+  border-color: rgba(96,165,250,0.45);
+}
+.mt5-connect-btn.connected {
+  background: rgba(52,211,153,0.08); border-color: rgba(52,211,153,0.25);
+  color: var(--green);
+}
+.mt5-connect-btn.connected:hover {
+  background: rgba(52,211,153,0.14); border-color: rgba(52,211,153,0.40);
+}
+
+/* Sync row in card */
+.acc-mt5-row {
+  font-size: 11px; color: var(--text3);
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid var(--glass-border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.acc-mt5-last { font-family: var(--font-mono); font-size: 10px; }
+
+/* Manage modal — MT5 row in account list item */
+.acc-mgr-mt5-indicator {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 9px; font-weight: 700; padding: 2px 7px;
+  border-radius: var(--r-full); margin-left: 6px;
+  background: rgba(96,165,250,0.10); color: var(--blue);
+  border: 1px solid rgba(96,165,250,0.22);
+}
+/* Sync spinner */
+.mt5-spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(96,165,250,0.20);
+  border-top-color: var(--blue);
+  animation: mt5-spin 0.75s linear infinite;
+  display: inline-block;
+}
+@keyframes mt5-spin { to { transform: rotate(360deg); } }
+
+/* Step 2 — EA instructions */
+.mt5-ea-steps { list-style: none; counter-reset: ea-step; padding: 0; margin: 0 0 14px; }
+.mt5-ea-steps li {
+  counter-increment: ea-step;
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 12px; color: var(--text2); line-height: 1.55;
+  padding: 5px 0; border-bottom: 1px solid var(--glass-border);
+}
+.mt5-ea-steps li:last-child { border-bottom: none; }
+.mt5-ea-steps li::before {
+  content: counter(ea-step);
+  flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--blue-dim); border: 1px solid rgba(96,165,250,0.25);
+  color: var(--blue); font-size: 10px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; margin-top: 1px;
+}
+
+/* Step 3 — success state */
+.mt5-success-banner {
+  background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.22);
+  border-radius: var(--r-md); padding: 18px 20px;
+  text-align: center; margin-bottom: 18px;
+}
+.mt5-success-icon { font-size: 32px; margin-bottom: 8px; }
+.mt5-success-title {
+  font-family: var(--font-head); font-size: 16px; font-weight: 800;
+  color: var(--green); margin-bottom: 4px;
+}
+.mt5-success-sub { font-size: 12px; color: var(--text3); line-height: 1.5; }
+
+/* Frequency selector */
+.mt5-freq-row { display: flex; gap: 8px; margin-top: 6px; }
+.mt5-freq-opt {
+  flex: 1; padding: 8px 4px; text-align: center;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-sm); font-size: 11px; font-weight: 600;
+  color: var(--text2); cursor: pointer; transition: all 0.15s;
+  background: var(--glass-1);
+}
+.mt5-freq-opt:hover { background: var(--glass-2); color: var(--text); }
+.mt5-freq-opt.active {
+  border-color: rgba(96,165,250,0.45); background: var(--blue-dim);
+  color: var(--blue);
+}
+
+/* Import trades table */
+.mt5-import-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.mt5-import-table th {
+  text-align: left; padding: 5px 8px;
+  color: var(--text3); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.6px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.mt5-import-table td {
+  padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.03);
+  color: var(--text2); font-family: var(--font-mono);
+}
+.mt5-import-table tr:hover td { background: var(--glass-1); }
+.mt5-import-cb { accent-color: var(--blue); width: 13px; height: 13px; cursor: pointer; }
+
+/* Light mode overrides */
+[data-theme="light"] .mt5-modal { background: rgba(241,245,251,0.97); }
+[data-theme="light"] .mt5-modal-head {
+  background: linear-gradient(135deg, rgba(59,130,246,0.06), rgba(139,92,246,0.04));
+  border-color: rgba(0,0,0,0.08);
+}
+[data-theme="light"] .mt5-input, [data-theme="light"] .mt5-select {
+  background: rgba(255,255,255,0.7); border-color: rgba(0,0,0,0.09); color: #0f172a;
+}
+[data-theme="light"] .mt5-input:focus, [data-theme="light"] .mt5-select:focus {
+  background: #fff; border-color: rgba(59,130,246,0.4);
+}
+[data-theme="light"] .mt5-code-block { background: rgba(15,23,42,0.06); }
+[data-theme="light"] .mt5-code-block pre { color: #059669; }

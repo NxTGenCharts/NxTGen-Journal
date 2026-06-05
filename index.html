@@ -311,6 +311,20 @@
           </div>
           <div class="wl-modal-body" id="acc-payout-modal-body"></div>
         </div>
+
+        <!-- MT5 Connect modal -->
+        <div class="mt5-overlay" id="mt5-overlay" onclick="if(event.target===this)mt5CloseModal()"></div>
+        <div class="mt5-modal" id="mt5-modal">
+          <div class="mt5-modal-head">
+            <div class="mt5-modal-logo">
+              <span class="mt5-logo-icon">⑤</span>
+              <span class="mt5-logo-text">MetaTrader 5</span>
+              <span class="mt5-logo-badge">Connection</span>
+            </div>
+            <button class="wl-modal-close" onclick="mt5CloseModal()">✕</button>
+          </div>
+          <div class="mt5-modal-body" id="mt5-modal-body"></div>
+        </div>
       </div>
     </div>
 

@@ -3872,7 +3872,7 @@ async function _accLoad() {
     _accData.payouts    = data.payouts    || [];
     _accData.milestones = data.milestones || [];
     _accData.accounts   = (data.accounts  || []).map(a =>
-      typeof a === 'string' ? { name: a, status: 'active', type: '', notes: '' } : a
+      typeof a === 'string' ? { name: a, status: 'active', type: '', notes: '', mt5: null } : { notes: '', ...a }
     );
   }
 }
@@ -3930,18 +3930,42 @@ function _renderAccGrid() {
     const dots  = last5.map(t =>
       `<span class="acc-dot ${t.outcome==='Win'?'w':t.outcome==='Loss'?'l':'b'}"></span>`
     ).join('');
-    const isArchived = a.status === 'archived';
+    const isArchived    = a.status === 'archived';
+    // MT5 integration
+    const mt5cfg        = a.mt5;
+    const mt5Enabled    = !!mt5cfg?.enabled;
+    const mt5Status     = mt5cfg?.lastSyncStatus || 'never';
+    const mt5Pending    = (mt5cfg?.pendingTrades || []).length;
+    const mt5LastSync   = mt5cfg?.lastSync ? new Date(mt5cfg.lastSync).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : null;
+    const mt5BadgeClass = {ok:'connected',error:'error',syncing:'syncing',pending:'pending',never:'pending'}[mt5Status] || 'pending';
+    const mt5BadgeLbl   = {ok:'MT5 Live',error:'Sync Error',syncing:'Syncing…',pending:'Waiting…',never:'Waiting…'}[mt5Status] || 'MT5';
+    const mt5HeadBadge  = mt5Enabled
+      ? `<span class="mt5-sync-badge ${mt5BadgeClass}"><span class="mt5-sync-dot"></span>${mt5BadgeLbl}</span>` : '';
+    const mt5PendingBadge = mt5Pending > 0
+      ? `<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:var(--r-full);background:rgba(251,191,36,0.12);color:var(--gold);border:1px solid rgba(251,191,36,0.25);margin-left:4px">+${mt5Pending} new</span>` : '';
+    const mt5Row = mt5Enabled
+      ? `<div class="acc-mt5-row">
+           <span style="color:var(--blue);font-size:10px;font-weight:600">⑥ MT5${mt5PendingBadge}</span>
+           <span class="acc-mt5-last">${mt5LastSync ? 'Last: '+mt5LastSync : 'No sync yet'}</span>
+         </div>` : '';
+    const mt5Btn = !isArchived
+      ? `<button class="mt5-connect-btn${mt5Enabled?' connected':''}"
+           onclick="event.stopPropagation();mt5OpenModal('${name.replace(/'/g,"\\'")}')">
+           <span>⑥</span>${mt5Enabled ? 'MT5 Connected — Manage' : 'Connect MT5 Account'}
+         </button>` : '';
     return `
     <div class="acc-card${isArchived ? ' acc-card-archived' : ''}" onclick="${isArchived ? '' : `accShowDetail('${name.replace(/'/g,"\\'")}')` }">
       <div class="acc-card-head">
-        <div class="acc-name">${name}${a.type ? `<span class="acc-type-badge">${a.type}</span>` : ''}</div>
+        <div class="acc-name">${name}${a.type ? `<span class="acc-type-badge">${a.type}</span>` : ''}${mt5HeadBadge}</div>
         <span class="acc-status ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span>
       </div>
       <div class="acc-row"><span class="k">Trades</span><span class="v">${at.length || '—'}</span></div>
       <div class="acc-row"><span class="k">Win Rate</span><span class="v" style="color:${wrColor}">${wr !== null ? wr + '%' : '—'}</span></div>
       <div class="acc-row"><span class="k">Net PnL</span><span class="v" style="color:${pnlColor}">${pnlStr || '—'}</span></div>
       ${last5.length ? `<div class="acc-recent-dots">${dots}<span class="acc-recent-label">Recent</span></div>` : ''}
-      ${isArchived ? `<button class="acc-restore-btn" onclick="event.stopPropagation();_restoreAccountByName('${name.replace(/'/g,"\\'")}')">↩ Restore</button>` : ''}
+      ${mt5Row}
+      ${mt5Btn}
+      ${isArchived ? `<button class="acc-restore-btn" onclick="event.stopPropagation();_restoreAccountByName('${name.replace(/'/g,"\\'")}'">↩ Restore</button>` : ''}
     </div>`;
   };
 
@@ -4057,7 +4081,7 @@ function _showPayoutModal(editIdx) {
       <div class="wl-form-row">
         <label class="wl-form-label">Account</label>
         <select class="wl-form-select" id="acc-p-account">
-          ${_buildActiveAccountOptions(p ? p.account : '')}
+          ${_getCustomAccounts().map(a => `<option${p&&p.account===a?' selected':''}>${a}</option>`).join('')}
         </select>
       </div>
       <div class="wl-form-row">
@@ -5297,15 +5321,20 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (event === 'SIGNED_OUT') window.location.replace('./login.html');
   });
 
-  // 5. Load critical data first (trades + accounts), render immediately, defer the rest
+  // 5. Load data from Supabase - parallel for speed
   loadTrashSettings();
   await Promise.all([
     loadTrades(),
     loadDeletedTrades(),
+    _wlLoad(),
+    _goalsLoad(),
+    _pbLoad(),
     _accLoad(),
+    _profileLoad(),
   ]);
+  await runAutoCleanup();
 
-  // 6. Render critical UI right away so the dashboard is visible fast
+  // 6. Render all UI
   updateKPIs();
   buildPairTable();
   buildKillzoneTable();
@@ -5319,28 +5348,18 @@ document.addEventListener('DOMContentLoaded', async function () {
   if (_bootSbEl) _bootSbEl.classList.add('active');
   refreshPairFilter();
   updateTrashBadge();
+  buildWatchlist();
   buildAccounts();
+  _mt5ResumeAllPolling();
+  buildPlaybook();
+  buildGoals();
+  buildMonthlyReview();
   renderTradeTable(trades);
   _refreshCalendarAccountFilter();
   renderCalendar();
   _injectTopbarAvatar();
 
-  // 7. Load secondary data in background — watchlist, goals, playbook, profile
-  //    These don't affect the main dashboard view so we defer them
-  Promise.all([
-    _wlLoad(),
-    _goalsLoad(),
-    _pbLoad(),
-    _profileLoad(),
-  ]).then(() => {
-    runAutoCleanup();
-    buildWatchlist();
-    buildPlaybook();
-    buildGoals();
-    buildMonthlyReview();
-  });
-
-  // 8. Live clock
+  // 7. Live clock
   updateClock();
   setInterval(updateClock, 1000);
 });
@@ -5446,18 +5465,27 @@ function _rebuildAccMgrList() {
     trash: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>',
   };
 
-  const renderActive = (a, i) => `
+  const renderActive = (a, i) => {
+    const mt5On = !!a.mt5?.enabled;
+    const mt5St = a.mt5?.lastSyncStatus || 'never';
+    const mt5Indicator = mt5On
+      ? `<span class="acc-mgr-mt5-indicator" title="MT5 ${mt5St}">⑤ ${mt5St === 'ok' ? 'Live' : mt5St === 'error' ? 'Error' : 'Pending'}</span>`
+      : '';
+    return `
     <div class="acc-mgr-item" id="acc-mgr-item-${i}">
-      <div class="acc-mgr-item-left">
+      <div class="acc-mgr-item-left" style="flex:1;min-width:0">
         <span class="acc-mgr-name">${a.name}</span>
         ${a.type ? `<span class="acc-mgr-type-badge">${a.type}</span>` : ''}
+        ${mt5Indicator}
       </div>
       <div class="acc-mgr-actions">
+        <button onclick="mt5OpenModal('${a.name.replace(/'/g,"\\'")}');document.getElementById('acc-manager-overlay')?.remove()"
+          class="acc-mgr-btn${mt5On ? ' restore' : ' edit'}" title="${mt5On ? 'Manage MT5' : 'Connect MT5'}">⑤</button>
         <button onclick="_editAccount(${i})" class="acc-mgr-btn edit" title="Edit">${ICONS.edit}</button>
         <button onclick="_toggleArchiveAccount(${i})" class="acc-mgr-btn archive" title="Archive">${ICONS.archive}</button>
         <button onclick="_softDeleteAccount(${i})" class="acc-mgr-btn del" title="Move to Deleted">${ICONS.trash}</button>
       </div>
-    </div>`;
+    </div>`;};
 
   const renderArchived = (a, i) => `
     <div class="acc-mgr-item acc-mgr-item-archived" id="acc-mgr-item-${i}">
@@ -6233,4 +6261,657 @@ function profileConfirmDeleteAccount() {
     confirmLabel:'Delete My Account', confirmClass:'glass-btn-danger',
     onConfirm: () => showToast('Please contact support at support@nxtgen.app to delete your account.', 'restore')
   });
+}
+
+// ══════════════════════════════════════════════════════
+// MT5 INTEGRATION — MetaTrader 5 Account Sync
+// Architecture:
+//   1. User configures MT5 credentials + webhook URL
+//   2. An MQL5 EA (provided as code) is installed in MT5
+//   3. The EA POSTs trade data to a Supabase Edge Function
+//      OR directly to a configurable webhook endpoint
+//   4. The app polls for new trades and auto-imports them
+//
+// MT5 config is stored per-account in: account.mt5 = {
+//   enabled: bool, login: str, server: str,
+//   webhookToken: str (random UUID for auth),
+//   syncFreqMs: number, lastSync: ISO string,
+//   lastSyncStatus: 'ok'|'error'|'syncing'|'never',
+//   pendingTrades: [] (trades received, not yet imported)
+// }
+// ══════════════════════════════════════════════════════
+
+/* ── State ─────────────────────────────────────────── */
+let _mt5SyncTimers = {};   // accountName → intervalId
+let _mt5ModalState = {};   // current wizard state
+
+/* ── Open MT5 modal ────────────────────────────────── */
+function mt5OpenModal(accountName) {
+  const list  = _getCustomAccounts();
+  const acc   = list.find(a => a.name === accountName);
+  if (!acc) return;
+
+  _mt5ModalState = { accountName, acc, step: acc.mt5?.enabled ? 3 : 1 };
+
+  const overlay = document.getElementById('mt5-overlay');
+  const modal   = document.getElementById('mt5-modal');
+  if (!overlay || !modal) return;
+
+  overlay.classList.add('open');
+  modal.classList.add('open');
+  _mt5RenderStep(_mt5ModalState.step);
+}
+
+function mt5CloseModal() {
+  document.getElementById('mt5-overlay')?.classList.remove('open');
+  document.getElementById('mt5-modal')?.classList.remove('open');
+}
+
+/* ── Render wizard step ────────────────────────────── */
+function _mt5RenderStep(step) {
+  _mt5ModalState.step = step;
+  const body = document.getElementById('mt5-modal-body');
+  if (!body) return;
+
+  const stepsHtml = `
+  <div class="mt5-steps">
+    <div class="mt5-step ${step >= 1 ? (step > 1 ? 'done' : 'active') : ''}">
+      <div class="mt5-step-num">${step > 1 ? '✓' : '1'}</div>
+      <span class="mt5-step-label">Configure</span>
+    </div>
+    <div class="mt5-step ${step >= 2 ? (step > 2 ? 'done' : 'active') : ''}">
+      <div class="mt5-step-num">${step > 2 ? '✓' : '2'}</div>
+      <span class="mt5-step-label">Install EA</span>
+    </div>
+    <div class="mt5-step ${step >= 3 ? 'active' : ''}">
+      <div class="mt5-step-num">3</div>
+      <span class="mt5-step-label">Sync</span>
+    </div>
+  </div>`;
+
+  if (step === 1) body.innerHTML = stepsHtml + _mt5Step1Html();
+  if (step === 2) body.innerHTML = stepsHtml + _mt5Step2Html();
+  if (step === 3) body.innerHTML = stepsHtml + _mt5Step3Html();
+}
+
+/* ── Step 1: credentials + config ─────────────────── */
+function _mt5Step1Html() {
+  const acc = _mt5ModalState.acc;
+  const cfg = acc.mt5 || {};
+  const freqs = [
+    { label: '30s', ms: 30000 },
+    { label: '1 min', ms: 60000 },
+    { label: '5 min', ms: 300000 },
+    { label: '15 min', ms: 900000 },
+  ];
+  const curFreq = cfg.syncFreqMs || 60000;
+
+  return `
+  <div class="mt5-info">
+    <span class="mt5-info-icon">ℹ️</span>
+    <div>Connect your <strong>MT5 brokerage account</strong> to auto-import trade history.
+    Your login credentials are stored <strong>only on your device</strong> — they are never sent
+    to NxTGen servers. Sync works via a secure token-authenticated webhook.</div>
+  </div>
+
+  <div class="mt5-grid-2">
+    <div class="mt5-field">
+      <label class="mt5-label">MT5 Login <span>(account number)</span></label>
+      <input class="mt5-input mono" id="mt5-login" type="text" placeholder="e.g. 12345678"
+        value="${cfg.login || ''}" autocomplete="off">
+    </div>
+    <div class="mt5-field">
+      <label class="mt5-label">Broker Server</label>
+      <input class="mt5-input" id="mt5-server" type="text" placeholder="e.g. ICMarkets-Live01"
+        value="${cfg.server || ''}" autocomplete="off">
+    </div>
+  </div>
+
+  <div class="mt5-field">
+    <label class="mt5-label">MT5 Password <span>(investor/read-only password recommended)</span></label>
+    <input class="mt5-input mono" id="mt5-pass" type="password" placeholder="••••••••"
+      value="${cfg.pass ? '••••••••' : ''}" autocomplete="new-password">
+  </div>
+
+  <div class="mt5-warn">
+    <span class="mt5-warn-icon">🔒</span>
+    <div>For maximum security, use your <strong>Investor Password</strong> (read-only access).
+    This lets the EA read trade history without the ability to place or close trades.</div>
+  </div>
+
+  <div class="mt5-field">
+    <label class="mt5-label">Sync Frequency</label>
+    <div class="mt5-freq-row" id="mt5-freq-row">
+      ${freqs.map(f => `
+        <div class="mt5-freq-opt${f.ms === curFreq ? ' active' : ''}"
+             onclick="_mt5SelectFreq(${f.ms},this)">${f.label}</div>
+      `).join('')}
+    </div>
+  </div>
+
+  <div class="mt5-field">
+    <label class="mt5-label">Account Label <span>(auto-filled)</span></label>
+    <input class="mt5-input" id="mt5-acc-label" type="text"
+      value="${acc.name}" readonly style="opacity:.6;cursor:default">
+  </div>
+
+  <div class="mt5-actions">
+    <button class="mt5-btn-cancel" onclick="mt5CloseModal()">Cancel</button>
+    <button class="mt5-btn-primary" onclick="_mt5Step1Next()">Next: Install EA →</button>
+  </div>`;
+}
+
+function _mt5SelectFreq(ms, el) {
+  document.querySelectorAll('.mt5-freq-opt').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  _mt5ModalState.pendingFreq = ms;
+}
+
+function _mt5Step1Next() {
+  const login  = document.getElementById('mt5-login')?.value.trim();
+  const server = document.getElementById('mt5-server')?.value.trim();
+  const pass   = document.getElementById('mt5-pass')?.value;
+
+  if (!login)  { showToast('Enter your MT5 login number', 'danger'); return; }
+  if (!server) { showToast('Enter your broker server name', 'danger'); return; }
+  if (!pass || pass === '••••••••') {
+    // If editing and pass is placeholder, keep existing
+    if (!(_mt5ModalState.acc.mt5?.pass) && pass !== '••••••••') {
+      showToast('Enter your MT5 password', 'danger'); return;
+    }
+  }
+
+  const list = _getCustomAccounts();
+  const idx  = list.findIndex(a => a.name === _mt5ModalState.accountName);
+  if (idx === -1) return;
+
+  // Generate webhook token if not already set
+  const token = list[idx].mt5?.webhookToken || _mt5GenToken();
+
+  // Preserve existing pass if placeholder shown
+  const finalPass = (pass === '••••••••' && list[idx].mt5?.pass)
+    ? list[idx].mt5.pass
+    : pass;
+
+  list[idx].mt5 = {
+    ...(list[idx].mt5 || {}),
+    login,
+    server,
+    pass: finalPass,
+    webhookToken: token,
+    syncFreqMs: _mt5ModalState.pendingFreq || list[idx].mt5?.syncFreqMs || 60000,
+    enabled: false,
+    lastSyncStatus: list[idx].mt5?.lastSyncStatus || 'never',
+    lastSync: list[idx].mt5?.lastSync || null,
+    pendingTrades: list[idx].mt5?.pendingTrades || [],
+  };
+
+  _mt5ModalState.acc = list[idx];
+  _saveCustomAccounts(list);
+  _mt5RenderStep(2);
+}
+
+/* ── Step 2: EA install instructions ──────────────── */
+function _mt5Step2Html() {
+  const acc   = _mt5ModalState.acc;
+  const token = acc.mt5?.webhookToken || '(not set)';
+  const label = acc.name;
+
+  // Webhook endpoint — uses the same Supabase project URL
+  const webhookUrl = `${SUPABASE_URL}/functions/v1/mt5-sync`;
+
+  const eaCode = `//+------------------------------------------------------------------+
+//|  NxTGen MT5 Sync EA — paste into MetaEditor, compile & attach   |
+//|  Tools > Options > Expert Advisors > Allow WebRequest for:      |
+//|  ${webhookUrl.slice(0, 52)}  |
+//+------------------------------------------------------------------+
+#property strict
+input string WebhookURL   = "${webhookUrl}";
+input string AuthToken    = "${token}";
+input string AccountLabel = "${label}";
+input int    SyncEvery    = 30; // seconds
+
+datetime lastSent = 0;
+
+void OnTick() {
+  if (TimeCurrent() - lastSent < SyncEvery) return;
+  lastSent = TimeCurrent();
+  SyncTrades();
+}
+
+void SyncTrades() {
+  int total = HistoryDealsTotal();
+  string json = "[";
+  bool first = true;
+  for (int i = MathMax(0, total - 50); i < total; i++) {
+    ulong ticket = HistoryDealGetTicket(i);
+    if (ticket == 0) continue;
+    if (HistoryDealGetInteger(ticket, DEAL_TYPE) > 1) continue; // buy/sell only
+    long entryType = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+    if (entryType != DEAL_ENTRY_IN && entryType != DEAL_ENTRY_OUT) continue;
+    if (!first) json += ",";
+    first = false;
+    json += StringFormat(
+      "{\\\"ticket\\\":%I64u,\\\"symbol\\\":\\\"%s\\\","
+      "\\\"type\\\":\\\"%s\\\",\\\"lots\\\":%.2f,"
+      "\\\"openPrice\\\":%.5f,\\\"closePrice\\\":%.5f,"
+      "\\\"openTime\\\":%I64u,\\\"closeTime\\\":%I64u,"
+      "\\\"profit\\\":%.2f,\\\"swap\\\":%.2f,\\\"commission\\\":%.2f}",
+      ticket,
+      HistoryDealGetString(ticket, DEAL_SYMBOL),
+      entryType == DEAL_ENTRY_IN ? "buy" : "sell",
+      HistoryDealGetDouble(ticket, DEAL_VOLUME),
+      HistoryDealGetDouble(ticket, DEAL_PRICE),
+      HistoryDealGetDouble(ticket, DEAL_PRICE),
+      HistoryDealGetInteger(ticket, DEAL_TIME),
+      HistoryDealGetInteger(ticket, DEAL_TIME),
+      HistoryDealGetDouble(ticket, DEAL_PROFIT),
+      HistoryDealGetDouble(ticket, DEAL_SWAP),
+      HistoryDealGetDouble(ticket, DEAL_COMMISSION)
+    );
+  }
+  json += "]";
+  string headers = "Content-Type: application/json\\r\\nX-MT5-Token: " + AuthToken +
+                   "\\r\\nX-MT5-Account: " + AccountLabel;
+  char post[], result[]; string resHeaders;
+  StringToCharArray(json, post);
+  int code = WebRequest("POST", WebhookURL, headers, 5000, post, result, resHeaders);
+  if (code == 200) Print("NxTGen sync OK");
+  else Print("NxTGen sync error: ", code);
+}`;
+
+  return `
+  <div class="mt5-info">
+    <span class="mt5-info-icon">⚡</span>
+    <div>Install a lightweight <strong>Expert Advisor (EA)</strong> into MetaTrader 5.
+    The EA runs silently in the background and pushes your closed trades to NxTGen
+    over a secure, token-authenticated connection.</div>
+  </div>
+
+  <ol class="mt5-ea-steps">
+    <li>In MT5: open <strong>MetaEditor</strong> (F4) → File → New → Expert Advisor</li>
+    <li>Delete all placeholder code and <strong>paste the code below</strong>, then press Compile (F7)</li>
+    <li>Back in MT5 charts: go to <strong>Tools → Options → Expert Advisors</strong>
+        and add <code style="color:var(--blue);font-family:var(--font-mono);font-size:11px">${webhookUrl}</code>
+        to the allowed WebRequest URLs list</li>
+    <li>Drag the EA onto <strong>any chart</strong> (e.g. EURUSD M1). Make sure
+        "Allow Live Trading" and "Allow WebRequest" are checked in the EA settings</li>
+    <li>Click <strong>Enable Sync</strong> below — NxTGen will start listening for trades</li>
+  </ol>
+
+  <label class="mt5-label" style="margin-bottom:8px">EA Source Code <span style="color:var(--blue)">(copy all)</span></label>
+  <div class="mt5-code-block">
+    <button class="mt5-copy-btn" onclick="_mt5CopyEA()">Copy</button>
+    <pre id="mt5-ea-code">${eaCode.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+  </div>
+
+  <div class="mt5-warn">
+    <span class="mt5-warn-icon">🔑</span>
+    <div>Your <strong>Auth Token</strong>: <code style="font-family:var(--font-mono);color:var(--gold);font-size:11px">${token}</code><br>
+    This is already embedded in the EA code above. Keep it private.</div>
+  </div>
+
+  <div class="mt5-actions">
+    <button class="mt5-btn-cancel" onclick="_mt5RenderStep(1)">← Back</button>
+    <button class="mt5-btn-primary" onclick="_mt5EnableSync()">Enable Sync ✓</button>
+  </div>`;
+}
+
+function _mt5CopyEA() {
+  const pre = document.getElementById('mt5-ea-code');
+  if (!pre) return;
+  // Decode HTML entities
+  const text = pre.innerText || pre.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.mt5-copy-btn');
+    if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); }
+  });
+}
+
+async function _mt5EnableSync() {
+  const list = _getCustomAccounts();
+  const idx  = list.findIndex(a => a.name === _mt5ModalState.accountName);
+  if (idx === -1) return;
+
+  list[idx].mt5 = { ...(list[idx].mt5 || {}), enabled: true, lastSyncStatus: 'pending' };
+  _mt5ModalState.acc = list[idx];
+  await _saveCustomAccounts(list);
+
+  // Start the polling loop for this account
+  _mt5StartPolling(list[idx]);
+
+  buildAccounts();
+  _mt5RenderStep(3);
+}
+
+/* ── Step 3: connected / sync status ──────────────── */
+function _mt5Step3Html() {
+  const acc      = _mt5ModalState.acc;
+  const cfg      = acc.mt5 || {};
+  const pending  = cfg.pendingTrades || [];
+  const lastSync = cfg.lastSync ? new Date(cfg.lastSync).toLocaleString() : 'Never';
+  const status   = cfg.lastSyncStatus || 'pending';
+  const freqLabel = _mt5FreqLabel(cfg.syncFreqMs);
+
+  const statusBadge = {
+    ok:      `<span class="mt5-sync-badge connected"><span class="mt5-sync-dot"></span> Connected</span>`,
+    error:   `<span class="mt5-sync-badge error"><span class="mt5-sync-dot"></span> Error</span>`,
+    syncing: `<span class="mt5-sync-badge syncing"><span class="mt5-sync-dot"></span> Syncing…</span>`,
+    pending: `<span class="mt5-sync-badge pending"><span class="mt5-sync-dot"></span> Waiting for EA</span>`,
+    never:   `<span class="mt5-sync-badge pending"><span class="mt5-sync-dot"></span> Waiting for EA</span>`,
+  }[status] || '';
+
+  const importSection = pending.length > 0 ? `
+    <div style="margin-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <label class="mt5-label" style="margin:0">${pending.length} trade${pending.length!==1?'s':''} ready to import</label>
+        <div style="display:flex;gap:8px">
+          <button class="mt5-btn-cancel" style="padding:5px 12px;font-size:11px"
+            onclick="_mt5SelectAll(true)">Select All</button>
+          <button class="mt5-btn-primary" style="padding:5px 14px;font-size:11px"
+            onclick="_mt5ImportSelected()">Import Selected →</button>
+        </div>
+      </div>
+      <div style="max-height:220px;overflow-y:auto;border:1px solid var(--glass-border);border-radius:var(--r-sm)">
+        <table class="mt5-import-table">
+          <thead><tr>
+            <th style="width:28px"><input type="checkbox" class="mt5-import-cb" id="mt5-cb-all"
+              onchange="_mt5SelectAll(this.checked)" checked></th>
+            <th>Symbol</th><th>Type</th><th>Lots</th>
+            <th>Profit</th><th>Date</th>
+          </tr></thead>
+          <tbody>
+            ${pending.map((t, i) => `
+            <tr>
+              <td><input type="checkbox" class="mt5-import-cb mt5-import-row-cb" data-i="${i}" checked></td>
+              <td style="color:var(--text);font-weight:600">${t.symbol || '—'}</td>
+              <td style="color:${t.type==='buy'?'var(--green)':'var(--red)'}">
+                ${t.type ? t.type.toUpperCase() : '—'}</td>
+              <td>${t.lots ?? '—'}</td>
+              <td style="color:${(t.profit||0)>=0?'var(--green)':'var(--red)'};font-weight:600">
+                ${(t.profit||0)>=0?'+':''}${(t.profit||0).toFixed(2)}</td>
+              <td>${t.closeTime ? new Date(t.closeTime*1000).toLocaleDateString() : '—'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>` : `
+    <div style="color:var(--text3);font-size:12px;text-align:center;padding:16px 0;">
+      No pending trades. New closed trades will appear here automatically.
+    </div>`;
+
+  return `
+  <div class="mt5-success-banner">
+    <div class="mt5-success-icon">🔗</div>
+    <div class="mt5-success-title">MT5 Sync Active ${statusBadge}</div>
+    <div class="mt5-success-sub">
+      Account: <strong>${acc.name}</strong> · Server: ${cfg.server || '—'} · Login: ${cfg.login || '—'}<br>
+      Sync every <strong>${freqLabel}</strong> · Last sync: ${lastSync}
+    </div>
+  </div>
+
+  ${importSection}
+
+  <div class="mt5-actions">
+    <button class="mt5-btn-danger" onclick="_mt5DisconnectConfirm()">Disconnect MT5</button>
+    <button class="mt5-btn-cancel" onclick="_mt5RenderStep(1)">Edit Config</button>
+    <button class="mt5-btn-primary" onclick="_mt5ForceSyncNow()">
+      <span class="mt5-spinner" id="mt5-spin" style="display:none"></span>
+      Sync Now
+    </button>
+  </div>`;
+}
+
+function _mt5SelectAll(checked) {
+  document.querySelectorAll('.mt5-import-row-cb').forEach(cb => cb.checked = checked);
+  const all = document.getElementById('mt5-cb-all');
+  if (all) all.checked = checked;
+}
+
+async function _mt5ImportSelected() {
+  const list = _getCustomAccounts();
+  const idx  = list.findIndex(a => a.name === _mt5ModalState.accountName);
+  if (idx === -1) return;
+
+  const pending  = list[idx].mt5?.pendingTrades || [];
+  const selected = [];
+  document.querySelectorAll('.mt5-import-row-cb').forEach(cb => {
+    if (cb.checked) selected.push(parseInt(cb.dataset.i));
+  });
+
+  if (!selected.length) { showToast('Select at least one trade to import', 'danger'); return; }
+
+  let imported = 0;
+  for (const i of selected) {
+    const t = pending[i];
+    if (!t) continue;
+    // Map MT5 trade to journal trade format
+    const jTrade = _mt5MapTrade(t, list[idx].name);
+    if (jTrade) {
+      const ok = await _cloudSaveTrade(jTrade);
+      if (ok !== false) { trades.push(jTrade); imported++; }
+    }
+  }
+
+  // Remove imported from pending
+  list[idx].mt5.pendingTrades = pending.filter((_, i) => !selected.includes(i));
+  await _saveCustomAccounts(list);
+
+  _mt5ModalState.acc = list[idx];
+  showToast(`${imported} trade${imported !== 1 ? 's' : ''} imported ✓`, 'restore');
+  _refreshAll();
+  _mt5RenderStep(3);
+}
+
+function _mt5MapTrade(mt5Trade, accountName) {
+  // Map MT5 fields to NxTGen trade schema
+  const symbol = (mt5Trade.symbol || '').replace(/\.?[A-Za-z]+$/, '').toUpperCase();
+  const type   = mt5Trade.type === 'buy' ? 'Buy' : 'Sell';
+  const profit = parseFloat(mt5Trade.profit) || 0;
+  const lots   = parseFloat(mt5Trade.lots) || 0;
+
+  // Estimate R:R (placeholder — real calc needs account balance)
+  const outcome = profit > 0 ? 'Win' : profit < 0 ? 'Loss' : 'B.E';
+  const pnlPct  = lots > 0 ? parseFloat((profit / (lots * 1000)).toFixed(2)) : 0;
+
+  const openDt  = mt5Trade.openTime  ? new Date(mt5Trade.openTime  * 1000)  : new Date();
+  const closeDt = mt5Trade.closeTime ? new Date(mt5Trade.closeTime * 1000) : new Date();
+
+  return {
+    id:        Date.now() + Math.random(),
+    date:      closeDt.toISOString().slice(0, 10),
+    pair:      symbol || 'UNKNOWN',
+    pos:       type,
+    rr:        '1:1', // user can edit
+    pnl:       pnlPct,
+    outcome,
+    kz:        _mt5GuessKillzone(closeDt),
+    strategy:  '',
+    tf:        '',
+    account:   accountName,
+    rating:    3,
+    notes:     `MT5 import: Ticket ${mt5Trade.ticket || '?'} · Lots: ${lots} · Raw P/L: ${profit.toFixed(2)}`,
+    pretrade:  '',
+    emotion:   'Neutral',
+    risk:      '',
+    checklist: [],
+    charts:    [],
+    chartLabels: [...(typeof CHART_LABELS !== 'undefined' ? CHART_LABELS : [])],
+    mistakes:  '',
+    source:    'mt5',
+    mt5Ticket: mt5Trade.ticket,
+  };
+}
+
+function _mt5GuessKillzone(date) {
+  const h = date.getUTCHours();
+  if (h >= 0  && h < 3)  return 'Asian';
+  if (h >= 7  && h < 11) return 'London';
+  if (h >= 12 && h < 17) return 'New York';
+  return 'Asian';
+}
+
+async function _mt5DisconnectConfirm() {
+  openGlassModal({
+    icon: '🔌',
+    title: 'Disconnect MT5?',
+    body: `This will stop syncing trades from <strong>${_mt5ModalState.accountName}</strong>
+           and remove the stored credentials.<br>
+           <small style="color:var(--text3)">Your already-imported trades will not be affected.</small>`,
+    confirmLabel: 'Disconnect',
+    confirmClass: 'glass-btn-danger',
+    onConfirm: async () => {
+      const list = _getCustomAccounts();
+      const idx  = list.findIndex(a => a.name === _mt5ModalState.accountName);
+      if (idx === -1) return;
+      // Clear MT5 data but keep account
+      delete list[idx].mt5;
+      await _saveCustomAccounts(list);
+      _mt5StopPolling(_mt5ModalState.accountName);
+      buildAccounts();
+      mt5CloseModal();
+      showToast('MT5 disconnected', 'restore');
+    }
+  });
+}
+
+/* ── Force manual sync ─────────────────────────────── */
+async function _mt5ForceSyncNow() {
+  const spin = document.getElementById('mt5-spin');
+  if (spin) spin.style.display = 'inline-block';
+  await _mt5DoSync(_mt5ModalState.accountName);
+  if (spin) spin.style.display = 'none';
+  // Re-render to show any new pending trades
+  const list = _getCustomAccounts();
+  const acc  = list.find(a => a.name === _mt5ModalState.accountName);
+  if (acc) { _mt5ModalState.acc = acc; }
+  _mt5RenderStep(3);
+}
+
+/* ── Polling engine ────────────────────────────────── */
+function _mt5StartPolling(acc) {
+  const name = acc.name;
+  _mt5StopPolling(name); // clear any existing timer
+  const freqMs = acc.mt5?.syncFreqMs || 60000;
+  _mt5SyncTimers[name] = setInterval(() => _mt5DoSync(name), freqMs);
+}
+
+function _mt5StopPolling(name) {
+  if (_mt5SyncTimers[name]) {
+    clearInterval(_mt5SyncTimers[name]);
+    delete _mt5SyncTimers[name];
+  }
+}
+
+/* ── Core sync — polls the Supabase edge function ──── */
+async function _mt5DoSync(accountName) {
+  const list = _getCustomAccounts();
+  const idx  = list.findIndex(a => a.name === accountName);
+  if (idx === -1 || !list[idx].mt5?.enabled) return;
+
+  const cfg = list[idx].mt5;
+  const token = cfg.webhookToken;
+
+  // Mark syncing
+  list[idx].mt5.lastSyncStatus = 'syncing';
+  await _saveCustomAccounts(list);
+  _mt5UpdateCardBadge(accountName, 'syncing');
+
+  try {
+    // Poll the Edge Function for any trades pushed by the EA for this token
+    const resp = await fetch(
+      `${SUPABASE_URL}/functions/v1/mt5-sync?token=${encodeURIComponent(token)}&account=${encodeURIComponent(accountName)}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${(await sb.auth.getSession()).data.session?.access_token || ''}`,
+          'X-MT5-Token': token,
+        }
+      }
+    );
+
+    const freshList = _getCustomAccounts();
+    const fIdx = freshList.findIndex(a => a.name === accountName);
+    if (fIdx === -1) return;
+
+    if (resp.ok) {
+      const data = await resp.json();
+      const incoming = Array.isArray(data.trades) ? data.trades : [];
+
+      // Deduplicate by ticket number
+      const existingTickets = new Set([
+        ...(freshList[fIdx].mt5?.pendingTrades || []).map(t => t.ticket),
+        ...trades.filter(t => t.mt5Ticket).map(t => t.mt5Ticket),
+      ]);
+      const newTrades = incoming.filter(t => !existingTickets.has(t.ticket));
+
+      freshList[fIdx].mt5.pendingTrades = [
+        ...(freshList[fIdx].mt5.pendingTrades || []),
+        ...newTrades,
+      ];
+      freshList[fIdx].mt5.lastSyncStatus = 'ok';
+      freshList[fIdx].mt5.lastSync = new Date().toISOString();
+      await _saveCustomAccounts(freshList);
+
+      _mt5UpdateCardBadge(accountName, 'ok');
+      if (newTrades.length) {
+        showToast(`${newTrades.length} new MT5 trade${newTrades.length !== 1 ? 's' : ''} — tap to review`, 'info',
+          { label: 'Review', fn: `mt5OpenModal('${accountName}')` });
+        buildAccounts();
+      }
+    } else {
+      freshList[fIdx].mt5.lastSyncStatus = 'error';
+      freshList[fIdx].mt5.lastSync = new Date().toISOString();
+      await _saveCustomAccounts(freshList);
+      _mt5UpdateCardBadge(accountName, 'error');
+    }
+  } catch (e) {
+    const freshList = _getCustomAccounts();
+    const fIdx = freshList.findIndex(a => a.name === accountName);
+    if (fIdx >= 0) {
+      freshList[fIdx].mt5.lastSyncStatus = 'error';
+      await _saveCustomAccounts(freshList);
+    }
+    _mt5UpdateCardBadge(accountName, 'error');
+    console.warn('MT5 sync error:', e.message);
+  }
+}
+
+/* ── Live update the badge on account card ─────────── */
+function _mt5UpdateCardBadge(accountName, status) {
+  // Tiny live update without full re-render
+  const cards = document.querySelectorAll('.acc-card');
+  cards.forEach(card => {
+    const nameEl = card.querySelector('.acc-name');
+    if (!nameEl) return;
+    // Check if this card is for our account
+    const text = nameEl.childNodes[0]?.textContent?.trim();
+    if (text !== accountName) return;
+    const badge = card.querySelector('.mt5-sync-badge');
+    if (!badge) return;
+    badge.className = `mt5-sync-badge ${status}`;
+    const dot = badge.querySelector('.mt5-sync-dot');
+    const labels = { ok:'Connected', error:'Sync Error', syncing:'Syncing…', pending:'Waiting for EA' };
+    if (dot) badge.innerHTML = `<span class="mt5-sync-dot"></span> ${labels[status] || status}`;
+  });
+}
+
+/* ── Resume polling on boot for all connected accounts  */
+function _mt5ResumeAllPolling() {
+  _getCustomAccounts().forEach(acc => {
+    if (acc.mt5?.enabled) _mt5StartPolling(acc);
+  });
+}
+
+/* ── Helpers ───────────────────────────────────────── */
+function _mt5GenToken() {
+  return 'mt5-' + Array.from(crypto.getRandomValues(new Uint8Array(18)))
+    .map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function _mt5FreqLabel(ms) {
+  if (!ms) return '1 min';
+  if (ms < 60000) return `${ms/1000}s`;
+  if (ms < 3600000) return `${ms/60000} min`;
+  return `${ms/3600000}h`;
 }
