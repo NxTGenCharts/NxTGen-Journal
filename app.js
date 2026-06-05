@@ -6621,17 +6621,24 @@ function _mt5Step3Html() {
             <th>Profit</th><th>Date</th>
           </tr></thead>
           <tbody>
-            ${pending.map((t, i) => `
+            ${pending.map((t, i) => {
+            const netPL    = (parseFloat(t.profit)||0) + (parseFloat(t.swap)||0) + (parseFloat(t.commission)||0);
+            const plColor  = netPL >= 0 ? 'var(--green)' : 'var(--red)';
+            const plStr    = (netPL >= 0 ? '+' : '') + netPL.toFixed(2);
+            const typeColor = t.type === 'buy' ? 'var(--green)' : 'var(--red)';
+            const closeDate = t.closeTime ? new Date(t.closeTime*1000).toLocaleString([], {
+              month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'
+            }) : '—';
+            return `
             <tr>
               <td><input type="checkbox" class="mt5-import-cb mt5-import-row-cb" data-i="${i}" checked></td>
-              <td style="color:var(--text);font-weight:600">${t.symbol || '—'}</td>
-              <td style="color:${t.type==='buy'?'var(--green)':'var(--red)'}">
-                ${t.type ? t.type.toUpperCase() : '—'}</td>
-              <td>${t.lots ?? '—'}</td>
-              <td style="color:${(t.profit||0)>=0?'var(--green)':'var(--red)'};font-weight:600">
-                ${(t.profit||0)>=0?'+':''}${(t.profit||0).toFixed(2)}</td>
-              <td>${t.closeTime ? new Date(t.closeTime*1000).toLocaleDateString() : '—'}</td>
-            </tr>`).join('')}
+              <td style="color:var(--text);font-weight:700">${t.symbol || '—'}</td>
+              <td style="color:${typeColor};font-weight:600">${t.type ? t.type.toUpperCase() : '—'}</td>
+              <td style="font-family:var(--font-mono)">${parseFloat(t.lots||0).toFixed(2)}</td>
+              <td style="color:${plColor};font-weight:700;font-family:var(--font-mono)">$${plStr}</td>
+              <td style="font-size:10px;color:var(--text3)">${closeDate}</td>
+            </tr>`;
+          }).join('')}
           </tbody>
         </table>
       </div>
@@ -6681,65 +6688,114 @@ async function _mt5ImportSelected() {
 
   if (!selected.length) { showToast('Select at least one trade to import', 'danger'); return; }
 
+  // Disable button during import
+  const importBtn = document.querySelector('.mt5-btn-primary');
+  if (importBtn) { importBtn.disabled = true; importBtn.textContent = 'Importing…'; }
+
   let imported = 0;
+  const successfulIndices = [];
+
   for (const i of selected) {
     const t = pending[i];
     if (!t) continue;
-    // Map MT5 trade to journal trade format
     const jTrade = _mt5MapTrade(t, list[idx].name);
-    if (jTrade) {
-      const ok = await _cloudSaveTrade(jTrade);
-      if (ok !== false) { trades.push(jTrade); imported++; }
+    if (!jTrade) continue;
+
+    // id must be a clean integer for getTS() and DB insert to work correctly
+    // Use 0 to signal "new trade" to _cloudSaveTrade (it will assign the DB id)
+    jTrade.id = 0;
+
+    const ok = await _cloudSaveTrade(jTrade);
+    if (ok !== false) {
+      trades.push(jTrade);
+      imported++;
+      successfulIndices.push(i);
+      // Track imported ticket so it's never shown as pending again
+      list[idx].mt5.importedTickets = [
+        ...(list[idx].mt5.importedTickets || []),
+        t.ticket,
+      ];
     }
   }
 
-  // Remove imported from pending
-  list[idx].mt5.pendingTrades = pending.filter((_, i) => !selected.includes(i));
+  // Only remove successfully imported trades from pending
+  list[idx].mt5.pendingTrades = pending.filter((_, i) => !successfulIndices.includes(i));
   await _saveCustomAccounts(list);
 
   _mt5ModalState.acc = list[idx];
-  showToast(`${imported} trade${imported !== 1 ? 's' : ''} imported ✓`, 'restore');
-  _refreshAll();
+
+  if (imported > 0) {
+    showToast(`${imported} trade${imported !== 1 ? 's' : ''} imported to journal ✓`, 'restore');
+    _refreshAll();
+  } else {
+    showToast('Import failed — check console for errors', 'danger');
+  }
   _mt5RenderStep(3);
 }
 
 function _mt5MapTrade(mt5Trade, accountName) {
-  // Map MT5 fields to NxTGen trade schema
-  const symbol = (mt5Trade.symbol || '').replace(/\.?[A-Za-z]+$/, '').toUpperCase();
-  const type   = mt5Trade.type === 'buy' ? 'Buy' : 'Sell';
-  const profit = parseFloat(mt5Trade.profit) || 0;
-  const lots   = parseFloat(mt5Trade.lots) || 0;
+  // ── Accurate field mapping from MT5 deal data ──────────────────────────
+  const symbol     = (mt5Trade.symbol || '').toUpperCase();
+  const type       = mt5Trade.type === 'buy' ? 'Buy' : 'Sell';
+  const profit     = parseFloat(mt5Trade.profit)     || 0;
+  const swap       = parseFloat(mt5Trade.swap)       || 0;
+  const commission = parseFloat(mt5Trade.commission) || 0;
+  const lots       = parseFloat(mt5Trade.lots)       || 0;
+  const openPrice  = parseFloat(mt5Trade.openPrice)  || 0;
+  const closePrice = parseFloat(mt5Trade.closePrice) || 0;
 
-  // Estimate R:R (placeholder — real calc needs account balance)
-  const outcome = profit > 0 ? 'Win' : profit < 0 ? 'Loss' : 'B.E';
-  const pnlPct  = lots > 0 ? parseFloat((profit / (lots * 1000)).toFixed(2)) : 0;
+  // Net P/L including swap and commission (what you actually made/lost)
+  const netProfit  = profit + swap + commission;
+  const outcome    = netProfit > 0 ? 'Win' : netProfit < 0 ? 'Loss' : 'B.E';
 
-  const openDt  = mt5Trade.openTime  ? new Date(mt5Trade.openTime  * 1000)  : new Date();
+  // Store raw dollar P/L as pnl — user can see exact amount
+  // Use 2 decimal places to match broker statements
+  const pnl = parseFloat(netProfit.toFixed(2));
+
+  // Dates from actual MT5 Unix timestamps (seconds → ms)
+  const openDt  = mt5Trade.openTime  ? new Date(mt5Trade.openTime  * 1000) : new Date();
   const closeDt = mt5Trade.closeTime ? new Date(mt5Trade.closeTime * 1000) : new Date();
 
+  // Date is the CLOSE date (when the trade was completed)
+  const tradeDate = closeDt.toISOString().slice(0, 10);
+
+  // Price difference for R:R note
+  const priceDiff = Math.abs(closePrice - openPrice);
+
   return {
-    id:        Date.now() + Math.random(),
-    date:      closeDt.toISOString().slice(0, 10),
+    id:        0, // 0 = new trade, DB assigns real id on insert
+    date:      tradeDate,
     pair:      symbol || 'UNKNOWN',
     pos:       type,
-    rr:        '1:1', // user can edit
-    pnl:       pnlPct,
+    rr:        '1:1',  // user edits after import
+    pnl,
     outcome,
     kz:        _mt5GuessKillzone(closeDt),
     strategy:  '',
     tf:        '',
     account:   accountName,
     rating:    3,
-    notes:     `MT5 import: Ticket ${mt5Trade.ticket || '?'} · Lots: ${lots} · Raw P/L: ${profit.toFixed(2)}`,
-    pretrade:  '',
-    emotion:   'Neutral',
-    risk:      '',
-    checklist: [],
-    charts:    [],
+    notes:     [
+      `📥 MT5 Import`,
+      `Ticket: ${mt5Trade.ticket || '?'}`,
+      `Lots: ${lots}`,
+      `Open: ${openPrice} → Close: ${closePrice} (${priceDiff.toFixed(5)})`,
+      `Profit: $${profit.toFixed(2)} | Swap: $${swap.toFixed(2)} | Commission: $${commission.toFixed(2)}`,
+      `Net P/L: $${netProfit.toFixed(2)}`,
+      `Opened: ${openDt.toLocaleString()} | Closed: ${closeDt.toLocaleString()}`,
+    ].join('\n'),
+    pretrade:    '',
+    emotion:     'Neutral',
+    risk:        '',
+    checklist:   [],
+    charts:      [],
     chartLabels: [...(typeof CHART_LABELS !== 'undefined' ? CHART_LABELS : [])],
-    mistakes:  '',
-    source:    'mt5',
-    mt5Ticket: mt5Trade.ticket,
+    mistakes:    '',
+    source:      'mt5',
+    mt5Ticket:   String(mt5Trade.ticket || ''),
+    mt5Lots:     lots,
+    mt5OpenTime: mt5Trade.openTime,
+    mt5CloseTime: mt5Trade.closeTime,
   };
 }
 
@@ -6840,10 +6896,14 @@ async function _mt5DoSync(accountName) {
 
       // Deduplicate by ticket number
       const existingTickets = new Set([
-        ...(freshList[fIdx].mt5?.pendingTrades || []).map(t => t.ticket),
-        ...trades.filter(t => t.mt5Ticket).map(t => t.mt5Ticket),
+        // Already sitting in pending (not yet imported)
+        ...(freshList[fIdx].mt5?.pendingTrades || []).map(t => String(t.ticket)),
+        // Already imported into the journal
+        ...(freshList[fIdx].mt5?.importedTickets || []).map(t => String(t)),
+        // In the live trades array (belt-and-suspenders)
+        ...trades.filter(t => t.mt5Ticket).map(t => String(t.mt5Ticket)),
       ]);
-      const newTrades = incoming.filter(t => !existingTickets.has(t.ticket));
+      const newTrades = incoming.filter(t => !existingTickets.has(String(t.ticket)));
 
       freshList[fIdx].mt5.pendingTrades = [
         ...(freshList[fIdx].mt5.pendingTrades || []),
