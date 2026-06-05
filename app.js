@@ -6868,20 +6868,25 @@ async function _mt5DoSync(accountName) {
   const cfg = list[idx].mt5;
   const token = cfg.webhookToken;
 
-  // Mark syncing
-  list[idx].mt5.lastSyncStatus = 'syncing';
-  await _saveCustomAccounts(list);
+  // Update badge only — don't save to DB just to mark "syncing"
+  // (avoids spurious "Account save failed" toasts on network hiccups)
   _mt5UpdateCardBadge(accountName, 'syncing');
 
   try {
-    // Poll the Edge Function for any trades pushed by the EA for this token
+    // Get a fresh session token
+    const { data: { session } } = await sb.auth.getSession();
+    const jwt = session?.access_token || '';
+
+    // Poll the Edge Function for buffered trades
+    // Only send Authorization — token is in the URL query param
+    // (extra custom headers trigger CORS preflight failures in some browsers)
     const resp = await fetch(
       `${SUPABASE_URL}/functions/v1/mt5-sync?token=${encodeURIComponent(token)}&account=${encodeURIComponent(accountName)}`,
       {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${(await sb.auth.getSession()).data.session?.access_token || ''}`,
-          'X-MT5-Token': token,
+          'Authorization': `Bearer ${jwt}`,
+          'Content-Type': 'application/json',
         }
       }
     );
