@@ -33,7 +33,7 @@ const CORS = {
 
 // MetaApi base URLs
 const META_API_URL    = "https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai";
-const META_CLIENT_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
+const META_CLIENT_URL = "https://mt-client-api-v1.london.agiliumtrade.ai";
 
 function makeAdmin() {
   const url = Deno.env.get("SUPABASE_URL");
@@ -114,13 +114,15 @@ async function handleConnect(req: Request): Promise<Response> {
     method: "POST",
     headers: metaApiHeaders(),
     body: JSON.stringify({
-      login:    String(login),
-      password: String(password),
-      name:     accountName,
-      server:   String(server),
-      platform: "mt5",
-      type:     "cloud-g2",
-      keywords: ["NxTGen Journal"],
+      login:       String(login),
+      password:    String(password),
+      name:        accountName.slice(0, 64),
+      server:      String(server),
+      platform:    "mt5",
+      type:        "cloud",
+      application: "MetaApi",
+      magic:       0,
+      reliability: "regular",
     }),
   });
 
@@ -168,39 +170,44 @@ async function handleSync(req: Request): Promise<Response> {
   console.log(`[mt5-sync] syncing MetaApi account ${metaApiAccountId}`);
 
   // Fetch account state first
-  const stateResp = await fetch(
-    `${META_CLIENT_URL}/users/current/accounts/${metaApiAccountId}`,
-    { headers: metaApiHeaders() }
-  );
-
-  if (!stateResp.ok) {
-    const err = await stateResp.json().catch(() => ({}));
-    return jsonError("MetaApi account fetch failed: " + (err.message || stateResp.status), 502);
+  // Wait for account to deploy (poll state up to 60s)
+  let state = "DEPLOYING";
+  let stateAttempts = 0;
+  while (state !== "DEPLOYED" && state !== "ERROR" && stateAttempts < 6) {
+    await new Promise(r => setTimeout(r, 10000)); // wait 10s between checks
+    stateAttempts++;
+    const stateResp = await fetch(
+      `${META_API_URL}/users/current/accounts/${metaApiAccountId}`,
+      { headers: metaApiHeaders() }
+    );
+    if (stateResp.ok) {
+      const stateData = await stateResp.json();
+      state = stateData.state || "DEPLOYING";
+      console.log(`[mt5-sync] account state attempt ${stateAttempts}: ${state}`);
+    }
   }
 
-  const state = await stateResp.json();
-  console.log(`[mt5-sync] account state: ${state.state} connectionStatus: ${state.connectionStatus}`);
-
-  if (state.state === "ERROR") {
-    return jsonError("MetaApi account in error state — check credentials", 502);
+  if (state === "ERROR") {
+    return jsonError("MetaApi failed to connect — check your login, password, and server name", 502);
   }
 
-  // Fetch deal history (all time → now)
-  const from = new Date(0).toISOString();
+  // Fetch deal history (from epoch → now)
+  const from = "1970-01-01T00:00:00.000Z";
   const to   = new Date().toISOString();
 
   const dealsResp = await fetch(
-    `${META_CLIENT_URL}/users/current/accounts/${metaApiAccountId}/history-deals/time/${from}/${to}`,
+    `${META_CLIENT_URL}/users/current/accounts/${metaApiAccountId}/history-deals/time/${encodeURIComponent(from)}/${encodeURIComponent(to)}`,
     { headers: metaApiHeaders() }
   );
 
   let deals: MetaDeal[] = [];
   if (dealsResp.ok) {
-    deals = await dealsResp.json();
+    const raw = await dealsResp.json();
+    deals = Array.isArray(raw) ? raw : (raw.deals ?? []);
     console.log(`[mt5-sync] fetched ${deals.length} deals from MetaApi`);
   } else {
     const err = await dealsResp.json().catch(() => ({}));
-    console.warn(`[mt5-sync] deals fetch failed: ${err.message || dealsResp.status}`);
+    console.warn(`[mt5-sync] deals fetch failed ${dealsResp.status}: ${err.message}`);
   }
 
   // Fetch open positions
@@ -211,7 +218,8 @@ async function handleSync(req: Request): Promise<Response> {
 
   let positions: MetaPosition[] = [];
   if (posResp.ok) {
-    positions = await posResp.json();
+    const raw = await posResp.json();
+    positions = Array.isArray(raw) ? raw : (raw.positions ?? []);
     console.log(`[mt5-sync] fetched ${positions.length} open positions`);
   }
 

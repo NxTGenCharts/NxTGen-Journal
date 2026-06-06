@@ -6476,20 +6476,21 @@ function _mt5Step2Html() {
   const cfg = _mt5ModalState.acc?.mt5 || {};
   return `
   <div class="mt5-success-banner" style="background:rgba(96,165,250,0.08);border-color:rgba(96,165,250,0.22)">
-    <div class="mt5-success-icon">🔄</div>
-    <div class="mt5-success-title" style="color:var(--blue)">Connecting to MT5 Server</div>
+    <div class="mt5-success-icon">☁️</div>
+    <div class="mt5-success-title" style="color:var(--blue)">Account Registered with MetaApi</div>
     <div class="mt5-success-sub">
       Login: <strong>${cfg.login}</strong> · Server: <strong>${cfg.server}</strong><br>
-      MetaApi is establishing a connection to your broker. This may take 30–60 seconds
-      on the first connection.
+      MetaApi is deploying a cloud terminal and connecting to your broker.<br>
+      <span style="color:var(--gold)">⏱ This takes 30–90 seconds on first connection.</span>
     </div>
   </div>
 
   <div class="mt5-info">
-    <span class="mt5-info-icon">⏱️</span>
-    <div>Once connected, MetaApi runs 24/7 in the cloud. Your trades will sync
-    automatically every <strong>${_mt5FreqLabel(cfg.syncFreqMs)}</strong>
-    — no laptop or EA needed.</div>
+    <span class="mt5-info-icon">💡</span>
+    <div>Click <strong>Fetch My Trades</strong> when ready. If it fails on the first try,
+    wait 30 seconds and try again — MetaApi needs time to establish the broker connection.
+    Once connected, syncs happen automatically every
+    <strong>${_mt5FreqLabel(cfg.syncFreqMs)}</strong> with no laptop needed.</div>
   </div>
 
   <div class="mt5-actions">
@@ -6532,7 +6533,7 @@ async function _mt5VerifyAndSync() {
     const data = await resp.json();
 
     if (!resp.ok) {
-      showToast(data.error || 'Sync failed — try again in 30 seconds', 'danger');
+      showToast((data.error || 'Not ready yet') + ' — wait 30s and try again', 'danger');
       if (btn) { btn.disabled = false; btn.textContent = 'Fetch My Trades →'; }
       return;
     }
