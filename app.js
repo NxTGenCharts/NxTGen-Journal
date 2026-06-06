@@ -14,6 +14,46 @@ const BASE_URL      = 'https://dabossmira.github.io/NxTGen-Journal';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
+// ── PnL formatting helper ─────────────────────────────────────────────────
+// Every trade has t.pnl (number) and t.pnlUnit ('$' or '%').
+// MT5 imported trades: pnlUnit='$', pnl is real dollar P/L.
+// Manual trades: pnlUnit='%' (default), pnl is % of account.
+// formatPnl() returns a display string like "+$3.32" or "+1.5%"
+// toPnlDollars() converts to $ using accSize if needed.
+function formatPnl(trade, accSize) {
+  const unit = trade.pnlUnit || '%';
+  const val  = parseFloat(trade.pnl) || 0;
+  if (unit === '$') {
+    return (val >= 0 ? '+$' : '-$') + Math.abs(val).toFixed(2);
+  }
+  // % mode
+  if (accSize > 0) {
+    // Also show $ equivalent in parentheses
+    const dollars = (val / 100) * accSize;
+    return (val >= 0 ? '+' : '') + val.toFixed(2) + '% (' +
+      (dollars >= 0 ? '+$' : '-$') + Math.abs(dollars).toFixed(0) + ')';
+  }
+  return (val >= 0 ? '+' : '') + val.toFixed(2) + '%';
+}
+
+function toPnlDollars(trade, accSize) {
+  const unit = trade.pnlUnit || '%';
+  const val  = parseFloat(trade.pnl) || 0;
+  if (unit === '$') return val;
+  if (accSize > 0) return (val / 100) * accSize;
+  return val; // no size — return raw
+}
+
+function getAccSizeForAccount(accountName) {
+  const acc = _getCustomAccounts ? _getCustomAccounts().find(a => a.name === accountName) : null;
+  return parseFloat(acc?.size) || 0;
+}
+
+function getAccPnlMode(accountName) {
+  const acc = _getCustomAccounts ? _getCustomAccounts().find(a => a.name === accountName) : null;
+  return acc?.pnlMode || '%';
+}
+
 // Current authenticated user — set on boot
 let _currentUser = null;
 
@@ -1718,7 +1758,7 @@ function openPairDrilldown(pair) {
       '<td class="mono" style="font-size:11px">' + t.date + '</td>',
       '<td>' + (t.pos || '—') + '</td>',
       '<td class="mono">' + (t.rr || '—') + '</td>',
-      '<td class="' + pnlCls + ' mono">' + (t.pnl > 0 ? '+' : '') + t.pnl + '%</td>',
+      '<td class="' + pnlCls + ' mono">' + formatPnl(t, getAccSizeForAccount(t.account)) + '</td>',
       '<td><span class="pill ' + outCls + '" style="font-size:10px">' + t.outcome + '</span></td>',
       '<td style="font-size:11px;color:var(--text2)">' + (t.kz || '—') + '</td>',
       '<td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">' + (t.account || '—') + '</td>',
@@ -1886,7 +1926,7 @@ function _buildDrillRows(list) {
       '<td class="bold" style="font-size:11px">' + (t.pair || '—') + '</td>',
       '<td>' + (t.pos || '—') + '</td>',
       '<td class="mono">' + (t.rr || '—') + '</td>',
-      '<td class="' + pnlCls + ' mono">' + (t.pnl > 0 ? '+' : '') + t.pnl + '%</td>',
+      '<td class="' + pnlCls + ' mono">' + formatPnl(t, getAccSizeForAccount(t.account)) + '</td>',
       '<td><span class="pill ' + outCls + '" style="font-size:10px">' + t.outcome + '</span></td>',
       '<td style="font-size:11px;color:var(--text2)">' + (t.kz || '—') + '</td>',
       '<td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">' + (t.account || '—') + '</td>',
@@ -2041,7 +2081,7 @@ function buildMonthlyTable() {
       <td class="bold">${MONTH_NAMES[mo - 1]} ${yr}</td>
       <td>${mt.length}</td>
       <td><span class="pill ${wrClass}">${wr}%</span></td>
-      <td class="${pnlClass} mono">${net >= 0 ? '+' : ''}${net}%</td>
+      <td class="${pnlClass} mono">${net >= 0 ? '+$' : '-$'}${Math.abs(parseFloat(net)).toFixed(2)}</td>
       <td>${bestStreak > 0 ? bestStreak + 'W' : '—'}</td>
       <td><span class="pill ${gradeClass}">${grade}</span></td>
     </tr>`;
@@ -2157,7 +2197,7 @@ function _renderDetail(id) {
     <div class="view-stats-grid">
       <div class="view-stat-card">
         <div class="view-stat-label">PnL</div>
-        <div class="view-stat-val ${pnlC}">${t.pnl > 0 ? '+' : ''}${t.pnl}%</div>
+        <div class="view-stat-val ${pnlC}">${formatPnl(t, getAccSizeForAccount(t.account))}</div>
       </div>
       <div class="view-stat-card">
         <div class="view-stat-label">Risk : Reward</div>
@@ -2188,7 +2228,7 @@ function _renderDetail(id) {
       <div class="form-field"><label class="form-label">Pair</label><input type="text" class="form-input" id="e-pair" value="${t.pair}"></div>
       <div class="form-field"><label class="form-label">Position</label><select class="form-select" id="e-pos"><option${t.pos === 'Buy' ? ' selected' : ''}>Buy</option><option${t.pos === 'Sell' ? ' selected' : ''}>Sell</option></select></div>
       <div class="form-field"><label class="form-label">R:R</label><input type="text" class="form-input" id="e-rr" value="${t.rr}"></div>
-      <div class="form-field"><label class="form-label">PnL %</label><input type="number" class="form-input" id="e-pnl" step="0.1" value="${t.pnl}"></div>
+      <div class="form-field"><label class="form-label">PnL <select id="e-pnlunit" class="form-select" style="display:inline-block;width:auto;padding:1px 6px;font-size:11px;margin-left:4px;height:22px;vertical-align:middle"><option value="%"${(!t.pnlUnit||t.pnlUnit==='%')?'selected':''}>%</option><option value="$"${t.pnlUnit==='$'?'selected':''}>$</option></select></label><input type="number" class="form-input" id="e-pnl" step="0.01" value="${t.pnl}"></div>
       <div class="form-field"><label class="form-label">Outcome</label><select class="form-select" id="e-outcome"><option${t.outcome === 'Win' ? ' selected' : ''}>Win</option><option${t.outcome === 'Loss' ? ' selected' : ''}>Loss</option><option${t.outcome === 'B.E' ? ' selected' : ''}>B.E</option></select></div>
       <div class="form-field"><label class="form-label">Killzone</label><select class="form-select" id="e-kz"><option${t.kz === 'London' ? ' selected' : ''}>London</option><option${t.kz === 'New York' ? ' selected' : ''}>New York</option><option${t.kz === 'Asian' ? ' selected' : ''}>Asian</option></select></div>
       <div class="form-field" style="grid-column:span 2"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Account <button type="button" onclick="_openManageAccounts()" style="font-size:10px;padding:2px 8px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);color:var(--blue);border-radius:4px;cursor:pointer;font-family:inherit">⚙ Manage</button></label><select class="form-select" id="e-acc">${_buildAccountOptions(t.account)}</select></div>
@@ -2569,6 +2609,7 @@ async function saveTrade() {
     pos:          document.getElementById('m-pos').value,
     rr:           document.getElementById('m-rr').value || '1:3',
     pnl:          parseFloat(document.getElementById('m-pnl').value) || 0,
+    pnlUnit:      '%',
     outcome:      document.getElementById('m-outcome').value,
     kz:           document.getElementById('m-kz').value,
     strategy:     document.getElementById('m-strat').value === '__custom__'
@@ -3922,8 +3963,24 @@ function _renderAccGrid() {
     const at   = trades.filter(t => t.account === name);
     const wins = at.filter(t => t.outcome === 'Win').length;
     const wr   = at.length ? ((wins / at.length) * 100).toFixed(1) : null;
-    const pnl  = at.reduce((s, t) => s + t.pnl, 0);
-    const pnlStr   = at.length ? (pnl >= 0 ? '+' : '') + pnl.toFixed(1) + '%' : null;
+    const _cardAccSize = parseFloat(a.size) || 0;
+    const _cardMode    = a.pnlMode || '%';
+    // Sum everything in $ first, then convert for display
+    const pnlDollars = at.reduce((s, t) => {
+      const unit = t.pnlUnit || '%';
+      const v    = parseFloat(t.pnl) || 0;
+      if (unit === '$') return s + v;
+      if (_cardAccSize > 0) return s + (v / 100) * _cardAccSize;
+      return s + v;
+    }, 0);
+    const pnl = _cardMode === '$' || _cardAccSize === 0
+      ? pnlDollars
+      : (_cardAccSize > 0 ? (pnlDollars / _cardAccSize) * 100 : pnlDollars);
+    const pnlStr = at.length
+      ? (_cardMode === '$'
+          ? (pnlDollars >= 0 ? '+$' : '-$') + Math.abs(pnlDollars).toFixed(2)
+          : (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '%')
+      : null;
     const pnlColor = pnl > 0 ? 'var(--green)' : pnl < 0 ? 'var(--red)' : 'var(--text2)';
     const wrColor  = wr !== null ? (parseFloat(wr) >= 60 ? 'var(--green)' : 'var(--red)') : 'var(--text3)';
     const last5 = [...at].sort((x,y) => y.date.localeCompare(x.date)).slice(0,5).reverse();
@@ -3984,53 +4041,38 @@ function accShowDetail(name) {
   const body   = document.getElementById('acc-detail-body');
   if (!drawer || !body) return;
 
-  const acc    = _getCustomAccounts().find(a => a.name === name) || {};
+  const acc     = _getCustomAccounts().find(a => a.name === name) || {};
   const accSize = parseFloat(acc.size) || 0;
-  const pnlMode = acc.pnlMode || '$';   // '$' = dollar display, '%' = percent display
+  const pnlMode = acc.pnlMode || '%';
 
   const at     = trades.filter(t => t.account === name).sort((a,b) => b.date.localeCompare(a.date));
   const wins   = at.filter(t => t.outcome === 'Win');
   const losses = at.filter(t => t.outcome === 'Loss');
   const wr     = at.length ? ((wins.length / at.length) * 100).toFixed(1) : 0;
 
-  // Convert raw pnl → display value based on pnlMode + account size
-  // MT5 imported trades store actual $ P/L; manual trades store % by convention
-  // If mode is '$': show raw value (MT5) or convert % → $ using account size
-  // If mode is '%': show raw value (manual) or convert $ → % using account size
-  const toDisplay = (rawPnl) => {
-    const v = parseFloat(rawPnl) || 0;
+  // Always sum in $ first using each trade's own pnlUnit, then display per pnlMode
+  const sumDollars = (arr) => arr.reduce((s, t) => s + toPnlDollars(t, accSize), 0);
+
+  const fmtVal = (dollars) => {
+    if (dollars === null || dollars === undefined) return '—';
+    const d = parseFloat(dollars) || 0;
     if (pnlMode === '$') {
-      // If value looks like a % (small, between -100 and 100) and we have account size → convert
-      if (accSize > 0 && Math.abs(v) <= 100 && at.some(t => !t.source || t.source !== 'mt5')) {
-        return (v / 100) * accSize;
-      }
-      return v; // already in $
-    } else {
-      // pnlMode === '%'
-      // If value looks like a $ amount (abs > 100 typically) and we have account size → convert
-      if (accSize > 0 && Math.abs(v) > 10) {
-        return (v / accSize) * 100;
-      }
-      return v; // already in %
+      return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2);
     }
+    // pnlMode '%' — convert dollars → %
+    if (accSize > 0) {
+      const pct = (d / accSize) * 100;
+      return (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+    }
+    return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2); // fallback to $ if no size
   };
 
-  const fmtVal = (v) => {
-    if (v === null || v === undefined) return '—';
-    const n = parseFloat(v) || 0;
-    if (pnlMode === '$') return (n >= 0 ? '+$' : '-$') + Math.abs(n).toFixed(2);
-    return (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
-  };
-
-  const netPnlRaw = at.reduce((a, t) => a + toDisplay(t.pnl), 0);
-  const avgWRaw   = wins.length
-    ? wins.reduce((a,t) => a + toDisplay(t.pnl), 0) / wins.length : null;
-  const avgLRaw   = losses.length
-    ? losses.reduce((a,t) => a + toDisplay(t.pnl), 0) / losses.length : null;
-
-  const grossW = wins.reduce((a,t) => a + toDisplay(t.pnl), 0);
-  const grossL = Math.abs(losses.reduce((a,t) => a + toDisplay(t.pnl), 0));
-  const pf     = grossL > 0 ? (grossW / grossL).toFixed(2) : '∞';
+  const netDollars = sumDollars(at);
+  const avgWDollars = wins.length   ? sumDollars(wins)   / wins.length   : null;
+  const avgLDollars = losses.length ? sumDollars(losses) / losses.length : null;
+  const grossW      = sumDollars(wins);
+  const grossL      = Math.abs(sumDollars(losses));
+  const pf          = grossL > 0 ? (grossW / grossL).toFixed(2) : '∞';
 
   title.textContent = name;
   const sizeNote = accSize > 0
@@ -4038,15 +4080,15 @@ function accShowDetail(name) {
     : `<span style="font-size:10px;color:var(--gold);margin-left:8px" title="Set account size in Manage Accounts for accurate $ display">⚠ Set account size for $ display</span>`;
   body.innerHTML = `
     <div style="display:flex;align-items:center;margin-bottom:10px">
-      <span style="font-size:11px;color:var(--text3)">Showing PnL in <strong style="color:var(--text)">${pnlMode}</strong></span>
+      <span style="font-size:11px;color:var(--text3)">Showing PnL in <strong style="color:var(--text)">${pnlMode === '$' ? 'USD ($)' : '% of account'}</strong></span>
       ${sizeNote}
     </div>
     <div class="acc-detail-stats">
       <div class="acc-ds"><div class="acc-ds-label">Trades</div><div class="acc-ds-val blue">${at.length}</div></div>
       <div class="acc-ds"><div class="acc-ds-label">Win Rate</div><div class="acc-ds-val ${parseFloat(wr)>=60?'green':'red'}">${wr}%</div></div>
-      <div class="acc-ds"><div class="acc-ds-label">Net PnL</div><div class="acc-ds-val ${netPnlRaw>=0?'green':'red'}">${fmtVal(netPnlRaw)}</div></div>
-      <div class="acc-ds"><div class="acc-ds-label">Avg Win</div><div class="acc-ds-val green">${fmtVal(avgWRaw)}</div></div>
-      <div class="acc-ds"><div class="acc-ds-label">Avg Loss</div><div class="acc-ds-val red">${fmtVal(avgLRaw)}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Net PnL</div><div class="acc-ds-val ${netDollars>=0?'green':'red'}">${fmtVal(netDollars)}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Avg Win</div><div class="acc-ds-val green">${fmtVal(avgWDollars)}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Avg Loss</div><div class="acc-ds-val red">${fmtVal(avgLDollars)}</div></div>
       <div class="acc-ds"><div class="acc-ds-label">Profit Factor</div><div class="acc-ds-val gold">${pf}x</div></div>
     </div>
     ${at.length === 0
@@ -4061,9 +4103,9 @@ function accShowDetail(name) {
             </thead>
             <tbody>
               ${at.map(t => {
-                const pnlVal  = toDisplay(t.pnl);
-                const pnlColor = pnlVal >= 0 ? 'outcome-win' : 'outcome-loss';
-                const pnlDisp  = fmtVal(pnlVal);
+                const _td     = toPnlDollars(t, accSize);
+                const pnlColor = _td >= 0 ? 'outcome-win' : 'outcome-loss';
+                const pnlDisp  = fmtVal(_td);
                 const outClass = t.outcome==='Win'?'outcome-win':t.outcome==='Loss'?'outcome-loss':'outcome-be';
                 const posClass = t.pos==='Buy'?'pos-buy':'pos-sell';
                 return `
@@ -6845,7 +6887,7 @@ function _mt5MapTrade(mt5Trade, accountName) {
     pair: symbol || 'UNKNOWN',
     pos:  type,
     rr:   '1:1',
-    pnl,  outcome,
+    pnl,  pnlUnit: '$',  outcome,
     kz:   _mt5GuessKillzone(closeDt),
     strategy: '', tf: '',
     account: accountName,
