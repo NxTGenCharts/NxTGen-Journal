@@ -466,7 +466,7 @@
           <input type="number" class="acc-size-input" id="cal-acc-size" value="5000" oninput="renderCalendar()">
           <span class="acc-size-hint">PnL % × account size = daily USD</span>
           <div style="margin-left:auto;display:flex;gap:6px">
-            <select class="form-select" id="cal-acc-filter" onchange="renderCalendar()" style="width:160px;font-size:12px">
+            <select class="form-select" id="cal-acc-filter" onchange="_onCalAccFilterChange()" style="width:160px;font-size:12px">
               <option value="">All active accounts</option>
             </select>
           </div>

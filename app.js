@@ -3984,47 +3984,69 @@ function accShowDetail(name) {
   const body   = document.getElementById('acc-detail-body');
   if (!drawer || !body) return;
 
+  const acc    = _getCustomAccounts().find(a => a.name === name) || {};
+  const accSize = parseFloat(acc.size) || 0;
+  const pnlMode = acc.pnlMode || '$';   // '$' = dollar display, '%' = percent display
+
   const at     = trades.filter(t => t.account === name).sort((a,b) => b.date.localeCompare(a.date));
   const wins   = at.filter(t => t.outcome === 'Win');
   const losses = at.filter(t => t.outcome === 'Loss');
   const wr     = at.length ? ((wins.length / at.length) * 100).toFixed(1) : 0;
 
-  // Net PnL: sum of raw pnl values (stored as $ from MT5 import, or % for manual)
-  const netPnl   = at.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
-  const pnlStr   = (netPnl >= 0 ? '+' : '') + netPnl.toFixed(2);
-
-  // Avg Win / Avg Loss in $ (raw pnl value — matches what was imported/entered)
-  const avgWRaw  = wins.length
-    ? wins.reduce((a,t) => a + (parseFloat(t.pnl)||0), 0) / wins.length
-    : null;
-  const avgLRaw  = losses.length
-    ? losses.reduce((a,t) => a + (parseFloat(t.pnl)||0), 0) / losses.length
-    : null;
-
-  // Format: if values look like dollar amounts (abs > 0.5 or has MT5 source), show $
-  // Otherwise fall back to showing the value with no unit
-  const fmtPnl = (val, sign) => {
-    if (val === null) return '—';
-    const abs = Math.abs(val);
-    // MT5 imported trades have pnl as dollar value; manual trades use % convention
-    // We show the value as-is with $ prefix since that's more meaningful
-    return (sign === '+' ? '+' : '') + '$' + Math.abs(val).toFixed(2);
+  // Convert raw pnl → display value based on pnlMode + account size
+  // MT5 imported trades store actual $ P/L; manual trades store % by convention
+  // If mode is '$': show raw value (MT5) or convert % → $ using account size
+  // If mode is '%': show raw value (manual) or convert $ → % using account size
+  const toDisplay = (rawPnl) => {
+    const v = parseFloat(rawPnl) || 0;
+    if (pnlMode === '$') {
+      // If value looks like a % (small, between -100 and 100) and we have account size → convert
+      if (accSize > 0 && Math.abs(v) <= 100 && at.some(t => !t.source || t.source !== 'mt5')) {
+        return (v / 100) * accSize;
+      }
+      return v; // already in $
+    } else {
+      // pnlMode === '%'
+      // If value looks like a $ amount (abs > 100 typically) and we have account size → convert
+      if (accSize > 0 && Math.abs(v) > 10) {
+        return (v / accSize) * 100;
+      }
+      return v; // already in %
+    }
   };
 
-  const lossPnls = losses.map(t => parseFloat(t.pnl)||0);
-  const winPnls  = wins.map(t => parseFloat(t.pnl)||0);
-  const grossW   = winPnls.reduce((a,b)=>a+b,0);
-  const grossL   = Math.abs(lossPnls.reduce((a,b)=>a+b,0));
-  const pf       = grossL > 0 ? (grossW / grossL).toFixed(2) : '∞';
+  const fmtVal = (v) => {
+    if (v === null || v === undefined) return '—';
+    const n = parseFloat(v) || 0;
+    if (pnlMode === '$') return (n >= 0 ? '+$' : '-$') + Math.abs(n).toFixed(2);
+    return (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
+  };
+
+  const netPnlRaw = at.reduce((a, t) => a + toDisplay(t.pnl), 0);
+  const avgWRaw   = wins.length
+    ? wins.reduce((a,t) => a + toDisplay(t.pnl), 0) / wins.length : null;
+  const avgLRaw   = losses.length
+    ? losses.reduce((a,t) => a + toDisplay(t.pnl), 0) / losses.length : null;
+
+  const grossW = wins.reduce((a,t) => a + toDisplay(t.pnl), 0);
+  const grossL = Math.abs(losses.reduce((a,t) => a + toDisplay(t.pnl), 0));
+  const pf     = grossL > 0 ? (grossW / grossL).toFixed(2) : '∞';
 
   title.textContent = name;
+  const sizeNote = accSize > 0
+    ? `<span style="font-size:10px;color:var(--text3);margin-left:8px">Account: $${accSize.toLocaleString()} · PnL in ${pnlMode}</span>`
+    : `<span style="font-size:10px;color:var(--gold);margin-left:8px" title="Set account size in Manage Accounts for accurate $ display">⚠ Set account size for $ display</span>`;
   body.innerHTML = `
+    <div style="display:flex;align-items:center;margin-bottom:10px">
+      <span style="font-size:11px;color:var(--text3)">Showing PnL in <strong style="color:var(--text)">${pnlMode}</strong></span>
+      ${sizeNote}
+    </div>
     <div class="acc-detail-stats">
       <div class="acc-ds"><div class="acc-ds-label">Trades</div><div class="acc-ds-val blue">${at.length}</div></div>
       <div class="acc-ds"><div class="acc-ds-label">Win Rate</div><div class="acc-ds-val ${parseFloat(wr)>=60?'green':'red'}">${wr}%</div></div>
-      <div class="acc-ds"><div class="acc-ds-label">Net PnL</div><div class="acc-ds-val ${netPnl>=0?'green':'red'}">$${pnlStr.replace('+','').replace('-','').trim()}</div></div>
-      <div class="acc-ds"><div class="acc-ds-label">Avg Win</div><div class="acc-ds-val green">${fmtPnl(avgWRaw,'+')}</div></div>
-      <div class="acc-ds"><div class="acc-ds-label">Avg Loss</div><div class="acc-ds-val red">${fmtPnl(avgLRaw,'-')}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Net PnL</div><div class="acc-ds-val ${netPnlRaw>=0?'green':'red'}">${fmtVal(netPnlRaw)}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Avg Win</div><div class="acc-ds-val green">${fmtVal(avgWRaw)}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Avg Loss</div><div class="acc-ds-val red">${fmtVal(avgLRaw)}</div></div>
       <div class="acc-ds"><div class="acc-ds-label">Profit Factor</div><div class="acc-ds-val gold">${pf}x</div></div>
     </div>
     ${at.length === 0
@@ -4039,9 +4061,9 @@ function accShowDetail(name) {
             </thead>
             <tbody>
               ${at.map(t => {
-                const pnlVal = parseFloat(t.pnl) || 0;
+                const pnlVal  = toDisplay(t.pnl);
                 const pnlColor = pnlVal >= 0 ? 'outcome-win' : 'outcome-loss';
-                const pnlDisp  = (pnlVal >= 0 ? '+' : '') + '$' + Math.abs(pnlVal).toFixed(2);
+                const pnlDisp  = fmtVal(pnlVal);
                 const outClass = t.outcome==='Win'?'outcome-win':t.outcome==='Loss'?'outcome-loss':'outcome-be';
                 const posClass = t.pos==='Buy'?'pos-buy':'pos-sell';
                 return `
@@ -4913,6 +4935,14 @@ async function _saveEdit(id) {
   _detEditMode = false;
   _refreshAll();
   _renderDetail(id);
+
+  // If account detail drawer is open, refresh it immediately too
+  const drawer = document.getElementById('acc-detail-drawer');
+  if (drawer && drawer.classList.contains('open')) {
+    const titleEl = document.getElementById('acc-detail-title');
+    if (titleEl?.textContent) accShowDetail(titleEl.textContent);
+  }
+
   showToast(t.pair + ' updated ✓', 'restore');
 
   // Background cloud save
@@ -5579,7 +5609,7 @@ async function _addAccount() {
   const name = inp.value.trim(); if (!name) return;
   const list = _getCustomAccounts();
   if (list.find(a => a.name === name)) { showToast('Account already exists', 'danger'); return; }
-  list.push({ name, type, status: 'active', notes: '' });
+  list.push({ name, type, status: 'active', notes: '', size: 0, pnlMode: '$' });
   await _saveCustomAccounts(list);
   inp.value = '';
   if (document.getElementById('acc-mgr-type')) document.getElementById('acc-mgr-type').value = '';
@@ -5663,30 +5693,49 @@ function _editAccount(i) {
   const a    = list[i];
   const item = document.getElementById('acc-mgr-item-'+i); if (!item) return;
   item.innerHTML = `
-    <input type="text" class="acc-mgr-input" id="acc-edit-${i}" value="${a.name}" style="flex:1;margin-right:6px"
-      onkeydown="if(event.key==='Enter')_saveEditAccount(${i})">
-    <select id="acc-edit-type-${i}" class="acc-mgr-input" style="max-width:120px;margin-right:6px">
-      <option value="">Type…</option>
-      ${['Funded','Paper','Live','Challenge'].map(t => `<option${a.type===t?' selected':''}>${t}</option>`).join('')}
-    </select>
-    <div class="acc-mgr-actions">
-      <button onclick="_saveEditAccount(${i})" class="acc-mgr-btn edit">✓</button>
-      <button onclick="_rebuildAccMgrList()" class="acc-mgr-btn">✕</button>
+    <div style="display:flex;flex-direction:column;gap:7px;width:100%">
+      <div style="display:flex;gap:6px;align-items:center">
+        <input type="text" class="acc-mgr-input" id="acc-edit-${i}" value="${a.name}" style="flex:1"
+          onkeydown="if(event.key==='Enter')_saveEditAccount(${i})" placeholder="Account name">
+        <select id="acc-edit-type-${i}" class="acc-mgr-input" style="max-width:120px">
+          <option value="">Type…</option>
+          ${['Funded','Paper','Live','Challenge'].map(t => `<option${a.type===t?' selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:11px;color:var(--text3);white-space:nowrap">Account Size ($):</span>
+        <input type="number" class="acc-mgr-input" id="acc-edit-size-${i}"
+          value="${a.size || ''}" placeholder="e.g. 10000" style="width:110px;flex:none" min="0">
+        <span style="font-size:11px;color:var(--text3);white-space:nowrap;margin-left:6px">PnL Display:</span>
+        <select id="acc-edit-pnlmode-${i}" class="acc-mgr-input" style="width:70px;flex:none">
+          <option value="$"${(a.pnlMode||'$')==='$'?' selected':''}>$ USD</option>
+          <option value="%"${a.pnlMode==='%'?' selected':''}>% Pct</option>
+        </select>
+        <div class="acc-mgr-actions" style="margin-left:auto">
+          <button onclick="_saveEditAccount(${i})" class="acc-mgr-btn edit" title="Save">✓</button>
+          <button onclick="_rebuildAccMgrList()" class="acc-mgr-btn" title="Cancel">✕</button>
+        </div>
+      </div>
     </div>`;
   document.getElementById('acc-edit-'+i)?.focus();
 }
 
 async function _saveEditAccount(i) {
-  const inp  = document.getElementById('acc-edit-'+i);
-  const typE = document.getElementById('acc-edit-type-'+i);
+  const inp     = document.getElementById('acc-edit-'+i);
+  const typE    = document.getElementById('acc-edit-type-'+i);
+  const sizeEl  = document.getElementById('acc-edit-size-'+i);
+  const modeEl  = document.getElementById('acc-edit-pnlmode-'+i);
   if (!inp) return;
   const name = inp.value.trim(); if (!name) return;
   const list = _getCustomAccounts();
   list[i].name = name;
-  if (typE) list[i].type = typE.value;
+  if (typE)   list[i].type    = typE.value;
+  if (sizeEl) list[i].size    = parseFloat(sizeEl.value) || 0;
+  if (modeEl) list[i].pnlMode = modeEl.value || '$';
   await _saveCustomAccounts(list);
   _rebuildAccMgrList();
   _refreshAccountDropdowns();
+  _refreshCalendarAccountFilter();
   showToast('Updated ✓', 'restore');
   buildAccounts();
 }
@@ -5698,6 +5747,19 @@ function _refreshAccountDropdowns() {
     const cur = sel.value;
     sel.innerHTML = _buildAccountOptions(cur);
   });
+}
+
+function _onCalAccFilterChange() {
+  // Auto-fill account size when user picks a specific account
+  const sel  = document.getElementById('cal-acc-filter'); if (!sel) return;
+  const name = sel.value;
+  if (name) {
+    const acc  = _getCustomAccounts().find(a => a.name === name);
+    const size = parseFloat(acc?.size) || 0;
+    const sizeEl = document.getElementById('cal-acc-size');
+    if (sizeEl && size > 0) sizeEl.value = size;
+  }
+  renderCalendar();
 }
 
 function _refreshCalendarAccountFilter() {
