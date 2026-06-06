@@ -6461,7 +6461,7 @@ function _mt5Step2Html() {
   const webhookUrl = `${SUPABASE_URL}/functions/v1/mt5-sync`;
 
   const eaCode = `//+------------------------------------------------------------------+
-//|  NxTGen MT5 Sync EA — paste into MetaEditor, compile & attach   |
+//|  NxTGen MT5 Sync EA - paste into MetaEditor, compile & attach   |
 //|  Tools > Options > Expert Advisors > Allow WebRequest for:      |
 //|  ${webhookUrl.slice(0, 52)}  |
 //+------------------------------------------------------------------+
@@ -6476,50 +6476,112 @@ datetime lastSent = 0;
 void OnTick() {
   if (TimeCurrent() - lastSent < SyncEvery) return;
   lastSent = TimeCurrent();
-  SyncTrades();
+  SyncAll();
 }
 
-void SyncTrades() {
-  int total = HistoryDealsTotal();
+void SyncAll() {
   string json = "[";
-  bool first = true;
-  for (int i = MathMax(0, total - 500); i < total; i++) {
-    ulong ticket = HistoryDealGetTicket(i);
-    if (ticket == 0) continue;
-    if (HistoryDealGetInteger(ticket, DEAL_TYPE) > 1) continue; // buy/sell only
-    long entryType = HistoryDealGetInteger(ticket, DEAL_ENTRY);
-    if (entryType != DEAL_ENTRY_IN && entryType != DEAL_ENTRY_OUT) continue;
+  bool first  = true;
+
+  // 1. CLOSED TRADES - pair entry+exit deals by PositionID
+  HistorySelect(0, TimeCurrent());
+  int total = HistoryDealsTotal();
+
+  // Store entry deals so we can match them to exits
+  ulong  ePos[];  double ePrice[]; long eTime[]; string eSym[]; string eDir[]; double eLots[]; double eComm[];
+  int    eCount = 0;
+  ArrayResize(ePos,6000); ArrayResize(ePrice,6000); ArrayResize(eTime,6000);
+  ArrayResize(eSym,6000); ArrayResize(eDir,6000);  ArrayResize(eLots,6000); ArrayResize(eComm,6000);
+
+  for (int i = 0; i < total; i++) {
+    ulong dk = HistoryDealGetTicket(i);
+    if (dk == 0) continue;
+    if (HistoryDealGetInteger(dk, DEAL_TYPE) > 1) continue;
+    if (HistoryDealGetInteger(dk, DEAL_ENTRY) != DEAL_ENTRY_IN) continue;
+    ePos[eCount]   = (ulong)HistoryDealGetInteger(dk, DEAL_POSITION_ID);
+    ePrice[eCount] = HistoryDealGetDouble(dk,  DEAL_PRICE);
+    eTime[eCount]  = (long)HistoryDealGetInteger(dk, DEAL_TIME);
+    eSym[eCount]   = HistoryDealGetString(dk,  DEAL_SYMBOL);
+    eDir[eCount]   = (HistoryDealGetInteger(dk, DEAL_TYPE) == DEAL_TYPE_BUY) ? "buy" : "sell";
+    eLots[eCount]  = HistoryDealGetDouble(dk,  DEAL_VOLUME);
+    eComm[eCount]  = HistoryDealGetDouble(dk,  DEAL_COMMISSION);
+    eCount++;
+  }
+
+  // Match exit deals to entries
+  for (int i = 0; i < total; i++) {
+    ulong dk = HistoryDealGetTicket(i);
+    if (dk == 0) continue;
+    if (HistoryDealGetInteger(dk, DEAL_TYPE) > 1) continue;
+    if (HistoryDealGetInteger(dk, DEAL_ENTRY) != DEAL_ENTRY_OUT) continue;
+
+    ulong  posId   = (ulong)HistoryDealGetInteger(dk, DEAL_POSITION_ID);
+    double closePx = HistoryDealGetDouble(dk,  DEAL_PRICE);
+    long   closeT  = (long)HistoryDealGetInteger(dk, DEAL_TIME);
+    double profit  = HistoryDealGetDouble(dk,  DEAL_PROFIT);
+    double swap    = HistoryDealGetDouble(dk,  DEAL_SWAP);
+    double comm    = HistoryDealGetDouble(dk,  DEAL_COMMISSION);
+    string sym     = HistoryDealGetString(dk,  DEAL_SYMBOL);
+    double lots    = HistoryDealGetDouble(dk,  DEAL_VOLUME);
+    string dir     = (HistoryDealGetInteger(dk, DEAL_TYPE) == DEAL_TYPE_SELL) ? "buy" : "sell";
+    double openPx  = closePx; long openT = closeT; double openComm = 0;
+
+    for (int j = 0; j < eCount; j++) {
+      if (ePos[j] == posId) {
+        openPx = ePrice[j]; openT = eTime[j];
+        dir = eDir[j]; openComm = eComm[j];
+        if (lots <= 0) lots = eLots[j];
+        break;
+      }
+    }
+
     if (!first) json += ",";
     first = false;
     json += StringFormat(
-      "{\\\"ticket\\\":%I64u,\\\"symbol\\\":\\\"%s\\\","
-      "\\\"type\\\":\\\"%s\\\",\\\"lots\\\":%.2f,"
-      "\\\"openPrice\\\":%.5f,\\\"closePrice\\\":%.5f,"
-      "\\\"openTime\\\":%I64u,\\\"closeTime\\\":%I64u,"
-      "\\\"profit\\\":%.2f,\\\"swap\\\":%.2f,\\\"commission\\\":%.2f}",
-      ticket,
-      HistoryDealGetString(ticket, DEAL_SYMBOL),
-      entryType == DEAL_ENTRY_IN ? "buy" : "sell",
-      HistoryDealGetDouble(ticket, DEAL_VOLUME),
-      HistoryDealGetDouble(ticket, DEAL_PRICE),
-      HistoryDealGetDouble(ticket, DEAL_PRICE),
-      HistoryDealGetInteger(ticket, DEAL_TIME),
-      HistoryDealGetInteger(ticket, DEAL_TIME),
-      HistoryDealGetDouble(ticket, DEAL_PROFIT),
-      HistoryDealGetDouble(ticket, DEAL_SWAP),
-      HistoryDealGetDouble(ticket, DEAL_COMMISSION)
+      "{\"ticket\":%I64u,\"symbol\":\"%s\",\"type\":\"%s\","
+      "\"lots\":%.2f,\"openPrice\":%.5f,\"closePrice\":%.5f,"
+      "\"openTime\":%I64u,\"closeTime\":%I64u,"
+      "\"profit\":%.2f,\"swap\":%.2f,\"commission\":%.2f,\"status\":\"closed\"}",
+      dk, sym, dir, lots, openPx, closePx, openT, closeT,
+      profit, swap, comm + openComm
     );
   }
-  json += "]";
-  string headers = "Content-Type: application/json\\r\\nX-MT5-Token: " + AuthToken +
-                   "\\r\\nX-MT5-Account: " + AccountLabel;
-  char post[], result[]; string resHeaders;
-  StringToCharArray(json, post);
-  int code = WebRequest("POST", WebhookURL, headers, 5000, post, result, resHeaders);
-  if (code == 200) Print("NxTGen sync OK");
-  else Print("NxTGen sync error: ", code);
-}`;
 
+  // 2. OPEN POSITIONS (floating P/L, not yet closed)
+  int pos = PositionsTotal();
+  for (int i = 0; i < pos; i++) {
+    ulong pt = PositionGetTicket(i);
+    if (pt == 0) continue;
+    string sym  = PositionGetString(POSITION_SYMBOL);
+    string dir  = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ? "buy" : "sell";
+    double lots = PositionGetDouble(POSITION_VOLUME);
+    double opx  = PositionGetDouble(POSITION_PRICE_OPEN);
+    double cpx  = PositionGetDouble(POSITION_PRICE_CURRENT);
+    long   opt  = (long)PositionGetInteger(POSITION_TIME);
+    double pnl  = PositionGetDouble(POSITION_PROFIT);
+    double sw   = PositionGetDouble(POSITION_SWAP);
+    double cm   = PositionGetDouble(POSITION_COMMISSION);
+    if (!first) json += ",";
+    first = false;
+    json += StringFormat(
+      "{\"ticket\":%I64u,\"symbol\":\"%s\",\"type\":\"%s\","
+      "\"lots\":%.2f,\"openPrice\":%.5f,\"closePrice\":%.5f,"
+      "\"openTime\":%I64u,\"closeTime\":0,"
+      "\"profit\":%.2f,\"swap\":%.2f,\"commission\":%.2f,\"status\":\"open\"}",
+      pt, sym, dir, lots, opx, cpx, opt, pnl, sw, cm
+    );
+  }
+
+  json += "]";
+  string headers = "Content-Type: application/json\r\nX-MT5-Token: " + AuthToken +
+                   "\r\nX-MT5-Account: " + AccountLabel;
+  char post[], result[]; string resHeaders;
+  int len = StringToCharArray(json, post) - 1;
+  ArrayResize(post, len);
+  int code = WebRequest("POST", WebhookURL, headers, 8000, post, result, resHeaders);
+  if (code == 200) Print("NxTGen sync OK");
+  else             Print("NxTGen sync error: ", code);
+}`;
   return `
   <div class="mt5-info">
     <span class="mt5-info-icon">⚡</span>
@@ -6667,20 +6729,29 @@ function _mt5Step3Html() {
 }
 
 function _mt5TradeRow(t, i, pending, importedSet) {
-  const ticket     = String(t.ticket);
-  const isImported = importedSet.has(ticket);
-  const netPL      = (parseFloat(t.profit)||0) + (parseFloat(t.swap)||0) + (parseFloat(t.commission)||0);
-  const plColor    = isImported ? 'var(--text3)' : netPL >= 0 ? 'var(--green)' : 'var(--red)';
-  const plStr      = (netPL >= 0 ? '+' : '') + netPL.toFixed(2);
-  const typeColor  = isImported ? 'var(--text3)' : t.type === 'buy' ? 'var(--green)' : 'var(--red)';
-  const closeDate  = t.closeTime ? new Date(t.closeTime * 1000).toLocaleString([], {
+  const ticket      = String(t.ticket);
+  const isImported  = importedSet.has(ticket);
+  const isOpen      = (t.status === 'open') || (!t.closeTime || t.closeTime === 0);
+  const netPL       = (parseFloat(t.profit)||0) + (parseFloat(t.swap)||0) + (parseFloat(t.commission)||0);
+  const plColor     = isImported ? 'var(--text3)' : netPL >= 0 ? 'var(--green)' : 'var(--red)';
+  const plStr       = (netPL >= 0 ? '+' : '') + netPL.toFixed(2);
+  const typeColor   = isImported ? 'var(--text3)' : t.type === 'buy' ? 'var(--green)' : 'var(--red)';
+  // Open trades show open time; closed trades show close time
+  const dateTs      = isOpen ? t.openTime : (t.closeTime || t.openTime);
+  const dateStr     = dateTs ? new Date(dateTs * 1000).toLocaleString([], {
     month: 'short', day: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit'
   }) : '—';
   const rowOpacity  = isImported ? 'opacity:0.45' : '';
   const pendingIdx  = pending.findIndex(p => String(p.ticket) === ticket);
-  const statusBadge = isImported
-    ? '<span style="font-size:9px;color:var(--green);font-weight:700">✓ DONE</span>'
-    : '<span style="font-size:9px;color:var(--blue);font-weight:700">NEW</span>';
+  let statusBadge;
+  if (isImported) {
+    statusBadge = '<span style="font-size:9px;color:var(--green);font-weight:700">✓ DONE</span>';
+  } else if (isOpen) {
+    statusBadge = '<span style="font-size:9px;color:var(--gold);font-weight:700">● OPEN</span>';
+  } else {
+    statusBadge = '<span style="font-size:9px;color:var(--blue);font-weight:700">CLOSED</span>';
+  }
+  const dateLabel   = isOpen ? 'Opened' : 'Closed';
   return '<tr style="' + rowOpacity + '">' +
     '<td><input type="checkbox" class="mt5-import-cb mt5-import-row-cb" data-i="' + pendingIdx + '"' +
       (isImported ? ' disabled title="Already imported"' : ' checked') + '></td>' +
@@ -6688,7 +6759,7 @@ function _mt5TradeRow(t, i, pending, importedSet) {
     '<td style="color:' + typeColor + ';font-weight:600">' + (t.type ? t.type.toUpperCase() : '—') + '</td>' +
     '<td style="font-family:var(--font-mono);color:var(--text2)">' + parseFloat(t.lots || 0).toFixed(2) + '</td>' +
     '<td style="color:' + plColor + ';font-weight:700;font-family:var(--font-mono)">$' + plStr + '</td>' +
-    '<td style="font-size:10px;color:var(--text3)">' + closeDate + '</td>' +
+    '<td style="font-size:10px;color:var(--text3)" title="' + dateLabel + '">' + dateStr + '</td>' +
     '<td style="text-align:right">' + statusBadge + '</td>' +
     '</tr>';
 }

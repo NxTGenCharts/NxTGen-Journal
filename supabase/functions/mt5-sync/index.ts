@@ -179,6 +179,7 @@ interface TradeRow {
   token: string; account: string; ticket: string; symbol: string;
   trade_type: string; lots: number; open_price: number; close_price: number;
   open_time: number; close_time: number; profit: number; swap: number; commission: number;
+  status: string;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -201,12 +202,14 @@ function sanitiseTrade(t: any, token: string, account: string): TradeRow | null 
     if (!["buy", "sell"].includes(tradeType)) return null;
     if (lots <= 0)                           return null;
 
+    const status = String(t.status ?? "closed").trim();
     return {
       token, account, ticket, symbol,
       trade_type: tradeType, lots,
       open_price: openPrice, close_price: closePrice,
       open_time: openTime, close_time: closeTime,
       profit, swap, commission,
+      status: ["open","closed"].includes(status) ? status : "closed",
     };
   } catch { return null; }
 }
@@ -225,6 +228,7 @@ function rowToTrade(row: any) {
     profit:     row.profit,
     swap:       row.swap,
     commission: row.commission,
+    status:     row.status ?? "closed",
   };
 }
 
