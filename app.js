@@ -130,6 +130,7 @@ function _rowToTrade(row) {
     pos:      row.pos,
     rr:       row.rr,
     pnl:      parseFloat(row.pnl) || 0,
+    pnlUnit:  row.pnl_unit || (row.source === 'mt5' ? '$' : '%'),
     outcome:  row.outcome,
     kz:       row.kz,
     strategy: row.strategy || '',
@@ -144,6 +145,7 @@ function _rowToTrade(row) {
     charts:   row.charts || [],
     chartLabels: row.chart_labels || [...CHART_LABELS],
     mistakes: row.mistakes || '',
+    source:   row.source || '',
   };
 }
 
@@ -257,6 +259,7 @@ async function _cloudSaveTrade(t) {
     pos:          t.pos,
     rr:           t.rr,
     pnl:          t.pnl,
+    pnl_unit:     t.pnlUnit || '%',
     outcome:      t.outcome,
     kz:           t.kz,
     strategy:     t.strategy || '',
@@ -271,6 +274,7 @@ async function _cloudSaveTrade(t) {
     charts:       s.charts || t.charts || [],
     chart_labels: s.chartLabels || t.chartLabels || [...CHART_LABELS],
     mistakes:     s.mistakes !== undefined ? s.mistakes : '',
+    source:       t.source || '',
   };
 
   let error;
@@ -4035,6 +4039,16 @@ function _renderAccGrid() {
 }
 
 /* ── Account detail drawer ── */
+
+async function _accDetailSetMode(accountName, mode) {
+  const list = _getCustomAccounts();
+  const idx  = list.findIndex(a => a.name === accountName);
+  if (idx === -1) return;
+  list[idx].pnlMode = mode;
+  await _saveCustomAccounts(list);
+  buildAccounts();
+  accShowDetail(accountName);
+}
 function accShowDetail(name) {
   const drawer = document.getElementById('acc-detail-drawer');
   const title  = document.getElementById('acc-detail-title');
@@ -4076,12 +4090,24 @@ function accShowDetail(name) {
 
   title.textContent = name;
   const sizeNote = accSize > 0
-    ? `<span style="font-size:10px;color:var(--text3);margin-left:8px">Account: $${accSize.toLocaleString()} · PnL in ${pnlMode}</span>`
-    : `<span style="font-size:10px;color:var(--gold);margin-left:8px" title="Set account size in Manage Accounts for accurate $ display">⚠ Set account size for $ display</span>`;
+    ? `$${accSize.toLocaleString()}`
+    : `<span style="color:var(--gold)" title="Set size in Manage Accounts">⚠ No size set</span>`;
+
   body.innerHTML = `
-    <div style="display:flex;align-items:center;margin-bottom:10px">
-      <span style="font-size:11px;color:var(--text3)">Showing PnL in <strong style="color:var(--text)">${pnlMode === '$' ? 'USD ($)' : '% of account'}</strong></span>
-      ${sizeNote}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <span style="font-size:11px;color:var(--text3)">
+        Account: <strong style="color:var(--text)">${sizeNote}</strong>
+      </span>
+      <div style="display:flex;gap:0;border:1px solid var(--glass-border);border-radius:6px;overflow:hidden">
+        <button onclick="_accDetailSetMode('${name}','\$')"
+          style="padding:4px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;
+          background:${pnlMode==='$'?'var(--blue)':'var(--glass-1)'};
+          color:${pnlMode==='$'?'#fff':'var(--text3)'};font-family:var(--font-body)">$ USD</button>
+        <button onclick="_accDetailSetMode('${name}','%')"
+          style="padding:4px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;
+          background:${pnlMode==='%'?'var(--blue)':'var(--glass-1)'};
+          color:${pnlMode==='%'?'#fff':'var(--text3)'};font-family:var(--font-body)">% PCT</button>
+      </div>
     </div>
     <div class="acc-detail-stats">
       <div class="acc-ds"><div class="acc-ds-label">Trades</div><div class="acc-ds-val blue">${at.length}</div></div>
