@@ -6483,7 +6483,7 @@ void SyncTrades() {
   int total = HistoryDealsTotal();
   string json = "[";
   bool first = true;
-  for (int i = MathMax(0, total - 50); i < total; i++) {
+  for (int i = MathMax(0, total - 500); i < total; i++) {
     ulong ticket = HistoryDealGetTicket(i);
     if (ticket == 0) continue;
     if (HistoryDealGetInteger(ticket, DEAL_TYPE) > 1) continue; // buy/sell only
@@ -6601,10 +6601,22 @@ function _mt5Step3Html() {
     never:   `<span class="mt5-sync-badge pending"><span class="mt5-sync-dot"></span> Waiting for EA</span>`,
   }[status] || '';
 
-  const importSection = pending.length > 0 ? `
+  // Build the trade history table
+  // Shows ALL trades from MT5 — imported ones are greyed out with a checkmark
+  const importedSet = new Set((cfg.importedTickets || []).map(t => String(t)));
+  const notImported = pending.filter(t => !importedSet.has(String(t.ticket)));
+  const alreadyDone = pending.filter(t =>  importedSet.has(String(t.ticket)));
+  const allHistory  = [...notImported, ...alreadyDone]; // new first, imported last
+
+  const importSection = allHistory.length > 0 ? `
     <div style="margin-top:16px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <label class="mt5-label" style="margin:0">${pending.length} trade${pending.length!==1?'s':''} ready to import</label>
+        <label class="mt5-label" style="margin:0">
+          Trade History
+          <span style="font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-left:6px">
+            ${notImported.length} new · ${alreadyDone.length} imported
+          </span>
+        </label>
         <div style="display:flex;gap:8px">
           <button class="mt5-btn-cancel" style="padding:5px 12px;font-size:11px"
             onclick="_mt5SelectAll(true)">Select All</button>
@@ -6612,39 +6624,24 @@ function _mt5Step3Html() {
             onclick="_mt5ImportSelected()">Import Selected →</button>
         </div>
       </div>
-      <div style="max-height:220px;overflow-y:auto;border:1px solid var(--glass-border);border-radius:var(--r-sm)">
+      <div style="max-height:280px;overflow-y:auto;border:1px solid var(--glass-border);border-radius:var(--r-sm)">
         <table class="mt5-import-table">
           <thead><tr>
             <th style="width:28px"><input type="checkbox" class="mt5-import-cb" id="mt5-cb-all"
-              onchange="_mt5SelectAll(this.checked)" checked></th>
+              onchange="_mt5SelectAll(this.checked)"></th>
             <th>Symbol</th><th>Type</th><th>Lots</th>
-            <th>Profit</th><th>Date</th>
+            <th>Net P/L</th><th>Close Date</th><th style="width:80px"></th>
           </tr></thead>
           <tbody>
-            ${pending.map((t, i) => {
-            const netPL    = (parseFloat(t.profit)||0) + (parseFloat(t.swap)||0) + (parseFloat(t.commission)||0);
-            const plColor  = netPL >= 0 ? 'var(--green)' : 'var(--red)';
-            const plStr    = (netPL >= 0 ? '+' : '') + netPL.toFixed(2);
-            const typeColor = t.type === 'buy' ? 'var(--green)' : 'var(--red)';
-            const closeDate = t.closeTime ? new Date(t.closeTime*1000).toLocaleString([], {
-              month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'
-            }) : '—';
-            return `
-            <tr>
-              <td><input type="checkbox" class="mt5-import-cb mt5-import-row-cb" data-i="${i}" checked></td>
-              <td style="color:var(--text);font-weight:700">${t.symbol || '—'}</td>
-              <td style="color:${typeColor};font-weight:600">${t.type ? t.type.toUpperCase() : '—'}</td>
-              <td style="font-family:var(--font-mono)">${parseFloat(t.lots||0).toFixed(2)}</td>
-              <td style="color:${plColor};font-weight:700;font-family:var(--font-mono)">$${plStr}</td>
-              <td style="font-size:10px;color:var(--text3)">${closeDate}</td>
-            </tr>`;
-          }).join('')}
+            ${allHistory.map((t, i) => _mt5TradeRow(t, i, pending, importedSet)).join('')}
           </tbody>
         </table>
       </div>
     </div>` : `
-    <div style="color:var(--text3);font-size:12px;text-align:center;padding:16px 0;">
-      No pending trades. New closed trades will appear here automatically.
+    <div style="color:var(--text3);font-size:12px;text-align:center;padding:20px 0">
+      <div style="font-size:22px;margin-bottom:8px">📭</div>
+      No trades in buffer yet.<br>
+      <span style="font-size:11px">Make sure the EA is attached to a chart in MT5 and AutoTrading is ON.</span>
     </div>`;
 
   return `
@@ -6667,6 +6664,33 @@ function _mt5Step3Html() {
       Sync Now
     </button>
   </div>`;
+}
+
+function _mt5TradeRow(t, i, pending, importedSet) {
+  const ticket     = String(t.ticket);
+  const isImported = importedSet.has(ticket);
+  const netPL      = (parseFloat(t.profit)||0) + (parseFloat(t.swap)||0) + (parseFloat(t.commission)||0);
+  const plColor    = isImported ? 'var(--text3)' : netPL >= 0 ? 'var(--green)' : 'var(--red)';
+  const plStr      = (netPL >= 0 ? '+' : '') + netPL.toFixed(2);
+  const typeColor  = isImported ? 'var(--text3)' : t.type === 'buy' ? 'var(--green)' : 'var(--red)';
+  const closeDate  = t.closeTime ? new Date(t.closeTime * 1000).toLocaleString([], {
+    month: 'short', day: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit'
+  }) : '—';
+  const rowOpacity  = isImported ? 'opacity:0.45' : '';
+  const pendingIdx  = pending.findIndex(p => String(p.ticket) === ticket);
+  const statusBadge = isImported
+    ? '<span style="font-size:9px;color:var(--green);font-weight:700">✓ DONE</span>'
+    : '<span style="font-size:9px;color:var(--blue);font-weight:700">NEW</span>';
+  return '<tr style="' + rowOpacity + '">' +
+    '<td><input type="checkbox" class="mt5-import-cb mt5-import-row-cb" data-i="' + pendingIdx + '"' +
+      (isImported ? ' disabled title="Already imported"' : ' checked') + '></td>' +
+    '<td style="color:' + (isImported ? 'var(--text3)' : 'var(--text)') + ';font-weight:700">' + (t.symbol || '—') + '</td>' +
+    '<td style="color:' + typeColor + ';font-weight:600">' + (t.type ? t.type.toUpperCase() : '—') + '</td>' +
+    '<td style="font-family:var(--font-mono);color:var(--text2)">' + parseFloat(t.lots || 0).toFixed(2) + '</td>' +
+    '<td style="color:' + plColor + ';font-weight:700;font-family:var(--font-mono)">$' + plStr + '</td>' +
+    '<td style="font-size:10px;color:var(--text3)">' + closeDate + '</td>' +
+    '<td style="text-align:right">' + statusBadge + '</td>' +
+    '</tr>';
 }
 
 function _mt5SelectAll(checked) {
@@ -6897,30 +6921,26 @@ async function _mt5DoSync(accountName) {
 
     if (resp.ok) {
       const data = await resp.json();
-      const incoming = Array.isArray(data.trades) ? data.trades : [];
+      // Full history from the buffer — all trades ever pushed by the EA
+      const allTrades = Array.isArray(data.trades) ? data.trades : [];
 
-      // Deduplicate by ticket number
-      const existingTickets = new Set([
-        // Already sitting in pending (not yet imported)
-        ...(freshList[fIdx].mt5?.pendingTrades || []).map(t => String(t.ticket)),
-        // Already imported into the journal
-        ...(freshList[fIdx].mt5?.importedTickets || []).map(t => String(t)),
-        // In the live trades array (belt-and-suspenders)
-        ...trades.filter(t => t.mt5Ticket).map(t => String(t.mt5Ticket)),
-      ]);
-      const newTrades = incoming.filter(t => !existingTickets.has(String(t.ticket)));
-
-      freshList[fIdx].mt5.pendingTrades = [
-        ...(freshList[fIdx].mt5.pendingTrades || []),
-        ...newTrades,
-      ];
+      // Replace pendingTrades with the full list from the server
+      // The server never deletes — this is always the complete history
+      freshList[fIdx].mt5.pendingTrades = allTrades;
       freshList[fIdx].mt5.lastSyncStatus = 'ok';
       freshList[fIdx].mt5.lastSync = new Date().toISOString();
       await _saveCustomAccounts(freshList);
 
       _mt5UpdateCardBadge(accountName, 'ok');
-      if (newTrades.length) {
-        showToast(`${newTrades.length} new MT5 trade${newTrades.length !== 1 ? 's' : ''} — tap to review`, 'info',
+
+      // Count trades not yet imported
+      const importedTickets = new Set(
+        (freshList[fIdx].mt5.importedTickets || []).map(t => String(t))
+      );
+      const newCount = allTrades.filter(t => !importedTickets.has(String(t.ticket))).length;
+
+      if (newCount > 0) {
+        showToast(`${newCount} trade${newCount !== 1 ? 's' : ''} ready to import — tap to review`, 'info',
           { label: 'Review', fn: `mt5OpenModal('${accountName}')` });
         buildAccounts();
       }

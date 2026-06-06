@@ -3,10 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin":  "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": [
-    "authorization", "content-type",
-    "x-mt5-token", "x-mt5-account", "apikey",
-  ].join(", "),
+  "Access-Control-Allow-Headers": "authorization, content-type, x-mt5-token, x-mt5-account, apikey",
 };
 
 function makeAdmin() {
@@ -14,15 +11,11 @@ function makeAdmin() {
   const key = Deno.env.get("SERVICE_ROLE_KEY");
   if (!url) throw new Error("Missing env: SUPABASE_URL");
   if (!key) throw new Error("Missing env: SERVICE_ROLE_KEY");
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
   try {
     if (req.method === "POST") return await handlePost(req);
     if (req.method === "GET")  return await handleGet(req);
@@ -33,8 +26,8 @@ Deno.serve(async (req: Request) => {
   }
 });
 
+// ── POST: EA pushes trades ───────────────────────────────────────────────────
 async function handlePost(req: Request): Promise<Response> {
-  // Log ALL headers so we can see exactly what MT5 sends
   const allHeaders: Record<string, string> = {};
   req.headers.forEach((val, key) => { allHeaders[key] = val; });
   console.log("[mt5-sync] POST headers:", JSON.stringify(allHeaders));
@@ -42,18 +35,17 @@ async function handlePost(req: Request): Promise<Response> {
   const token   = (req.headers.get("x-mt5-token")   || "").trim();
   const account = (req.headers.get("x-mt5-account") || "").trim();
 
-  console.log(`[mt5-sync] token="${token}" account="${account}"`);
-  console.log(`[mt5-sync] token length=${token.length} account length=${account.length}`);
+  console.log(`[mt5-sync] token="${token.slice(0,16)}..." account="${account}"`);
 
   if (!token || token.length < 10) return jsonError("Missing or invalid X-MT5-Token", 401);
-  if (!account) return jsonError("Missing X-MT5-Account header", 400);
+  if (!account)                    return jsonError("Missing X-MT5-Account header", 400);
 
   let trades: unknown[];
   try {
-    // MQL5 StringToCharArray adds a null terminator \0 — strip it before parsing
-    const raw = await req.text();
+    // MQL5 StringToCharArray adds a null terminator \0 — strip before parsing
+    const raw     = await req.text();
     const cleaned = raw.replace(/\0/g, "").trim();
-    console.log(`[mt5-sync] raw body (first 120 chars): ${cleaned.slice(0, 120)}`);
+    console.log(`[mt5-sync] body preview: ${cleaned.slice(0, 120)}`);
     const body = JSON.parse(cleaned);
     trades = Array.isArray(body) ? body : [];
     console.log(`[mt5-sync] received ${trades.length} trades`);
@@ -63,52 +55,23 @@ async function handlePost(req: Request): Promise<Response> {
   }
 
   const admin = makeAdmin();
-
-  // Fetch ALL accounts and log them so we can compare
-  const { data, error } = await admin
-    .from("journal_account_data")
-    .select("accounts");
-
-  if (error) {
-    console.error("[mt5-sync] DB error:", error.message);
-    return jsonError("DB read failed", 500);
+  const tokenValid = await verifyToken(admin, token, account);
+  if (!tokenValid) {
+    console.error(`[mt5-sync] token not found: account="${account}"`);
+    return jsonError("Unrecognised token or account", 401);
   }
 
-  console.log(`[mt5-sync] DB rows found: ${data?.length ?? 0}`);
-
-  // Log every account and its token for comparison
-  let tokenMatch = false;
-  let accountMatch = false;
-  let bothMatch = false;
-
-  for (const row of (data ?? [])) {
-    const accounts = row.accounts ?? [];
-    for (const a of accounts) {
-      const storedToken   = a?.mt5?.webhookToken ?? "(none)";
-      const storedName    = a?.name ?? "(none)";
-      const tMatch = storedToken === token;
-      const aMatch = storedName  === account;
-      console.log(`[mt5-sync] account="${storedName}" tokenMatch=${tMatch} nameMatch=${aMatch}`);
-      console.log(`[mt5-sync]   stored token="${storedToken.slice(0,16)}..." received="${token.slice(0,16)}..."`);
-      console.log(`[mt5-sync]   stored name bytes=${[...storedName].map(c=>c.charCodeAt(0)).join(",")} received bytes=${[...account].map(c=>c.charCodeAt(0)).join(",")}`);
-      if (tMatch) tokenMatch = true;
-      if (aMatch) accountMatch = true;
-      if (tMatch && aMatch) bothMatch = true;
-    }
-  }
-
-  console.log(`[mt5-sync] result: tokenMatch=${tokenMatch} accountMatch=${accountMatch} bothMatch=${bothMatch}`);
-
-  if (!bothMatch) {
-    return jsonError(`Token/account mismatch. tokenFound=${tokenMatch} accountFound=${accountMatch}`, 400);
-  }
-
-  // Sanitise and insert
   if (trades.length === 0) return json({ ok: true, inserted: 0 });
 
-  const rows = trades.map((t) => sanitiseTrade(t, token, account)).filter(Boolean) as TradeRow[];
-  if (rows.length === 0) return json({ ok: true, inserted: 0, message: "All records failed validation" });
+  // Sanitise all trades
+  const rows = trades
+    .map((t) => sanitiseTrade(t, token, account))
+    .filter(Boolean) as TradeRow[];
 
+  if (rows.length === 0) return json({ ok: true, inserted: 0, message: "No valid trades" });
+
+  // UPSERT — never deletes, just updates existing or inserts new
+  // Trade history is permanent in the buffer until the user clears it
   const { error: upsertErr } = await admin
     .from("mt5_trade_buffer")
     .upsert(rows, { onConflict: "token,ticket" });
@@ -118,17 +81,20 @@ async function handlePost(req: Request): Promise<Response> {
     return jsonError("DB write failed", 500);
   }
 
+  console.log(`[mt5-sync] upserted ${rows.length} trades OK`);
   return json({ ok: true, inserted: rows.length });
 }
 
+// ── GET: app fetches full trade history ──────────────────────────────────────
 async function handleGet(req: Request): Promise<Response> {
   const url     = new URL(req.url);
   const token   = (url.searchParams.get("token")   || "").trim();
   const account = (url.searchParams.get("account") || "").trim();
 
   if (!token || token.length < 10) return jsonError("Missing or invalid token param", 401);
-  if (!account) return jsonError("Missing account param", 400);
+  if (!account)                    return jsonError("Missing account param", 400);
 
+  // Verify JWT
   const jwt = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
   if (!jwt) return jsonError("Missing Authorization header", 401);
 
@@ -141,41 +107,74 @@ async function handleGet(req: Request): Promise<Response> {
 
   const admin = makeAdmin();
 
-  const { data: accData } = await admin
-    .from("journal_account_data")
-    .select("accounts")
-    .eq("user_id", user.id)
-    .single();
-
-  const accounts = accData?.accounts ?? [];
-  const owns = accounts.some(
-    (a: AccountObj) => a?.name === account && a?.mt5?.webhookToken === token,
-  );
+  // Confirm ownership
+  const owns = await verifyTokenOwnership(admin, token, account, user.id);
   if (!owns) return jsonError("Token does not belong to your account", 403);
 
+  // Fetch ALL trades for this token — ordered by close time descending (newest first)
+  // NEVER deleted — full history always available
   const { data: rows, error: fetchErr } = await admin
     .from("mt5_trade_buffer")
     .select("*")
     .eq("token", token)
-    .order("close_time", { ascending: true });
+    .order("close_time", { ascending: false })
+    .limit(500);
 
-  if (fetchErr) return jsonError("DB read failed", 500);
-
-  const trades = (rows ?? []).map(rowToTrade);
-
-  if (trades.length > 0) {
-    const ids = (rows ?? []).map((r) => r.id);
-    await admin.from("mt5_trade_buffer").delete().in("id", ids);
+  if (fetchErr) {
+    console.error("[mt5-sync] fetch error:", fetchErr.message);
+    return jsonError("DB read failed", 500);
   }
 
-  return json({ ok: true, trades, account });
+  console.log(`[mt5-sync] GET returning ${rows?.length ?? 0} trades for account="${account}"`);
+  return json({ ok: true, trades: (rows ?? []).map(rowToTrade), account });
 }
 
+// ── Token verification ───────────────────────────────────────────────────────
 interface AccountObj {
   name?: string;
   mt5?:  { webhookToken?: string; enabled?: boolean };
 }
 
+function normaliseName(s: string): string {
+  return s.replace(/[^a-z0-9]/gi, "").toLowerCase();
+}
+
+async function verifyToken(
+  admin: ReturnType<typeof createClient>,
+  token: string,
+  account: string,
+): Promise<boolean> {
+  const { data, error } = await admin.from("journal_account_data").select("accounts");
+  if (error) { console.error("[mt5-sync] verifyToken DB error:", error.message); return false; }
+  if (!data?.length) return false;
+  const normAccount = normaliseName(account);
+  return data.some((row) => {
+    const accounts: AccountObj[] = row.accounts ?? [];
+    return accounts.some((a) => {
+      if (a?.mt5?.webhookToken !== token) return false;
+      return a?.name === account || normaliseName(a?.name ?? "") === normAccount;
+    });
+  });
+}
+
+async function verifyTokenOwnership(
+  admin: ReturnType<typeof createClient>,
+  token: string,
+  account: string,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("journal_account_data").select("accounts").eq("user_id", userId).single();
+  if (error || !data) return false;
+  const accounts: AccountObj[] = data.accounts ?? [];
+  const norm = normaliseName(account);
+  return accounts.some((a) =>
+    a?.mt5?.webhookToken === token &&
+    (a?.name === account || normaliseName(a?.name ?? "") === norm)
+  );
+}
+
+// ── Trade sanitisation ───────────────────────────────────────────────────────
 interface TradeRow {
   token: string; account: string; ticket: string; symbol: string;
   trade_type: string; lots: number; open_price: number; close_price: number;
@@ -197,10 +196,10 @@ function sanitiseTrade(t: any, token: string, account: string): TradeRow | null 
     const swap       = clampNum(t.swap,       -1e6, 1e6);
     const commission = clampNum(t.commission, -1e6, 0);
 
-    if (!ticket)                            return null;
-    if (!symbol || symbol.length < 2)       return null;
-    if (!["buy","sell"].includes(tradeType)) return null;
-    if (lots <= 0)                          return null;
+    if (!ticket)                             return null;
+    if (!symbol || symbol.length < 2)        return null;
+    if (!["buy", "sell"].includes(tradeType)) return null;
+    if (lots <= 0)                           return null;
 
     return {
       token, account, ticket, symbol,
@@ -209,18 +208,23 @@ function sanitiseTrade(t: any, token: string, account: string): TradeRow | null 
       open_time: openTime, close_time: closeTime,
       profit, swap, commission,
     };
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 // deno-lint-ignore no-explicit-any
 function rowToTrade(row: any) {
   return {
-    ticket: row.ticket, symbol: row.symbol, type: row.trade_type,
-    lots: row.lots, openPrice: row.open_price, closePrice: row.close_price,
-    openTime: row.open_time, closeTime: row.close_time,
-    profit: row.profit, swap: row.swap, commission: row.commission,
+    ticket:     row.ticket,
+    symbol:     row.symbol,
+    type:       row.trade_type,
+    lots:       row.lots,
+    openPrice:  row.open_price,
+    closePrice: row.close_price,
+    openTime:   row.open_time,
+    closeTime:  row.close_time,
+    profit:     row.profit,
+    swap:       row.swap,
+    commission: row.commission,
   };
 }
 
