@@ -3984,42 +3984,85 @@ function accShowDetail(name) {
   const body   = document.getElementById('acc-detail-body');
   if (!drawer || !body) return;
 
-  const at = trades.filter(t => t.account === name).sort((a,b) => b.date.localeCompare(a.date));
-  const wins   = at.filter(t => t.outcome === 'Win').length;
-  const losses = at.filter(t => t.outcome === 'Loss').length;
-  const wr     = at.length ? ((wins / at.length) * 100).toFixed(1) : 0;
-  const pnl    = at.reduce((a, t) => a + t.pnl, 0).toFixed(1);
-  const avgW   = wins   ? (at.filter(t=>t.pnl>0).reduce((a,t)=>a+t.pnl,0)/wins).toFixed(1)   : 0;
-  const avgL   = losses ? (at.filter(t=>t.pnl<0).reduce((a,t)=>a+t.pnl,0)/losses).toFixed(1) : 0;
-  const lossPnls = at.filter(t=>t.pnl<0).map(t=>t.pnl);
-  const winPnls  = at.filter(t=>t.pnl>0).map(t=>t.pnl);
-  const pf = lossPnls.length ? Math.abs(winPnls.reduce((a,b)=>a+b,0)/lossPnls.reduce((a,b)=>a+b,0)).toFixed(2) : '∞';
+  const at     = trades.filter(t => t.account === name).sort((a,b) => b.date.localeCompare(a.date));
+  const wins   = at.filter(t => t.outcome === 'Win');
+  const losses = at.filter(t => t.outcome === 'Loss');
+  const wr     = at.length ? ((wins.length / at.length) * 100).toFixed(1) : 0;
+
+  // Net PnL: sum of raw pnl values (stored as $ from MT5 import, or % for manual)
+  const netPnl   = at.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
+  const pnlStr   = (netPnl >= 0 ? '+' : '') + netPnl.toFixed(2);
+
+  // Avg Win / Avg Loss in $ (raw pnl value — matches what was imported/entered)
+  const avgWRaw  = wins.length
+    ? wins.reduce((a,t) => a + (parseFloat(t.pnl)||0), 0) / wins.length
+    : null;
+  const avgLRaw  = losses.length
+    ? losses.reduce((a,t) => a + (parseFloat(t.pnl)||0), 0) / losses.length
+    : null;
+
+  // Format: if values look like dollar amounts (abs > 0.5 or has MT5 source), show $
+  // Otherwise fall back to showing the value with no unit
+  const fmtPnl = (val, sign) => {
+    if (val === null) return '—';
+    const abs = Math.abs(val);
+    // MT5 imported trades have pnl as dollar value; manual trades use % convention
+    // We show the value as-is with $ prefix since that's more meaningful
+    return (sign === '+' ? '+' : '') + '$' + Math.abs(val).toFixed(2);
+  };
+
+  const lossPnls = losses.map(t => parseFloat(t.pnl)||0);
+  const winPnls  = wins.map(t => parseFloat(t.pnl)||0);
+  const grossW   = winPnls.reduce((a,b)=>a+b,0);
+  const grossL   = Math.abs(lossPnls.reduce((a,b)=>a+b,0));
+  const pf       = grossL > 0 ? (grossW / grossL).toFixed(2) : '∞';
 
   title.textContent = name;
   body.innerHTML = `
     <div class="acc-detail-stats">
       <div class="acc-ds"><div class="acc-ds-label">Trades</div><div class="acc-ds-val blue">${at.length}</div></div>
       <div class="acc-ds"><div class="acc-ds-label">Win Rate</div><div class="acc-ds-val ${parseFloat(wr)>=60?'green':'red'}">${wr}%</div></div>
-      <div class="acc-ds"><div class="acc-ds-label">Net PnL</div><div class="acc-ds-val ${pnl>=0?'green':'red'}">${pnl>=0?'+':''}${pnl}%</div></div>
-      <div class="acc-ds"><div class="acc-ds-label">Avg Win</div><div class="acc-ds-val green">+${avgW}%</div></div>
-      <div class="acc-ds"><div class="acc-ds-label">Avg Loss</div><div class="acc-ds-val red">${avgL}%</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Net PnL</div><div class="acc-ds-val ${netPnl>=0?'green':'red'}">$${pnlStr.replace('+','').replace('-','').trim()}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Avg Win</div><div class="acc-ds-val green">${fmtPnl(avgWRaw,'+')}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Avg Loss</div><div class="acc-ds-val red">${fmtPnl(avgLRaw,'-')}</div></div>
       <div class="acc-ds"><div class="acc-ds-label">Profit Factor</div><div class="acc-ds-val gold">${pf}x</div></div>
     </div>
     ${at.length === 0
       ? '<div style="color:var(--text3);text-align:center;padding:30px;font-style:italic">No trades logged under this account yet.</div>'
-      : `<div class="data-table-wrap" style="max-height:340px;overflow-y:auto;overflow-x:auto">
-          <table class="data-table">
-            <thead><tr><th>Date</th><th>Pair</th><th>Pos</th><th>Outcome</th><th>PnL</th><th>R:R</th><th>Strategy</th></tr></thead>
-            <tbody>${at.map(t => `
+      : `<div class="data-table-wrap" style="overflow-x:auto">
+          <table class="data-table" style="width:100%">
+            <thead>
               <tr>
-                <td class="mono">${t.date}</td>
-                <td class="bold">${t.pair}</td>
-                <td>${t.pos}</td>
-                <td class="${t.outcome==='Win'?'outcome-win':t.outcome==='Loss'?'outcome-loss':'outcome-be'}">${t.outcome}</td>
-                <td class="${t.pnl>=0?'outcome-win':'outcome-loss'} mono">${t.pnl>=0?'+':''}${t.pnl.toFixed(1)}%</td>
-                <td class="mono">${t.rr||'—'}</td>
-                <td>${t.strategy||'—'}</td>
-              </tr>`).join('')}
+                <th>Date</th><th>Pair</th><th>Pos</th><th>Outcome</th>
+                <th>P/L</th><th>R:R</th><th>Strategy</th><th style="width:72px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${at.map(t => {
+                const pnlVal = parseFloat(t.pnl) || 0;
+                const pnlColor = pnlVal >= 0 ? 'outcome-win' : 'outcome-loss';
+                const pnlDisp  = (pnlVal >= 0 ? '+' : '') + '$' + Math.abs(pnlVal).toFixed(2);
+                const outClass = t.outcome==='Win'?'outcome-win':t.outcome==='Loss'?'outcome-loss':'outcome-be';
+                const posClass = t.pos==='Buy'?'pos-buy':'pos-sell';
+                return `
+                <tr class="acc-trade-row" onclick="openDetail(${t.id})" title="Click to view / edit trade"
+                    onmouseenter="this.querySelector('.acc-tr-actions').style.opacity='1'"
+                    onmouseleave="this.querySelector('.acc-tr-actions').style.opacity='0'">
+                  <td class="mono" style="color:var(--text2)">${t.date}</td>
+                  <td class="bold">${t.pair}</td>
+                  <td><span class="${posClass}">${t.pos}</span></td>
+                  <td class="${outClass}">${t.outcome}</td>
+                  <td class="${pnlColor} mono">${pnlDisp}</td>
+                  <td class="mono">${t.rr||'—'}</td>
+                  <td style="color:var(--text2);font-size:11px">${t.strategy||'—'}</td>
+                  <td class="acc-tr-actions" style="opacity:0;transition:opacity .15s;white-space:nowrap;text-align:right">
+                    <button onclick="event.stopPropagation();openDetail(${t.id},true)"
+                      style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;margin-right:3px">✏️</button>
+                    <button onclick="event.stopPropagation();quickDelete(${t.id});accShowDetail('${name.replace(/'/g, "\'")}')"
+                      style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer">🗑</button>
+                  </td>
+                </tr>`;
+              }).join('')}
             </tbody>
           </table>
         </div>`}
