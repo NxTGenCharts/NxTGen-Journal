@@ -4166,7 +4166,7 @@ function accShowDetail(name) {
                   <td class="acc-tr-actions" style="opacity:0;transition:opacity .15s;white-space:nowrap;text-align:right">
                     <button onclick="event.stopPropagation();openDetail(${t.id},true)"
                       style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;margin-right:3px">✏️</button>
-                    <button onclick="event.stopPropagation();quickDelete(${t.id});accShowDetail('${name.replace(/'/g, "\'")}')"
+                    <button onclick="event.stopPropagation();quickDelete(${t.id},'${name.replace(/'/g, "\'")}')"
                       style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer">🗑</button>
                   </td>
                 </tr>`;
@@ -5085,6 +5085,9 @@ async function _executeSoftDelete(id) {
   if (row) { row.style.transition = 'opacity 0.15s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 150); }
   _refreshAll();
   renderTradeTable(trades);
+  // If account detail drawer is open, refresh it immediately too
+  const _delDrawer = document.getElementById('acc-detail-drawer');
+  if (_delDrawer && _delDrawer.classList.contains('open') && t.account) accShowDetail(t.account);
   showToast(t.pair + ' moved to Trash', 'danger', { label: 'View Trash', fn: "nav('trash',null,'Trash')" });
 }
 
@@ -5356,7 +5359,7 @@ function renderTrash() {
   list.innerHTML = html2;
 }
 
-async function quickDelete(id) {
+async function quickDelete(id, accountName) {
   const t = trades.find(x => x.id === id);
   if (!t) return;
   openGlassModal({
@@ -5374,6 +5377,10 @@ async function quickDelete(id) {
       if (row) { row.style.transition = 'opacity 0.15s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 150); }
       _refreshAll();
       renderTradeTable(trades);
+      // If called from account drawer, re-render drawer immediately (no reload needed)
+      const _accName = accountName || t.account;
+      const drawer = document.getElementById('acc-detail-drawer');
+      if (drawer && drawer.classList.contains('open') && _accName) accShowDetail(_accName);
       showToast(t.pair + ' moved to Trash', 'danger', { label: 'View Trash', fn: "nav('trash',null,'Trash')" });
     }
   });
@@ -5412,6 +5419,10 @@ async function restoreTrade(originalId) {
   }
   _refreshAll();
   renderTrash();
+  renderTradeTable(trades);
+  // If account detail drawer is open, refresh it immediately (no reload needed)
+  const _restDrawer = document.getElementById('acc-detail-drawer');
+  if (_restDrawer && _restDrawer.classList.contains('open') && t.account) accShowDetail(t.account);
   showToast(t.pair + ' restored to Trade Log', 'restore');
 }
 
