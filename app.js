@@ -5419,6 +5419,22 @@ function permanentDelete(originalId) {
       await _cloudPermDelete(t.originalId || t.id);
       deletedTrades = deletedTrades.filter(x => (x.originalId || x.id) != originalId);
       delete tradeState[t.id];
+
+      // Remove the ticket from importedTickets so it can be re-imported from MT5
+      if (t.mt5Ticket || t.source === 'mt5') {
+        const ticket = String(t.mt5Ticket || '');
+        const list = _getCustomAccounts();
+        const idx = list.findIndex(a => a.name === t.account);
+        if (idx >= 0 && list[idx].mt5?.importedTickets && ticket) {
+          list[idx].mt5.importedTickets = list[idx].mt5.importedTickets.filter(tk => String(tk) !== ticket);
+          await _saveCustomAccounts(list);
+          if (_mt5ModalState.accountName === t.account) {
+            _mt5ModalState.acc = list[idx];
+            _mt5RenderStep(3);
+          }
+        }
+      }
+
       renderTrash();
       showToast(t.pair + ' permanently deleted', 'danger');
     }
@@ -5433,6 +5449,32 @@ function openEmptyTrashModal() {
     confirmLabel: 'Empty Trash', confirmClass: 'glass-btn-danger',
     onConfirm: async () => {
       const count = deletedTrades.length;
+
+      // Strip any MT5 tickets from importedTickets before wiping the trash
+      const mt5Deleted = deletedTrades.filter(t => t.mt5Ticket || t.source === 'mt5');
+      if (mt5Deleted.length > 0) {
+        const list = _getCustomAccounts();
+        let changed = false;
+        mt5Deleted.forEach(t => {
+          const ticket = String(t.mt5Ticket || '');
+          if (!ticket) return;
+          const idx = list.findIndex(a => a.name === t.account);
+          if (idx >= 0 && list[idx].mt5?.importedTickets) {
+            list[idx].mt5.importedTickets = list[idx].mt5.importedTickets.filter(tk => String(tk) !== ticket);
+            changed = true;
+          }
+        });
+        if (changed) {
+          await _saveCustomAccounts(list);
+          // Refresh MT5 modal if open
+          const openAcc = _mt5ModalState.accountName;
+          if (openAcc) {
+            const updated = list.find(a => a.name === openAcc);
+            if (updated) { _mt5ModalState.acc = updated; _mt5RenderStep(3); }
+          }
+        }
+      }
+
       await _cloudEmptyTrash();
       deletedTrades.forEach(t => delete tradeState[t.id]);
       deletedTrades = [];
@@ -6527,6 +6569,19 @@ function mt5OpenModal(accountName) {
   const list = _getCustomAccounts();
   const acc  = list.find(a => a.name === accountName);
   if (!acc) return;
+
+  // Self-heal: remove any importedTickets whose trade no longer exists in trades[]
+  // (handles permanent deletes that happened before this fix was in place)
+  if (acc.mt5?.importedTickets?.length) {
+    const liveTickets = new Set(trades.filter(t => t.mt5Ticket).map(t => String(t.mt5Ticket)));
+    const before = acc.mt5.importedTickets.length;
+    acc.mt5.importedTickets = acc.mt5.importedTickets.filter(tk => liveTickets.has(String(tk)));
+    if (acc.mt5.importedTickets.length !== before) {
+      // Save quietly in background — no await needed here
+      _saveCustomAccounts(list);
+    }
+  }
+
   _mt5ModalState = { accountName, acc };
   document.getElementById('mt5-overlay')?.classList.add('open');
   document.getElementById('mt5-modal')?.classList.add('open');
