@@ -4076,35 +4076,48 @@ function accShowDetail(name) {
   const accSize = parseFloat(acc.size) || 0;
   const pnlMode = acc.pnlMode || '%';
 
-  const at     = trades.filter(t => t.account === name).sort((a,b) => b.date.localeCompare(a.date));
-  const wins   = at.filter(t => t.outcome === 'Win');
-  const losses = at.filter(t => t.outcome === 'Loss');
-  const wr     = at.length ? ((wins.length / at.length) * 100).toFixed(1) : 0;
+  const at      = trades.filter(t => t.account === name).sort((a,b) => a.date.localeCompare(b.date));
+  const atDesc  = [...at].reverse();
+  const wins    = at.filter(t => t.outcome === 'Win');
+  const losses  = at.filter(t => t.outcome === 'Loss');
+  const bes     = at.filter(t => t.outcome === 'BE');
+  const wr      = at.length ? ((wins.length / at.length) * 100).toFixed(1) : 0;
 
-  // Always sum in $ first using each trade's own pnlUnit, then display per pnlMode
   const sumDollars = (arr) => arr.reduce((s, t) => s + toPnlDollars(t, accSize), 0);
 
   const fmtVal = (dollars) => {
     if (dollars === null || dollars === undefined) return '—';
     const d = parseFloat(dollars) || 0;
-    if (pnlMode === '$') {
-      return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2);
-    }
-    // pnlMode '%' — convert dollars → % using account size
-    if (accSize > 0) {
-      const pct = (d / accSize) * 100;
-      return (pct >= 0 ? '+' : '') + pct.toFixed(3) + '%';
-    }
-    // No account size — fall back to $ display
+    if (pnlMode === '$') return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2);
+    if (accSize > 0) { const pct = (d / accSize) * 100; return (pct >= 0 ? '+' : '') + pct.toFixed(3) + '%'; }
     return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2);
   };
 
-  const netDollars = sumDollars(at);
+  const netDollars  = sumDollars(at);
   const avgWDollars = wins.length   ? sumDollars(wins)   / wins.length   : null;
   const avgLDollars = losses.length ? sumDollars(losses) / losses.length : null;
   const grossW      = sumDollars(wins);
   const grossL      = Math.abs(sumDollars(losses));
-  const pf          = grossL > 0 ? (grossW / grossL).toFixed(2) : '∞';
+  const pf          = grossL > 0 ? (grossW / grossL).toFixed(2) : wins.length ? '∞' : '0.00';
+
+  // Extra stats
+  const rrVals    = at.map(t => parseFloat(t.rr)).filter(v => !isNaN(v) && v > 0);
+  const avgRR     = rrVals.length ? (rrVals.reduce((a,b)=>a+b,0)/rrVals.length).toFixed(2) : null;
+  const pnlArr    = at.map(t => toPnlDollars(t, accSize));
+  const maxDD     = (() => { let peak=0,dd=0,cum=0; pnlArr.forEach(p=>{ cum+=p; if(cum>peak)peak=cum; const d=peak-cum; if(d>dd)dd=d; }); return dd; })();
+  const bestTrade = pnlArr.length ? Math.max(...pnlArr) : 0;
+  const worstTrade= pnlArr.length ? Math.min(...pnlArr) : 0;
+
+  // Streaks
+  const streaks = (() => {
+    let curW=0,curL=0,maxW=0,maxL=0;
+    atDesc.forEach(t => {
+      if (t.outcome==='Win') { curW++; curL=0; maxW=Math.max(maxW,curW); }
+      else if (t.outcome==='Loss') { curL++; curW=0; maxL=Math.max(maxL,curL); }
+      else { curW=0; curL=0; }
+    });
+    return { maxW, maxL };
+  })();
 
   title.textContent = name;
   const sizeNote = accSize > 0
@@ -4112,12 +4125,10 @@ function accShowDetail(name) {
     : `<span style="color:var(--gold)" title="Set size in Manage Accounts">⚠ No size set</span>`;
 
   body.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-      <span style="font-size:11px;color:var(--text3)">
-        Account: <strong style="color:var(--text)">${sizeNote}</strong>
-      </span>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <span style="font-size:11px;color:var(--text3)">Account: <strong style="color:var(--text)">${sizeNote}</strong></span>
       <div style="display:flex;gap:0;border:1px solid var(--glass-border);border-radius:6px;overflow:hidden">
-        <button onclick="_accDetailSetMode('${name}','\$')"
+        <button onclick="_accDetailSetMode('${name}','$')"
           style="padding:4px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;
           background:${pnlMode==='$'?'var(--blue)':'var(--glass-1)'};
           color:${pnlMode==='$'?'#fff':'var(--text3)'};font-family:var(--font-body)">$ USD</button>
@@ -4127,7 +4138,9 @@ function accShowDetail(name) {
           color:${pnlMode==='%'?'#fff':'var(--text3)'};font-family:var(--font-body)">% PCT</button>
       </div>
     </div>
-    <div class="acc-detail-stats">
+
+    <!-- KPI row -->
+    <div class="acc-detail-stats" style="margin-bottom:14px">
       <div class="acc-ds"><div class="acc-ds-label">Trades</div><div class="acc-ds-val blue">${at.length}</div></div>
       <div class="acc-ds"><div class="acc-ds-label">Win Rate</div><div class="acc-ds-val ${parseFloat(wr)>=60?'green':'red'}">${wr}%</div></div>
       <div class="acc-ds"><div class="acc-ds-label">Net PnL</div><div class="acc-ds-val ${netDollars>=0?'green':'red'}">${fmtVal(netDollars)}</div></div>
@@ -4135,51 +4148,391 @@ function accShowDetail(name) {
       <div class="acc-ds"><div class="acc-ds-label">Avg Loss</div><div class="acc-ds-val red">${fmtVal(avgLDollars)}</div></div>
       <div class="acc-ds"><div class="acc-ds-label">Profit Factor</div><div class="acc-ds-val gold">${pf}x</div></div>
     </div>
-    ${at.length === 0
-      ? '<div style="color:var(--text3);text-align:center;padding:30px;font-style:italic">No trades logged under this account yet.</div>'
-      : `<div class="data-table-wrap" style="overflow-x:auto">
-          <table class="data-table" style="width:100%">
-            <thead>
-              <tr>
-                <th>Date</th><th>Pair</th><th>Pos</th><th>Outcome</th>
-                <th>P/L</th><th>R:R</th><th>Strategy</th><th style="width:72px"></th>
-              </tr>
-            </thead>
-            <tbody>
-              ${at.map(t => {
-                const _td     = toPnlDollars(t, accSize);
-                const pnlColor = _td >= 0 ? 'outcome-win' : 'outcome-loss';
-                const pnlDisp  = fmtVal(_td);
-                const outClass = t.outcome==='Win'?'outcome-win':t.outcome==='Loss'?'outcome-loss':'outcome-be';
-                const posClass = t.pos==='Buy'?'pos-buy':'pos-sell';
-                return `
-                <tr class="acc-trade-row" onclick="openDetail(${t.id})" title="Click to view / edit trade"
-                    onmouseenter="this.querySelector('.acc-tr-actions').style.opacity='1'"
-                    onmouseleave="this.querySelector('.acc-tr-actions').style.opacity='0'">
-                  <td class="mono" style="color:var(--text2)">${t.date}</td>
-                  <td class="bold">${t.pair}</td>
-                  <td><span class="${posClass}">${t.pos}</span></td>
-                  <td class="${outClass}">${t.outcome}</td>
-                  <td class="${pnlColor} mono">${pnlDisp}</td>
-                  <td class="mono">${t.rr||'—'}</td>
-                  <td style="color:var(--text2);font-size:11px">${t.strategy||'—'}</td>
-                  <td class="acc-tr-actions" style="opacity:0;transition:opacity .15s;white-space:nowrap;text-align:right">
-                    <button onclick="event.stopPropagation();openDetail(${t.id},true)"
-                      style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;margin-right:3px">✏️</button>
-                    <button onclick="event.stopPropagation();quickDelete(${t.id},'${name.replace(/'/g, "\'")}')"
-                      style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer">🗑</button>
-                  </td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>`}
+
+    <!-- Tab bar -->
+    <div class="acc-tab-bar" id="acc-tab-bar-${name.replace(/\W/g,'_')}">
+      <button class="acc-tab-btn active" onclick="_accTab(this,'analytics','${name.replace(/'/g,"\\'")}')">📊 Analytics</button>
+      <button class="acc-tab-btn" onclick="_accTab(this,'trades','${name.replace(/'/g,"\\'")}')">📋 Trades</button>
+    </div>
+
+    <!-- Analytics panel -->
+    <div class="acc-panel" id="acc-panel-analytics">
+      ${at.length < 1 ? '<div style="color:var(--text3);text-align:center;padding:30px;font-style:italic">No trades yet — add some to see analytics.</div>' : `
+      <!-- Secondary KPIs -->
+      <div class="acc-kpi2-row">
+        <div class="acc-kpi2"><span class="acc-kpi2-label">Max Drawdown</span><span class="acc-kpi2-val" style="color:var(--red)">${fmtVal(-maxDD)}</span></div>
+        <div class="acc-kpi2"><span class="acc-kpi2-label">Best Trade</span><span class="acc-kpi2-val" style="color:var(--green)">${fmtVal(bestTrade)}</span></div>
+        <div class="acc-kpi2"><span class="acc-kpi2-val" style="color:var(--red)">${fmtVal(worstTrade)}</span><span class="acc-kpi2-label">Worst Trade</span></div>
+        <div class="acc-kpi2"><span class="acc-kpi2-label">Avg R:R</span><span class="acc-kpi2-val" style="color:var(--gold)">${avgRR ? avgRR+'R' : '—'}</span></div>
+        <div class="acc-kpi2"><span class="acc-kpi2-label">Best Streak</span><span class="acc-kpi2-val" style="color:var(--green)">${streaks.maxW}W</span></div>
+        <div class="acc-kpi2"><span class="acc-kpi2-label">Worst Streak</span><span class="acc-kpi2-val" style="color:var(--red)">${streaks.maxL}L</span></div>
+      </div>
+
+      <!-- Charts grid -->
+      <div class="acc-charts-grid">
+        <!-- Equity Curve -->
+        <div class="acc-chart-card acc-chart-wide">
+          <div class="acc-chart-label">Equity Curve</div>
+          <canvas id="acc-chart-equity" height="110"></canvas>
+        </div>
+        <!-- Win/Loss/BE Donut -->
+        <div class="acc-chart-card">
+          <div class="acc-chart-label">Outcome Split</div>
+          <canvas id="acc-chart-donut" height="130"></canvas>
+          <div class="acc-donut-legend">
+            <span><span style="background:var(--green)"></span>Win ${wins.length}</span>
+            <span><span style="background:var(--red)"></span>Loss ${losses.length}</span>
+            ${bes.length ? `<span><span style="background:var(--gold)"></span>BE ${bes.length}</span>` : ''}
+          </div>
+        </div>
+        <!-- Pair breakdown bar -->
+        <div class="acc-chart-card">
+          <div class="acc-chart-label">PnL by Pair</div>
+          <canvas id="acc-chart-pairs" height="130"></canvas>
+        </div>
+        <!-- Day of week heatmap -->
+        <div class="acc-chart-card">
+          <div class="acc-chart-label">Day of Week</div>
+          <canvas id="acc-chart-dow" height="130"></canvas>
+        </div>
+        <!-- Strategy bar -->
+        <div class="acc-chart-card acc-chart-wide">
+          <div class="acc-chart-label">PnL by Strategy</div>
+          <canvas id="acc-chart-strategy" height="90"></canvas>
+        </div>
+      </div>
+      `}
+    </div>
+
+    <!-- Trades panel (hidden by default) -->
+    <div class="acc-panel" id="acc-panel-trades" style="display:none">
+      ${atDesc.length === 0
+        ? '<div style="color:var(--text3);text-align:center;padding:30px;font-style:italic">No trades logged under this account yet.</div>'
+        : `<div class="data-table-wrap" style="overflow-x:auto">
+            <table class="data-table" style="width:100%">
+              <thead><tr><th>Date</th><th>Pair</th><th>Pos</th><th>Outcome</th><th>P/L</th><th>R:R</th><th>Strategy</th><th style="width:72px"></th></tr></thead>
+              <tbody>
+                ${atDesc.map(t => {
+                  const _td = toPnlDollars(t, accSize);
+                  const pnlColor = _td >= 0 ? 'outcome-win' : 'outcome-loss';
+                  const pnlDisp  = fmtVal(_td);
+                  const outClass = t.outcome==='Win'?'outcome-win':t.outcome==='Loss'?'outcome-loss':'outcome-be';
+                  const posClass = t.pos==='Buy'?'pos-buy':'pos-sell';
+                  return `<tr class="acc-trade-row" onclick="openDetail(${t.id})" title="Click to view / edit trade"
+                      onmouseenter="this.querySelector('.acc-tr-actions').style.opacity='1'"
+                      onmouseleave="this.querySelector('.acc-tr-actions').style.opacity='0'">
+                    <td class="mono" style="color:var(--text2)">${t.date}</td>
+                    <td class="bold">${t.pair}</td>
+                    <td><span class="${posClass}">${t.pos}</span></td>
+                    <td class="${outClass}">${t.outcome}</td>
+                    <td class="${pnlColor} mono">${pnlDisp}</td>
+                    <td class="mono">${t.rr||'—'}</td>
+                    <td style="color:var(--text2);font-size:11px">${t.strategy||'—'}</td>
+                    <td class="acc-tr-actions" style="opacity:0;transition:opacity .15s;white-space:nowrap;text-align:right">
+                      <button onclick="event.stopPropagation();openDetail(${t.id},true)"
+                        style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;margin-right:3px">✏️</button>
+                      <button onclick="event.stopPropagation();quickDelete(${t.id},'${name.replace(/'/g, "\\'")}')"
+                        style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer">🗑</button>
+                    </td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>`}
+    </div>
   `;
 
   drawer.style.display = '';
-  requestAnimationFrame(() => drawer.classList.add('open'));
+  requestAnimationFrame(() => {
+    drawer.classList.add('open');
+    // Draw charts after DOM is visible
+    if (at.length > 0) {
+      setTimeout(() => _accDrawCharts(at, accSize, pnlMode, name), 80);
+    }
+  });
   drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
+
+function _accTab(btn, panel, name) {
+  const bar = btn.closest('.acc-tab-bar');
+  bar.querySelectorAll('.acc-tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('acc-panel-analytics').style.display = panel === 'analytics' ? '' : 'none';
+  document.getElementById('acc-panel-trades').style.display    = panel === 'trades'    ? '' : 'none';
+  if (panel === 'analytics') {
+    const acc     = _getCustomAccounts().find(a => a.name === name) || {};
+    const accSize = parseFloat(acc.size) || 0;
+    const pnlMode = acc.pnlMode || '%';
+    const at      = trades.filter(t => t.account === name).sort((a,b) => a.date.localeCompare(b.date));
+    if (at.length > 0) setTimeout(() => _accDrawCharts(at, accSize, pnlMode, name), 40);
+  }
+}
+
+function _accDrawCharts(at, accSize, pnlMode, name) {
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const textColor  = isDark ? 'rgba(148,163,184,0.7)' : 'rgba(51,65,85,0.7)';
+  const gridColor  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const GREEN = isDark ? '#34d399' : '#059669';
+  const RED   = isDark ? '#f87171' : '#dc2626';
+  const BLUE  = isDark ? '#60a5fa' : '#2563eb';
+  const GOLD  = isDark ? '#fbbf24' : '#b45309';
+  const PURPLE= isDark ? '#a78bfa' : '#6d28d9';
+  const TEAL  = isDark ? '#2dd4bf' : '#0d9488';
+
+  const pnlArr = at.map(t => toPnlDollars(t, accSize));
+
+  // ── 1. Equity Curve ──────────────────────────────────────
+  const cvEq = document.getElementById('acc-chart-equity');
+  if (cvEq) {
+    const ctx = cvEq.getContext('2d');
+    cvEq.width = cvEq.offsetWidth || cvEq.parentElement.offsetWidth || 500;
+    const W = cvEq.width, H = cvEq.height;
+    ctx.clearRect(0,0,W,H);
+
+    // Build cumulative equity
+    let cum = 0;
+    const equity = [0, ...pnlArr.map(p => { cum += p; return cum; })];
+    const minE = Math.min(...equity), maxE = Math.max(...equity);
+    const range = maxE - minE || 1;
+    const padX = 48, padY = 12;
+    const toX = i => padX + (i / (equity.length-1)) * (W - padX - 12);
+    const toY = v => padY + (1 - (v - minE) / range) * (H - padY*2);
+
+    // Zero line
+    const zeroY = toY(0);
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3,4]);
+    ctx.beginPath(); ctx.moveTo(padX, zeroY); ctx.lineTo(W-12, zeroY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Grid lines (3)
+    [0.25,0.5,0.75].forEach(f => {
+      const gy = padY + f*(H-padY*2);
+      ctx.strokeStyle = gridColor; ctx.lineWidth=0.5;
+      ctx.beginPath(); ctx.moveTo(padX,gy); ctx.lineTo(W-12,gy); ctx.stroke();
+    });
+
+    // Y axis labels
+    ctx.fillStyle = textColor; ctx.font = '9px Inter,sans-serif'; ctx.textAlign = 'right';
+    [minE, (minE+maxE)/2, maxE].forEach((v,i) => {
+      const y = i===0 ? H-padY : i===2 ? padY : H/2;
+      const lbl = pnlMode==='$' ? (v>=0?'+$':'-$')+Math.abs(v).toFixed(0)
+                : accSize>0 ? (v>=0?'+':'')+((v/accSize)*100).toFixed(1)+'%'
+                : (v>=0?'+$':'-$')+Math.abs(v).toFixed(0);
+      ctx.fillText(lbl, padX-4, y+3);
+    });
+
+    // Fill gradient under curve
+    const grad = ctx.createLinearGradient(0, padY, 0, H-padY);
+    const finalPnl = equity[equity.length-1];
+    const lineCol = finalPnl >= 0 ? GREEN : RED;
+    grad.addColorStop(0, finalPnl>=0 ? 'rgba(52,211,153,0.22)' : 'rgba(248,113,113,0.22)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath();
+    equity.forEach((v,i) => { const x=toX(i),y=toY(v); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+    ctx.lineTo(toX(equity.length-1), H-padY);
+    ctx.lineTo(toX(0), H-padY);
+    ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    equity.forEach((v,i) => { const x=toX(i),y=toY(v); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+    ctx.strokeStyle = lineCol; ctx.lineWidth = 2; ctx.lineJoin='round'; ctx.stroke();
+
+    // Dots at each trade
+    equity.forEach((v,i) => {
+      if (i===0) return;
+      const x=toX(i), y=toY(v);
+      const col = pnlArr[i-1]>=0 ? GREEN : RED;
+      ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2);
+      ctx.fillStyle=col; ctx.fill();
+    });
+
+    // Hover tooltip
+    cvEq._accData = { equity, pnlArr, at, toX, toY, padX, pnlMode, accSize, lineCol, GREEN, RED, textColor, gridColor };
+    cvEq.onmousemove = function(e) {
+      const d = cvEq._accData;
+      const rect = cvEq.getBoundingClientRect();
+      const mx = (e.clientX - rect.left) * (cvEq.width/rect.width);
+      // Find nearest point
+      let nearest=0, minDist=Infinity;
+      d.equity.forEach((_,i) => { const dx=Math.abs(d.toX(i)-mx); if(dx<minDist){minDist=dx;nearest=i;} });
+      if (nearest===0) { cvEq.title=''; return; }
+      const t = d.at[nearest-1];
+      const v = d.equity[nearest];
+      const disp = d.pnlMode==='$' ? (v>=0?'+$':'-$')+Math.abs(v).toFixed(2)
+                 : d.accSize>0 ? (v>=0?'+':'')+((v/d.accSize)*100).toFixed(2)+'%'
+                 : (v>=0?'+$':'-$')+Math.abs(v).toFixed(2);
+      cvEq.title = `${t.date} · ${t.pair} · ${t.outcome}\nCumulative: ${disp}`;
+    };
+    cvEq.onmouseleave = () => { cvEq.title=''; };
+  }
+
+  // ── 2. Outcome Donut ────────────────────────────────────
+  const cvDon = document.getElementById('acc-chart-donut');
+  if (cvDon) {
+    const ctx = cvDon.getContext('2d');
+    cvDon.width = cvDon.offsetWidth || cvDon.parentElement.offsetWidth || 160;
+    const W=cvDon.width, H=cvDon.height;
+    ctx.clearRect(0,0,W,H);
+    const wins=at.filter(t=>t.outcome==='Win').length;
+    const losses=at.filter(t=>t.outcome==='Loss').length;
+    const bes=at.filter(t=>t.outcome==='BE').length;
+    const total=at.length;
+    const slices=[{v:wins,c:GREEN},{v:losses,c:RED},{v:bes,c:GOLD}].filter(s=>s.v>0);
+    const cx=W/2, cy=H/2-8, r=Math.min(W,H)/2-18, inner=r*0.55;
+    let angle=-Math.PI/2;
+    slices.forEach(s => {
+      const sweep=(s.v/total)*Math.PI*2;
+      ctx.beginPath(); ctx.moveTo(cx,cy);
+      ctx.arc(cx,cy,r,angle,angle+sweep);
+      ctx.closePath(); ctx.fillStyle=s.c; ctx.fill();
+      angle+=sweep;
+    });
+    // Inner hole
+    ctx.beginPath(); ctx.arc(cx,cy,inner,0,Math.PI*2);
+    ctx.fillStyle = isDark ? '#080b12' : '#f1f5fb'; ctx.fill();
+    // Center label
+    ctx.fillStyle = isDark?'rgba(248,250,252,0.95)':'rgba(15,23,42,0.95)';
+    ctx.font='bold 15px Inter,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(((wins/total)*100).toFixed(0)+'%', cx, cy-4);
+    ctx.font='9px Inter,sans-serif'; ctx.fillStyle=textColor;
+    ctx.fillText('Win Rate', cx, cy+10);
+  }
+
+  // ── 3. PnL by Pair ──────────────────────────────────────
+  const cvPairs = document.getElementById('acc-chart-pairs');
+  if (cvPairs) {
+    const ctx = cvPairs.getContext('2d');
+    cvPairs.width = cvPairs.offsetWidth || cvPairs.parentElement.offsetWidth || 200;
+    const W=cvPairs.width, H=cvPairs.height;
+    ctx.clearRect(0,0,W,H);
+    const pairMap = {};
+    at.forEach((t,i) => {
+      if (!pairMap[t.pair]) pairMap[t.pair]={pnl:0,count:0};
+      pairMap[t.pair].pnl += pnlArr[i]; pairMap[t.pair].count++;
+    });
+    const pairs = Object.entries(pairMap).sort((a,b)=>b[1].pnl-a[1].pnl);
+    if (pairs.length===0) return;
+    const maxAbs = Math.max(...pairs.map(p=>Math.abs(p[1].pnl)),1);
+    const padL=64, padR=8, padT=8, padB=8;
+    const barH = Math.min(18, (H-padT-padB)/pairs.length - 4);
+    const totalH = pairs.length * (barH+4);
+    const startY = padT + (H-padT-padB-totalH)/2;
+    pairs.forEach(([pair,{pnl}],i) => {
+      const y = startY + i*(barH+4);
+      const bw = Math.abs(pnl)/maxAbs * (W-padL-padR);
+      const col = pnl>=0 ? GREEN : RED;
+      // Label
+      ctx.fillStyle=textColor; ctx.font='9px Inter,sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
+      ctx.fillText(pair.length>8?pair.slice(0,7)+'…':pair, padL-4, y+barH/2);
+      // Bar
+      ctx.fillStyle=col+'33'; ctx.strokeStyle=col; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.roundRect(padL, y, bw||1, barH, 3); ctx.fill(); ctx.stroke();
+      // Value
+      ctx.fillStyle=col; ctx.textAlign='left'; ctx.font='bold 8px Inter,sans-serif';
+      const disp = pnl>=0?'+$'+pnl.toFixed(0):'-$'+Math.abs(pnl).toFixed(0);
+      ctx.fillText(disp, padL+bw+3, y+barH/2);
+    });
+  }
+
+  // ── 4. Day of Week ──────────────────────────────────────
+  const cvDow = document.getElementById('acc-chart-dow');
+  if (cvDow) {
+    const ctx = cvDow.getContext('2d');
+    cvDow.width = cvDow.offsetWidth || cvDow.parentElement.offsetWidth || 200;
+    const W=cvDow.width, H=cvDow.height;
+    ctx.clearRect(0,0,W,H);
+    const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const dayMap = {Mon:{pnl:0,count:0},Tue:{pnl:0,count:0},Wed:{pnl:0,count:0},Thu:{pnl:0,count:0},Fri:{pnl:0,count:0},Sat:{pnl:0,count:0},Sun:{pnl:0,count:0}};
+    at.forEach((t,i) => {
+      const d=new Date(t.date+'T12:00:00'); const key=DAYS[d.getDay()===0?6:d.getDay()-1];
+      dayMap[key].pnl+=pnlArr[i]; dayMap[key].count++;
+    });
+    const vals=DAYS.map(d=>dayMap[d].pnl);
+    const maxAbs=Math.max(...vals.map(Math.abs),1);
+    const padB=18, padT=8;
+    const bw=(W-8)/7-3;
+    DAYS.forEach((day,i) => {
+      const pnl=vals[i];
+      const x=4+i*(bw+3);
+      const barMaxH=H-padT-padB;
+      const barH=Math.abs(pnl)/maxAbs*barMaxH*0.85;
+      const col=pnl>0?GREEN:pnl<0?RED:gridColor;
+      const y=padT+barMaxH-barH;
+      ctx.fillStyle=col+'44'; ctx.strokeStyle=col; ctx.lineWidth=1;
+      if (barH>0) { ctx.beginPath(); ctx.roundRect(x,y,bw,barH,3); ctx.fill(); ctx.stroke(); }
+      // Day label
+      ctx.fillStyle=dayMap[day].count>0?(pnl>=0?GREEN:RED):textColor;
+      ctx.font=`${dayMap[day].count>0?'bold ':''}9px Inter,sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='top';
+      ctx.fillText(day, x+bw/2, H-padB+3);
+      // Count badge
+      if (dayMap[day].count>0) {
+        ctx.fillStyle=textColor; ctx.font='8px Inter,sans-serif'; ctx.textBaseline='bottom';
+        ctx.fillText(dayMap[day].count+'t', x+bw/2, y-1);
+      }
+    });
+    // Zero line
+    ctx.strokeStyle=gridColor; ctx.lineWidth=1; ctx.setLineDash([2,3]);
+    const zeroY=padT+H-padT-padB;
+    ctx.beginPath(); ctx.moveTo(4,zeroY); ctx.lineTo(W-4,zeroY); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ── 5. PnL by Strategy ──────────────────────────────────
+  const cvStrat = document.getElementById('acc-chart-strategy');
+  if (cvStrat) {
+    const ctx = cvStrat.getContext('2d');
+    cvStrat.width = cvStrat.offsetWidth || cvStrat.parentElement.offsetWidth || 400;
+    const W=cvStrat.width, H=cvStrat.height;
+    ctx.clearRect(0,0,W,H);
+    const stratMap={};
+    at.forEach((t,i) => {
+      const k=t.strategy||'No Strategy';
+      if(!stratMap[k]) stratMap[k]={pnl:0,count:0};
+      stratMap[k].pnl+=pnlArr[i]; stratMap[k].count++;
+    });
+    const strats=Object.entries(stratMap).sort((a,b)=>b[1].pnl-a[1].pnl);
+    if (!strats.length) return;
+    const maxAbs=Math.max(...strats.map(s=>Math.abs(s[1].pnl)),1);
+    const padL=8, padR=60, padT=8, padB=22;
+    const bw=(W-padL-padR)/strats.length-4;
+    const COLORS=[GREEN,BLUE,TEAL,GOLD,PURPLE,RED,'#f472b6'];
+    strats.forEach(([strat,{pnl,count}],i) => {
+      const x=padL+i*(bw+4);
+      const barMaxH=H-padT-padB;
+      const barH=Math.abs(pnl)/maxAbs*barMaxH*0.82;
+      const col=pnl>=0?COLORS[i%COLORS.length]:RED;
+      const y=padT+barMaxH-barH;
+      ctx.fillStyle=col+'44'; ctx.strokeStyle=col; ctx.lineWidth=1;
+      if(barH>0){ ctx.beginPath(); ctx.roundRect(x,y,bw,barH,3); ctx.fill(); ctx.stroke(); }
+      // Strategy label (truncated)
+      const lbl=strat.length>10?strat.slice(0,9)+'…':strat;
+      ctx.fillStyle=textColor; ctx.font='8px Inter,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='top';
+      ctx.fillText(lbl, x+bw/2, H-padB+4);
+      // Trade count
+      ctx.font='bold 8px Inter,sans-serif'; ctx.fillStyle=col; ctx.textBaseline='bottom';
+      ctx.fillText(count+'t', x+bw/2, y-1);
+    });
+    // Zero line
+    ctx.strokeStyle=gridColor; ctx.lineWidth=1; ctx.setLineDash([2,3]);
+    const zeroY=padT+H-padT-padB;
+    ctx.beginPath(); ctx.moveTo(padL,zeroY); ctx.lineTo(W-padR,zeroY); ctx.stroke();
+    ctx.setLineDash([]);
+    // Legend
+    ctx.fillStyle=textColor; ctx.font='8px Inter,sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    strats.slice(0,4).forEach(([s,{pnl}],i) => {
+      const col=pnl>=0?COLORS[i%COLORS.length]:RED;
+      ctx.fillStyle=col; ctx.fillRect(W-padR+4, 10+i*14, 7, 7);
+      ctx.fillStyle=textColor; ctx.fillText(s.length>8?s.slice(0,7)+'…':s, W-padR+14, 13+i*14);
+    });
+  }
+}
+
+
 
 function accCloseDetail() {
   const drawer = document.getElementById('acc-detail-drawer');
@@ -5085,9 +5438,6 @@ async function _executeSoftDelete(id) {
   if (row) { row.style.transition = 'opacity 0.15s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 150); }
   _refreshAll();
   renderTradeTable(trades);
-  // If account detail drawer is open, refresh it immediately too
-  const _delDrawer = document.getElementById('acc-detail-drawer');
-  if (_delDrawer && _delDrawer.classList.contains('open') && t.account) accShowDetail(t.account);
   showToast(t.pair + ' moved to Trash', 'danger', { label: 'View Trash', fn: "nav('trash',null,'Trash')" });
 }
 
@@ -5359,7 +5709,7 @@ function renderTrash() {
   list.innerHTML = html2;
 }
 
-async function quickDelete(id, accountName) {
+async function quickDelete(id) {
   const t = trades.find(x => x.id === id);
   if (!t) return;
   openGlassModal({
@@ -5377,10 +5727,6 @@ async function quickDelete(id, accountName) {
       if (row) { row.style.transition = 'opacity 0.15s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 150); }
       _refreshAll();
       renderTradeTable(trades);
-      // If called from account drawer, re-render drawer immediately (no reload needed)
-      const _accName = accountName || t.account;
-      const drawer = document.getElementById('acc-detail-drawer');
-      if (drawer && drawer.classList.contains('open') && _accName) accShowDetail(_accName);
       showToast(t.pair + ' moved to Trash', 'danger', { label: 'View Trash', fn: "nav('trash',null,'Trash')" });
     }
   });
@@ -5419,10 +5765,6 @@ async function restoreTrade(originalId) {
   }
   _refreshAll();
   renderTrash();
-  renderTradeTable(trades);
-  // If account detail drawer is open, refresh it immediately (no reload needed)
-  const _restDrawer = document.getElementById('acc-detail-drawer');
-  if (_restDrawer && _restDrawer.classList.contains('open') && t.account) accShowDetail(t.account);
   showToast(t.pair + ' restored to Trade Log', 'restore');
 }
 
