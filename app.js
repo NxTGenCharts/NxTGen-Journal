@@ -37,11 +37,24 @@ function formatPnl(trade, accSize) {
 }
 
 function toPnlDollars(trade, accSize) {
-  const unit = trade.pnlUnit || '%';
   const val  = parseFloat(trade.pnl) || 0;
-  if (unit === '$') return val;
-  if (accSize > 0) return (val / 100) * accSize;
-  return val; // no size — return raw
+
+  // Determine unit: trust explicit pnlUnit, fallback to source/notes detection
+  let unit = trade.pnlUnit;
+  if (!unit || unit === '%') {
+    // Auto-detect: MT5 imported trades always store real dollar P/L
+    if (trade.source === 'mt5' ||
+        (trade.notes && trade.notes.includes('MT5 Import')) ||
+        trade.mt5Ticket) {
+      unit = '$';
+    } else {
+      unit = '%';
+    }
+  }
+
+  if (unit === '$') return val;                        // already dollars
+  if (accSize > 0)  return (val / 100) * accSize;     // % → dollars
+  return val;                                          // no size, return raw
 }
 
 function getAccSizeForAccount(accountName) {
@@ -130,7 +143,9 @@ function _rowToTrade(row) {
     pos:      row.pos,
     rr:       row.rr,
     pnl:      parseFloat(row.pnl) || 0,
-    pnlUnit:  row.pnl_unit || (row.source === 'mt5' ? '$' : '%'),
+    pnlUnit:  row.pnl_unit && row.pnl_unit !== '%' 
+              ? row.pnl_unit 
+              : (row.source === 'mt5' || (row.notes && row.notes.includes('MT5 Import')) ? '$' : '%'),
     outcome:  row.outcome,
     kz:       row.kz,
     strategy: row.strategy || '',
@@ -3969,14 +3984,8 @@ function _renderAccGrid() {
     const wr   = at.length ? ((wins / at.length) * 100).toFixed(1) : null;
     const _cardAccSize = parseFloat(a.size) || 0;
     const _cardMode    = a.pnlMode || '%';
-    // Sum everything in $ first, then convert for display
-    const pnlDollars = at.reduce((s, t) => {
-      const unit = t.pnlUnit || '%';
-      const v    = parseFloat(t.pnl) || 0;
-      if (unit === '$') return s + v;
-      if (_cardAccSize > 0) return s + (v / 100) * _cardAccSize;
-      return s + v;
-    }, 0);
+    // Sum everything in $ using toPnlDollars (handles MT5 auto-detection)
+    const pnlDollars = at.reduce((s, t) => s + toPnlDollars(t, _cardAccSize), 0);
     const pnl = _cardMode === '$' || _cardAccSize === 0
       ? pnlDollars
       : (_cardAccSize > 0 ? (pnlDollars / _cardAccSize) * 100 : pnlDollars);
