@@ -21,40 +21,48 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 // formatPnl() returns a display string like "+$3.32" or "+1.5%"
 // toPnlDollars() converts to $ using accSize if needed.
 function formatPnl(trade, accSize) {
-  const unit = trade.pnlUnit || '%';
-  const val  = parseFloat(trade.pnl) || 0;
+  const val     = parseFloat(trade.pnl) || 0;
+  const dollars = toPnlDollars(trade, accSize);
+  const isMt5   = _isMt5Trade(trade);
+  const unit    = isMt5 ? '$' : (trade.pnlUnit || '%');
+
   if (unit === '$') {
-    return (val >= 0 ? '+$' : '-$') + Math.abs(val).toFixed(2);
+    return (dollars >= 0 ? '+$' : '-$') + Math.abs(dollars).toFixed(2);
   }
-  // % mode
+  // % mode — show percentage, and dollar equivalent if we have account size
+  const pct = accSize > 0 ? (dollars / accSize) * 100 : val;
   if (accSize > 0) {
-    // Also show $ equivalent in parentheses
-    const dollars = (val / 100) * accSize;
-    return (val >= 0 ? '+' : '') + val.toFixed(2) + '% (' +
-      (dollars >= 0 ? '+$' : '-$') + Math.abs(dollars).toFixed(0) + ')';
+    return (pct >= 0 ? '+' : '') + pct.toFixed(3) + '% (' +
+      (dollars >= 0 ? '+$' : '-$') + Math.abs(dollars).toFixed(2) + ')';
   }
-  return (val >= 0 ? '+' : '') + val.toFixed(2) + '%';
+  return (pct >= 0 ? '+' : '') + pct.toFixed(3) + '%';
+}
+
+function _isMt5Trade(trade) {
+  return trade.source === 'mt5'
+      || trade.pnlUnit === '$'
+      || (trade.notes && trade.notes.includes('MT5 Import'))
+      || !!trade.mt5Ticket;
 }
 
 function toPnlDollars(trade, accSize) {
   const val  = parseFloat(trade.pnl) || 0;
 
-  // Determine unit: trust explicit pnlUnit, fallback to source/notes detection
-  let unit = trade.pnlUnit;
-  if (!unit || unit === '%') {
-    // Auto-detect: MT5 imported trades always store real dollar P/L
-    if (trade.source === 'mt5' ||
-        (trade.notes && trade.notes.includes('MT5 Import')) ||
-        trade.mt5Ticket) {
-      unit = '$';
-    } else {
-      unit = '%';
-    }
-  }
+  // 1. Explicit $ unit — trust it directly
+  if (trade.pnlUnit === '$') return val;
 
-  if (unit === '$') return val;                        // already dollars
-  if (accSize > 0)  return (val / 100) * accSize;     // % → dollars
-  return val;                                          // no size, return raw
+  // 2. MT5 detection via source/notes/ticket — value is already in dollars
+  if (_isMt5Trade(trade)) return val;
+
+  // 3. Magnitude guard — if accSize is known and |val| > accSize*0.5,
+  //    the value can't possibly be a percentage (no one loses 50%+ per trade normally)
+  //    so treat as dollars
+  if (accSize > 0 && Math.abs(val) > accSize * 0.5) return val;
+
+  // 4. Standard % trade — convert using account size
+  if (trade.pnlUnit === '%' && accSize > 0) return (val / 100) * accSize;
+
+  return val; // fallback — no conversion possible
 }
 
 function getAccSizeForAccount(accountName) {
@@ -4082,12 +4090,13 @@ function accShowDetail(name) {
     if (pnlMode === '$') {
       return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2);
     }
-    // pnlMode '%' — convert dollars → %
+    // pnlMode '%' — convert dollars → % using account size
     if (accSize > 0) {
       const pct = (d / accSize) * 100;
-      return (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+      return (pct >= 0 ? '+' : '') + pct.toFixed(3) + '%';
     }
-    return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2); // fallback to $ if no size
+    // No account size — fall back to $ display
+    return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2);
   };
 
   const netDollars = sumDollars(at);
