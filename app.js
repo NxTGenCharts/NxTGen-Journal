@@ -5080,7 +5080,11 @@ async function _executeSoftDelete(id) {
   }
 
   closeDetail();
+  // Immediately remove the row from the DOM so it vanishes without waiting for _refreshAll
+  const row = document.querySelector(`#trade-table-body tr[onclick*="openDetail(${id})"]`);
+  if (row) { row.style.transition = 'opacity 0.15s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 150); }
   _refreshAll();
+  renderTradeTable(trades);
   showToast(t.pair + ' moved to Trash', 'danger', { label: 'View Trash', fn: "nav('trash',null,'Trash')" });
 }
 
@@ -5365,7 +5369,11 @@ async function quickDelete(id) {
       deletedTrades.unshift({ ...t, deletedAt: new Date().toISOString(), originalId: t.id });
       trades = trades.filter(x => x.id !== id);
       delete tradeState[id];
+      // Immediately remove the row from the DOM so it vanishes without waiting for _refreshAll
+      const row = document.querySelector(`#trade-table-body tr[onclick*="openDetail(${id})"]`);
+      if (row) { row.style.transition = 'opacity 0.15s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 150); }
       _refreshAll();
+      renderTradeTable(trades);
       showToast(t.pair + ' moved to Trash', 'danger', { label: 'View Trash', fn: "nav('trash',null,'Trash')" });
     }
   });
@@ -6996,12 +7004,18 @@ async function _mt5ImportSelected() {
   await _saveCustomAccounts(list);
   _mt5ModalState.acc = list[idx];
   if (imported > 0) {
+    trades.sort((a, b) => b.date.localeCompare(a.date));
     showToast(`${imported} trade${imported !== 1 ? 's' : ''} imported ✓`, 'restore');
     _refreshAll();
+    mt5CloseModal();
+    nav('tradelog', null, 'Trade Log');
+    renderTradeTable(trades);
+    const tl = document.getElementById('page-tradelog');
+    if (tl) tl.scrollTop = 0;
   } else {
     showToast('Import failed — check console', 'danger');
+    _mt5RenderStep(3);
   }
-  _mt5RenderStep(3);
 }
 
 function _mt5MapTrade(mt5Trade, accountName) {
