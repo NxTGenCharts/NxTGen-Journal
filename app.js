@@ -5061,6 +5061,24 @@ async function _executeSoftDelete(id) {
   deletedTrades.unshift({ ...t, deletedAt: new Date().toISOString(), originalId: t.id });
   trades = trades.filter(x => x.id !== id);
   delete tradeState[id];
+
+  // If this was an MT5 trade, remove it from importedTickets immediately
+  // so the MT5 modal reflects the change without needing a manual sync.
+  if (t.mt5Ticket || t.source === 'mt5') {
+    const ticket = String(t.mt5Ticket || '');
+    const list = _getCustomAccounts();
+    const idx = list.findIndex(a => a.name === t.account);
+    if (idx >= 0 && list[idx].mt5?.importedTickets) {
+      list[idx].mt5.importedTickets = list[idx].mt5.importedTickets.filter(tk => String(tk) !== ticket);
+      await _saveCustomAccounts(list);
+      // Re-render the MT5 modal step 3 if it's currently open for this account
+      if (_mt5ModalState.accountName === t.account) {
+        _mt5ModalState.acc = list[idx];
+        _mt5RenderStep(3);
+      }
+    }
+  }
+
   closeDetail();
   _refreshAll();
   showToast(t.pair + ' moved to Trash', 'danger', { label: 'View Trash', fn: "nav('trash',null,'Trash')" });
@@ -5363,6 +5381,27 @@ async function restoreTrade(originalId) {
   trades.push(restored);
   trades.sort((a, b) => b.date.localeCompare(a.date));
   tradeState[restored.id] = { notes: restored.notes || '', pretrade: restored.pretrade || '', emotion: restored.emotion || 'Calm', checklist: restored.checklist || [], charts: restored.charts || [], chartLabels: restored.chartLabels || [...CHART_LABELS], mistakes: restored.mistakes || '' };
+
+  // If this was an MT5 trade, add the ticket back to importedTickets
+  // (trade is live in the journal again — prevent re-import)
+  if ((t.mt5Ticket || t.source === 'mt5') && (t.mt5Ticket || restored.mt5Ticket)) {
+    const ticket = String(t.mt5Ticket || restored.mt5Ticket || '');
+    const list = _getCustomAccounts();
+    const accName = t.account || restored.account;
+    const idx = list.findIndex(a => a.name === accName);
+    if (idx >= 0 && list[idx].mt5 && ticket) {
+      const already = (list[idx].mt5.importedTickets || []).map(String);
+      if (!already.includes(ticket)) {
+        list[idx].mt5.importedTickets = [...already, ticket];
+        _saveCustomAccounts(list).then(() => {
+          if (_mt5ModalState.accountName === accName) {
+            _mt5ModalState.acc = list[idx];
+            _mt5RenderStep(3);
+          }
+        });
+      }
+    }
+  }
   _refreshAll();
   renderTrash();
   showToast(t.pair + ' restored to Trade Log', 'restore');
