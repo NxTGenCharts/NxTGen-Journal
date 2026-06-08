@@ -34,11 +34,11 @@
   --glass-shine:   rgba(255,255,255,0.06);
 
   /* Blur levels */
-  --blur-xs: blur(6px);
-  --blur-sm: blur(12px);
-  --blur-md: blur(20px);
-  --blur-lg: blur(32px);
-  --blur-xl: blur(48px);
+  --blur-xs: blur(8px);
+  --blur-sm: blur(16px);
+  --blur-md: blur(28px);
+  --blur-lg: blur(44px);
+  --blur-xl: blur(64px);
 
   /* Borders */
   --border:        rgba(255,255,255,0.07);
@@ -180,6 +180,7 @@ html{height:100%;font-size:14px;
 }
 body{
   height:100%;
+  min-height:100dvh;
   background:var(--bg-base);
   color:var(--text);
   font-family:var(--font-body);
@@ -351,7 +352,7 @@ body{
 }
 
 /* ════════════ LAYOUT ═══════════════════════════════ */
-.layout{display:flex;flex:1;overflow:hidden}
+.layout{display:flex;flex:1;overflow:hidden;height:100%}
 
 /* ════════════ SIDEBAR ══════════════════════════════ */
 
@@ -430,7 +431,7 @@ body{
 }
 
 /* ════════════ MAIN + TABS ══════════════════════════ */
-.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
 .tabs{
   height:44px;
   background:var(--glass-1);
@@ -449,10 +450,10 @@ body{
 .tab.active{color:var(--text);border-bottom-color:var(--blue);font-weight:600}
 
 /* ════════════ PAGE ════════════════════════════════ */
-.page{flex:1;overflow-y:auto;padding:24px;display:none;scroll-behavior:smooth}
+.page{flex:1;overflow-y:auto;padding:24px;display:none;scroll-behavior:smooth;min-width:0}
 #page-dashboard{padding:0}
 .page.active{display:block}
-.page-inner{max-width:920px;margin:0 auto}
+.page-inner{max-width:920px;margin:0 auto;min-width:0}
 .dash-layout .page-inner,.dash-left .page-inner{max-width:none;margin:0}
 
 @keyframes pageIn{
@@ -2528,24 +2529,28 @@ body{
 
 /* ════════════ DASHBOARD TWO-COLUMN LAYOUT ══════════════ */
 .page#page-dashboard { overflow-y: auto; }
-.page#page-dashboard > .dash-layout { max-width: 1600px; margin: 0 auto; }
+.page#page-dashboard > .dash-layout { max-width: 1600px; margin: 0 auto; width: 100%; }
 
 .dash-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
+  grid-template-columns: minmax(0, 1fr) 400px;
   gap: 24px;
   padding: 20px 24px 40px;
   align-items: start;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .dash-left {
   min-width: 0;
+  overflow: hidden;
 }
 
 /* Right column — sticky calendar panel */
 .dash-right {
   position: sticky;
   top: 0;
+  min-width: 0;
 }
 
 .dash-cal-panel {
@@ -2553,10 +2558,13 @@ body{
   border: 1px solid var(--glass-border);
   border-radius: var(--r-xl);
   padding: 16px;
-  backdrop-filter: var(--blur-sm);
+  backdrop-filter: blur(36px) saturate(1.8);
+  -webkit-backdrop-filter: blur(36px) saturate(1.8);
   box-shadow: var(--shadow-lg), inset 0 1px 0 var(--glass-shine);
   position: relative;
   overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 .dash-cal-panel::before {
   content: '';
@@ -2584,11 +2592,15 @@ body{
   font-weight: 800;
   color: var(--text);
   letter-spacing: -0.2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .dash-cal-controls {
   display: flex;
   gap: 6px;
   align-items: center;
+  flex-shrink: 0;
 }
 
 /* Compact cal KPI inside dashboard */
@@ -2657,9 +2669,11 @@ body{
   }
   .dash-right {
     position: static;
+    width: 100%;
   }
+  /* On mid-size screens, show calendar in 2-col row layout for space efficiency */
   .dash-cal-panel .cal-kpi-row {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
   .dash-cal-panel .cal-day {
     min-height: 62px;
@@ -2673,7 +2687,34 @@ body{
   }
   .dash-cal-panel .cal-kpi-row {
     grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
   }
+  .dash-cal-panel {
+    padding: 12px;
+    border-radius: var(--r-lg);
+  }
+  .dash-cal-top {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .dash-cal-controls {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+  .dash-cal-controls #cal-acc-filter {
+    display: none; /* hide filter on very small screens, save space */
+  }
+  .dash-cal-panel .cal-day {
+    min-height: 46px;
+    padding: 3px 4px;
+  }
+  .dash-cal-panel .cal-day-num { font-size: 9px; }
+  .dash-cal-panel .cal-day-pnl { font-size: 8px; }
+  .dash-cal-panel .cal-day-count { font-size: 7px; }
+  .dash-cal-panel .cal-day-pairs { display: none; }
+  .dash-cal-panel .cal-dow { font-size: 7px; padding: 4px 0; }
+  .dash-cal-panel .cal-nav { width: 24px; height: 24px; font-size: 12px; }
+  .dash-cal-panel .cal-month-label { font-size: 13px; min-width: 120px; }
 }
 
 /* ════════════ CHECKLIST ════════════════════════ */
@@ -3356,8 +3397,8 @@ body{
     padding:0 14px;
     height:var(--topbar);
     background:rgba(8,11,18,0.92);
-    backdrop-filter:blur(36px) saturate(2);
-    -webkit-backdrop-filter:blur(36px) saturate(2);
+    backdrop-filter:blur(48px) saturate(2.2);
+    -webkit-backdrop-filter:blur(48px) saturate(2.2);
     box-shadow:0 1px 0 rgba(255,255,255,0.05),0 2px 20px rgba(0,0,0,0.45);
     position:fixed;top:0;left:0;right:0;z-index:300;
   }
@@ -3372,9 +3413,9 @@ body{
   .topbar-left .sep,
   .topbar-left .page-name{ display:none }
   .topbar-clock{ display:none }
-  /* Hide Share, keep theme + new trade + avatar */
+  /* Hide Share + New Trade from topbar (New Trade is in bottom nav) */
   .topbar-share-btn{ display:none !important }
-  .btn-primary{ font-size:11px;padding:7px 12px;border-radius:var(--r-full) }
+  .topbar-right .btn-primary{ display:none !important }
   .theme-toggle{ width:34px;height:34px;border-radius:50%;font-size:15px;display:flex;align-items:center;justify-content:center }
   .topbar-avatar{ width:34px;height:34px;border-radius:50%;font-size:11px;font-weight:700 }
 
@@ -3385,10 +3426,10 @@ body{
   .layout{
     display:flex;flex-direction:column;
     margin-top:var(--topbar);
-    height:calc(100vh - var(--topbar) - var(--mob-nav-h) - var(--mob-safe));
+    height:calc(100dvh - var(--topbar) - calc(62px + env(safe-area-inset-bottom,0px)));
     overflow:hidden;
   }
-  .main{ flex:1;display:flex;flex-direction:column;overflow:hidden }
+  .main{ flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0 }
 
   /* ── Pages — scrollable content area ── */
   .page{
@@ -3397,8 +3438,9 @@ body{
     -webkit-overflow-scrolling:touch;
     overscroll-behavior-y:contain;
     height:100%;
+    box-sizing:border-box;
   }
-  .page-inner{ max-width:100% }
+  .page-inner{ max-width:100%;width:100% }
 
   /* ── Sidebar — slides in from left over content ── */
   .sidebar{
@@ -3484,8 +3526,8 @@ body{
     position:fixed;bottom:0;left:0;right:0;
     overflow-y:auto;
     background:var(--bg2);
-    backdrop-filter:blur(40px) saturate(1.8);
-    -webkit-backdrop-filter:blur(40px) saturate(1.8);
+    backdrop-filter:blur(60px) saturate(2.0);
+    -webkit-backdrop-filter:blur(60px) saturate(2.0);
   }
   [data-theme="light"] .modal{ background:rgba(252,254,255,0.98) }
   .modal.open .modal-box{ animation:slideUp 0.32s cubic-bezier(0.22,1,0.36,1) both }
@@ -3496,19 +3538,38 @@ body{
   }
   .modal-head{
     padding:12px 18px 10px;
-    position:sticky;top:0;z-index:1;
+    position:sticky;top:0;z-index:2;
     background:inherit;
     backdrop-filter:inherit;
+    border-bottom:1px solid var(--glass-border);
   }
   .modal-body{ padding:12px 18px 16px }
   .modal-form-grid{ grid-template-columns:1fr 1fr;gap:10px }
   /* Save button — always visible, sticky at bottom */
   .form-actions{
-    position:sticky;bottom:0;
+    position:sticky;bottom:0;z-index:2;
     background:inherit;
     padding:14px 18px calc(14px + var(--mob-safe));
     margin-top:0;border-top:1px solid var(--glass-border);
     backdrop-filter:inherit;
+    display:flex;
+    gap:10px;
+    justify-content:flex-end;
+  }
+  .form-actions .btn{
+    flex:1;max-width:160px;
+    padding:12px 16px;
+    font-size:13px;
+    font-weight:600;
+    border-radius:var(--r-md);
+    text-align:center;
+  }
+  .form-actions .btn-primary{
+    background:linear-gradient(135deg,rgba(96,165,250,0.32),rgba(96,165,250,0.20));
+    border-color:rgba(96,165,250,0.55);
+    color:var(--blue);
+    box-shadow:var(--glow-blue);
+    max-width:200px;
   }
 
   /* ── Detail panel ── */
@@ -3554,10 +3615,11 @@ body{
   }
 
   /* ── Dashboard: single-column, calendar above KPIs on mobile ── */
-  .dash-layout{ display:flex !important;flex-direction:column;gap:0;padding:12px 14px 32px }
-  .dash-right{ order:-1;margin-bottom:14px }
-  .dash-cal-panel{ border-radius:var(--r-xl);overflow:hidden }
-  .dash-cal-panel .cal-kpi-row{ grid-template-columns:repeat(2,1fr) }
+  .dash-layout{ display:flex !important;flex-direction:column;gap:14px;padding:12px 12px 80px }
+  .dash-right{ order:-1;width:100% }
+  .dash-cal-panel{ border-radius:var(--r-xl);overflow:hidden;width:100%;box-sizing:border-box }
+  .dash-cal-panel .cal-kpi-row{ grid-template-columns:repeat(2,1fr);gap:4px }
+  .dash-left{ width:100%;min-width:0 }
 
   /* ── Misc ── */
   .insight{ font-size:12px;padding:12px 14px;border-radius:var(--r-md) }
@@ -3581,11 +3643,15 @@ body{
 @media(max-width:420px){
   .kpi-grid{ gap:6px }
   .kpi-value{ font-size:18px }
-  .btn-primary{ font-size:10px;padding:6px 10px }
   .cover-title{ font-size:18px }
   .data-table{ min-width:460px }
   .modal-form-grid{ grid-template-columns:1fr }
+  .form-grid{ grid-template-columns:1fr }
   .det-tab{ padding:5px 10px;font-size:11px }
+  .dash-layout{ padding:10px 10px 80px }
+  .dash-cal-panel .cal-day{ min-height:40px;padding:2px 3px }
+  .dash-cal-panel .cal-kpi-val{ font-size:12px }
+  .dash-cal-panel .cal-kpi-label{ font-size:7px }
 }
 
 /* ══════════════════════════════════════════════════════
@@ -3723,22 +3789,41 @@ body{
    CALENDAR TOGGLE BUTTON (dashboard panel)
    ══════════════════════════════════════════════════════ */
 .cal-toggle-btn{
-  width:26px;height:26px;border-radius:var(--r-sm);
+  width:28px;height:28px;border-radius:var(--r-sm);
   background:var(--glass-2);border:1px solid var(--glass-border);
   color:var(--text2);font-size:13px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   transition:var(--t-fast);flex-shrink:0;
+  position:relative;overflow:hidden;
 }
-.cal-toggle-btn:hover{ background:var(--glass-3);color:var(--text) }
+.cal-toggle-btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(96,165,250,0.08),transparent);
+  opacity:0;transition:opacity 0.2s;
+}
+.cal-toggle-btn:hover{ background:var(--glass-3);color:var(--text);border-color:var(--glass-border-h);box-shadow:var(--shadow-xs) }
+.cal-toggle-btn:hover::before{ opacity:1 }
 #cal-toggle-icon{
-  display:inline-block;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
   transition:transform 0.28s var(--ease-spring);
   line-height:1;
+  font-size:14px;
+}
+/* Rotate icon when body is collapsed (arrow points down = closed, up = open) */
+.dash-cal-body.collapsed ~ * #cal-toggle-icon,
+.dash-cal-panel.cal-collapsed #cal-toggle-icon {
+  transform: rotate(180deg);
+}
+/* Better: use data attr on the panel */
+.dash-cal-panel[data-collapsed="true"] #cal-toggle-icon {
+  transform: rotate(180deg);
 }
 .dash-cal-body{
   overflow:hidden;
-  transition:max-height 0.35s cubic-bezier(0.4,0,0.2,1),
-             opacity 0.28s ease;
+  transition:max-height 0.38s cubic-bezier(0.4,0,0.2,1),
+             opacity 0.3s ease;
   max-height:900px;
   opacity:1;
 }
@@ -3751,28 +3836,28 @@ body{
    GLASS BLUR ENHANCEMENTS (all components)
    ══════════════════════════════════════════════════════ */
 .topbar{
-  backdrop-filter:blur(32px) saturate(1.9);
-  -webkit-backdrop-filter:blur(32px) saturate(1.9);
+  backdrop-filter:blur(44px) saturate(2.1);
+  -webkit-backdrop-filter:blur(44px) saturate(2.1);
 }
 .sidebar{
-  backdrop-filter:blur(44px) saturate(1.8);
-  -webkit-backdrop-filter:blur(44px) saturate(1.8);
+  backdrop-filter:blur(60px) saturate(2.0);
+  -webkit-backdrop-filter:blur(60px) saturate(2.0);
 }
 .modal{
-  backdrop-filter:blur(44px) saturate(1.8);
-  -webkit-backdrop-filter:blur(44px) saturate(1.8);
+  backdrop-filter:blur(60px) saturate(2.0);
+  -webkit-backdrop-filter:blur(60px) saturate(2.0);
 }
 .detail-panel{
-  backdrop-filter:blur(44px) saturate(1.8);
-  -webkit-backdrop-filter:blur(44px) saturate(1.8);
+  backdrop-filter:blur(60px) saturate(2.0);
+  -webkit-backdrop-filter:blur(60px) saturate(2.0);
 }
 .kpi-card{
-  backdrop-filter:blur(18px) saturate(1.5);
-  -webkit-backdrop-filter:blur(18px) saturate(1.5);
+  backdrop-filter:blur(28px) saturate(1.7);
+  -webkit-backdrop-filter:blur(28px) saturate(1.7);
 }
 .dash-cal-panel{
-  backdrop-filter:blur(24px) saturate(1.6);
-  -webkit-backdrop-filter:blur(24px) saturate(1.6);
+  backdrop-filter:blur(36px) saturate(1.8);
+  -webkit-backdrop-filter:blur(36px) saturate(1.8);
 }
 
 
@@ -5593,6 +5678,27 @@ body{
 [data-theme="light"] .avatar-dropdown {
   background: #fff;
   box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+}
+
+/* ── Sidebar New Trade wrapper (mobile only) ── */
+.sb-new-trade-wrap{
+  display:none;
+  padding:10px 8px 4px;
+}
+.sb-new-trade-btn{
+  width:100%;
+  padding:11px 16px;
+  font-size:13px;
+  font-weight:700;
+  border-radius:var(--r-md);
+  text-align:center;
+  justify-content:center;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+@media(max-width:768px){
+  .sb-new-trade-wrap{ display:block }
 }
 
 /* ── Account manager mobile responsive ───────────────────── */

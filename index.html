@@ -63,6 +63,10 @@
     <div class="sb-logo-header">
       <img class="sb-logo-img" src="logo.svg" alt="NxTGen Trading Journal" draggable="false">
     </div>
+    <!-- Mobile-only New Trade button in sidebar -->
+    <div class="sb-new-trade-wrap" id="sb-new-trade-wrap">
+      <button class="btn btn-primary sb-new-trade-btn" onclick="openModal();closeSidebar()">＋ New Trade</button>
+    </div>
     <div class="sb-section">
       <div class="sb-section-label">Journal</div>
       <div class="sb-item active" onclick="nav('dashboard',this,'Dashboard')"><span class="ico">📊</span><span class="lbl">Dashboard</span></div>
@@ -184,8 +188,12 @@
                   <option value="">All accounts</option>
                 </select>
                 <input type="number" class="acc-size-input" id="cal-acc-size" value="5000" oninput="renderCalendar()" title="Account size for USD calc" style="width:80px;font-size:11px;padding:4px 6px;height:28px">
-                <button class="cal-toggle-btn" id="cal-toggle-btn" onclick="toggleDashCalendar()" title="Hide calendar">
-                  <span id="cal-toggle-icon">⌃</span>
+                <button class="cal-toggle-btn" id="cal-toggle-btn" onclick="toggleDashCalendar()" title="Toggle calendar">
+                  <span id="cal-toggle-icon">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2 5L7 9L12 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </span>
                 </button>
               </div>
             </div>
