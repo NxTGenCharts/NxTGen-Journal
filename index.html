@@ -54,31 +54,6 @@
 <!-- ══ MOBILE SIDEBAR OVERLAY ══ -->
 <div class="mob-overlay" id="mob-overlay" onclick="closeSidebar()"></div>
 
-<!-- ══ MOBILE BOTTOM NAVIGATION BAR ══ -->
-<nav class="mob-bottom-nav" id="mob-bottom-nav" style="display:none">
-  <button class="mob-bottom-nav-item active" id="mob-nav-dashboard" onclick="nav('dashboard',null,'Dashboard');mobNavActivate('dashboard')" aria-label="Dashboard">
-    <span class="mob-nav-icon">📊</span>
-    <span class="mob-nav-label">Dashboard</span>
-  </button>
-  <button class="mob-bottom-nav-item" id="mob-nav-tradelog" onclick="nav('tradelog',null,'Trade Log');mobNavActivate('tradelog')" aria-label="Trade Log">
-    <span class="mob-nav-icon">☰</span>
-    <span class="mob-nav-label">Trades</span>
-  </button>
-  <button class="mob-bottom-nav-item mob-nav-add-btn" id="mob-nav-add" onclick="openModal()" aria-label="New Trade">
-    <span class="mob-nav-icon" style="font-size:26px;line-height:1">＋</span>
-    <span class="mob-nav-label">New Trade</span>
-  </button>
-  <button class="mob-bottom-nav-item" id="mob-nav-calendar" onclick="nav('calendar',null,'Calendar');mobNavActivate('calendar')" aria-label="Calendar">
-    <span class="mob-nav-icon">📅</span>
-    <span class="mob-nav-label">Calendar</span>
-  </button>
-  <button class="mob-bottom-nav-item" id="mob-nav-more" onclick="mobNavMore()" aria-label="More">
-    <span class="mob-nav-icon">⋯</span>
-    <span class="mob-nav-label">More</span>
-    <span class="mob-nav-badge" id="mob-nav-trash-badge" style="display:none">0</span>
-  </button>
-</nav>
-
 <!-- ══ LAYOUT ══ -->
 <div class="layout" id="main-layout">
 
@@ -199,8 +174,8 @@
         </div>
 
         <!-- ── RIGHT COLUMN: inline calendar ── -->
-        <div class="dash-right">
-          <div class="dash-cal-panel">
+        <div class="dash-right" id="dash-right">
+          <div class="dash-cal-panel" id="dash-cal-panel">
             <!-- Calendar header row -->
             <div class="dash-cal-top">
               <div class="dash-cal-title">📅 Trading Calendar</div>
@@ -209,29 +184,36 @@
                   <option value="">All accounts</option>
                 </select>
                 <input type="number" class="acc-size-input" id="cal-acc-size" value="5000" oninput="renderCalendar()" title="Account size for USD calc" style="width:80px;font-size:11px;padding:4px 6px;height:28px">
+                <button class="cal-toggle-btn" id="cal-toggle-btn" onclick="toggleDashCalendar()" title="Hide calendar">
+                  <span id="cal-toggle-icon">⌃</span>
+                </button>
               </div>
             </div>
 
-            <!-- Month nav -->
-            <div class="cal-header" style="padding:8px 0 8px">
-              <div class="cal-nav" onclick="calNav(-1)">‹</div>
-              <div class="cal-month-label" id="cal-month-label">Loading…</div>
-              <div class="cal-nav" onclick="calNav(1)">›</div>
-            </div>
-
-            <!-- KPI strip -->
-            <div class="cal-kpi-row" id="cal-kpi-row"></div>
-
-            <!-- Calendar grid -->
-            <div class="cal-grid-wrap">
-              <div class="cal-dow-row">
-                <div class="cal-dow">MON</div><div class="cal-dow">TUE</div><div class="cal-dow">WED</div>
-                <div class="cal-dow">THU</div><div class="cal-dow">FRI</div><div class="cal-dow">SAT</div><div class="cal-dow">SUN</div>
+            <!-- Collapsible body -->
+            <div class="dash-cal-body" id="dash-cal-body">
+              <!-- Month nav -->
+              <div class="cal-header" style="padding:8px 0 8px">
+                <div class="cal-nav" onclick="calNav(-1)">‹</div>
+                <div class="cal-month-label" id="cal-month-label">Loading…</div>
+                <div class="cal-nav" onclick="calNav(1)">›</div>
               </div>
-              <div class="cal-days" id="cal-days"></div>
+
+              <!-- KPI strip -->
+              <div class="cal-kpi-row" id="cal-kpi-row"></div>
+
+              <!-- Calendar grid -->
+              <div class="cal-grid-wrap">
+                <div class="cal-dow-row">
+                  <div class="cal-dow">MON</div><div class="cal-dow">TUE</div><div class="cal-dow">WED</div>
+                  <div class="cal-dow">THU</div><div class="cal-dow">FRI</div><div class="cal-dow">SAT</div><div class="cal-dow">SUN</div>
+                </div>
+                <div class="cal-days" id="cal-days"></div>
+              </div>
             </div>
           </div>
         </div>
+
 
       </div>
     </div>
@@ -1153,45 +1135,72 @@
 <!-- ══ App Script ══ -->
 <script src="app.js"></script>
 
+<!-- ══ MOBILE SIDEBAR OVERLAY ══ already present above ══ -->
+
+<!-- ══ MOBILE BOTTOM NAVIGATION BAR ══ -->
+<nav class="mob-bottom-nav" id="mob-bottom-nav">
+  <button class="mob-bottom-nav-item active" id="mob-nav-dashboard" onclick="nav('dashboard',null,'Dashboard');mobNavActivate('dashboard')" aria-label="Dashboard">
+    <span class="mob-nav-icon">📊</span>
+    <span class="mob-nav-label">Dashboard</span>
+  </button>
+  <button class="mob-bottom-nav-item" id="mob-nav-tradelog" onclick="nav('tradelog',null,'Trade Log');mobNavActivate('tradelog')" aria-label="Trades">
+    <span class="mob-nav-icon">☰</span>
+    <span class="mob-nav-label">Trades</span>
+  </button>
+  <button class="mob-bottom-nav-item mob-nav-add-btn" id="mob-nav-add" onclick="openModal()" aria-label="New Trade">
+    <span class="mob-nav-icon">＋</span>
+    <span class="mob-nav-label">New Trade</span>
+  </button>
+  <button class="mob-bottom-nav-item" id="mob-nav-calendar" onclick="nav('calendar',null,'Calendar');mobNavActivate('calendar')" aria-label="Calendar">
+    <span class="mob-nav-icon">📅</span>
+    <span class="mob-nav-label">Calendar</span>
+  </button>
+  <button class="mob-bottom-nav-item" id="mob-nav-more" onclick="mobNavMore()" aria-label="More">
+    <span class="mob-nav-icon">•••</span>
+    <span class="mob-nav-label">More</span>
+    <span class="mob-nav-badge" id="mob-nav-trash-badge" style="display:none">0</span>
+  </button>
+</nav>
+
 <!-- ══ MOBILE MORE SHEET OVERLAY ══ -->
 <div class="mob-more-overlay" id="mob-more-overlay" onclick="mobMoreClose()"></div>
 
 <!-- ══ MOBILE MORE BOTTOM SHEET ══ -->
 <div class="mob-more-sheet" id="mob-more-sheet">
-  <div class="mob-more-sheet-handle"></div>
-  <div class="mob-more-sheet-title">More</div>
-  <div class="mob-more-sheet-grid">
+  <div class="mob-more-handle"></div>
+  <div class="mob-more-title">More</div>
+  <div class="mob-more-grid">
     <button class="mob-more-item" onclick="mobMoreNav('accounts','Account Tracker')">
-      <div class="mob-more-item-icon">💰</div>
-      <span class="mob-more-item-label">Accounts</span>
+      <div class="mob-more-icon">💰</div>
+      <span>Accounts</span>
     </button>
     <button class="mob-more-item" onclick="mobMoreNav('watchlist','Weekly Watchlist')">
-      <div class="mob-more-item-icon">📋</div>
-      <span class="mob-more-item-label">Watchlist</span>
+      <div class="mob-more-icon">📋</div>
+      <span>Watchlist</span>
     </button>
     <button class="mob-more-item" onclick="mobMoreNav('ai','AI Coach')">
-      <div class="mob-more-item-icon">🤖</div>
-      <span class="mob-more-item-label">AI Coach</span>
+      <div class="mob-more-icon">🤖</div>
+      <span>AI Coach</span>
     </button>
     <button class="mob-more-item" onclick="mobMoreNav('monthly','Monthly Review')">
-      <div class="mob-more-item-icon">📈</div>
-      <span class="mob-more-item-label">Monthly</span>
+      <div class="mob-more-icon">📈</div>
+      <span>Monthly</span>
     </button>
     <button class="mob-more-item" onclick="mobMoreNav('goals','Goals')">
-      <div class="mob-more-item-icon">🎯</div>
-      <span class="mob-more-item-label">Goals</span>
+      <div class="mob-more-icon">🎯</div>
+      <span>Goals</span>
     </button>
     <button class="mob-more-item" onclick="mobMoreNav('playbook','Trading Playbook')">
-      <div class="mob-more-item-icon">📖</div>
-      <span class="mob-more-item-label">Playbook</span>
+      <div class="mob-more-icon">📖</div>
+      <span>Playbook</span>
     </button>
     <button class="mob-more-item" onclick="mobMoreNav('profile','My Profile')">
-      <div class="mob-more-item-icon">👤</div>
-      <span class="mob-more-item-label">Profile</span>
+      <div class="mob-more-icon">👤</div>
+      <span>Profile</span>
     </button>
-    <button class="mob-more-item" onclick="mobMoreNav('trash','Trash')" id="mob-more-trash-btn">
-      <div class="mob-more-item-icon">🗑</div>
-      <span class="mob-more-item-label">Trash</span>
+    <button class="mob-more-item" onclick="mobMoreNav('trash','Trash')">
+      <div class="mob-more-icon">🗑</div>
+      <span>Trash</span>
       <span class="mob-nav-badge" id="mob-more-trash-badge" style="display:none">0</span>
     </button>
   </div>
