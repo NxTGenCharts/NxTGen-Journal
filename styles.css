@@ -450,10 +450,11 @@ body{
 
 /* ════════════ PAGE ════════════════════════════════ */
 .page{flex:1;overflow-y:auto;padding:24px;display:none;scroll-behavior:smooth}
-#page-dashboard{padding:0}
 .page.active{display:block}
+#page-dashboard{padding:0;overflow-y:auto}
+#page-calendar{padding:0;overflow:hidden;display:none;flex-direction:column}
+#page-calendar.active{display:flex}
 .page-inner{max-width:920px;margin:0 auto}
-.dash-layout .page-inner,.dash-left .page-inner{max-width:none;margin:0}
 
 @keyframes pageIn{
   from{opacity:0;transform:translateY(10px)}
@@ -2483,7 +2484,7 @@ body{
 .acc-detail-drawer{background:var(--glass-1);border:1px solid var(--glass-border);
   border-radius:var(--r-lg);margin-bottom:20px;overflow-x:visible;overflow-y:hidden;
   max-height:0;transition:max-height .3s ease, opacity .25s ease;opacity:0}
-.acc-detail-drawer.open{max-height:600px;opacity:1}
+.acc-detail-drawer.open{max-height:2600px;opacity:1}
 .acc-detail-header{display:flex;align-items:center;justify-content:space-between;
   padding:14px 18px;border-bottom:1px solid var(--glass-border);
   position:sticky;top:0;background:var(--glass-1);z-index:1;
@@ -2526,154 +2527,303 @@ body{
   .acc-detail-stats{grid-template-columns:repeat(2,1fr)}
 }
 
-/* ════════════ DASHBOARD TWO-COLUMN LAYOUT ══════════════ */
-.page#page-dashboard { overflow-y: auto; }
-.page#page-dashboard > .dash-layout { max-width: 1600px; margin: 0 auto; }
-
+/* ══════════════════════════════════════════════════════════
+   DASHBOARD TWO-COLUMN LAYOUT
+   ══════════════════════════════════════════════════════════ */
 .dash-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
-  gap: 24px;
-  padding: 20px 24px 40px;
+  grid-template-columns: minmax(0,1fr) 380px;
+  min-height: 100%;
   align-items: start;
 }
-
 .dash-left {
+  padding: 24px 20px 48px 24px;
   min-width: 0;
+  border-right: 1px solid var(--glass-border);
 }
-
-/* Right column — sticky calendar panel */
 .dash-right {
   position: sticky;
   top: 0;
-}
-
-.dash-cal-panel {
-  background: var(--glass-1);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--r-xl);
-  padding: 16px;
-  backdrop-filter: var(--blur-sm);
-  box-shadow: var(--shadow-lg), inset 0 1px 0 var(--glass-shine);
-  position: relative;
+  height: 100vh;
   overflow: hidden;
-}
-.dash-cal-panel::before {
-  content: '';
-  position: absolute;
-  top: -40%;
-  right: -20%;
-  width: 60%;
-  height: 60%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(96,165,250,0.05) 0%, transparent 65%);
-  pointer-events: none;
+  display: flex;
+  flex-direction: column;
 }
 
-.dash-cal-top {
+/* ── Dashboard calendar card ── */
+.dash-cal-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 14px 12px 10px;
+  background: var(--glass-0);
+  overflow: hidden;
+  gap: 0;
+  border-left: 1px solid var(--glass-border);
+}
+.dash-cal-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   gap: 8px;
+  flex-shrink: 0;
   flex-wrap: wrap;
 }
 .dash-cal-title {
   font-family: var(--font-head);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   color: var(--text);
-  letter-spacing: -0.2px;
+  white-space: nowrap;
 }
-.dash-cal-controls {
+.dash-cal-filters {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   align-items: center;
 }
-
-/* Compact cal KPI inside dashboard */
-.dash-cal-panel .cal-kpi-row {
-  grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
-  padding: 0 0 8px;
-}
-.dash-cal-panel .cal-kpi {
-  padding: 7px 8px;
-  border-radius: var(--r-md);
-}
-.dash-cal-panel .cal-kpi-val {
-  font-size: 13px;
-}
-.dash-cal-panel .cal-kpi-label {
-  font-size: 8px;
-}
-
-/* Compact day cells inside dashboard */
-.dash-cal-panel .cal-day {
-  min-height: 56px;
-  padding: 5px 6px;
-}
-.dash-cal-panel .cal-day-num {
+.dash-cal-filters .form-select {
   font-size: 10px;
+  padding: 3px 5px;
+  height: 24px;
+  max-width: 120px;
 }
-.dash-cal-panel .cal-day-pnl {
-  font-size: 9px;
-}
-.dash-cal-panel .cal-day-count {
-  font-size: 8px;
-}
-.dash-cal-panel .cal-day-pairs {
-  font-size: 7px;
-}
-.dash-cal-panel .cal-month-label {
-  font-size: 14px;
-}
-.dash-cal-panel .cal-grid-wrap {
-  border-radius: var(--r-lg);
-}
-.dash-cal-panel .cal-dow {
-  font-size: 8px;
-  padding: 5px 0;
-}
-.dash-cal-panel .cal-nav {
-  width: 26px;
-  height: 26px;
-  font-size: 14px;
+.dash-cal-filters .acc-size-input {
+  width: 65px;
+  font-size: 10px;
+  padding: 3px 5px;
+  height: 24px;
 }
 
-/* Light theme */
-[data-theme="light"] .dash-cal-panel {
-  background: rgba(255,255,255,0.72);
-  border-color: rgba(0,0,0,0.08);
-  box-shadow: var(--shadow-md);
+/* Compact overrides for embedded calendar */
+.dash-cal-card .cal-header {
+  padding: 2px 0 6px;
+  flex-shrink: 0;
+}
+.dash-cal-card .cal-month-label { font-size: 14px; }
+.dash-cal-card .cal-nav { width: 24px; height: 24px; font-size: 13px; }
+.dash-cal-card .cal-kpi-row {
+  grid-template-columns: repeat(3,1fr) !important;
+  gap: 4px !important;
+  padding-bottom: 6px !important;
+  flex-shrink: 0;
+}
+.dash-cal-card .cal-kpi { padding: 6px 7px; border-radius: var(--r-md); }
+.dash-cal-card .cal-kpi-val { font-size: 11px; }
+.dash-cal-card .cal-kpi-label { font-size: 7px; }
+.dash-cal-card .cal-grid-wrap {
+  flex: 1;
+  min-height: 0;
+}
+.dash-cal-card .cal-days {
+  grid-auto-rows: 1fr;
+}
+.dash-cal-card .cal-dow { font-size: 7.5px; padding: 4px 0; }
+.dash-cal-card .cal-day { min-height: 0; padding: 3px 4px; }
+.dash-cal-card .cal-day-num { font-size: 9px; }
+.dash-cal-card .cal-day-pnl { font-size: 8.5px; margin-top: 2px; }
+.dash-cal-card .cal-day-count { font-size: 7px; }
+.dash-cal-card .cal-day-pairs { font-size: 6.5px; }
+.dash-cal-card .cal-today-badge { width: 16px; height: 16px; font-size: 8px; }
+[data-theme="light"] .dash-cal-card { background: rgba(241,245,251,0.5); }
+
+/* ══════════════════════════════════════════════════════════
+   STANDALONE CALENDAR PAGE
+   ══════════════════════════════════════════════════════════ */
+.cal-standalone-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 14px 20px 10px;
+  overflow: hidden;
+}
+.cal-sa-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.cal-sa-topbar .form-select { font-size: 11px; padding: 4px 8px; }
+.cal-sa-topbar .acc-size-input { width: 80px; font-size: 11px; }
+.cal-standalone-wrap .cal-grid-wrap { flex: 1; min-height: 0; }
+.cal-standalone-wrap .cal-days { grid-auto-rows: 1fr; }
+
+/* ══════════════════════════════════════════════════════════
+   ADVANCED ANALYTICS — Account Drawer (ASA)
+   ══════════════════════════════════════════════════════════ */
+
+/* Top bar */
+.asa-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+}
+.asa-size-lbl {
+  font-size: 11px; color: var(--text3);
+  background: var(--glass-2); border: 1px solid var(--glass-border);
+  border-radius: var(--r-full); padding: 3px 10px;
+}
+.asa-size-lbl strong { color: var(--text); font-weight: 700; }
+.asa-mode-tog {
+  display: flex; border: 1px solid var(--glass-border);
+  border-radius: var(--r-sm); overflow: hidden;
+}
+.asa-mode-btn {
+  padding: 4px 12px; font-size: 11px; font-weight: 700; border: none;
+  cursor: pointer; background: var(--glass-1); color: var(--text3);
+  font-family: var(--font-body); transition: var(--t-fast);
+}
+.asa-mode-btn.act { background: var(--blue); color: #fff; }
+.asa-mode-btn:hover:not(.act) { background: var(--glass-2); color: var(--text2); }
+
+/* Tabs */
+.asa-tabs {
+  display: flex; gap: 2px; margin-bottom: 14px;
+  border-bottom: 1px solid var(--glass-border); padding-bottom: 0;
+  overflow-x: auto; scrollbar-width: none;
+}
+.asa-tabs::-webkit-scrollbar { display: none; }
+.asa-tab {
+  flex-shrink: 0; padding: 7px 13px; font-size: 11px; font-weight: 600;
+  border: none; background: transparent; color: var(--text3); cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  font-family: var(--font-body); transition: var(--t-fast); white-space: nowrap;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+}
+.asa-tab:hover { color: var(--text2); background: var(--glass-1); }
+.asa-tab.act { color: var(--blue); border-bottom-color: var(--blue); background: var(--glass-2); }
+
+/* Panels */
+.asa-panel { animation: asaFade .18s ease; }
+@keyframes asaFade { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+.asa-empty { color: var(--text3); text-align: center; padding: 40px 20px; font-style: italic; font-size: 13px; }
+
+/* 6-KPI grid */
+.asa-kpi6 {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 10px;
+}
+.asa-kp {
+  background: var(--glass-1); border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg); padding: 12px 10px; text-align: center;
+  position: relative; overflow: hidden; transition: var(--t-fast);
+}
+.asa-kp::before {
+  content:''; position: absolute; top:0; left:0; right:0; height:1px;
+  background: linear-gradient(90deg, transparent, var(--glass-shine), transparent);
+}
+.asa-kp:hover { transform: translateY(-2px); background: var(--glass-2); box-shadow: var(--shadow-md); }
+.asa-kp-green { border-top: 2px solid var(--green); }
+.asa-kp-red   { border-top: 2px solid var(--red); }
+.asa-kp-blue  { border-top: 2px solid var(--blue); }
+.asa-kp-gold  { border-top: 2px solid var(--gold); }
+.asa-kp-ico { font-size: 16px; margin-bottom: 4px; line-height: 1; }
+.asa-kp-v {
+  font-family: var(--font-head); font-size: 15px; font-weight: 800;
+  line-height: 1; margin-bottom: 3px; letter-spacing: -0.3px;
+}
+.asa-kp-v.green { color: var(--green); text-shadow: 0 0 16px var(--green-glow); }
+.asa-kp-v.red   { color: var(--red);   text-shadow: 0 0 16px var(--red-glow); }
+.asa-kp-v.blue  { color: var(--blue);  text-shadow: 0 0 16px var(--blue-glow); }
+.asa-kp-v.gold  { color: var(--gold);  text-shadow: 0 0 16px var(--gold-glow); }
+.asa-kp-l { font-size: 8.5px; color: var(--text3); text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
+
+/* Metrics strip */
+.asa-strip {
+  display: flex; align-items: center; flex-wrap: wrap;
+  background: var(--glass-1); border: 1px solid var(--glass-border);
+  border-radius: var(--r-md); padding: 8px 12px; margin-bottom: 12px;
+}
+.asa-met { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px 8px; min-width: 60px; text-align: center; }
+.asa-ml  { font-size: 7.5px; color: var(--text3); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; white-space: nowrap; }
+.asa-mv  { font-family: var(--font-mono); font-size: 11px; font-weight: 700; }
+.asa-mv.green { color: var(--green); }
+.asa-mv.red   { color: var(--red); }
+.asa-mv.gold  { color: var(--gold); }
+.asa-sep { width: 1px; height: 26px; background: var(--glass-border); flex-shrink: 0; }
+
+/* Glass chart cards */
+.asa-card {
+  background: var(--glass-1); border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg); padding: 12px 12px 8px;
+  position: relative; overflow: hidden; transition: var(--t-fast);
+}
+.asa-card::after {
+  content:''; position: absolute; top:0; left:0; right:0; height:1px;
+  background: linear-gradient(90deg, transparent, var(--glass-shine), transparent);
+}
+.asa-card:hover { background: var(--glass-2); }
+.asa-ct {
+  font-size: 11px; font-weight: 700; color: var(--text2); margin-bottom: 2px;
+  display: flex; align-items: center; gap: 5px;
+}
+.asa-cs { font-size: 9px; color: var(--text3); margin-bottom: 7px; }
+.asa-badge {
+  font-size: 9px; font-weight: 600; background: var(--blue-dim);
+  color: var(--blue); border-radius: var(--r-full); padding: 1px 6px;
+}
+.asa-card canvas { width: 100%; display: block; cursor: crosshair; }
+
+/* 2-col overview charts */
+.asa-2col { display: grid; grid-template-columns: 1fr 200px; gap: 8px; }
+
+/* Charts grid — 2 col, equity full width */
+.asa-cgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.asa-full  { grid-column: 1 / -1; }
+
+/* Donut legend */
+.asa-don-leg {
+  display: flex; gap: 8px; justify-content: center;
+  font-size: 10px; color: var(--text2); font-weight: 600; margin-top: 5px;
 }
 
-/* ── Responsive: stack on narrow screens ── */
-@media (max-width: 1080px) {
-  .dash-layout {
-    grid-template-columns: 1fr;
-    padding: 16px 16px 40px;
-    gap: 20px;
-  }
-  .dash-right {
-    position: static;
-  }
-  .dash-cal-panel .cal-kpi-row {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .dash-cal-panel .cal-day {
-    min-height: 62px;
-  }
+/* Trades tab */
+.asa-tr-head {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+}
+.asa-tr-cnt {
+  font-size: 11px; font-weight: 700; color: var(--text2);
+  background: var(--glass-2); border: 1px solid var(--glass-border);
+  border-radius: var(--r-full); padding: 2px 10px;
 }
 
-@media (max-width: 640px) {
-  .dash-layout {
-    padding: 12px 12px 32px;
-    gap: 14px;
-  }
-  .dash-cal-panel .cal-kpi-row {
-    grid-template-columns: repeat(2, 1fr);
-  }
+/* Light mode */
+[data-theme="light"] .asa-kp    { background: rgba(255,255,255,.72); border-color: rgba(0,0,0,.07); }
+[data-theme="light"] .asa-card  { background: rgba(255,255,255,.72); border-color: rgba(0,0,0,.07); }
+[data-theme="light"] .asa-strip { background: rgba(255,255,255,.72); border-color: rgba(0,0,0,.07); }
+[data-theme="light"] .asa-mode-btn.act { background: var(--blue); color: #fff; }
+[data-theme="light"] .asa-tab.act { color: var(--blue); border-bottom-color: var(--blue); }
+[data-theme="light"] .dash-cal-card { background: rgba(241,245,251,.5); border-color: rgba(0,0,0,.07); }
+[data-theme="light"] .dash-left { border-right-color: rgba(0,0,0,.07); }
+
+/* ── Responsive ── */
+@media (max-width: 1120px) {
+  .dash-layout { grid-template-columns: 1fr; }
+  .dash-right { position: static; height: auto; }
+  .dash-cal-card { height: auto; min-height: 520px; border-left: none; border-top: 1px solid var(--glass-border); }
+  .dash-cal-card .cal-days { grid-auto-rows: 68px; }
+  .dash-cal-card .cal-kpi-row { grid-template-columns: repeat(3,1fr) !important; }
+  .dash-left { border-right: none; padding: 20px 16px 32px; }
+}
+@media (max-width: 700px) {
+  .dash-left { padding: 14px 12px 24px; }
+  .dash-cal-card { min-height: 460px; padding: 10px 8px 8px; }
+  .dash-cal-card .cal-kpi-row { grid-template-columns: repeat(2,1fr) !important; }
+  .dash-cal-card .cal-day-pairs { display: none; }
+  .asa-kpi6 { grid-template-columns: repeat(2,1fr); gap: 6px; }
+  .asa-2col { grid-template-columns: 1fr; }
+  .asa-cgrid { grid-template-columns: 1fr; }
+  .asa-strip { padding: 6px 8px; }
+  .asa-met { padding: 3px 5px; min-width: 48px; }
+  .asa-tabs { gap: 0; }
+  .asa-tab { padding: 6px 8px; font-size: 10px; }
+}
+@media (max-width: 480px) {
+  .asa-kpi6 { gap: 5px; }
+  .asa-kp-v { font-size: 13px; }
+  .asa-sep { display: none; }
+  .asa-strip { flex-wrap: wrap; gap: 4px; }
+  .asa-met { min-width: 42px; }
 }
 
 /* ════════════ CHECKLIST ════════════════════════ */
