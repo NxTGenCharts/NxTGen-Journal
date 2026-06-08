@@ -2637,7 +2637,7 @@ async function saveTrade() {
     pos:          document.getElementById('m-pos').value,
     rr:           document.getElementById('m-rr').value || '1:3',
     pnl:          parseFloat(document.getElementById('m-pnl').value) || 0,
-    pnlUnit:      '%',
+    pnl_unit:     '%',
     outcome:      document.getElementById('m-outcome').value,
     kz:           document.getElementById('m-kz').value,
     strategy:     document.getElementById('m-strat').value === '__custom__'
