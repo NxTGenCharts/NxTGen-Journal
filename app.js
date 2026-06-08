@@ -1722,12 +1722,10 @@ function nav(pageId, sbEl, label, extra) {
   if (sbEl) sbEl.classList.add('active');
   document.getElementById('topbar-page').textContent = label;
   if (pageId === 'tradelog') renderTradeTable(trades);
-  // Dashboard always has inline calendar — refresh it on every nav
   renderCalendar();
   if (pageId === 'quarter' && extra) { renderQuarterPage(extra.year, extra.q); }
-  // Standalone calendar page — uses its own separate IDs
-  if (pageId === 'calendar') { _refreshCalendarSAFilter(); setTimeout(renderCalendarSA, 0); }
-  if (pageId === 'dashboard') { _refreshCalendarAccountFilter(); }
+  if (pageId === 'calendar') { _refreshCalendarAccountFilter(); setTimeout(renderCalendar, 0); }
+  if (pageId === 'dashboard') { _refreshCalendarAccountFilter(); setTimeout(renderCalendar, 0); }
   if (pageId === 'trash') { setTimeout(renderTrash, 0); }
   if (pageId === 'monthly') { buildMonthlyReview(); }
   if (pageId === 'ai') { buildAI(); }
@@ -5143,8 +5141,11 @@ function hideCalTooltip() { const tip = document.getElementById('cal-tooltip'); 
 
 function renderCalendar() {
   const accSize = getAccSize(); const accFilter = getCalFilter();
+  // Update both the dashboard inline calendar label and the standalone calendar page label
+  ['cal-month-label','cal-month-label-2'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = MONTH_NAMES_LONG[calMonth] + ' ' + calYear;
+  });
   const label = document.getElementById('cal-month-label');
-  if (label) label.textContent = MONTH_NAMES_LONG[calMonth] + ' ' + calYear;
   const ym = calYear + '-' + String(calMonth + 1).padStart(2, '0');
   const monthTrades = trades.filter(t => t.date.startsWith(ym) && (!accFilter || t.account === accFilter));
   const dayMap = groupTradesByDay(monthTrades);
@@ -5156,15 +5157,19 @@ function renderCalendar() {
   let bestDay = null, worstDay = null;
   Object.entries(dayMap).forEach(([date, d]) => { if (!bestDay || d.totalPnl > dayMap[bestDay].totalPnl) bestDay = date; if (!worstDay || d.totalPnl < dayMap[worstDay].totalPnl) worstDay = date; });
   const kpiEl = document.getElementById('cal-kpi-row');
-  if (kpiEl) {
+  const kpiEl2 = document.getElementById('cal-kpi-row-2');
+  if (kpiEl || kpiEl2) {
     const dayName = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
     const bestUSD = bestDay ? pnlToUSD(dayMap[bestDay].totalPnl, accSize) : 0;
     const worstUSD = worstDay ? pnlToUSD(dayMap[worstDay].totalPnl, accSize) : 0;
     const wrColor = wr >= 70 ? 'green' : wr >= 50 ? 'white' : 'red';
-    kpiEl.innerHTML = `<div class="cal-kpi"><div class="cal-kpi-label">🗂 Trades</div><div class="cal-kpi-val white">${totalTrades}<span style="font-size:10px;color:var(--text3);font-family:var(--font-body);margin-left:5px">${tradingDays.length}d</span></div></div><div class="cal-kpi"><div class="cal-kpi-label">💰 P&L</div><div class="cal-kpi-val ${totalUSD >= 0 ? 'green' : 'red'}">${fmtUSD(totalUSD)}</div></div><div class="cal-kpi"><div class="cal-kpi-label">📈 Best${bestDay ? ' (' + dayName(bestDay) + ')' : ''}</div><div class="cal-kpi-val green">${bestDay ? fmtUSD(bestUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label">📉 Worst${worstDay ? ' (' + dayName(worstDay) + ')' : ''}</div><div class="cal-kpi-val ${worstUSD < 0 ? 'red' : 'green'}">${worstDay ? fmtUSD(worstUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label">🎯 Day Win Rate</div><div class="cal-kpi-val ${wrColor}">${wr}%</div><div style="font-size:9px;color:var(--text3);margin-top:3px;display:flex;gap:5px"><span style="color:var(--green)">▲${winDays}W</span><span style="color:var(--red)">▼${lossDays}L</span><span>⬤${beDays}BE</span></div></div>`;
+    const _kpiHtml = `<div class="cal-kpi"><div class="cal-kpi-label">🗂 Trades</div><div class="cal-kpi-val white">${totalTrades}<span style="font-size:10px;color:var(--text3);font-family:var(--font-body);margin-left:5px">${tradingDays.length}d</span></div></div><div class="cal-kpi"><div class="cal-kpi-label">💰 P&L</div><div class="cal-kpi-val ${totalUSD >= 0 ? 'green' : 'red'}">${fmtUSD(totalUSD)}</div></div><div class="cal-kpi"><div class="cal-kpi-label">📈 Best${bestDay ? ' (' + dayName(bestDay) + ')' : ''}</div><div class="cal-kpi-val green">${bestDay ? fmtUSD(bestUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label">📉 Worst${worstDay ? ' (' + dayName(worstDay) + ')' : ''}</div><div class="cal-kpi-val ${worstUSD < 0 ? 'red' : 'green'}">${worstDay ? fmtUSD(worstUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label">🎯 Day Win Rate</div><div class="cal-kpi-val ${wrColor}">${wr}%</div><div style="font-size:9px;color:var(--text3);margin-top:3px;display:flex;gap:5px"><span style="color:var(--green)">▲${winDays}W</span><span style="color:var(--red)">▼${lossDays}L</span><span>⬤${beDays}BE</span></div></div>`;
+    if (kpiEl) kpiEl.innerHTML = _kpiHtml;
+    if (kpiEl2) kpiEl2.innerHTML = _kpiHtml;
   }
   const daysEl = document.getElementById('cal-days');
-  if (!daysEl) return;
+  const daysEl2 = document.getElementById('cal-days-2');
+  if (!daysEl && !daysEl2) return;
   const firstDay = new Date(calYear, calMonth, 1);
   let startDow = firstDay.getDay() - 1; if (startDow < 0) startDow = 6;
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
@@ -5175,7 +5180,8 @@ function renderCalendar() {
   for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, month: calMonth + 1, year: calYear, current: true });
   let nextD = 1;
   while (cells.length < 42) { const nextMonth = calMonth === 11 ? 1 : calMonth + 2; const nextYear = calMonth === 11 ? calYear + 1 : calYear; cells.push({ day: nextD++, month: nextMonth, year: nextYear, current: false }); }
-  daysEl.innerHTML = cells.map(c => {
+  const _calDaysHTML_fn = (daysEl_target) => { if (!daysEl_target) return;
+  daysEl_target.innerHTML = cells.map(c => {
     const dateStr = c.year + '-' + String(c.month).padStart(2, '0') + '-' + String(c.day).padStart(2, '0');
     const isToday = dateStr === today; const dayData = dayMap[dateStr]; const hasTrades = !!dayData;
     const outcome = hasTrades ? calculateDailyOutcome(dayData.totalPnl) : null;
@@ -5187,7 +5193,8 @@ function renderCalendar() {
     let clickAttr = '', hoverAttr = '';
     if (c.current) { if (hasTrades) { clickAttr = `onclick="openCalPopup(event,'${dateStr}')"`;  hoverAttr = `onmouseenter="showCalTooltip(event,window._dayMap&&window._dayMap['${dateStr}'],'${dateStr}',${accSize})" onmouseleave="hideCalTooltip()"`; } else { clickAttr = `onclick="closeCalPopup();openModal({date:'${dateStr}'})"` ; } }
     return `<div class="${cls}" ${clickAttr} ${hoverAttr}>${dotHTML}${dayNumHTML}${pnlHTML}${countHTML}${pairsHTML}</div>`;
-  }).join('');
+  }).join(''); };
+  _calDaysHTML_fn(daysEl); _calDaysHTML_fn(daysEl2);
   window._dayMap = dayMap;
 }
 
@@ -5250,130 +5257,6 @@ function openCalPopup(e, dateStr) {
 }
 function closeCalPopup() { document.getElementById('cal-popup').style.display = 'none'; }
 document.addEventListener('click', e => { const p = document.getElementById('cal-popup'); if (p && !p.contains(e.target)) closeCalPopup(); });
-
-// ══════════════════════════════════════════════════════
-// STANDALONE CALENDAR (Calendar page — own IDs: -sa)
-// Completely independent from the inline dashboard calendar
-// ══════════════════════════════════════════════════════
-let calMonthSA = new Date().getMonth();
-let calYearSA  = new Date().getFullYear();
-
-function calNavSA(dir) {
-  calMonthSA += dir;
-  if (calMonthSA > 11) { calMonthSA = 0; calYearSA++; }
-  if (calMonthSA < 0)  { calMonthSA = 11; calYearSA--; }
-  renderCalendarSA();
-}
-
-function getAccSizeSA() { return parseFloat(document.getElementById('cal-acc-size-sa')?.value) || 5000; }
-function getCalFilterSA() { const el = document.getElementById('cal-acc-filter-sa'); return el ? el.value : ''; }
-
-function _refreshCalendarSAFilter() {
-  const sel = document.getElementById('cal-acc-filter-sa'); if (!sel) return;
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">All active accounts</option>' +
-    _getActiveAccounts().map(a =>
-      `<option value="${a.name}"${a.name === cur ? ' selected' : ''}>${a.name}</option>`
-    ).join('') +
-    (_getArchivedAccounts().length ? '<optgroup label="Archived">' +
-      _getArchivedAccounts().map(a =>
-        `<option value="${a.name}"${a.name === cur ? ' selected' : ''}>${a.name} (archived)</option>`
-      ).join('') + '</optgroup>' : '');
-}
-
-function _onCalAccFilterChangeSA() {
-  const sel = document.getElementById('cal-acc-filter-sa'); if (!sel) return;
-  const accName = sel.value;
-  if (accName) {
-    const sizeEl = document.getElementById('cal-acc-size-sa');
-    const accSize = getAccSizeForAccount(accName);
-    if (sizeEl && accSize > 0) sizeEl.value = accSize;
-  }
-  renderCalendarSA();
-}
-
-function renderCalendarSA() {
-  const accSize   = getAccSizeSA();
-  const accFilter = getCalFilterSA();
-  const label = document.getElementById('cal-month-label-sa');
-  if (label) label.textContent = MONTH_NAMES_LONG[calMonthSA] + ' ' + calYearSA;
-  const ym = calYearSA + '-' + String(calMonthSA + 1).padStart(2, '0');
-  const monthTrades = trades.filter(t => t.date.startsWith(ym) && (!accFilter || t.account === accFilter));
-  const dayMap = groupTradesByDay(monthTrades);
-  const { winDays, lossDays, beDays, wr } = calculateCalendarWinrate(dayMap);
-  const tradingDays = Object.keys(dayMap);
-  const totalTrades = monthTrades.length;
-  const totalPnlPct = monthTrades.reduce((a, t) => a + t.pnl, 0);
-  const totalUSD = pnlToUSD(totalPnlPct, accSize);
-  let bestDay = null, worstDay = null;
-  Object.entries(dayMap).forEach(([date, d]) => {
-    if (!bestDay || d.totalPnl > dayMap[bestDay].totalPnl) bestDay = date;
-    if (!worstDay || d.totalPnl < dayMap[worstDay].totalPnl) worstDay = date;
-  });
-  const kpiEl = document.getElementById('cal-kpi-row-sa');
-  if (kpiEl) {
-    const dayName = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
-    const bestUSD  = bestDay  ? pnlToUSD(dayMap[bestDay].totalPnl, accSize)  : 0;
-    const worstUSD = worstDay ? pnlToUSD(dayMap[worstDay].totalPnl, accSize) : 0;
-    const wrColor  = wr >= 70 ? 'green' : wr >= 50 ? 'white' : 'red';
-    kpiEl.innerHTML = `<div class="cal-kpi"><div class="cal-kpi-label">🗂 Trades</div><div class="cal-kpi-val white">${totalTrades}<span style="font-size:10px;color:var(--text3);font-family:var(--font-body);margin-left:5px">${tradingDays.length}d</span></div></div><div class="cal-kpi"><div class="cal-kpi-label">💰 P&L</div><div class="cal-kpi-val ${totalUSD >= 0 ? 'green' : 'red'}">${fmtUSD(totalUSD)}</div></div><div class="cal-kpi"><div class="cal-kpi-label">📈 Best${bestDay ? ' (' + dayName(bestDay) + ')' : ''}</div><div class="cal-kpi-val green">${bestDay ? fmtUSD(bestUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label">📉 Worst${worstDay ? ' (' + dayName(worstDay) + ')' : ''}</div><div class="cal-kpi-val ${worstUSD < 0 ? 'red' : 'green'}">${worstDay ? fmtUSD(worstUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label">🎯 Day Win Rate</div><div class="cal-kpi-val ${wrColor}">${wr}%</div><div style="font-size:9px;color:var(--text3);margin-top:3px;display:flex;gap:5px"><span style="color:var(--green)">▲${winDays}W</span><span style="color:var(--red)">▼${lossDays}L</span><span>⬤${beDays}BE</span></div></div>`;
-  }
-  const daysEl = document.getElementById('cal-days-sa');
-  if (!daysEl) return;
-  const firstDay = new Date(calYearSA, calMonthSA, 1);
-  let startDow = firstDay.getDay() - 1; if (startDow < 0) startDow = 6;
-  const daysInMonth = new Date(calYearSA, calMonthSA + 1, 0).getDate();
-  const daysInPrev  = new Date(calYearSA, calMonthSA, 0).getDate();
-  const today = new Date().toISOString().slice(0, 10);
-  let cells = [];
-  for (let i = startDow - 1; i >= 0; i--) {
-    const prevMonth = calMonthSA === 0 ? 12 : calMonthSA;
-    const prevYear  = calMonthSA === 0 ? calYearSA - 1 : calYearSA;
-    cells.push({ day: daysInPrev - i, month: prevMonth, year: prevYear, current: false });
-  }
-  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, month: calMonthSA + 1, year: calYearSA, current: true });
-  let nextD = 1;
-  while (cells.length < 42) {
-    const nextMonth = calMonthSA === 11 ? 1 : calMonthSA + 2;
-    const nextYear  = calMonthSA === 11 ? calYearSA + 1 : calYearSA;
-    cells.push({ day: nextD++, month: nextMonth, year: nextYear, current: false });
-  }
-  daysEl.innerHTML = cells.map(c => {
-    const dateStr = c.year + '-' + String(c.month).padStart(2, '0') + '-' + String(c.day).padStart(2, '0');
-    const isToday = dateStr === today;
-    const dayData = dayMap[dateStr]; const hasTrades = !!dayData;
-    const outcome = hasTrades ? calculateDailyOutcome(dayData.totalPnl) : null;
-    let cls = 'cal-day';
-    if (!c.current) cls += ' other-month';
-    if (isToday) cls += ' today';
-    if (hasTrades) { cls += ' has-trades'; cls += outcome === 'win' ? ' win-day' : outcome === 'loss' ? ' loss-day' : ' mixed-day'; }
-    const dayNumHTML = isToday
-      ? `<div class="cal-day-num"><span class="cal-today-badge">${c.day}</span></div>`
-      : `<div class="cal-day-num">${String(c.day).padStart(2, '0')}</div>`;
-    let dotHTML = '', pnlHTML = '', countHTML = '', pairsHTML = '';
-    if (hasTrades) {
-      const dotColor = outcome === 'win' ? 'green' : outcome === 'loss' ? 'red' : 'blue';
-      dotHTML   = `<div class="cal-day-dot ${dotColor}"></div>`;
-      const usd = pnlToUSD(dayData.totalPnl, accSize);
-      pnlHTML   = `<div class="cal-day-pnl ${usd > 0 ? 'green' : usd < 0 ? 'red' : 'zero'}">${fmtUSD(usd)}</div>`;
-      countHTML = `<div class="cal-day-count">${dayData.trades.length} trade${dayData.trades.length > 1 ? 's' : ''}</div>`;
-      const pairs = [...new Set(dayData.trades.map(t => t.pair))].join(', ');
-      pairsHTML = `<div class="cal-day-pairs">${pairs}</div>`;
-    }
-    let clickAttr = '', hoverAttr = '';
-    if (c.current) {
-      if (hasTrades) {
-        clickAttr = `onclick="openCalPopup(event,'${dateStr}')"`;
-        hoverAttr = `onmouseenter="showCalTooltip(event,window._dayMap&&window._dayMap['${dateStr}'],'${dateStr}',${accSize})" onmouseleave="hideCalTooltip()"`;
-      } else {
-        clickAttr = `onclick="closeCalPopup();openModal({date:'${dateStr}'})"`;
-      }
-    }
-    return `<div class="${cls}" ${clickAttr} ${hoverAttr}>${dotHTML}${dayNumHTML}${pnlHTML}${countHTML}${pairsHTML}</div>`;
-  }).join('');
-  window._dayMap = dayMap;
-}
-
 
 // ── TRASH SYSTEM ──────────────────────────────────────
 let trashSettings = { autoDays: 30 };
@@ -5663,8 +5546,6 @@ function _refreshAll() {
   updateKPIs(); buildPairTable(); buildKillzoneTable(); buildStrategyTable(); buildMonthlyTable(); refreshPairFilter();
   buildSidebarYears(); renderCalendar(); renderTradeTable(trades); updateTrashBadge();
   buildAccounts();
-  // Also refresh the standalone calendar page if it's visible
-  if (document.getElementById('page-calendar')?.classList.contains('active')) renderCalendarSA();
 }
 
 // ── USER BAR (shows logged-in user + sign out button) ──
