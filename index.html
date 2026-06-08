@@ -2,11 +2,6 @@
 <html lang="en" data-theme="">
 <head>
 <meta charset="UTF-8">
-  <!-- Speed: preconnect to external resources -->
-  <link rel="preconnect" href="https://jlqgdwfbwdiieafhwisy.supabase.co" crossorigin>
-  <link rel="dns-prefetch" href="https://jlqgdwfbwdiieafhwisy.supabase.co">
-  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <meta name="description" content="NxTGen Trading Journal — Premium ICT Trading Dashboard with glassmorphism design">
 <meta name="theme-color" content="#080b12" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f1f5fb" media="(prefers-color-scheme: light)">
@@ -25,28 +20,6 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <!-- ── Boot splash — shown until Phase 3 render completes ── -->
-  <div id="boot-splash" style="
-    position:fixed;inset:0;z-index:9999;
-    background:var(--bg-base);
-    display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:20px;
-    transition:opacity 0.35s ease, visibility 0.35s ease;
-  ">
-    <img src="logo.svg" alt="NxTGen" style="width:64px;height:64px;opacity:.9;animation:splashPulse 1.4s ease-in-out infinite">
-    <div style="text-align:center">
-      <div style="font-family:'Inter',sans-serif;font-size:15px;font-weight:700;color:rgba(248,250,252,.9);margin-bottom:6px">NxTGen Trading Journal</div>
-      <div id="splash-status" style="font-family:'Inter',sans-serif;font-size:12px;color:rgba(148,163,184,.7)">Connecting…</div>
-    </div>
-    <div style="width:180px;height:3px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden">
-      <div id="splash-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#60a5fa,#34d399);border-radius:99px;transition:width 0.4s ease"></div>
-    </div>
-  </div>
-  <style>
-    @keyframes splashPulse{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
-  </style>
-
-
 
 <!-- ══ Background noise texture mesh ══ -->
 <div style="position:fixed;inset:0;pointer-events:none;z-index:0;
@@ -96,6 +69,7 @@
       <div class="sb-item" onclick="nav('tradelog',this,'Trade Log')"><span class="ico">☰</span><span class="lbl">Trade Log</span></div>
       <div class="sb-item" onclick="nav('watchlist',this,'Weekly Watchlist')"><span class="ico">📅</span><span class="lbl">Weekly Watchlist</span></div>
       <div class="sb-item" onclick="nav('accounts',this,'Account Tracker')"><span class="ico">💰</span><span class="lbl">Account Tracker</span></div>
+      <div class="sb-item" id="sb-calendar" onclick="nav('calendar',this,'Calendar')"><span class="ico">📅</span><span class="lbl">Calendar</span></div>
     </div>
     <div class="sb-sep"></div>
     <div id="sb-years"></div>
@@ -123,7 +97,6 @@
       <div class="tab" id="tab-tradelog" onclick="nav('tradelog',null,'Trade Log')">Trade Log</div>
       <div class="tab" id="tab-watchlist" onclick="nav('watchlist',null,'Watchlist')">Watchlist</div>
       <div class="tab" id="tab-accounts" onclick="nav('accounts',null,'Accounts')">Accounts</div>
-      <div class="tab" id="tab-calendar" onclick="nav('calendar',null,'Calendar')">📅 Calendar</div>
       <div class="tab" id="tab-trash" onclick="nav('trash',null,'Trash')">🗑 Trash</div>
     </div>
 
@@ -131,62 +104,110 @@
          DASHBOARD PAGE
     ═══════════════════════════════════════════════ -->
     <div class="page active" id="page-dashboard">
-      <div class="page-inner">
-        <div class="cover" id="dash-cover">
-          <div class="cover-label" id="dash-cover-period">QUARTERLY PERFORMANCE · 2026</div>
-          <div class="cover-title" id="dash-cover-title">Loading…</div>
-          <div class="cover-sub" id="dash-cover-sub"><span id="dash-cover-sub-text">Loading…</span> · <span id="dash-last-updated" style="opacity:.7">Loading...</span></div>
+      <div class="dash-layout">
+
+        <!-- ── LEFT COLUMN ── -->
+        <div class="dash-left">
+
+          <!-- Cover / quarter banner -->
+          <div class="cover" id="dash-cover">
+            <div class="cover-label" id="dash-cover-period">QUARTERLY PERFORMANCE · 2026</div>
+            <div class="cover-title" id="dash-cover-title">Loading…</div>
+            <div class="cover-sub" id="dash-cover-sub"><span id="dash-cover-sub-text">Loading…</span> · <span id="dash-last-updated" style="opacity:.7">Loading...</span></div>
+          </div>
+
+          <!-- KPI rows -->
+          <div class="kpi-grid">
+            <div class="kpi-card"><div class="kpi-label">Total trades</div><div class="kpi-value blue" id="kpi-total">—</div></div>
+            <div class="kpi-card"><div class="kpi-label">Win rate</div><div class="kpi-value green" id="kpi-wr">—</div></div>
+            <div class="kpi-card"><div class="kpi-label">Net PnL</div><div class="kpi-value green" id="kpi-pnl">—</div></div>
+            <div class="kpi-card"><div class="kpi-label">Profit factor</div><div class="kpi-value gold" id="kpi-pf">—</div></div>
+          </div>
+          <div class="kpi-grid" style="margin-bottom:16px">
+            <div class="kpi-card"><div class="kpi-label">Avg win</div><div class="kpi-value green" id="kpi-aw">—</div></div>
+            <div class="kpi-card"><div class="kpi-label">Avg loss</div><div class="kpi-value red" id="kpi-al">—</div></div>
+            <div class="kpi-card"><div class="kpi-label">Risk:reward</div><div class="kpi-value blue" id="kpi-rr">—</div></div>
+            <div class="kpi-card"><div class="kpi-label">Win streak</div><div class="kpi-value teal" id="kpi-ws">—</div></div>
+          </div>
+
+          <!-- Insight -->
+          <div class="insight">
+            <span class="insight-ico">💡</span>
+            <span class="insight-text" id="dash-insight-text">Analysing your data…</span>
+          </div>
+
+          <!-- Pair Performance -->
+          <div class="sec-head">Pair Performance</div>
+          <div class="data-table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Pair</th><th>Trades</th><th>Win%</th><th>Net PnL</th><th class="col-winbar">Win rate bar</th></tr></thead>
+              <tbody id="pair-table-body"></tbody>
+            </table>
+          </div>
+
+          <!-- Killzone -->
+          <div class="sec-head">Killzone Breakdown</div>
+          <div class="data-table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Session</th><th>Trades</th><th>Win%</th><th>Avg PnL</th><th>Grade</th></tr></thead>
+              <tbody id="kz-table-body"></tbody>
+            </table>
+          </div>
+
+          <!-- Strategy -->
+          <div class="sec-head">Strategy Performance</div>
+          <div class="data-table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Strategy</th><th>Trades</th><th>Win%</th><th>Avg PnL</th></tr></thead>
+              <tbody id="strategy-table-body"></tbody>
+            </table>
+          </div>
+
+          <!-- Monthly -->
+          <div class="sec-head">Monthly PnL</div>
+          <div class="data-table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Month</th><th>Trades</th><th>Win%</th><th>Net PnL</th><th>Streak</th><th>Grade</th></tr></thead>
+              <tbody id="monthly-table-body"></tbody>
+            </table>
+          </div>
         </div>
 
-        <div class="kpi-grid">
-          <div class="kpi-card"><div class="kpi-label">Total trades</div><div class="kpi-value blue" id="kpi-total">—</div></div>
-          <div class="kpi-card"><div class="kpi-label">Win rate</div><div class="kpi-value green" id="kpi-wr">—</div></div>
-          <div class="kpi-card"><div class="kpi-label">Net PnL</div><div class="kpi-value green" id="kpi-pnl">—</div></div>
-          <div class="kpi-card"><div class="kpi-label">Profit factor</div><div class="kpi-value gold" id="kpi-pf">—</div></div>
-        </div>
-        <div class="kpi-grid" style="margin-bottom:16px">
-          <div class="kpi-card"><div class="kpi-label">Avg win</div><div class="kpi-value green" id="kpi-aw">—</div></div>
-          <div class="kpi-card"><div class="kpi-label">Avg loss</div><div class="kpi-value red" id="kpi-al">—</div></div>
-          <div class="kpi-card"><div class="kpi-label">Risk:reward</div><div class="kpi-value blue" id="kpi-rr">—</div></div>
-          <div class="kpi-card"><div class="kpi-label">Win streak</div><div class="kpi-value teal" id="kpi-ws">—</div></div>
+        <!-- ── RIGHT COLUMN: inline calendar ── -->
+        <div class="dash-right">
+          <div class="dash-cal-panel">
+            <!-- Calendar header row -->
+            <div class="dash-cal-top">
+              <div class="dash-cal-title">📅 Trading Calendar</div>
+              <div class="dash-cal-controls">
+                <select class="form-select" id="cal-acc-filter" onchange="_onCalAccFilterChange()" style="font-size:11px;padding:4px 8px;height:28px">
+                  <option value="">All accounts</option>
+                </select>
+                <input type="number" class="acc-size-input" id="cal-acc-size" value="5000" oninput="renderCalendar()" title="Account size for USD calc" style="width:80px;font-size:11px;padding:4px 6px;height:28px">
+              </div>
+            </div>
+
+            <!-- Month nav -->
+            <div class="cal-header" style="padding:8px 0 8px">
+              <div class="cal-nav" onclick="calNav(-1)">‹</div>
+              <div class="cal-month-label" id="cal-month-label">Loading…</div>
+              <div class="cal-nav" onclick="calNav(1)">›</div>
+            </div>
+
+            <!-- KPI strip -->
+            <div class="cal-kpi-row" id="cal-kpi-row"></div>
+
+            <!-- Calendar grid -->
+            <div class="cal-grid-wrap">
+              <div class="cal-dow-row">
+                <div class="cal-dow">MON</div><div class="cal-dow">TUE</div><div class="cal-dow">WED</div>
+                <div class="cal-dow">THU</div><div class="cal-dow">FRI</div><div class="cal-dow">SAT</div><div class="cal-dow">SUN</div>
+              </div>
+              <div class="cal-days" id="cal-days"></div>
+            </div>
+          </div>
         </div>
 
-        <div class="insight">
-          <span class="insight-ico">💡</span>
-          <span class="insight-text" id="dash-insight-text">Analysing your data…</span>
-        </div>
-
-        <div class="sec-head">Pair Performance</div>
-        <div class="data-table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Pair</th><th>Trades</th><th>Win%</th><th>Net PnL</th><th class="col-winbar">Win rate bar</th></tr></thead>
-          <tbody id="pair-table-body"></tbody>
-        </table>
-        </div>
-
-        <div class="sec-head">Killzone Breakdown</div>
-        <div class="data-table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Session</th><th>Trades</th><th>Win%</th><th>Avg PnL</th><th>Grade</th></tr></thead>
-          <tbody id="kz-table-body"></tbody>
-        </table>
-        </div>
-
-        <div class="sec-head">Strategy Performance</div>
-        <div class="data-table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Strategy</th><th>Trades</th><th>Win%</th><th>Avg PnL</th></tr></thead>
-          <tbody id="strategy-table-body"></tbody>
-        </table>
-        </div>
-
-        <div class="sec-head">Monthly PnL</div>
-        <div class="data-table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Month</th><th>Trades</th><th>Win%</th><th>Net PnL</th><th>Streak</th><th>Grade</th></tr></thead>
-          <tbody id="monthly-table-body"></tbody>
-        </table>
-        </div>
       </div>
     </div>
 
@@ -490,27 +511,21 @@
       <div style="display:flex;flex-direction:column;height:100%;padding:16px 20px;overflow:hidden">
         <div class="acc-size-bar">
           <span class="acc-size-label">Account size for USD calc:</span>
-          <input type="number" class="acc-size-input" id="cal-acc-size" value="5000" oninput="renderCalendar()">
-          <span class="acc-size-hint">PnL % × account size = daily USD</span>
-          <div style="margin-left:auto;display:flex;gap:6px">
-            <select class="form-select" id="cal-acc-filter" onchange="_onCalAccFilterChange()" style="width:160px;font-size:12px">
-              <option value="">All active accounts</option>
-            </select>
-          </div>
+          <span class="acc-size-hint" style="color:var(--text2)">Adjust from Dashboard → Calendar panel</span>
         </div>
         <div class="cal-wrap">
           <div class="cal-header">
             <div class="cal-nav" onclick="calNav(-1)">‹</div>
-            <div class="cal-month-label" id="cal-month-label">May 2026</div>
+            <div class="cal-month-label" id="cal-month-label-2">May 2026</div>
             <div class="cal-nav" onclick="calNav(1)">›</div>
           </div>
-          <div class="cal-kpi-row" id="cal-kpi-row"></div>
+          <div class="cal-kpi-row" id="cal-kpi-row-2"></div>
           <div class="cal-grid-wrap">
             <div class="cal-dow-row">
               <div class="cal-dow">MON</div><div class="cal-dow">TUE</div><div class="cal-dow">WED</div>
               <div class="cal-dow">THU</div><div class="cal-dow">FRI</div><div class="cal-dow">SAT</div><div class="cal-dow">SUN</div>
             </div>
-            <div class="cal-days" id="cal-days"></div>
+            <div class="cal-days" id="cal-days-2"></div>
           </div>
         </div>
       </div>

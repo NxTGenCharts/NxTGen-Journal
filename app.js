@@ -12,14 +12,7 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const BASE_URL      = 'https://dabossmira.github.io/NxTGen-Journal';
 
 const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: false,
-  },
-  realtime: { params: { eventsPerSecond: 0 } },
-});
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
 // ── PnL formatting helper ─────────────────────────────────────────────────
 // Every trade has t.pnl (number) and t.pnlUnit ('$' or '%').
@@ -192,9 +185,8 @@ function _rowToDeleted(row) {
 async function loadTrades() {
   const { data, error } = await sb
     .from('journal_trades')
-    .select('id,trade_date,pair,pos,rr,pnl,pnl_unit,outcome,kz,strategy,tf,account,rating,risk,notes,pretrade,mistakes,emotion,checklist,charts,chart_labels,source,mt5_ticket,deleted_at')
+    .select('*')
     .eq('user_id', _currentUser.id)
-    .is('deleted_at', null)
     .order('trade_date', { ascending: false });
 
   if (error) {
@@ -229,7 +221,7 @@ async function loadTrades() {
 async function loadDeletedTrades() {
   const { data, error } = await sb
     .from('journal_deleted_trades')
-    .select('id,trade_date,pair,pos,rr,pnl,pnl_unit,outcome,kz,strategy,tf,account,rating,risk,notes,pretrade,mistakes,emotion,checklist,charts,chart_labels,source,mt5_ticket,original_id,deleted_at')
+    .select('*')
     .eq('user_id', _currentUser.id)
     .order('deleted_at', { ascending: false });
 
@@ -1733,6 +1725,7 @@ function nav(pageId, sbEl, label, extra) {
   renderCalendar();
   if (pageId === 'quarter' && extra) { renderQuarterPage(extra.year, extra.q); }
   if (pageId === 'calendar') { _refreshCalendarAccountFilter(); setTimeout(renderCalendar, 0); }
+  if (pageId === 'dashboard') { _refreshCalendarAccountFilter(); setTimeout(renderCalendar, 0); }
   if (pageId === 'trash') { setTimeout(renderTrash, 0); }
   if (pageId === 'monthly') { buildMonthlyReview(); }
   if (pageId === 'ai') { buildAI(); }
@@ -3935,7 +3928,7 @@ async function _accLoad() {
   if (!_currentUser) return;
   const { data, error } = await sb
     .from('journal_account_data')
-    .select('id,payouts,milestones,accounts')
+    .select('id, payouts, milestones, accounts')
     .eq('user_id', _currentUser.id)
     .maybeSingle();
   if (error) {
@@ -5148,8 +5141,11 @@ function hideCalTooltip() { const tip = document.getElementById('cal-tooltip'); 
 
 function renderCalendar() {
   const accSize = getAccSize(); const accFilter = getCalFilter();
+  // Update both the dashboard inline calendar label and the standalone calendar page label
+  ['cal-month-label','cal-month-label-2'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = MONTH_NAMES_LONG[calMonth] + ' ' + calYear;
+  });
   const label = document.getElementById('cal-month-label');
-  if (label) label.textContent = MONTH_NAMES_LONG[calMonth] + ' ' + calYear;
   const ym = calYear + '-' + String(calMonth + 1).padStart(2, '0');
   const monthTrades = trades.filter(t => t.date.startsWith(ym) && (!accFilter || t.account === accFilter));
   const dayMap = groupTradesByDay(monthTrades);
@@ -5161,15 +5157,19 @@ function renderCalendar() {
   let bestDay = null, worstDay = null;
   Object.entries(dayMap).forEach(([date, d]) => { if (!bestDay || d.totalPnl > dayMap[bestDay].totalPnl) bestDay = date; if (!worstDay || d.totalPnl < dayMap[worstDay].totalPnl) worstDay = date; });
   const kpiEl = document.getElementById('cal-kpi-row');
-  if (kpiEl) {
+  const kpiEl2 = document.getElementById('cal-kpi-row-2');
+  if (kpiEl || kpiEl2) {
     const dayName = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
     const bestUSD = bestDay ? pnlToUSD(dayMap[bestDay].totalPnl, accSize) : 0;
     const worstUSD = worstDay ? pnlToUSD(dayMap[worstDay].totalPnl, accSize) : 0;
     const wrColor = wr >= 70 ? 'green' : wr >= 50 ? 'white' : 'red';
-    kpiEl.innerHTML = `<div class="cal-kpi"><div class="cal-kpi-label">🗂 Trades</div><div class="cal-kpi-val white">${totalTrades}<span style="font-size:10px;color:var(--text3);font-family:var(--font-body);margin-left:5px">${tradingDays.length}d</span></div></div><div class="cal-kpi"><div class="cal-kpi-label">💰 P&L</div><div class="cal-kpi-val ${totalUSD >= 0 ? 'green' : 'red'}">${fmtUSD(totalUSD)}</div></div><div class="cal-kpi"><div class="cal-kpi-label">📈 Best${bestDay ? ' (' + dayName(bestDay) + ')' : ''}</div><div class="cal-kpi-val green">${bestDay ? fmtUSD(bestUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label">📉 Worst${worstDay ? ' (' + dayName(worstDay) + ')' : ''}</div><div class="cal-kpi-val ${worstUSD < 0 ? 'red' : 'green'}">${worstDay ? fmtUSD(worstUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label">🎯 Day Win Rate</div><div class="cal-kpi-val ${wrColor}">${wr}%</div><div style="font-size:9px;color:var(--text3);margin-top:3px;display:flex;gap:5px"><span style="color:var(--green)">▲${winDays}W</span><span style="color:var(--red)">▼${lossDays}L</span><span>⬤${beDays}BE</span></div></div>`;
+    const _kpiHtml = `<div class="cal-kpi"><div class="cal-kpi-label">🗂 Trades</div><div class="cal-kpi-val white">${totalTrades}<span style="font-size:10px;color:var(--text3);font-family:var(--font-body);margin-left:5px">${tradingDays.length}d</span></div></div><div class="cal-kpi"><div class="cal-kpi-label">💰 P&L</div><div class="cal-kpi-val ${totalUSD >= 0 ? 'green' : 'red'}">${fmtUSD(totalUSD)}</div></div><div class="cal-kpi"><div class="cal-kpi-label">📈 Best${bestDay ? ' (' + dayName(bestDay) + ')' : ''}</div><div class="cal-kpi-val green">${bestDay ? fmtUSD(bestUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label">📉 Worst${worstDay ? ' (' + dayName(worstDay) + ')' : ''}</div><div class="cal-kpi-val ${worstUSD < 0 ? 'red' : 'green'}">${worstDay ? fmtUSD(worstUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label">🎯 Day Win Rate</div><div class="cal-kpi-val ${wrColor}">${wr}%</div><div style="font-size:9px;color:var(--text3);margin-top:3px;display:flex;gap:5px"><span style="color:var(--green)">▲${winDays}W</span><span style="color:var(--red)">▼${lossDays}L</span><span>⬤${beDays}BE</span></div></div>`;
+    if (kpiEl) kpiEl.innerHTML = _kpiHtml;
+    if (kpiEl2) kpiEl2.innerHTML = _kpiHtml;
   }
   const daysEl = document.getElementById('cal-days');
-  if (!daysEl) return;
+  const daysEl2 = document.getElementById('cal-days-2');
+  if (!daysEl && !daysEl2) return;
   const firstDay = new Date(calYear, calMonth, 1);
   let startDow = firstDay.getDay() - 1; if (startDow < 0) startDow = 6;
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
@@ -5180,7 +5180,8 @@ function renderCalendar() {
   for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, month: calMonth + 1, year: calYear, current: true });
   let nextD = 1;
   while (cells.length < 42) { const nextMonth = calMonth === 11 ? 1 : calMonth + 2; const nextYear = calMonth === 11 ? calYear + 1 : calYear; cells.push({ day: nextD++, month: nextMonth, year: nextYear, current: false }); }
-  daysEl.innerHTML = cells.map(c => {
+  const _calDaysHTML_fn = (daysEl_target) => { if (!daysEl_target) return;
+  daysEl_target.innerHTML = cells.map(c => {
     const dateStr = c.year + '-' + String(c.month).padStart(2, '0') + '-' + String(c.day).padStart(2, '0');
     const isToday = dateStr === today; const dayData = dayMap[dateStr]; const hasTrades = !!dayData;
     const outcome = hasTrades ? calculateDailyOutcome(dayData.totalPnl) : null;
@@ -5192,7 +5193,8 @@ function renderCalendar() {
     let clickAttr = '', hoverAttr = '';
     if (c.current) { if (hasTrades) { clickAttr = `onclick="openCalPopup(event,'${dateStr}')"`;  hoverAttr = `onmouseenter="showCalTooltip(event,window._dayMap&&window._dayMap['${dateStr}'],'${dateStr}',${accSize})" onmouseleave="hideCalTooltip()"`; } else { clickAttr = `onclick="closeCalPopup();openModal({date:'${dateStr}'})"` ; } }
     return `<div class="${cls}" ${clickAttr} ${hoverAttr}>${dotHTML}${dayNumHTML}${pnlHTML}${countHTML}${pairsHTML}</div>`;
-  }).join('');
+  }).join(''); };
+  _calDaysHTML_fn(daysEl); _calDaysHTML_fn(daysEl2);
   window._dayMap = dayMap;
 }
 
@@ -5558,79 +5560,66 @@ function _injectUserBar(user) {
 // ══════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async function () {
 
-  // ── Helper: update splash UI ─────────────────────────────
-  const _splash = document.getElementById('boot-splash');
-  const _splashBar = document.getElementById('splash-bar');
-  const _splashStatus = document.getElementById('splash-status');
-  const _setSplash = (pct, msg) => {
-    if (_splashBar) _splashBar.style.width = pct + '%';
-    if (_splashStatus) _splashStatus.textContent = msg;
-  };
-  const _hideSplash = () => {
-    if (!_splash) return;
-    _splash.style.opacity = '0';
-    _splash.style.visibility = 'hidden';
-    setTimeout(() => { if (_splash) _splash.remove(); }, 380);
-  };
-
-  // ── PHASE 0: Instant setup (no network) ──────────────────
+  // 1. Theme first (prevents flash)
   loadTheme();
-  updateClock();
-  setInterval(updateClock, 1000);
-  _setSplash(10, 'Connecting…');
 
-  // ── PHASE 1: Auth check ───────────────────────────────────
+  // 2. Auth guard — redirect to login if not signed in
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) { window.location.replace('./login.html'); return; }
+  if (!session) {
+    window.location.replace('./login.html');
+    return;
+  }
   _currentUser = session.user;
+
+  // 3. Inject user bar + sign out
   _injectUserBar(_currentUser);
-  _injectTopbarAvatar();
-  _setSplash(25, 'Authenticated — loading trades…');
+
+  // 4. Also sign out if another tab signs out
   sb.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') window.location.replace('./login.html');
   });
 
-  // ── PHASE 2: Critical data only (trades + accounts) ──────
+  // 5. Load data from Supabase - parallel for speed
   loadTrashSettings();
   await Promise.all([
     loadTrades(),
     loadDeletedTrades(),
+    _wlLoad(),
+    _goalsLoad(),
+    _pbLoad(),
     _accLoad(),
+    _profileLoad(),
   ]);
   await runAutoCleanup();
-  _setSplash(75, 'Rendering dashboard…');
 
-  // ── PHASE 3: First paint — dashboard visible immediately ──
+  // 6. Render all UI
   updateKPIs();
   buildPairTable();
   buildKillzoneTable();
   buildStrategyTable();
   buildMonthlyTable();
   buildSidebarYears();
+  // Auto-highlight current quarter in sidebar on first load
+  const _bootYear = new Date().getFullYear();
+  const _bootQ    = getQuarter(new Date().toISOString().slice(0, 10));
+  const _bootSbEl = document.getElementById(`sb-q-${_bootYear}-${_bootQ}`);
+  if (_bootSbEl) _bootSbEl.classList.add('active');
   refreshPairFilter();
   updateTrashBadge();
+  buildWatchlist();
   buildAccounts();
+  _mt5ResumeAllPolling();
+  buildPlaybook();
+  buildGoals();
+  buildMonthlyReview();
   renderTradeTable(trades);
   _refreshCalendarAccountFilter();
   renderCalendar();
-  // Auto-highlight current quarter in sidebar
-  const _bootYear = new Date().getFullYear();
-  const _bootQ    = getQuarter(new Date().toISOString().slice(0, 10));
-  const _bootSbEl = document.getElementById(\`sb-q-\${_bootYear}-\${_bootQ}\`);
-  if (_bootSbEl) _bootSbEl.classList.add('active');
-  _setSplash(100, 'Done');
+  _injectTopbarAvatar();
 
-  // ── PHASE 3b: Remove splash — dashboard is now visible ───
-  _hideSplash();
-
-  // ── PHASE 4: Background loads — non-blocking ─────────────
-  _wlLoad().then(() => buildWatchlist());
-  _goalsLoad().then(() => buildGoals());
-  _pbLoad().then(() => buildPlaybook());
-  _profileLoad();
-  if (typeof _monthlyLoad === 'function') _monthlyLoad().then(() => buildMonthlyReview());
-  else buildMonthlyReview();
-  _mt5ResumeAllPolling();
+  // 7. Live clock
+  updateClock();
+  setInterval(updateClock, 1000);
 });
 
 // ── CUSTOM ACCOUNTS — Cloud-synced via journal_account_data ──────────────
