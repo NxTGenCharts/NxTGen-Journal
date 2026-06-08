@@ -1722,9 +1722,12 @@ function nav(pageId, sbEl, label, extra) {
   if (sbEl) sbEl.classList.add('active');
   document.getElementById('topbar-page').textContent = label;
   if (pageId === 'tradelog') renderTradeTable(trades);
+  // Dashboard always has inline calendar — refresh it on every nav
   renderCalendar();
   if (pageId === 'quarter' && extra) { renderQuarterPage(extra.year, extra.q); }
-  if (pageId === 'calendar') { _refreshCalendarAccountFilter(); setTimeout(renderCalendar, 0); }
+  // Standalone calendar page — uses its own separate IDs
+  if (pageId === 'calendar') { _refreshCalendarSAFilter(); setTimeout(renderCalendarSA, 0); }
+  if (pageId === 'dashboard') { _refreshCalendarAccountFilter(); }
   if (pageId === 'trash') { setTimeout(renderTrash, 0); }
   if (pageId === 'monthly') { buildMonthlyReview(); }
   if (pageId === 'ai') { buildAI(); }
@@ -4074,656 +4077,112 @@ function accShowDetail(name) {
 
   const acc     = _getCustomAccounts().find(a => a.name === name) || {};
   const accSize = parseFloat(acc.size) || 0;
-  const pnlMode = acc.pnlMode || '$';
+  const pnlMode = acc.pnlMode || '%';
 
-  const at    = trades.filter(t => t.account === name).sort((a,b) => a.date.localeCompare(b.date));
-  const atRev = [...at].reverse();
+  const at     = trades.filter(t => t.account === name).sort((a,b) => b.date.localeCompare(a.date));
   const wins   = at.filter(t => t.outcome === 'Win');
   const losses = at.filter(t => t.outcome === 'Loss');
-  const bes    = at.filter(t => t.outcome === 'BE');
   const wr     = at.length ? ((wins.length / at.length) * 100).toFixed(1) : 0;
 
-  const sumD = arr => arr.reduce((s,t) => s + toPnlDollars(t, accSize), 0);
-  const pnlArr = at.map(t => toPnlDollars(t, accSize));
+  // Always sum in $ first using each trade's own pnlUnit, then display per pnlMode
+  const sumDollars = (arr) => arr.reduce((s, t) => s + toPnlDollars(t, accSize), 0);
 
-  const fmtV = (d) => {
-    if (d === null || d === undefined) return '—';
-    const v = parseFloat(d) || 0;
-    if (pnlMode === '$') return (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2);
-    if (accSize > 0) { const p = (v / accSize) * 100; return (p >= 0 ? '+' : '') + p.toFixed(2) + '%'; }
-    return (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2);
+  const fmtVal = (dollars) => {
+    if (dollars === null || dollars === undefined) return '—';
+    const d = parseFloat(dollars) || 0;
+    if (pnlMode === '$') {
+      return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2);
+    }
+    // pnlMode '%' — convert dollars → % using account size
+    if (accSize > 0) {
+      const pct = (d / accSize) * 100;
+      return (pct >= 0 ? '+' : '') + pct.toFixed(3) + '%';
+    }
+    // No account size — fall back to $ display
+    return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2);
   };
 
-  const netD    = sumD(at);
-  const avgW    = wins.length   ? sumD(wins)   / wins.length   : null;
-  const avgL    = losses.length ? sumD(losses) / losses.length : null;
-  const grossW  = sumD(wins);
-  const grossL  = Math.abs(sumD(losses));
-  const pf      = grossL > 0 ? (grossW / grossL).toFixed(2) : wins.length ? '∞' : '0.00';
-
-  // Max drawdown
-  let peak = 0, dd = 0, cum = 0;
-  pnlArr.forEach(p => { cum += p; if (cum > peak) peak = cum; if (peak - cum > dd) dd = peak - cum; });
-  const maxDD = dd;
-
-  // Streaks
-  let curW = 0, curL = 0, maxW = 0, maxL = 0;
-  at.forEach(t => {
-    if (t.outcome === 'Win')  { curW++; curL = 0; maxW = Math.max(maxW, curW); }
-    else if (t.outcome === 'Loss') { curL++; curW = 0; maxL = Math.max(maxL, curL); }
-    else { curW = 0; curL = 0; }
-  });
-
-  const rrVals = at.map(t => parseFloat(t.rr)).filter(v => !isNaN(v) && v > 0);
-  const avgRR  = rrVals.length ? (rrVals.reduce((a,b)=>a+b,0)/rrVals.length).toFixed(2) : null;
-  const best   = pnlArr.length ? Math.max(...pnlArr) : 0;
-  const worst  = pnlArr.length ? Math.min(...pnlArr) : 0;
-  const expectancy = at.length
-    ? ((wins.length/at.length)*(avgW||0) + (losses.length/at.length)*(avgL||0)).toFixed(2)
-    : 0;
-  const consistency = at.length > 1
-    ? Math.max(0, 100 - (Math.sqrt(pnlArr.reduce((s,v,_,a)=>s+Math.pow(v-(a.reduce((x,y)=>x+y,0)/a.length),2),0)/pnlArr.length) / (Math.abs(netD/at.length)||1) * 10)).toFixed(0)
-    : 0;
+  const netDollars = sumDollars(at);
+  const avgWDollars = wins.length   ? sumDollars(wins)   / wins.length   : null;
+  const avgLDollars = losses.length ? sumDollars(losses) / losses.length : null;
+  const grossW      = sumDollars(wins);
+  const grossL      = Math.abs(sumDollars(losses));
+  const pf          = grossL > 0 ? (grossW / grossL).toFixed(2) : '∞';
 
   title.textContent = name;
-  const sizeNote = accSize > 0 ? `$${accSize.toLocaleString()}` : `<span style="color:var(--gold)">⚠ No size</span>`;
+  const sizeNote = accSize > 0
+    ? `$${accSize.toLocaleString()}`
+    : `<span style="color:var(--gold)" title="Set size in Manage Accounts">⚠ No size set</span>`;
 
   body.innerHTML = `
-    <!-- Top bar -->
-    <div class="asa-topbar">
-      <span class="asa-size-badge">${sizeNote}</span>
-      <div class="asa-mode-toggle">
-        <button class="asa-mode-btn ${pnlMode==='$'?'active':''}" onclick="_accDetailSetMode('${name.replace(/'/g,"\\'")}','$')">$ USD</button>
-        <button class="asa-mode-btn ${pnlMode==='%'?'active':''}" onclick="_accDetailSetMode('${name.replace(/'/g,"\\'")}','%')">% PCT</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <span style="font-size:11px;color:var(--text3)">
+        Account: <strong style="color:var(--text)">${sizeNote}</strong>
+      </span>
+      <div style="display:flex;gap:0;border:1px solid var(--glass-border);border-radius:6px;overflow:hidden">
+        <button onclick="_accDetailSetMode('${name}','\$')"
+          style="padding:4px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;
+          background:${pnlMode==='$'?'var(--blue)':'var(--glass-1)'};
+          color:${pnlMode==='$'?'#fff':'var(--text3)'};font-family:var(--font-body)">$ USD</button>
+        <button onclick="_accDetailSetMode('${name}','%')"
+          style="padding:4px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;
+          background:${pnlMode==='%'?'var(--blue)':'var(--glass-1)'};
+          color:${pnlMode==='%'?'#fff':'var(--text3)'};font-family:var(--font-body)">% PCT</button>
       </div>
     </div>
-
-    <!-- Tab nav -->
-    <div class="asa-tabs" id="asa-tabs-${name.replace(/\W/g,'_')}">
-      <button class="asa-tab active" data-tab="overview" onclick="_asaTab(this,'${name.replace(/'/g,"\\'")}')">📊 Overview</button>
-      <button class="asa-tab" data-tab="charts"   onclick="_asaTab(this,'${name.replace(/'/g,"\\'")}')">📈 Charts</button>
-      <button class="asa-tab" data-tab="breakdown" onclick="_asaTab(this,'${name.replace(/'/g,"\\'")}')">🔍 Breakdown</button>
-      <button class="asa-tab" data-tab="trades"   onclick="_asaTab(this,'${name.replace(/'/g,"\\'")}')">📋 Trades</button>
+    <div class="acc-detail-stats">
+      <div class="acc-ds"><div class="acc-ds-label">Trades</div><div class="acc-ds-val blue">${at.length}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Win Rate</div><div class="acc-ds-val ${parseFloat(wr)>=60?'green':'red'}">${wr}%</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Net PnL</div><div class="acc-ds-val ${netDollars>=0?'green':'red'}">${fmtVal(netDollars)}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Avg Win</div><div class="acc-ds-val green">${fmtVal(avgWDollars)}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Avg Loss</div><div class="acc-ds-val red">${fmtVal(avgLDollars)}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Profit Factor</div><div class="acc-ds-val gold">${pf}x</div></div>
     </div>
-
-    <!-- OVERVIEW TAB -->
-    <div class="asa-panel" id="asa-panel-overview">
-      ${at.length === 0 ? '<div class="asa-empty">No trades yet — start trading to unlock analytics.</div>' : `
-      <!-- Primary KPIs -->
-      <div class="asa-kpi-grid">
-        <div class="asa-kpi asa-kpi-blue">
-          <div class="asa-kpi-icon">🔢</div>
-          <div class="asa-kpi-val blue">${at.length}</div>
-          <div class="asa-kpi-lbl">Total Trades</div>
-        </div>
-        <div class="asa-kpi asa-kpi-${parseFloat(wr)>=60?'green':'red'}">
-          <div class="asa-kpi-icon">🎯</div>
-          <div class="asa-kpi-val ${parseFloat(wr)>=60?'green':'red'}">${wr}%</div>
-          <div class="asa-kpi-lbl">Win Rate</div>
-        </div>
-        <div class="asa-kpi asa-kpi-${netD>=0?'green':'red'}">
-          <div class="asa-kpi-icon">${netD>=0?'📈':'📉'}</div>
-          <div class="asa-kpi-val ${netD>=0?'green':'red'}">${fmtV(netD)}</div>
-          <div class="asa-kpi-lbl">Net PnL</div>
-        </div>
-        <div class="asa-kpi asa-kpi-gold">
-          <div class="asa-kpi-icon">⚖️</div>
-          <div class="asa-kpi-val gold">${pf}x</div>
-          <div class="asa-kpi-lbl">Profit Factor</div>
-        </div>
-        <div class="asa-kpi asa-kpi-green">
-          <div class="asa-kpi-icon">✅</div>
-          <div class="asa-kpi-val green">${fmtV(avgW)}</div>
-          <div class="asa-kpi-lbl">Avg Win</div>
-        </div>
-        <div class="asa-kpi asa-kpi-red">
-          <div class="asa-kpi-icon">❌</div>
-          <div class="asa-kpi-val red">${fmtV(avgL)}</div>
-          <div class="asa-kpi-lbl">Avg Loss</div>
-        </div>
-      </div>
-      <!-- Secondary metrics strip -->
-      <div class="asa-metrics-strip">
-        <div class="asa-metric">
-          <span class="asa-metric-lbl">Max Drawdown</span>
-          <span class="asa-metric-val red">${fmtV(-maxDD)}</span>
-        </div>
-        <div class="asa-metric-sep"></div>
-        <div class="asa-metric">
-          <span class="asa-metric-lbl">Best Trade</span>
-          <span class="asa-metric-val green">${fmtV(best)}</span>
-        </div>
-        <div class="asa-metric-sep"></div>
-        <div class="asa-metric">
-          <span class="asa-metric-lbl">Worst Trade</span>
-          <span class="asa-metric-val red">${fmtV(worst)}</span>
-        </div>
-        <div class="asa-metric-sep"></div>
-        <div class="asa-metric">
-          <span class="asa-metric-lbl">Avg R:R</span>
-          <span class="asa-metric-val gold">${avgRR ? avgRR+'R' : '—'}</span>
-        </div>
-        <div class="asa-metric-sep"></div>
-        <div class="asa-metric">
-          <span class="asa-metric-lbl">Expectancy</span>
-          <span class="asa-metric-val ${parseFloat(expectancy)>=0?'green':'red'}">${fmtV(parseFloat(expectancy))}</span>
-        </div>
-        <div class="asa-metric-sep"></div>
-        <div class="asa-metric">
-          <span class="asa-metric-lbl">Win Streak</span>
-          <span class="asa-metric-val green">${maxW}W</span>
-        </div>
-        <div class="asa-metric-sep"></div>
-        <div class="asa-metric">
-          <span class="asa-metric-lbl">Loss Streak</span>
-          <span class="asa-metric-val red">${maxL}L</span>
-        </div>
-        <div class="asa-metric-sep"></div>
-        <div class="asa-metric">
-          <span class="asa-metric-lbl">Consistency</span>
-          <span class="asa-metric-val ${parseInt(consistency)>=65?'green':parseInt(consistency)>=40?'gold':'red'}">${consistency}%</span>
-        </div>
-      </div>
-      <!-- Mini equity + outcome donut side by side -->
-      <div class="asa-overview-charts">
-        <div class="asa-glass-card asa-chart-wide">
-          <div class="asa-chart-title">Equity Curve</div>
-          <canvas id="asa-eq-mini" height="90"></canvas>
-        </div>
-        <div class="asa-glass-card">
-          <div class="asa-chart-title">Outcome</div>
-          <canvas id="asa-donut-mini" height="90"></canvas>
-          <div class="asa-donut-legend">
-            <span style="color:var(--green)">●</span> ${wins.length}W
-            <span style="color:var(--red)">●</span> ${losses.length}L
-            ${bes.length ? `<span style="color:var(--gold)">●</span> ${bes.length}BE` : ''}
-          </div>
-        </div>
-      </div>
-      `}
-    </div>
-
-    <!-- CHARTS TAB -->
-    <div class="asa-panel" id="asa-panel-charts" style="display:none">
-      ${at.length === 0 ? '<div class="asa-empty">No trades to chart yet.</div>' : `
-      <div class="asa-charts-grid">
-        <div class="asa-glass-card asa-chart-full">
-          <div class="asa-chart-title">📈 Cumulative Equity Curve <span class="asa-chart-badge">${at.length} trades</span></div>
-          <div class="asa-chart-subtitle">Hover over any point to see trade details</div>
-          <canvas id="asa-equity" height="160"></canvas>
-        </div>
-        <div class="asa-glass-card">
-          <div class="asa-chart-title">📊 Trade PnL Distribution</div>
-          <div class="asa-chart-subtitle">Each bar = one trade</div>
-          <canvas id="asa-dist" height="130"></canvas>
-        </div>
-        <div class="asa-glass-card">
-          <div class="asa-chart-title">🔥 Running Win Rate</div>
-          <div class="asa-chart-subtitle">Win rate evolution over trades</div>
-          <canvas id="asa-wr" height="130"></canvas>
-        </div>
-        <div class="asa-glass-card">
-          <div class="asa-chart-title">⚖️ R:R Per Trade</div>
-          <div class="asa-chart-subtitle">Scatter — risk:reward each trade</div>
-          <canvas id="asa-rr" height="130"></canvas>
-        </div>
-        <div class="asa-glass-card">
-          <div class="asa-chart-title">📅 Day of Week PnL</div>
-          <div class="asa-chart-subtitle">Total PnL + trade count per day</div>
-          <canvas id="asa-dow" height="130"></canvas>
-        </div>
-      </div>
-      `}
-    </div>
-
-    <!-- BREAKDOWN TAB -->
-    <div class="asa-panel" id="asa-panel-breakdown" style="display:none">
-      ${at.length === 0 ? '<div class="asa-empty">No trades to break down yet.</div>' : `
-      <div class="asa-charts-grid">
-        <div class="asa-glass-card">
-          <div class="asa-chart-title">💱 PnL by Pair</div>
-          <div class="asa-chart-subtitle">Net PnL per instrument</div>
-          <canvas id="asa-pairs" height="160"></canvas>
-        </div>
-        <div class="asa-glass-card">
-          <div class="asa-chart-title">🧠 PnL by Strategy</div>
-          <div class="asa-chart-subtitle">Which setups print?</div>
-          <canvas id="asa-strat" height="160"></canvas>
-        </div>
-        <div class="asa-glass-card">
-          <div class="asa-chart-title">⏰ PnL by Killzone</div>
-          <div class="asa-chart-subtitle">Session performance</div>
-          <canvas id="asa-kz" height="160"></canvas>
-        </div>
-        <div class="asa-glass-card">
-          <div class="asa-chart-title">😌 PnL by Emotion</div>
-          <div class="asa-chart-subtitle">Mind state vs results</div>
-          <canvas id="asa-emo" height="160"></canvas>
-        </div>
-        <div class="asa-glass-card">
-          <div class="asa-chart-title">⭐ PnL by Rating</div>
-          <div class="asa-chart-subtitle">Setup quality scoring</div>
-          <canvas id="asa-rating" height="160"></canvas>
-        </div>
-        <div class="asa-glass-card">
-          <div class="asa-chart-title">📐 Win/Loss by Position</div>
-          <div class="asa-chart-subtitle">Buy vs Sell accuracy</div>
-          <canvas id="asa-pos" height="160"></canvas>
-        </div>
-      </div>
-      `}
-    </div>
-
-    <!-- TRADES TAB -->
-    <div class="asa-panel" id="asa-panel-trades" style="display:none">
-      ${atRev.length === 0
-        ? '<div class="asa-empty">No trades logged under this account yet.</div>'
-        : `<div class="asa-trades-header">
-            <span class="asa-trades-count">${at.length} trades</span>
-            <span style="font-size:10px;color:var(--text3)">Click any row to view · hover for actions</span>
-          </div>
-          <div style="overflow-x:auto">
+    ${at.length === 0
+      ? '<div style="color:var(--text3);text-align:center;padding:30px;font-style:italic">No trades logged under this account yet.</div>'
+      : `<div class="data-table-wrap" style="overflow-x:auto">
           <table class="data-table" style="width:100%">
-            <thead><tr><th>Date</th><th>Pair</th><th>Pos</th><th>Outcome</th><th>P/L</th><th>R:R</th><th>Strategy</th><th>Killzone</th><th></th></tr></thead>
-            <tbody>${atRev.map(t => {
-              const td = toPnlDollars(t, accSize);
-              const pC = td>=0?'outcome-win':'outcome-loss';
-              const oC = t.outcome==='Win'?'outcome-win':t.outcome==='Loss'?'outcome-loss':'outcome-be';
-              return `<tr class="acc-trade-row" onclick="openDetail(${t.id})"
-                onmouseenter="this.querySelector('.acc-tr-actions').style.opacity='1'"
-                onmouseleave="this.querySelector('.acc-tr-actions').style.opacity='0'">
-                <td class="mono" style="color:var(--text2)">${t.date}</td>
-                <td class="bold">${t.pair}</td>
-                <td><span class="${t.pos==='Buy'?'pos-buy':'pos-sell'}">${t.pos}</span></td>
-                <td class="${oC}">${t.outcome}</td>
-                <td class="${pC} mono">${fmtV(td)}</td>
-                <td class="mono">${t.rr||'—'}</td>
-                <td style="font-size:11px;color:var(--text2)">${t.strategy||'—'}</td>
-                <td style="font-size:11px;color:var(--text3)">${t.kz||'—'}</td>
-                <td class="acc-tr-actions" style="opacity:0;transition:opacity .15s;white-space:nowrap">
-                  <button onclick="event.stopPropagation();openDetail(${t.id},true)"
-                    style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;margin-right:3px">✏️</button>
-                  <button onclick="event.stopPropagation();quickDelete(${t.id},'${name.replace(/'/g,"\\'")}')"
-                    style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer">🗑</button>
-                </td>
-              </tr>`;
-            }).join('')}</tbody>
-          </table></div>`}
-    </div>
+            <thead>
+              <tr>
+                <th>Date</th><th>Pair</th><th>Pos</th><th>Outcome</th>
+                <th>P/L</th><th>R:R</th><th>Strategy</th><th style="width:72px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${at.map(t => {
+                const _td     = toPnlDollars(t, accSize);
+                const pnlColor = _td >= 0 ? 'outcome-win' : 'outcome-loss';
+                const pnlDisp  = fmtVal(_td);
+                const outClass = t.outcome==='Win'?'outcome-win':t.outcome==='Loss'?'outcome-loss':'outcome-be';
+                const posClass = t.pos==='Buy'?'pos-buy':'pos-sell';
+                return `
+                <tr class="acc-trade-row" onclick="openDetail(${t.id})" title="Click to view / edit trade"
+                    onmouseenter="this.querySelector('.acc-tr-actions').style.opacity='1'"
+                    onmouseleave="this.querySelector('.acc-tr-actions').style.opacity='0'">
+                  <td class="mono" style="color:var(--text2)">${t.date}</td>
+                  <td class="bold">${t.pair}</td>
+                  <td><span class="${posClass}">${t.pos}</span></td>
+                  <td class="${outClass}">${t.outcome}</td>
+                  <td class="${pnlColor} mono">${pnlDisp}</td>
+                  <td class="mono">${t.rr||'—'}</td>
+                  <td style="color:var(--text2);font-size:11px">${t.strategy||'—'}</td>
+                  <td class="acc-tr-actions" style="opacity:0;transition:opacity .15s;white-space:nowrap;text-align:right">
+                    <button onclick="event.stopPropagation();openDetail(${t.id},true)"
+                      style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;margin-right:3px">✏️</button>
+                    <button onclick="event.stopPropagation();quickDelete(${t.id});accShowDetail('${name.replace(/'/g, "\'")}')"
+                      style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer">🗑</button>
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`}
   `;
 
   drawer.style.display = '';
-  requestAnimationFrame(() => {
-    drawer.classList.add('open');
-    if (at.length > 0) {
-      setTimeout(() => _asaDrawAll(at, accSize, pnlMode, name, 'overview'), 80);
-    }
-  });
+  requestAnimationFrame(() => drawer.classList.add('open'));
   drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
-
-/* ─── Tab switcher ─────────────────────────────────────── */
-function _asaTab(btn, name) {
-  const panel = btn.dataset.tab;
-  btn.closest('.asa-tabs').querySelectorAll('.asa-tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  ['overview','charts','breakdown','trades'].forEach(p => {
-    const el = document.getElementById('asa-panel-' + p);
-    if (el) el.style.display = p === panel ? '' : 'none';
-  });
-  const acc     = _getCustomAccounts().find(a => a.name === name) || {};
-  const accSize = parseFloat(acc.size) || 0;
-  const pnlMode = acc.pnlMode || '$';
-  const at      = trades.filter(t => t.account === name).sort((a,b) => a.date.localeCompare(b.date));
-  if (at.length > 0) setTimeout(() => _asaDrawAll(at, accSize, pnlMode, name, panel), 40);
-}
-
-/* ─── Master chart renderer ────────────────────────────── */
-function _asaDrawAll(at, accSize, pnlMode, name, activeTab) {
-  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-  const G  = { GREEN: isDark?'#34d399':'#059669', RED: isDark?'#f87171':'#dc2626',
-               BLUE: isDark?'#60a5fa':'#2563eb', GOLD: isDark?'#fbbf24':'#b45309',
-               TEAL: isDark?'#2dd4bf':'#0d9488', PURPLE: isDark?'#a78bfa':'#6d28d9',
-               PINK: isDark?'#f472b6':'#db2777',
-               TEXT: isDark?'rgba(148,163,184,0.7)':'rgba(51,65,85,0.75)',
-               GRID: isDark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)',
-               BG:   isDark?'#080b12':'#f1f5fb' };
-  const pnlArr = at.map(t => toPnlDollars(t, accSize));
-  const fmtV = d => {
-    const v = parseFloat(d)||0;
-    if (pnlMode==='$') return (v>=0?'+$':'-$')+Math.abs(v).toFixed(2);
-    if (accSize>0) { const p=(v/accSize)*100; return (p>=0?'+':'')+p.toFixed(2)+'%'; }
-    return (v>=0?'+$':'-$')+Math.abs(v).toFixed(2);
-  };
-
-  // ── helpers ──────────────────────────────────────────────
-  function cvSetup(id) {
-    const cv = document.getElementById(id); if (!cv) return null;
-    cv.width = cv.parentElement.clientWidth || 400;
-    cv.getContext('2d').clearRect(0,0,cv.width,cv.height);
-    return cv;
-  }
-  function drawLine(ctx, pts, col, lw, fill, fillCol) {
-    if (pts.length < 2) return;
-    if (fill) {
-      ctx.beginPath(); pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
-      ctx.lineTo(pts[pts.length-1][0], ctx.canvas.height);
-      ctx.lineTo(pts[0][0], ctx.canvas.height); ctx.closePath();
-      ctx.fillStyle = fillCol; ctx.fill();
-    }
-    ctx.beginPath(); pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
-    ctx.strokeStyle=col; ctx.lineWidth=lw; ctx.lineJoin='round'; ctx.stroke();
-  }
-  function hBar(ctx,x,y,w,h,r,fill,stroke) {
-    if (w===0) return;
-    ctx.beginPath(); ctx.roundRect(x,y,w,Math.max(h,1),r);
-    if (fill) { ctx.fillStyle=fill; ctx.fill(); }
-    if (stroke) { ctx.strokeStyle=stroke; ctx.lineWidth=1; ctx.stroke(); }
-  }
-  function vBar(ctx,x,y,w,h,r,fill,stroke) {
-    if (h===0) return;
-    ctx.beginPath(); ctx.roundRect(x,y,w,Math.max(h,1),r);
-    if (fill) { ctx.fillStyle=fill; ctx.fill(); }
-    if (stroke) { ctx.strokeStyle=stroke; ctx.lineWidth=1; ctx.stroke(); }
-  }
-  function yAxis(ctx,W,H,min,max,pL,pT,pB,cnt=4) {
-    ctx.font='9px Inter,sans-serif'; ctx.textAlign='right'; ctx.fillStyle=G.TEXT; ctx.textBaseline='middle';
-    for (let i=0;i<=cnt;i++) {
-      const v = min + (max-min)*(i/cnt);
-      const y = pT+(H-pT-pB)*(1-i/cnt);
-      ctx.fillText(fmtV(v), pL-4, y);
-      ctx.strokeStyle=G.GRID; ctx.lineWidth=0.5; ctx.setLineDash([2,4]);
-      ctx.beginPath(); ctx.moveTo(pL,y); ctx.lineTo(W,y); ctx.stroke(); ctx.setLineDash([]);
-    }
-  }
-  function hoverDots(cv, pts, labels) {
-    cv.onmousemove = e => {
-      const r = cv.getBoundingClientRect();
-      const mx = (e.clientX-r.left)*(cv.width/r.width);
-      let ni=0, md=Infinity;
-      pts.forEach(([x],i)=>{ const d=Math.abs(x-mx); if(d<md){md=d;ni=i;} });
-      cv.title = md < 40 ? (labels[ni]||'') : '';
-    };
-    cv.onmouseleave = () => { cv.title = ''; };
-  }
-
-  // ══════════ OVERVIEW MINI CHARTS ══════════════════════════
-  if (activeTab === 'overview') {
-    // Mini equity
-    const cvEqM = cvSetup('asa-eq-mini');
-    if (cvEqM) {
-      const ctx = cvEqM.getContext('2d'); const W=cvEqM.width, H=cvEqM.height;
-      let cum=0; const eq=[0,...pnlArr.map(p=>{cum+=p;return cum;})];
-      const mn=Math.min(...eq), mx=Math.max(...eq), rng=mx-mn||1;
-      const pL=8,pR=8,pT=8,pB=8;
-      const toX=i=>pL+(i/(eq.length-1))*(W-pL-pR);
-      const toY=v=>pT+(1-(v-mn)/rng)*(H-pT-pB);
-      const pts=eq.map((v,i)=>[toX(i),toY(v)]);
-      const finalV=eq[eq.length-1]; const lc=finalV>=0?G.GREEN:G.RED;
-      const grd=ctx.createLinearGradient(0,pT,0,H-pB);
-      grd.addColorStop(0,finalV>=0?'rgba(52,211,153,0.25)':'rgba(248,113,113,0.25)');
-      grd.addColorStop(1,'rgba(0,0,0,0)');
-      drawLine(ctx,pts,lc,1.5,true,grd);
-      // zero line
-      ctx.strokeStyle=G.GRID; ctx.lineWidth=1; ctx.setLineDash([2,3]);
-      const zy=toY(0); ctx.beginPath(); ctx.moveTo(pL,zy); ctx.lineTo(W-pR,zy); ctx.stroke();
-      ctx.setLineDash([]);
-      hoverDots(cvEqM,pts,eq.map((v,i)=>i===0?'Start':(`${at[i-1].date} · ${at[i-1].pair}: ${fmtV(v)}`)));
-    }
-    // Mini donut
-    const cvDon = cvSetup('asa-donut-mini');
-    if (cvDon) {
-      const ctx=cvDon.getContext('2d'); const W=cvDon.width, H=cvDon.height;
-      const slices=[{v:at.filter(t=>t.outcome==='Win').length,c:G.GREEN},
-                    {v:at.filter(t=>t.outcome==='Loss').length,c:G.RED},
-                    {v:at.filter(t=>t.outcome==='BE').length,c:G.GOLD}].filter(s=>s.v>0);
-      const total=slices.reduce((a,s)=>a+s.v,0)||1;
-      const cx=W/2,cy=H/2-4,r=Math.min(W,H)/2-16,inner=r*0.52;
-      let ang=-Math.PI/2;
-      slices.forEach(s=>{
-        const sw=(s.v/total)*Math.PI*2;
-        ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,ang,ang+sw); ctx.closePath();
-        ctx.fillStyle=s.c+'cc'; ctx.fill();
-        ang+=sw;
-      });
-      ctx.beginPath(); ctx.arc(cx,cy,inner,0,Math.PI*2);
-      ctx.fillStyle=G.BG; ctx.fill();
-      const wrVal=((at.filter(t=>t.outcome==='Win').length/at.length)*100).toFixed(0);
-      ctx.fillStyle=isDark?'rgba(248,250,252,0.95)':'rgba(15,23,42,0.95)';
-      ctx.font='bold 14px Inter,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText(wrVal+'%',cx,cy-3);
-      ctx.font='8px Inter,sans-serif'; ctx.fillStyle=G.TEXT; ctx.fillText('Win Rate',cx,cy+10);
-    }
-  }
-
-  // ══════════ CHARTS TAB ════════════════════════════════════
-  if (activeTab === 'charts') {
-    // 1. Full equity curve
-    const cvEq = cvSetup('asa-equity');
-    if (cvEq) {
-      const ctx=cvEq.getContext('2d'); const W=cvEq.width, H=cvEq.height;
-      let cum=0; const eq=[0,...pnlArr.map(p=>{cum+=p;return cum;})];
-      const mn=Math.min(...eq)-Math.abs(Math.max(...eq)-Math.min(...eq))*0.05;
-      const mx=Math.max(...eq)+Math.abs(Math.max(...eq)-Math.min(...eq))*0.05;
-      const rng=mx-mn||1; const pL=62,pR=16,pT=14,pB=20;
-      const toX=i=>pL+(i/(eq.length-1||1))*(W-pL-pR);
-      const toY=v=>pT+(1-(v-mn)/rng)*(H-pT-pB);
-      yAxis(ctx,W,H,mn,mx,pL,pT,pB,4);
-      // zero line
-      ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=1; ctx.setLineDash([3,5]);
-      const zy=toY(0); ctx.beginPath(); ctx.moveTo(pL,zy); ctx.lineTo(W-pR,zy); ctx.stroke(); ctx.setLineDash([]);
-      const finalV=eq[eq.length-1]; const lc=finalV>=0?G.GREEN:G.RED;
-      const grd=ctx.createLinearGradient(0,pT,0,H-pB);
-      grd.addColorStop(0,finalV>=0?'rgba(52,211,153,0.22)':'rgba(248,113,113,0.22)');
-      grd.addColorStop(1,'rgba(0,0,0,0)');
-      const pts=eq.map((v,i)=>[toX(i),toY(v)]);
-      drawLine(ctx,pts,lc,2,true,grd);
-      // trade dots
-      eq.forEach((v,i)=>{
-        if(i===0) return;
-        const col=pnlArr[i-1]>=0?G.GREEN:G.RED;
-        ctx.beginPath(); ctx.arc(toX(i),toY(v),3.5,0,Math.PI*2);
-        ctx.fillStyle=col+'cc'; ctx.fill();
-      });
-      // drawdown fill
-      let peak2=0,c2=0;
-      const ddPts=[];
-      eq.forEach((v,i)=>{ c2+=i>0?pnlArr[i-1]:0; if(c2>peak2)peak2=c2; ddPts.push([toX(i),toY(peak2)]); });
-      if (ddPts.length>1) {
-        ctx.beginPath(); pts.forEach(([x,y],i)=>{ const [,py]=ddPts[i]; i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
-        ddPts.slice().reverse().forEach(([x,y])=>ctx.lineTo(x,y));
-        ctx.closePath(); ctx.fillStyle='rgba(248,113,113,0.07)'; ctx.fill();
-      }
-      hoverDots(cvEq,pts,eq.map((v,i)=>i===0?'Start':
-        `#${i} · ${at[i-1].date} · ${at[i-1].pair} · ${at[i-1].outcome}\nCumulative: ${fmtV(v)}`));
-    }
-
-    // 2. PnL distribution bar per trade
-    const cvDist = cvSetup('asa-dist');
-    if (cvDist) {
-      const ctx=cvDist.getContext('2d'); const W=cvDist.width, H=cvDist.height;
-      const pL=52,pR=8,pT=10,pB=20;
-      const mn=Math.min(0,...pnlArr), mx=Math.max(0,...pnlArr);
-      const rng=Math.max(Math.abs(mn),Math.abs(mx))||1;
-      const bw=Math.max(2,(W-pL-pR)/at.length-2);
-      const toY=v=>pT+(1-((v+rng)/(rng*2)))*(H-pT-pB);
-      const zy=toY(0);
-      yAxis(ctx,W,H,-rng,rng,pL,pT,pB,3);
-      ctx.strokeStyle=G.GRID; ctx.lineWidth=1; ctx.setLineDash([2,3]);
-      ctx.beginPath(); ctx.moveTo(pL,zy); ctx.lineTo(W-pR,zy); ctx.stroke(); ctx.setLineDash([]);
-      pnlArr.forEach((v,i)=>{
-        const x=pL+i*(W-pL-pR)/at.length; const col=v>=0?G.GREEN:G.RED;
-        const barH=Math.abs(v)/rng*(H-pT-pB)/2;
-        const y=v>=0?zy-barH:zy;
-        vBar(ctx,x+1,y,bw,barH,2,col+'55',col+'99');
-      });
-      ctx.font='8px Inter,sans-serif'; ctx.fillStyle=G.TEXT; ctx.textAlign='center'; ctx.textBaseline='top';
-      ctx.fillText('Trade #',pL+(W-pL-pR)/2,H-pB+3);
-    }
-
-    // 3. Running win rate line
-    const cvWR = cvSetup('asa-wr');
-    if (cvWR) {
-      const ctx=cvWR.getContext('2d'); const W=cvWR.width, H=cvWR.height;
-      const pL=36,pR=12,pT=10,pB=14;
-      let wins2=0; const wrArr=at.map((t,i)=>{ if(t.outcome==='Win')wins2++; return (wins2/(i+1))*100; });
-      const pts=wrArr.map((v,i)=>[pL+i/(wrArr.length-1||1)*(W-pL-pR), pT+(1-v/100)*(H-pT-pB)]);
-      // 50% guide
-      const y50=pT+(1-0.5)*(H-pT-pB);
-      ctx.strokeStyle='rgba(251,191,36,0.25)'; ctx.lineWidth=1; ctx.setLineDash([3,4]);
-      ctx.beginPath(); ctx.moveTo(pL,y50); ctx.lineTo(W-pR,y50); ctx.stroke(); ctx.setLineDash([]);
-      ctx.font='8px Inter,sans-serif'; ctx.fillStyle='rgba(251,191,36,0.5)'; ctx.textAlign='right'; ctx.textBaseline='middle';
-      ctx.fillText('50%',pL-4,y50);
-      // current wr guide
-      const curWR=wrArr[wrArr.length-1];
-      const yCur=pT+(1-curWR/100)*(H-pT-pB);
-      ctx.strokeStyle=curWR>=50?G.GREEN+'55':G.RED+'55'; ctx.lineWidth=1; ctx.setLineDash([2,3]);
-      ctx.beginPath(); ctx.moveTo(pL,yCur); ctx.lineTo(W-pR,yCur); ctx.stroke(); ctx.setLineDash([]);
-      // axes labels
-      ctx.fillStyle=G.TEXT; ctx.textAlign='right'; ctx.textBaseline='middle';
-      [0,50,100].forEach(v=>{
-        const y=pT+(1-v/100)*(H-pT-pB);
-        ctx.fillText(v+'%',pL-4,y);
-      });
-      const grd=cvWR.getContext('2d').createLinearGradient(0,pT,0,H-pB);
-      grd.addColorStop(0,curWR>=50?'rgba(52,211,153,0.18)':'rgba(248,113,113,0.18)');
-      grd.addColorStop(1,'rgba(0,0,0,0)');
-      drawLine(ctx,pts,curWR>=50?G.GREEN:G.RED,2,true,grd);
-      // dots per trade
-      pts.forEach(([x,y],i)=>{
-        const col=at[i].outcome==='Win'?G.GREEN:at[i].outcome==='Loss'?G.RED:G.GOLD;
-        ctx.beginPath(); ctx.arc(x,y,2.5,0,Math.PI*2); ctx.fillStyle=col; ctx.fill();
-      });
-      hoverDots(cvWR,pts,wrArr.map((v,i)=>`Trade ${i+1}: ${at[i].pair} · ${at[i].outcome}\nWin rate: ${v.toFixed(1)}%`));
-    }
-
-    // 4. R:R scatter
-    const cvRR = cvSetup('asa-rr');
-    if (cvRR) {
-      const ctx=cvRR.getContext('2d'); const W=cvRR.width, H=cvRR.height;
-      const pL=14,pR=14,pT=10,pB=14;
-      const rrData=at.map((t,i)=>({rr:parseFloat(t.rr)||0,pnl:pnlArr[i],out:t.outcome,pair:t.pair,date:t.date}));
-      const maxRR=Math.max(...rrData.map(d=>d.rr),4);
-      const mnP=Math.min(...rrData.map(d=>d.pnl)), mxP=Math.max(...rrData.map(d=>d.pnl));
-      const rngP=Math.max(mxP-mnP,1);
-      rrData.forEach(d=>{
-        const x=pL+(d.rr/maxRR)*(W-pL-pR);
-        const y=pT+(1-(d.pnl-mnP)/rngP)*(H-pT-pB);
-        const col=d.out==='Win'?G.GREEN:d.out==='Loss'?G.RED:G.GOLD;
-        ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2);
-        ctx.fillStyle=col+'99'; ctx.fill();
-        ctx.strokeStyle=col; ctx.lineWidth=1; ctx.stroke();
-      });
-      ctx.font='8px Inter,sans-serif'; ctx.fillStyle=G.TEXT; ctx.textAlign='center';
-      ctx.textBaseline='bottom'; ctx.fillText('→ Risk:Reward',W/2,H);
-    }
-
-    // 5. Day of week
-    const cvDow = cvSetup('asa-dow');
-    if (cvDow) {
-      const ctx=cvDow.getContext('2d'); const W=cvDow.width, H=cvDow.height;
-      const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-      const dm={Mon:{p:0,n:0},Tue:{p:0,n:0},Wed:{p:0,n:0},Thu:{p:0,n:0},Fri:{p:0,n:0},Sat:{p:0,n:0},Sun:{p:0,n:0}};
-      at.forEach((t,i)=>{
-        const d=new Date(t.date+'T12:00:00'); const k=DAYS[d.getDay()===0?6:d.getDay()-1];
-        dm[k].p+=pnlArr[i]; dm[k].n++;
-      });
-      const vals=DAYS.map(d=>dm[d].p);
-      const maxA=Math.max(...vals.map(Math.abs),1);
-      const pT=8,pB=22; const bw=(W-8)/7-4;
-      DAYS.forEach((day,i)=>{
-        const x=4+i*(bw+4); const pnl=vals[i];
-        const bH=Math.abs(pnl)/maxA*(H-pT-pB)*0.85;
-        const col=pnl>0?G.GREEN:pnl<0?G.RED:G.GRID;
-        const y=pT+(H-pT-pB)-bH;
-        if(bH>0) vBar(ctx,x,y,bw,bH,3,col+'44',col);
-        ctx.fillStyle=dm[day].n>0?(pnl>=0?G.GREEN:G.RED):G.TEXT;
-        ctx.font=`${dm[day].n>0?'bold ':''}9px Inter,sans-serif`;
-        ctx.textAlign='center'; ctx.textBaseline='top';
-        ctx.fillText(day,x+bw/2,H-pB+3);
-        if(dm[day].n>0){
-          ctx.fillStyle=G.TEXT; ctx.font='7px Inter,sans-serif'; ctx.textBaseline='bottom';
-          ctx.fillText(dm[day].n+'t',x+bw/2,y-1);
-        }
-      });
-    }
-  }
-
-  // ══════════ BREAKDOWN TAB ═════════════════════════════════
-  if (activeTab === 'breakdown') {
-    function groupChart(canvasId, keyFn, label, colors) {
-      const cv = cvSetup(canvasId); if (!cv) return;
-      const ctx=cv.getContext('2d'); const W=cv.width, H=cv.height;
-      const map={};
-      at.forEach((t,i)=>{ const k=keyFn(t)||label; if(!map[k]){map[k]={p:0,w:0,n:0};} map[k].p+=pnlArr[i]; if(t.outcome==='Win')map[k].w++; map[k].n++; });
-      const entries=Object.entries(map).sort((a,b)=>b[1].p-a[1].p);
-      if(!entries.length){ctx.fillStyle=G.TEXT;ctx.font='11px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('No data',W/2,H/2);return;}
-      const maxA=Math.max(...entries.map(e=>Math.abs(e[1].p)),1);
-      const pL=8,pR=64,pT=8,pB=8;
-      const bH=Math.min(18,(H-pT-pB)/entries.length-5);
-      const totalBarH=entries.length*(bH+5)-5;
-      let startY=pT+(H-pT-pB-totalBarH)/2;
-      entries.forEach(([k,{p,w,n}],i)=>{
-        const y=startY+i*(bH+5);
-        const bw=Math.abs(p)/maxA*(W-pL-pR);
-        const col=colors?colors[i%colors.length]:(p>=0?G.GREEN:G.RED);
-        // Label
-        ctx.fillStyle=G.TEXT; ctx.font='9px Inter,sans-serif'; ctx.textAlign='left';
-        ctx.textBaseline='middle';
-        const lbl=k.length>12?k.slice(0,11)+'…':k;
-        ctx.fillText(lbl,pL,y+bH/2);
-        const lblW=ctx.measureText(lbl).width;
-        // Bar
-        hBar(ctx,pL+lblW+4,y,Math.max(bw,1),bH,3,col+'44',col);
-        // Value + count
-        ctx.fillStyle=col; ctx.font='bold 8px Inter,sans-serif'; ctx.textAlign='left';
-        ctx.fillText(`${fmtV(p)}  ${n}t  ${((w/n)*100).toFixed(0)}%WR`,pL+lblW+6+bw+3,y+bH/2);
-      });
-    }
-
-    const PALETTE=[G.GREEN,G.BLUE,G.TEAL,G.GOLD,G.PURPLE,G.PINK,G.RED,'#fb923c'];
-    groupChart('asa-pairs',   t=>t.pair,           'Unknown', null);
-    groupChart('asa-strat',   t=>t.strategy,       'No Strategy', PALETTE);
-    groupChart('asa-kz',      t=>t.kz,             'No Session', PALETTE);
-    groupChart('asa-emo',     t=>t.emotion,         'Unknown', PALETTE);
-    groupChart('asa-rating',  t=>t.rating?`${t.rating}★`:'No Rating', 'No Rating', PALETTE);
-
-    // Buy vs Sell grouped
-    const cvPos=cvSetup('asa-pos'); if(cvPos){
-      const ctx=cvPos.getContext('2d'); const W=cvPos.width, H=cvPos.height;
-      const groups={Buy:{Win:0,Loss:0,BE:0,p:0},Sell:{Win:0,Loss:0,BE:0,p:0}};
-      at.forEach((t,i)=>{
-        const g=groups[t.pos]||groups.Buy;
-        g[t.outcome]=(g[t.outcome]||0)+1; g.p+=pnlArr[i];
-      });
-      const entries=Object.entries(groups);
-      const maxP=Math.max(...entries.map(e=>e[1].Win+e[1].Loss+e[1].BE),1);
-      const pL=40,pT=12,pB=16; const grpW=(W-pL)/2-8;
-      const COLS={Win:G.GREEN,Loss:G.RED,BE:G.GOLD};
-      entries.forEach(([pos,data],gi)=>{
-        const gx=pL+gi*(grpW+8);
-        const total=data.Win+data.Loss+data.BE||1;
-        let cx=gx;
-        ['Win','Loss','BE'].forEach(out=>{
-          if(!data[out]) return;
-          const bw=(data[out]/total)*grpW;
-          vBar(ctx,cx,pT,bw,H-pT-pB,3,COLS[out]+'55',COLS[out]);
-          if(bw>18){
-            ctx.fillStyle=COLS[out]; ctx.font='bold 8px Inter,sans-serif';
-            ctx.textAlign='center'; ctx.textBaseline='middle';
-            ctx.fillText(data[out],cx+bw/2,pT+(H-pT-pB)/2);
-          }
-          cx+=bw+1;
-        });
-        ctx.fillStyle=G.TEXT; ctx.font='bold 9px Inter,sans-serif';
-        ctx.textAlign='center'; ctx.textBaseline='top';
-        ctx.fillText(`${pos}  ${fmtV(data.p)}`,gx+grpW/2,H-pB+2);
-      });
-    }
-  }
-}
-
-
 
 function accCloseDetail() {
   const drawer = document.getElementById('acc-detail-drawer');
@@ -5792,6 +5251,130 @@ function openCalPopup(e, dateStr) {
 function closeCalPopup() { document.getElementById('cal-popup').style.display = 'none'; }
 document.addEventListener('click', e => { const p = document.getElementById('cal-popup'); if (p && !p.contains(e.target)) closeCalPopup(); });
 
+// ══════════════════════════════════════════════════════
+// STANDALONE CALENDAR (Calendar page — own IDs: -sa)
+// Completely independent from the inline dashboard calendar
+// ══════════════════════════════════════════════════════
+let calMonthSA = new Date().getMonth();
+let calYearSA  = new Date().getFullYear();
+
+function calNavSA(dir) {
+  calMonthSA += dir;
+  if (calMonthSA > 11) { calMonthSA = 0; calYearSA++; }
+  if (calMonthSA < 0)  { calMonthSA = 11; calYearSA--; }
+  renderCalendarSA();
+}
+
+function getAccSizeSA() { return parseFloat(document.getElementById('cal-acc-size-sa')?.value) || 5000; }
+function getCalFilterSA() { const el = document.getElementById('cal-acc-filter-sa'); return el ? el.value : ''; }
+
+function _refreshCalendarSAFilter() {
+  const sel = document.getElementById('cal-acc-filter-sa'); if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All active accounts</option>' +
+    _getActiveAccounts().map(a =>
+      `<option value="${a.name}"${a.name === cur ? ' selected' : ''}>${a.name}</option>`
+    ).join('') +
+    (_getArchivedAccounts().length ? '<optgroup label="Archived">' +
+      _getArchivedAccounts().map(a =>
+        `<option value="${a.name}"${a.name === cur ? ' selected' : ''}>${a.name} (archived)</option>`
+      ).join('') + '</optgroup>' : '');
+}
+
+function _onCalAccFilterChangeSA() {
+  const sel = document.getElementById('cal-acc-filter-sa'); if (!sel) return;
+  const accName = sel.value;
+  if (accName) {
+    const sizeEl = document.getElementById('cal-acc-size-sa');
+    const accSize = getAccSizeForAccount(accName);
+    if (sizeEl && accSize > 0) sizeEl.value = accSize;
+  }
+  renderCalendarSA();
+}
+
+function renderCalendarSA() {
+  const accSize   = getAccSizeSA();
+  const accFilter = getCalFilterSA();
+  const label = document.getElementById('cal-month-label-sa');
+  if (label) label.textContent = MONTH_NAMES_LONG[calMonthSA] + ' ' + calYearSA;
+  const ym = calYearSA + '-' + String(calMonthSA + 1).padStart(2, '0');
+  const monthTrades = trades.filter(t => t.date.startsWith(ym) && (!accFilter || t.account === accFilter));
+  const dayMap = groupTradesByDay(monthTrades);
+  const { winDays, lossDays, beDays, wr } = calculateCalendarWinrate(dayMap);
+  const tradingDays = Object.keys(dayMap);
+  const totalTrades = monthTrades.length;
+  const totalPnlPct = monthTrades.reduce((a, t) => a + t.pnl, 0);
+  const totalUSD = pnlToUSD(totalPnlPct, accSize);
+  let bestDay = null, worstDay = null;
+  Object.entries(dayMap).forEach(([date, d]) => {
+    if (!bestDay || d.totalPnl > dayMap[bestDay].totalPnl) bestDay = date;
+    if (!worstDay || d.totalPnl < dayMap[worstDay].totalPnl) worstDay = date;
+  });
+  const kpiEl = document.getElementById('cal-kpi-row-sa');
+  if (kpiEl) {
+    const dayName = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+    const bestUSD  = bestDay  ? pnlToUSD(dayMap[bestDay].totalPnl, accSize)  : 0;
+    const worstUSD = worstDay ? pnlToUSD(dayMap[worstDay].totalPnl, accSize) : 0;
+    const wrColor  = wr >= 70 ? 'green' : wr >= 50 ? 'white' : 'red';
+    kpiEl.innerHTML = `<div class="cal-kpi"><div class="cal-kpi-label">🗂 Trades</div><div class="cal-kpi-val white">${totalTrades}<span style="font-size:10px;color:var(--text3);font-family:var(--font-body);margin-left:5px">${tradingDays.length}d</span></div></div><div class="cal-kpi"><div class="cal-kpi-label">💰 P&L</div><div class="cal-kpi-val ${totalUSD >= 0 ? 'green' : 'red'}">${fmtUSD(totalUSD)}</div></div><div class="cal-kpi"><div class="cal-kpi-label">📈 Best${bestDay ? ' (' + dayName(bestDay) + ')' : ''}</div><div class="cal-kpi-val green">${bestDay ? fmtUSD(bestUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label">📉 Worst${worstDay ? ' (' + dayName(worstDay) + ')' : ''}</div><div class="cal-kpi-val ${worstUSD < 0 ? 'red' : 'green'}">${worstDay ? fmtUSD(worstUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label">🎯 Day Win Rate</div><div class="cal-kpi-val ${wrColor}">${wr}%</div><div style="font-size:9px;color:var(--text3);margin-top:3px;display:flex;gap:5px"><span style="color:var(--green)">▲${winDays}W</span><span style="color:var(--red)">▼${lossDays}L</span><span>⬤${beDays}BE</span></div></div>`;
+  }
+  const daysEl = document.getElementById('cal-days-sa');
+  if (!daysEl) return;
+  const firstDay = new Date(calYearSA, calMonthSA, 1);
+  let startDow = firstDay.getDay() - 1; if (startDow < 0) startDow = 6;
+  const daysInMonth = new Date(calYearSA, calMonthSA + 1, 0).getDate();
+  const daysInPrev  = new Date(calYearSA, calMonthSA, 0).getDate();
+  const today = new Date().toISOString().slice(0, 10);
+  let cells = [];
+  for (let i = startDow - 1; i >= 0; i--) {
+    const prevMonth = calMonthSA === 0 ? 12 : calMonthSA;
+    const prevYear  = calMonthSA === 0 ? calYearSA - 1 : calYearSA;
+    cells.push({ day: daysInPrev - i, month: prevMonth, year: prevYear, current: false });
+  }
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, month: calMonthSA + 1, year: calYearSA, current: true });
+  let nextD = 1;
+  while (cells.length < 42) {
+    const nextMonth = calMonthSA === 11 ? 1 : calMonthSA + 2;
+    const nextYear  = calMonthSA === 11 ? calYearSA + 1 : calYearSA;
+    cells.push({ day: nextD++, month: nextMonth, year: nextYear, current: false });
+  }
+  daysEl.innerHTML = cells.map(c => {
+    const dateStr = c.year + '-' + String(c.month).padStart(2, '0') + '-' + String(c.day).padStart(2, '0');
+    const isToday = dateStr === today;
+    const dayData = dayMap[dateStr]; const hasTrades = !!dayData;
+    const outcome = hasTrades ? calculateDailyOutcome(dayData.totalPnl) : null;
+    let cls = 'cal-day';
+    if (!c.current) cls += ' other-month';
+    if (isToday) cls += ' today';
+    if (hasTrades) { cls += ' has-trades'; cls += outcome === 'win' ? ' win-day' : outcome === 'loss' ? ' loss-day' : ' mixed-day'; }
+    const dayNumHTML = isToday
+      ? `<div class="cal-day-num"><span class="cal-today-badge">${c.day}</span></div>`
+      : `<div class="cal-day-num">${String(c.day).padStart(2, '0')}</div>`;
+    let dotHTML = '', pnlHTML = '', countHTML = '', pairsHTML = '';
+    if (hasTrades) {
+      const dotColor = outcome === 'win' ? 'green' : outcome === 'loss' ? 'red' : 'blue';
+      dotHTML   = `<div class="cal-day-dot ${dotColor}"></div>`;
+      const usd = pnlToUSD(dayData.totalPnl, accSize);
+      pnlHTML   = `<div class="cal-day-pnl ${usd > 0 ? 'green' : usd < 0 ? 'red' : 'zero'}">${fmtUSD(usd)}</div>`;
+      countHTML = `<div class="cal-day-count">${dayData.trades.length} trade${dayData.trades.length > 1 ? 's' : ''}</div>`;
+      const pairs = [...new Set(dayData.trades.map(t => t.pair))].join(', ');
+      pairsHTML = `<div class="cal-day-pairs">${pairs}</div>`;
+    }
+    let clickAttr = '', hoverAttr = '';
+    if (c.current) {
+      if (hasTrades) {
+        clickAttr = `onclick="openCalPopup(event,'${dateStr}')"`;
+        hoverAttr = `onmouseenter="showCalTooltip(event,window._dayMap&&window._dayMap['${dateStr}'],'${dateStr}',${accSize})" onmouseleave="hideCalTooltip()"`;
+      } else {
+        clickAttr = `onclick="closeCalPopup();openModal({date:'${dateStr}'})"`;
+      }
+    }
+    return `<div class="${cls}" ${clickAttr} ${hoverAttr}>${dotHTML}${dayNumHTML}${pnlHTML}${countHTML}${pairsHTML}</div>`;
+  }).join('');
+  window._dayMap = dayMap;
+}
+
+
 // ── TRASH SYSTEM ──────────────────────────────────────
 let trashSettings = { autoDays: 30 };
 let _trashFilter = 'all';
@@ -6080,6 +5663,8 @@ function _refreshAll() {
   updateKPIs(); buildPairTable(); buildKillzoneTable(); buildStrategyTable(); buildMonthlyTable(); refreshPairFilter();
   buildSidebarYears(); renderCalendar(); renderTradeTable(trades); updateTrashBadge();
   buildAccounts();
+  // Also refresh the standalone calendar page if it's visible
+  if (document.getElementById('page-calendar')?.classList.contains('active')) renderCalendarSA();
 }
 
 // ── USER BAR (shows logged-in user + sign out button) ──
