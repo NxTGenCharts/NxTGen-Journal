@@ -1730,6 +1730,8 @@ function nav(pageId, sbEl, label, extra) {
   if (pageId === 'monthly') { buildMonthlyReview(); }
   if (pageId === 'ai') { buildAI(); }
   if (pageId === 'profile') { setTimeout(buildProfile, 0); }
+  // Sync mobile bottom nav
+  mobNavActivate(pageId);
 }
 
 // ── DASHBOARD: PAIR TABLE ────────────────────────────
@@ -2637,7 +2639,7 @@ async function saveTrade() {
     pos:          document.getElementById('m-pos').value,
     rr:           document.getElementById('m-rr').value || '1:3',
     pnl:          parseFloat(document.getElementById('m-pnl').value) || 0,
-    pnl_unit:     '%',
+    pnlUnit:      '%',
     outcome:      document.getElementById('m-outcome').value,
     kz:           document.getElementById('m-kz').value,
     strategy:     document.getElementById('m-strat').value === '__custom__'
@@ -5316,6 +5318,14 @@ function getFilteredTrash() {
 function updateTrashBadge() {
   const badge = document.getElementById('trash-sb-badge');
   if (badge) { if (deletedTrades.length) { badge.textContent = deletedTrades.length; badge.style.display = ''; } else badge.style.display = 'none'; }
+  // Also update mobile badges
+  const mobNavBadge  = document.getElementById('mob-nav-trash-badge');
+  const mobMoreBadge = document.getElementById('mob-more-trash-badge');
+  [mobNavBadge, mobMoreBadge].forEach(b => {
+    if (!b) return;
+    if (deletedTrades.length) { b.textContent = deletedTrades.length; b.style.display = ''; }
+    else b.style.display = 'none';
+  });
 }
 
 function renderTrash() {
@@ -5558,6 +5568,79 @@ function _injectUserBar(user) {
 // BOOT — runs after DOM is ready
 // Auth guard + load cloud data + render everything
 // ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+//  MOBILE BOTTOM NAVIGATION — Telegram-style
+// ══════════════════════════════════════════════════════
+
+// Pages that map directly to a bottom nav button
+const MOB_NAV_PAGES = ['dashboard', 'tradelog', 'calendar'];
+
+// Show/hide the bottom nav based on screen width
+function mobNavInit() {
+  const nav = document.getElementById('mob-bottom-nav');
+  if (!nav) return;
+  const isMobile = window.innerWidth <= 768;
+  nav.style.display = isMobile ? 'flex' : 'none';
+}
+
+// Activate the correct bottom nav button for a given page
+function mobNavActivate(pageId) {
+  if (window.innerWidth > 768) return;
+  document.querySelectorAll('.mob-bottom-nav-item').forEach(btn => btn.classList.remove('active'));
+  // Map page IDs to nav button IDs
+  const map = {
+    dashboard: 'mob-nav-dashboard',
+    tradelog:  'mob-nav-tradelog',
+    calendar:  'mob-nav-calendar',
+  };
+  const btnId = map[pageId];
+  if (btnId) {
+    const btn = document.getElementById(btnId);
+    if (btn) btn.classList.add('active');
+  } else {
+    // Secondary pages — highlight "More"
+    const moreBtn = document.getElementById('mob-nav-more');
+    if (moreBtn) moreBtn.classList.add('active');
+  }
+}
+
+// Open the "More" bottom sheet
+function mobNavMore() {
+  const sheet   = document.getElementById('mob-more-sheet');
+  const overlay = document.getElementById('mob-more-overlay');
+  if (!sheet || !overlay) return;
+  sheet.classList.add('open');
+  overlay.classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+// Close the "More" bottom sheet
+function mobMoreClose() {
+  const sheet   = document.getElementById('mob-more-sheet');
+  const overlay = document.getElementById('mob-more-overlay');
+  if (!sheet || !overlay) return;
+  sheet.classList.remove('open');
+  overlay.classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+// Navigate from the More sheet
+function mobMoreNav(pageId, label) {
+  mobMoreClose();
+  // Small delay so sheet close animation finishes cleanly
+  setTimeout(() => {
+    nav(pageId, null, label);
+  }, 120);
+}
+
+// Handle resize — show/hide bottom nav
+window.addEventListener('resize', () => {
+  mobNavInit();
+  if (window.innerWidth > 768) {
+    mobMoreClose();
+  }
+});
+
 document.addEventListener('DOMContentLoaded', async function () {
 
   // 1. Theme first (prevents flash)
@@ -5620,6 +5703,10 @@ document.addEventListener('DOMContentLoaded', async function () {
   // 7. Live clock
   updateClock();
   setInterval(updateClock, 1000);
+
+  // 8. Mobile bottom nav
+  mobNavInit();
+  mobNavActivate('dashboard');
 });
 
 // ── CUSTOM ACCOUNTS — Cloud-synced via journal_account_data ──────────────

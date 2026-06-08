@@ -54,6 +54,31 @@
 <!-- ══ MOBILE SIDEBAR OVERLAY ══ -->
 <div class="mob-overlay" id="mob-overlay" onclick="closeSidebar()"></div>
 
+<!-- ══ MOBILE BOTTOM NAVIGATION BAR ══ -->
+<nav class="mob-bottom-nav" id="mob-bottom-nav" style="display:none">
+  <button class="mob-bottom-nav-item active" id="mob-nav-dashboard" onclick="nav('dashboard',null,'Dashboard');mobNavActivate('dashboard')" aria-label="Dashboard">
+    <span class="mob-nav-icon">📊</span>
+    <span class="mob-nav-label">Dashboard</span>
+  </button>
+  <button class="mob-bottom-nav-item" id="mob-nav-tradelog" onclick="nav('tradelog',null,'Trade Log');mobNavActivate('tradelog')" aria-label="Trade Log">
+    <span class="mob-nav-icon">☰</span>
+    <span class="mob-nav-label">Trades</span>
+  </button>
+  <button class="mob-bottom-nav-item mob-nav-add-btn" id="mob-nav-add" onclick="openModal()" aria-label="New Trade">
+    <span class="mob-nav-icon" style="font-size:26px;line-height:1">＋</span>
+    <span class="mob-nav-label">New Trade</span>
+  </button>
+  <button class="mob-bottom-nav-item" id="mob-nav-calendar" onclick="nav('calendar',null,'Calendar');mobNavActivate('calendar')" aria-label="Calendar">
+    <span class="mob-nav-icon">📅</span>
+    <span class="mob-nav-label">Calendar</span>
+  </button>
+  <button class="mob-bottom-nav-item" id="mob-nav-more" onclick="mobNavMore()" aria-label="More">
+    <span class="mob-nav-icon">⋯</span>
+    <span class="mob-nav-label">More</span>
+    <span class="mob-nav-badge" id="mob-nav-trash-badge" style="display:none">0</span>
+  </button>
+</nav>
+
 <!-- ══ LAYOUT ══ -->
 <div class="layout" id="main-layout">
 
@@ -1127,6 +1152,50 @@
 
 <!-- ══ App Script ══ -->
 <script src="app.js"></script>
+
+<!-- ══ MOBILE MORE SHEET OVERLAY ══ -->
+<div class="mob-more-overlay" id="mob-more-overlay" onclick="mobMoreClose()"></div>
+
+<!-- ══ MOBILE MORE BOTTOM SHEET ══ -->
+<div class="mob-more-sheet" id="mob-more-sheet">
+  <div class="mob-more-sheet-handle"></div>
+  <div class="mob-more-sheet-title">More</div>
+  <div class="mob-more-sheet-grid">
+    <button class="mob-more-item" onclick="mobMoreNav('accounts','Account Tracker')">
+      <div class="mob-more-item-icon">💰</div>
+      <span class="mob-more-item-label">Accounts</span>
+    </button>
+    <button class="mob-more-item" onclick="mobMoreNav('watchlist','Weekly Watchlist')">
+      <div class="mob-more-item-icon">📋</div>
+      <span class="mob-more-item-label">Watchlist</span>
+    </button>
+    <button class="mob-more-item" onclick="mobMoreNav('ai','AI Coach')">
+      <div class="mob-more-item-icon">🤖</div>
+      <span class="mob-more-item-label">AI Coach</span>
+    </button>
+    <button class="mob-more-item" onclick="mobMoreNav('monthly','Monthly Review')">
+      <div class="mob-more-item-icon">📈</div>
+      <span class="mob-more-item-label">Monthly</span>
+    </button>
+    <button class="mob-more-item" onclick="mobMoreNav('goals','Goals')">
+      <div class="mob-more-item-icon">🎯</div>
+      <span class="mob-more-item-label">Goals</span>
+    </button>
+    <button class="mob-more-item" onclick="mobMoreNav('playbook','Trading Playbook')">
+      <div class="mob-more-item-icon">📖</div>
+      <span class="mob-more-item-label">Playbook</span>
+    </button>
+    <button class="mob-more-item" onclick="mobMoreNav('profile','My Profile')">
+      <div class="mob-more-item-icon">👤</div>
+      <span class="mob-more-item-label">Profile</span>
+    </button>
+    <button class="mob-more-item" onclick="mobMoreNav('trash','Trash')" id="mob-more-trash-btn">
+      <div class="mob-more-item-icon">🗑</div>
+      <span class="mob-more-item-label">Trash</span>
+      <span class="mob-nav-badge" id="mob-more-trash-badge" style="display:none">0</span>
+    </button>
+  </div>
+</div>
 
 <!-- Share Modal — injected dynamically by openShareModal() -->
 <div id="share-modal-overlay"></div>
