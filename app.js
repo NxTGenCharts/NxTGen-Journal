@@ -12,7 +12,14 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const BASE_URL      = 'https://dabossmira.github.io/NxTGen-Journal';
 
 const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
+  },
+  realtime: { params: { eventsPerSecond: 0 } },
+});
 
 // ── PnL formatting helper ─────────────────────────────────────────────────
 // Every trade has t.pnl (number) and t.pnlUnit ('$' or '%').
@@ -185,8 +192,9 @@ function _rowToDeleted(row) {
 async function loadTrades() {
   const { data, error } = await sb
     .from('journal_trades')
-    .select('*')
+    .select('id,trade_date,pair,pos,rr,pnl,pnl_unit,outcome,kz,strategy,tf,account,rating,risk,notes,pretrade,mistakes,emotion,checklist,charts,chart_labels,source,mt5_ticket,deleted_at')
     .eq('user_id', _currentUser.id)
+    .is('deleted_at', null)
     .order('trade_date', { ascending: false });
 
   if (error) {
@@ -221,7 +229,7 @@ async function loadTrades() {
 async function loadDeletedTrades() {
   const { data, error } = await sb
     .from('journal_deleted_trades')
-    .select('*')
+    .select('id,trade_date,pair,pos,rr,pnl,pnl_unit,outcome,kz,strategy,tf,account,rating,risk,notes,pretrade,mistakes,emotion,checklist,charts,chart_labels,source,mt5_ticket,original_id,deleted_at')
     .eq('user_id', _currentUser.id)
     .order('deleted_at', { ascending: false });
 
@@ -1722,12 +1730,9 @@ function nav(pageId, sbEl, label, extra) {
   if (sbEl) sbEl.classList.add('active');
   document.getElementById('topbar-page').textContent = label;
   if (pageId === 'tradelog') renderTradeTable(trades);
-  // Dashboard always has inline calendar — render it on every nav
   renderCalendar();
   if (pageId === 'quarter' && extra) { renderQuarterPage(extra.year, extra.q); }
-  // Standalone calendar page uses its own IDs
-  if (pageId === 'calendar') { _refreshCalSAFilter(); setTimeout(renderCalendarSA, 0); }
-  if (pageId === 'dashboard') { _refreshCalendarAccountFilter(); }
+  if (pageId === 'calendar') { _refreshCalendarAccountFilter(); setTimeout(renderCalendar, 0); }
   if (pageId === 'trash') { setTimeout(renderTrash, 0); }
   if (pageId === 'monthly') { buildMonthlyReview(); }
   if (pageId === 'ai') { buildAI(); }
@@ -3930,7 +3935,7 @@ async function _accLoad() {
   if (!_currentUser) return;
   const { data, error } = await sb
     .from('journal_account_data')
-    .select('id, payouts, milestones, accounts')
+    .select('id,payouts,milestones,accounts')
     .eq('user_id', _currentUser.id)
     .maybeSingle();
   if (error) {
@@ -4071,448 +4076,118 @@ async function _accDetailSetMode(accountName, mode) {
 }
 function accShowDetail(name) {
   const drawer = document.getElementById('acc-detail-drawer');
-  const titleEl = document.getElementById('acc-detail-title');
-  const body    = document.getElementById('acc-detail-body');
+  const title  = document.getElementById('acc-detail-title');
+  const body   = document.getElementById('acc-detail-body');
   if (!drawer || !body) return;
 
   const acc     = _getCustomAccounts().find(a => a.name === name) || {};
   const accSize = parseFloat(acc.size) || 0;
-  const pnlMode = acc.pnlMode || '$';
-  const at      = trades.filter(t => t.account === name).sort((a,b) => a.date.localeCompare(b.date));
-  const atRev   = [...at].reverse();
-  const wins    = at.filter(t => t.outcome === 'Win');
-  const losses  = at.filter(t => t.outcome === 'Loss');
-  const bes     = at.filter(t => t.outcome === 'BE');
-  const wr      = at.length ? ((wins.length / at.length)*100).toFixed(1) : 0;
-  const sumD    = arr => arr.reduce((s,t) => s + toPnlDollars(t, accSize), 0);
-  const pnlArr  = at.map(t => toPnlDollars(t, accSize));
+  const pnlMode = acc.pnlMode || '%';
 
-  const fmtV = d => {
-    if (d === null || d === undefined) return '—';
-    const v = parseFloat(d)||0;
-    if (pnlMode === '$') return (v>=0?'+$':'-$') + Math.abs(v).toFixed(2);
-    if (accSize > 0) { const p=(v/accSize)*100; return (p>=0?'+':'')+p.toFixed(2)+'%'; }
-    return (v>=0?'+$':'-$') + Math.abs(v).toFixed(2);
+  const at     = trades.filter(t => t.account === name).sort((a,b) => b.date.localeCompare(a.date));
+  const wins   = at.filter(t => t.outcome === 'Win');
+  const losses = at.filter(t => t.outcome === 'Loss');
+  const wr     = at.length ? ((wins.length / at.length) * 100).toFixed(1) : 0;
+
+  // Always sum in $ first using each trade's own pnlUnit, then display per pnlMode
+  const sumDollars = (arr) => arr.reduce((s, t) => s + toPnlDollars(t, accSize), 0);
+
+  const fmtVal = (dollars) => {
+    if (dollars === null || dollars === undefined) return '—';
+    const d = parseFloat(dollars) || 0;
+    if (pnlMode === '$') {
+      return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2);
+    }
+    // pnlMode '%' — convert dollars → % using account size
+    if (accSize > 0) {
+      const pct = (d / accSize) * 100;
+      return (pct >= 0 ? '+' : '') + pct.toFixed(3) + '%';
+    }
+    // No account size — fall back to $ display
+    return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2);
   };
 
-  const netD   = sumD(at);
-  const avgW   = wins.length   ? sumD(wins)/wins.length   : null;
-  const avgL   = losses.length ? sumD(losses)/losses.length : null;
-  const grossW = sumD(wins);
-  const grossL = Math.abs(sumD(losses));
-  const pf     = grossL>0 ? (grossW/grossL).toFixed(2) : wins.length?'∞':'0.00';
+  const netDollars = sumDollars(at);
+  const avgWDollars = wins.length   ? sumDollars(wins)   / wins.length   : null;
+  const avgLDollars = losses.length ? sumDollars(losses) / losses.length : null;
+  const grossW      = sumDollars(wins);
+  const grossL      = Math.abs(sumDollars(losses));
+  const pf          = grossL > 0 ? (grossW / grossL).toFixed(2) : '∞';
 
-  // Drawdown
-  let peak=0,dd=0,cum=0;
-  pnlArr.forEach(p=>{ cum+=p; if(cum>peak)peak=cum; if(peak-cum>dd)dd=peak-cum; });
-
-  // Streaks
-  let cW=0,cL=0,mW=0,mL=0;
-  at.forEach(t=>{ if(t.outcome==='Win'){cW++;cL=0;mW=Math.max(mW,cW);}else if(t.outcome==='Loss'){cL++;cW=0;mL=Math.max(mL,cL);}else{cW=0;cL=0;} });
-
-  const rrVals = at.map(t=>parseFloat(t.rr)).filter(v=>!isNaN(v)&&v>0);
-  const avgRR  = rrVals.length?(rrVals.reduce((a,b)=>a+b,0)/rrVals.length).toFixed(2):null;
-  const best   = pnlArr.length?Math.max(...pnlArr):0;
-  const worst  = pnlArr.length?Math.min(...pnlArr):0;
-  const exp    = at.length ? ((wins.length/at.length)*(avgW||0)+(losses.length/at.length)*(avgL||0)).toFixed(2) : 0;
-
-  if (titleEl) titleEl.textContent = name;
-  const sizeNote = accSize>0 ? `$${accSize.toLocaleString()}` : `<span style="color:var(--gold)">⚠ No size</span>`;
+  title.textContent = name;
+  const sizeNote = accSize > 0
+    ? `$${accSize.toLocaleString()}`
+    : `<span style="color:var(--gold)" title="Set size in Manage Accounts">⚠ No size set</span>`;
 
   body.innerHTML = `
-    <div class="asa-topbar">
-      <span class="asa-size-lbl">Account: <strong>${sizeNote}</strong></span>
-      <div class="asa-mode-tog">
-        <button class="asa-mode-btn${pnlMode==='$'?' act':''}" onclick="_accDetailSetMode('${name.replace(/'/g,"\\'")}','$')">$ USD</button>
-        <button class="asa-mode-btn${pnlMode==='%'?' act':''}" onclick="_accDetailSetMode('${name.replace(/'/g,"\\'")}','%')">% PCT</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <span style="font-size:11px;color:var(--text3)">
+        Account: <strong style="color:var(--text)">${sizeNote}</strong>
+      </span>
+      <div style="display:flex;gap:0;border:1px solid var(--glass-border);border-radius:6px;overflow:hidden">
+        <button onclick="_accDetailSetMode('${name}','\$')"
+          style="padding:4px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;
+          background:${pnlMode==='$'?'var(--blue)':'var(--glass-1)'};
+          color:${pnlMode==='$'?'#fff':'var(--text3)'};font-family:var(--font-body)">$ USD</button>
+        <button onclick="_accDetailSetMode('${name}','%')"
+          style="padding:4px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;
+          background:${pnlMode==='%'?'var(--blue)':'var(--glass-1)'};
+          color:${pnlMode==='%'?'#fff':'var(--text3)'};font-family:var(--font-body)">% PCT</button>
       </div>
     </div>
-
-    <div class="asa-tabs" id="asa-tabs">
-      <button class="asa-tab act" data-tab="overview" onclick="_asaTab(this,'${name.replace(/'/g,"\\'")}')">📊 Overview</button>
-      <button class="asa-tab" data-tab="charts"    onclick="_asaTab(this,'${name.replace(/'/g,"\\'")}')">📈 Charts</button>
-      <button class="asa-tab" data-tab="breakdown" onclick="_asaTab(this,'${name.replace(/'/g,"\\'")}')">🔍 Breakdown</button>
-      <button class="asa-tab" data-tab="trades"    onclick="_asaTab(this,'${name.replace(/'/g,"\\'")}')">📋 Trades</button>
+    <div class="acc-detail-stats">
+      <div class="acc-ds"><div class="acc-ds-label">Trades</div><div class="acc-ds-val blue">${at.length}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Win Rate</div><div class="acc-ds-val ${parseFloat(wr)>=60?'green':'red'}">${wr}%</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Net PnL</div><div class="acc-ds-val ${netDollars>=0?'green':'red'}">${fmtVal(netDollars)}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Avg Win</div><div class="acc-ds-val green">${fmtVal(avgWDollars)}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Avg Loss</div><div class="acc-ds-val red">${fmtVal(avgLDollars)}</div></div>
+      <div class="acc-ds"><div class="acc-ds-label">Profit Factor</div><div class="acc-ds-val gold">${pf}x</div></div>
     </div>
-
-    <!-- OVERVIEW -->
-    <div class="asa-panel" id="asa-ov">
-      ${at.length===0?'<div class="asa-empty">No trades yet on this account.</div>':`
-      <div class="asa-kpi6">
-        <div class="asa-kp asa-kp-blue"><div class="asa-kp-ico">🔢</div><div class="asa-kp-v blue">${at.length}</div><div class="asa-kp-l">Trades</div></div>
-        <div class="asa-kp asa-kp-${parseFloat(wr)>=60?'green':'red'}"><div class="asa-kp-ico">🎯</div><div class="asa-kp-v ${parseFloat(wr)>=60?'green':'red'}">${wr}%</div><div class="asa-kp-l">Win Rate</div></div>
-        <div class="asa-kp asa-kp-${netD>=0?'green':'red'}"><div class="asa-kp-ico">${netD>=0?'📈':'📉'}</div><div class="asa-kp-v ${netD>=0?'green':'red'}">${fmtV(netD)}</div><div class="asa-kp-l">Net PnL</div></div>
-        <div class="asa-kp asa-kp-gold"><div class="asa-kp-ico">⚖️</div><div class="asa-kp-v gold">${pf}x</div><div class="asa-kp-l">Profit Factor</div></div>
-        <div class="asa-kp asa-kp-green"><div class="asa-kp-ico">✅</div><div class="asa-kp-v green">${fmtV(avgW)}</div><div class="asa-kp-l">Avg Win</div></div>
-        <div class="asa-kp asa-kp-red"><div class="asa-kp-ico">❌</div><div class="asa-kp-v red">${fmtV(avgL)}</div><div class="asa-kp-l">Avg Loss</div></div>
-      </div>
-      <div class="asa-strip">
-        <div class="asa-met"><span class="asa-ml">Max DD</span><span class="asa-mv red">${fmtV(-dd)}</span></div><div class="asa-sep"></div>
-        <div class="asa-met"><span class="asa-ml">Best</span><span class="asa-mv green">${fmtV(best)}</span></div><div class="asa-sep"></div>
-        <div class="asa-met"><span class="asa-ml">Worst</span><span class="asa-mv red">${fmtV(worst)}</span></div><div class="asa-sep"></div>
-        <div class="asa-met"><span class="asa-ml">Avg R:R</span><span class="asa-mv gold">${avgRR?avgRR+'R':'—'}</span></div><div class="asa-sep"></div>
-        <div class="asa-met"><span class="asa-ml">Expectancy</span><span class="asa-mv ${parseFloat(exp)>=0?'green':'red'}">${fmtV(parseFloat(exp))}</span></div><div class="asa-sep"></div>
-        <div class="asa-met"><span class="asa-ml">Win Streak</span><span class="asa-mv green">${mW}W</span></div><div class="asa-sep"></div>
-        <div class="asa-met"><span class="asa-ml">Loss Streak</span><span class="asa-mv red">${mL}L</span></div>
-      </div>
-      <div class="asa-2col">
-        <div class="asa-card"><div class="asa-ct">Equity Curve</div><canvas id="asa-eq-m" height="90"></canvas></div>
-        <div class="asa-card"><div class="asa-ct">Outcome Split</div><canvas id="asa-don-m" height="90"></canvas>
-          <div class="asa-don-leg"><span style="color:var(--green)">●</span>${wins.length}W <span style="color:var(--red)">●</span>${losses.length}L${bes.length?` <span style="color:var(--gold)">●</span>${bes.length}BE`:''}</div>
-        </div>
-      </div>`}
-    </div>
-
-    <!-- CHARTS -->
-    <div class="asa-panel" id="asa-ch" style="display:none">
-      ${at.length===0?'<div class="asa-empty">No trades to chart.</div>':`
-      <div class="asa-cgrid">
-        <div class="asa-card asa-full"><div class="asa-ct">📈 Cumulative Equity <span class="asa-badge">${at.length} trades</span></div><div class="asa-cs">Hover each dot for trade detail</div><canvas id="asa-eq" height="150"></canvas></div>
-        <div class="asa-card"><div class="asa-ct">📊 PnL per Trade</div><div class="asa-cs">Each bar = one trade</div><canvas id="asa-dist" height="120"></canvas></div>
-        <div class="asa-card"><div class="asa-ct">🔥 Running Win Rate</div><div class="asa-cs">Evolution over trades</div><canvas id="asa-wr" height="120"></canvas></div>
-        <div class="asa-card"><div class="asa-ct">⚖️ R:R Scatter</div><div class="asa-cs">Risk:reward vs PnL</div><canvas id="asa-rr" height="120"></canvas></div>
-        <div class="asa-card"><div class="asa-ct">📅 Day of Week</div><div class="asa-cs">PnL + trade count</div><canvas id="asa-dow" height="120"></canvas></div>
-      </div>`}
-    </div>
-
-    <!-- BREAKDOWN -->
-    <div class="asa-panel" id="asa-br" style="display:none">
-      ${at.length===0?'<div class="asa-empty">No trades yet.</div>':`
-      <div class="asa-cgrid">
-        <div class="asa-card"><div class="asa-ct">💱 By Pair</div><canvas id="asa-pairs" height="150"></canvas></div>
-        <div class="asa-card"><div class="asa-ct">🧠 By Strategy</div><canvas id="asa-strat" height="150"></canvas></div>
-        <div class="asa-card"><div class="asa-ct">⏰ By Session</div><canvas id="asa-kz" height="150"></canvas></div>
-        <div class="asa-card"><div class="asa-ct">😌 By Emotion</div><canvas id="asa-emo" height="150"></canvas></div>
-        <div class="asa-card"><div class="asa-ct">⭐ By Rating</div><canvas id="asa-rat" height="150"></canvas></div>
-        <div class="asa-card"><div class="asa-ct">📐 Buy vs Sell</div><canvas id="asa-pos" height="150"></canvas></div>
-      </div>`}
-    </div>
-
-    <!-- TRADES -->
-    <div class="asa-panel" id="asa-tr" style="display:none">
-      ${atRev.length===0?'<div class="asa-empty">No trades on this account.</div>':`
-      <div class="asa-tr-head"><span class="asa-tr-cnt">${at.length} trades</span><span style="font-size:10px;color:var(--text3)">Click row to view · hover for actions</span></div>
-      <div style="overflow-x:auto">
-      <table class="data-table" style="width:100%">
-        <thead><tr><th>Date</th><th>Pair</th><th>Pos</th><th>Outcome</th><th>P/L</th><th>R:R</th><th>Strategy</th><th>KZ</th><th></th></tr></thead>
-        <tbody>${atRev.map(t=>{
-          const td=toPnlDollars(t,accSize);
-          const pC=td>=0?'outcome-win':'outcome-loss';
-          const oC=t.outcome==='Win'?'outcome-win':t.outcome==='Loss'?'outcome-loss':'outcome-be';
-          return `<tr class="acc-trade-row" onclick="openDetail(${t.id})"
-            onmouseenter="this.querySelector('.acc-tr-actions').style.opacity='1'"
-            onmouseleave="this.querySelector('.acc-tr-actions').style.opacity='0'">
-            <td class="mono" style="color:var(--text2)">${t.date}</td>
-            <td class="bold">${t.pair}</td>
-            <td><span class="${t.pos==='Buy'?'pos-buy':'pos-sell'}">${t.pos}</span></td>
-            <td class="${oC}">${t.outcome}</td>
-            <td class="${pC} mono">${fmtV(td)}</td>
-            <td class="mono">${t.rr||'—'}</td>
-            <td style="font-size:11px;color:var(--text2)">${t.strategy||'—'}</td>
-            <td style="font-size:10px;color:var(--text3)">${t.kz||'—'}</td>
-            <td class="acc-tr-actions" style="opacity:0;transition:opacity .15s;white-space:nowrap">
-              <button onclick="event.stopPropagation();openDetail(${t.id},true)"
-                style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;margin-right:3px">✏️</button>
-              <button onclick="event.stopPropagation();quickDelete(${t.id},'${name.replace(/'/g,"\\'")}')"
-                style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer">🗑</button>
-            </td>
-          </tr>`;}).join('')}
-        </tbody>
-      </table></div>`}
-    </div>
+    ${at.length === 0
+      ? '<div style="color:var(--text3);text-align:center;padding:30px;font-style:italic">No trades logged under this account yet.</div>'
+      : `<div class="data-table-wrap" style="overflow-x:auto">
+          <table class="data-table" style="width:100%">
+            <thead>
+              <tr>
+                <th>Date</th><th>Pair</th><th>Pos</th><th>Outcome</th>
+                <th>P/L</th><th>R:R</th><th>Strategy</th><th style="width:72px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${at.map(t => {
+                const _td     = toPnlDollars(t, accSize);
+                const pnlColor = _td >= 0 ? 'outcome-win' : 'outcome-loss';
+                const pnlDisp  = fmtVal(_td);
+                const outClass = t.outcome==='Win'?'outcome-win':t.outcome==='Loss'?'outcome-loss':'outcome-be';
+                const posClass = t.pos==='Buy'?'pos-buy':'pos-sell';
+                return `
+                <tr class="acc-trade-row" onclick="openDetail(${t.id})" title="Click to view / edit trade"
+                    onmouseenter="this.querySelector('.acc-tr-actions').style.opacity='1'"
+                    onmouseleave="this.querySelector('.acc-tr-actions').style.opacity='0'">
+                  <td class="mono" style="color:var(--text2)">${t.date}</td>
+                  <td class="bold">${t.pair}</td>
+                  <td><span class="${posClass}">${t.pos}</span></td>
+                  <td class="${outClass}">${t.outcome}</td>
+                  <td class="${pnlColor} mono">${pnlDisp}</td>
+                  <td class="mono">${t.rr||'—'}</td>
+                  <td style="color:var(--text2);font-size:11px">${t.strategy||'—'}</td>
+                  <td class="acc-tr-actions" style="opacity:0;transition:opacity .15s;white-space:nowrap;text-align:right">
+                    <button onclick="event.stopPropagation();openDetail(${t.id},true)"
+                      style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;margin-right:3px">✏️</button>
+                    <button onclick="event.stopPropagation();quickDelete(${t.id});accShowDetail('${name.replace(/'/g, "\'")}')"
+                      style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer">🗑</button>
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`}
   `;
 
   drawer.style.display = '';
-  requestAnimationFrame(() => {
-    drawer.classList.add('open');
-    if (at.length > 0) setTimeout(() => _asaRender(at, pnlArr, accSize, pnlMode, fmtV, 'overview'), 80);
-  });
+  requestAnimationFrame(() => drawer.classList.add('open'));
   drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
-
-/* ─── Tab switch ─────────────────────────────────────── */
-function _asaTab(btn, name) {
-  const tab = btn.dataset.tab;
-  document.querySelectorAll('.asa-tab').forEach(b=>b.classList.remove('act'));
-  btn.classList.add('act');
-  ['ov','ch','br','tr'].forEach(p => {
-    const el = document.getElementById('asa-'+p);
-    if (el) el.style.display = 'none';
-  });
-  const map = {overview:'ov',charts:'ch',breakdown:'br',trades:'tr'};
-  const el = document.getElementById('asa-'+map[tab]);
-  if (el) el.style.display = '';
-
-  const acc = _getCustomAccounts().find(a=>a.name===name)||{};
-  const accSize = parseFloat(acc.size)||0;
-  const pnlMode = acc.pnlMode||'$';
-  const at = trades.filter(t=>t.account===name).sort((a,b)=>a.date.localeCompare(b.date));
-  const pnlArr = at.map(t=>toPnlDollars(t,accSize));
-  const fmtV = d => {
-    if (d===null||d===undefined) return '—';
-    const v=parseFloat(d)||0;
-    if (pnlMode==='$') return (v>=0?'+$':'-$')+Math.abs(v).toFixed(2);
-    if (accSize>0) { const p=(v/accSize)*100; return (p>=0?'+':'')+p.toFixed(2)+'%'; }
-    return (v>=0?'+$':'-$')+Math.abs(v).toFixed(2);
-  };
-  if (at.length>0) setTimeout(()=>_asaRender(at,pnlArr,accSize,pnlMode,fmtV,tab),40);
-}
-
-/* ─── Master chart renderer ─────────────────────────── */
-function _asaRender(at, pnlArr, accSize, pnlMode, fmtV, activeTab) {
-  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-  const C = {
-    G: isDark?'#34d399':'#059669', R: isDark?'#f87171':'#dc2626',
-    B: isDark?'#60a5fa':'#2563eb', O: isDark?'#fbbf24':'#b45309',
-    T: isDark?'#2dd4bf':'#0d9488', P: isDark?'#a78bfa':'#6d28d9',
-    PK:'#f472b6', OR:'#fb923c',
-    TX: isDark?'rgba(148,163,184,0.7)':'rgba(51,65,85,0.75)',
-    GR: isDark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)',
-    BG: isDark?'#080b12':'#f1f5fb'
-  };
-
-  function cv(id) {
-    const el=document.getElementById(id); if(!el)return null;
-    el.width=el.parentElement.clientWidth||400;
-    el.getContext('2d').clearRect(0,0,el.width,el.height);
-    return el;
-  }
-  function line(ctx,pts,col,lw,fill,fg) {
-    if(pts.length<2)return;
-    if(fill){ctx.beginPath();pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
-      ctx.lineTo(pts[pts.length-1][0],ctx.canvas.height);ctx.lineTo(pts[0][0],ctx.canvas.height);
-      ctx.closePath();ctx.fillStyle=fg;ctx.fill();}
-    ctx.beginPath();pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
-    ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.lineJoin='round';ctx.stroke();
-  }
-  function bar(ctx,x,y,w,h,r,f,s){
-    if(!h)return;ctx.beginPath();ctx.roundRect(x,y,Math.max(w,1),Math.max(h,1),r);
-    if(f){ctx.fillStyle=f;ctx.fill();}if(s){ctx.strokeStyle=s;ctx.lineWidth=1;ctx.stroke();}
-  }
-  function yax(ctx,W,H,mn,mx,pL,pT,pB,n=4){
-    ctx.font='9px Inter,sans-serif';ctx.textAlign='right';ctx.fillStyle=C.TX;ctx.textBaseline='middle';
-    for(let i=0;i<=n;i++){
-      const v=mn+(mx-mn)*(i/n),y=pT+(H-pT-pB)*(1-i/n);
-      ctx.fillText(fmtV(v),pL-4,y);
-      ctx.strokeStyle=C.GR;ctx.lineWidth=0.5;ctx.setLineDash([2,4]);
-      ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(W,y);ctx.stroke();ctx.setLineDash([]);
-    }
-  }
-  function hover(el,pts,labs){
-    el.onmousemove=e=>{const r=el.getBoundingClientRect();const mx=(e.clientX-r.left)*(el.width/r.width);
-      let ni=0,md=Infinity;pts.forEach(([x],i)=>{const d=Math.abs(x-mx);if(d<md){md=d;ni=i;}});
-      el.title=md<50?(labs[ni]||''):'';};
-    el.onmouseleave=()=>{el.title='';};
-  }
-  function groupData(keyFn){
-    const m={};
-    at.forEach((t,i)=>{const k=keyFn(t)||'Unknown';if(!m[k]){m[k]={p:0,w:0,n:0};}m[k].p+=pnlArr[i];if(t.outcome==='Win')m[k].w++;m[k].n++;});
-    return Object.entries(m).sort((a,b)=>b[1].p-a[1].p);
-  }
-  function hbarChart(id,entries,colors){
-    const el=cv(id);if(!el)return;
-    const ctx=el.getContext('2d');const W=el.width,H=el.height;
-    if(!entries.length){ctx.fillStyle=C.TX;ctx.font='11px Inter';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('No data',W/2,H/2);return;}
-    const maxA=Math.max(...entries.map(e=>Math.abs(e[1].p)),1);
-    const pH=Math.min(16,(H-12)/entries.length-4);
-    const total=entries.reduce((s,e)=>s+pH+4,0);
-    let sy=8+(H-8-total)/2;
-    entries.forEach(([k,{p,w,n}],i)=>{
-      const col=colors?colors[i%colors.length]:(p>=0?C.G:C.R);
-      const bw=Math.abs(p)/maxA*(W-88);
-      ctx.fillStyle=C.TX;ctx.font='8px Inter';ctx.textAlign='left';ctx.textBaseline='middle';
-      const lbl=k.length>10?k.slice(0,9)+'…':k;
-      ctx.fillText(lbl,4,sy+pH/2);
-      bar(ctx,58,sy,Math.max(bw,2),pH,3,col+'44',col);
-      ctx.fillStyle=col;ctx.font='bold 8px Inter';ctx.textAlign='left';
-      ctx.fillText(`${fmtV(p)} · ${n}t · ${((w/n)*100).toFixed(0)}%WR`,60+bw+3,sy+pH/2);
-      sy+=pH+4;
-    });
-  }
-
-  // ── Overview mini charts ──────────────────────────────
-  if(activeTab==='overview'){
-    // Mini equity
-    const eqM=cv('asa-eq-m');
-    if(eqM){
-      const ctx=eqM.getContext('2d');const W=eqM.width,H=eqM.height;
-      let c=0;const eq=[0,...pnlArr.map(p=>{c+=p;return c;})];
-      const mn=Math.min(...eq),mx=Math.max(...eq),rng=mx-mn||1;
-      const pL=8,pT=6,pB=6;
-      const toX=i=>pL+(i/(eq.length-1||1))*(W-pL-8);
-      const toY=v=>pT+(1-(v-mn)/rng)*(H-pT-pB);
-      const pts=eq.map((v,i)=>[toX(i),toY(v)]);
-      const lc=eq[eq.length-1]>=0?C.G:C.R;
-      const grd=ctx.createLinearGradient(0,pT,0,H-pB);
-      grd.addColorStop(0,eq[eq.length-1]>=0?'rgba(52,211,153,0.22)':'rgba(248,113,113,0.22)');
-      grd.addColorStop(1,'rgba(0,0,0,0)');
-      const zy=toY(0);ctx.strokeStyle=C.GR;ctx.lineWidth=1;ctx.setLineDash([2,3]);
-      ctx.beginPath();ctx.moveTo(pL,zy);ctx.lineTo(W-8,zy);ctx.stroke();ctx.setLineDash([]);
-      line(ctx,pts,lc,1.5,true,grd);
-      eq.forEach((v,i)=>{if(i===0)return;const col=pnlArr[i-1]>=0?C.G:C.R;
-        ctx.beginPath();ctx.arc(toX(i),toY(v),2.5,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();});
-      hover(eqM,pts,eq.map((v,i)=>i===0?'Start':`${at[i-1].date} · ${at[i-1].pair}: ${fmtV(v)}`));
-    }
-    // Mini donut
-    const don=cv('asa-don-m');
-    if(don){
-      const ctx=don.getContext('2d');const W=don.width,H=don.height;
-      const sl=[{v:at.filter(t=>t.outcome==='Win').length,c:C.G},{v:at.filter(t=>t.outcome==='Loss').length,c:C.R},{v:at.filter(t=>t.outcome==='BE').length,c:C.O}].filter(s=>s.v>0);
-      const tot=at.length||1,cx=W/2,cy=H/2-4,r=Math.min(W,H)/2-14,inn=r*0.52;
-      let ang=-Math.PI/2;
-      sl.forEach(s=>{const sw=(s.v/tot)*Math.PI*2;ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,ang,ang+sw);ctx.closePath();ctx.fillStyle=s.c+'cc';ctx.fill();ang+=sw;});
-      ctx.beginPath();ctx.arc(cx,cy,inn,0,Math.PI*2);ctx.fillStyle=C.BG;ctx.fill();
-      const wrv=((at.filter(t=>t.outcome==='Win').length/at.length)*100).toFixed(0);
-      ctx.fillStyle=isDark?'rgba(248,250,252,0.95)':'rgba(15,23,42,0.95)';
-      ctx.font='bold 13px Inter';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(wrv+'%',cx,cy-3);
-      ctx.font='8px Inter';ctx.fillStyle=C.TX;ctx.fillText('Win Rate',cx,cy+10);
-    }
-  }
-
-  // ── Charts tab ───────────────────────────────────────
-  if(activeTab==='charts'){
-    // Full equity
-    const eqF=cv('asa-eq');
-    if(eqF){
-      const ctx=eqF.getContext('2d');const W=eqF.width,H=eqF.height;
-      let c=0;const eq=[0,...pnlArr.map(p=>{c+=p;return c;})];
-      const pad=0.05*Math.abs(Math.max(...eq)-Math.min(...eq));
-      const mn=Math.min(...eq)-pad,mx=Math.max(...eq)+pad,rng=mx-mn||1;
-      const pL=62,pR=16,pT=14,pB=20;
-      const toX=i=>pL+(i/(eq.length-1||1))*(W-pL-pR);
-      const toY=v=>pT+(1-(v-mn)/rng)*(H-pT-pB);
-      yax(ctx,W,H,mn,mx,pL,pT,pB,4);
-      const zy=toY(0);ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=1;ctx.setLineDash([3,5]);
-      ctx.beginPath();ctx.moveTo(pL,zy);ctx.lineTo(W-pR,zy);ctx.stroke();ctx.setLineDash([]);
-      const lc=eq[eq.length-1]>=0?C.G:C.R;
-      const grd=ctx.createLinearGradient(0,pT,0,H-pB);
-      grd.addColorStop(0,eq[eq.length-1]>=0?'rgba(52,211,153,0.2)':'rgba(248,113,113,0.2)');
-      grd.addColorStop(1,'rgba(0,0,0,0)');
-      const pts=eq.map((v,i)=>[toX(i),toY(v)]);
-      line(ctx,pts,lc,2,true,grd);
-      // drawdown fill
-      let pk=0,cc=0;const ddP=[];
-      eq.forEach((v,i)=>{cc+=i>0?pnlArr[i-1]:0;if(cc>pk)pk=cc;ddP.push([toX(i),toY(pk)]);});
-      if(ddP.length>1){ctx.beginPath();pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
-        ddP.reverse().forEach(([x,y])=>ctx.lineTo(x,y));ctx.closePath();ctx.fillStyle='rgba(248,113,113,0.06)';ctx.fill();}
-      eq.forEach((v,i)=>{if(i===0)return;const col=pnlArr[i-1]>=0?C.G:C.R;
-        ctx.beginPath();ctx.arc(toX(i),toY(v),3.5,0,Math.PI*2);ctx.fillStyle=col+'cc';ctx.fill();});
-      hover(eqF,pts,eq.map((v,i)=>i===0?'Start':
-        `#${i} · ${at[i-1].date} · ${at[i-1].pair} · ${at[i-1].outcome}\nCumulative: ${fmtV(v)}`));
-    }
-    // PnL distribution
-    const dist=cv('asa-dist');
-    if(dist){
-      const ctx=dist.getContext('2d');const W=dist.width,H=dist.height;
-      const pL=50,pT=10,pB=18;
-      const mx=Math.max(...pnlArr.map(Math.abs),1);
-      const bw=Math.max(2,(W-pL-8)/at.length-1.5);
-      const zy=pT+(H-pT-pB)/2;
-      ctx.strokeStyle=C.GR;ctx.lineWidth=1;ctx.setLineDash([2,3]);
-      ctx.beginPath();ctx.moveTo(pL,zy);ctx.lineTo(W-8,zy);ctx.stroke();ctx.setLineDash([]);
-      [mx/2,mx,-mx/2,-mx].forEach(v=>{
-        const y=pT+(1-((v+mx)/(mx*2)))*(H-pT-pB);
-        ctx.fillStyle=C.TX;ctx.font='8px Inter';ctx.textAlign='right';ctx.textBaseline='middle';
-        ctx.fillText(fmtV(v),pL-3,y);
-      });
-      pnlArr.forEach((v,i)=>{
-        const x=pL+i*(W-pL-8)/at.length;const col=v>=0?C.G:C.R;
-        const bH=Math.abs(v)/mx*(H-pT-pB)/2;const y=v>=0?zy-bH:zy;
-        bar(ctx,x+0.5,y,bw,bH,2,col+'55',col+'99');
-      });
-      ctx.font='8px Inter';ctx.fillStyle=C.TX;ctx.textAlign='center';ctx.textBaseline='top';
-      ctx.fillText('Trade #',pL+(W-pL-8)/2,H-pB+3);
-    }
-    // Running win rate
-    const wrC=cv('asa-wr');
-    if(wrC){
-      const ctx=wrC.getContext('2d');const W=wrC.width,H=wrC.height;
-      const pL=34,pT=10,pB=14;
-      let wins2=0;const wrArr=at.map((t,i)=>{if(t.outcome==='Win')wins2++;return(wins2/(i+1))*100;});
-      const pts=wrArr.map((v,i)=>[pL+i/(wrArr.length-1||1)*(W-pL-10),pT+(1-v/100)*(H-pT-pB)]);
-      const y50=pT+0.5*(H-pT-pB);
-      ctx.strokeStyle='rgba(251,191,36,0.25)';ctx.lineWidth=1;ctx.setLineDash([3,4]);
-      ctx.beginPath();ctx.moveTo(pL,y50);ctx.lineTo(W-10,y50);ctx.stroke();ctx.setLineDash([]);
-      ctx.fillStyle='rgba(251,191,36,0.5)';ctx.font='8px Inter';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText('50%',pL-3,y50);
-      [0,50,100].forEach(v=>{const y=pT+(1-v/100)*(H-pT-pB);
-        ctx.fillStyle=C.TX;ctx.font='8px Inter';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(v+'%',pL-3,y);});
-      const curWR=wrArr[wrArr.length-1]||0;
-      const grd=wrC.getContext('2d').createLinearGradient(0,pT,0,H-pB);
-      grd.addColorStop(0,curWR>=50?'rgba(52,211,153,0.18)':'rgba(248,113,113,0.18)');grd.addColorStop(1,'rgba(0,0,0,0)');
-      line(ctx,pts,curWR>=50?C.G:C.R,2,true,grd);
-      pts.forEach(([x,y],i)=>{const col=at[i].outcome==='Win'?C.G:at[i].outcome==='Loss'?C.R:C.O;
-        ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();});
-      hover(wrC,pts,wrArr.map((v,i)=>`Trade ${i+1}: ${at[i].pair} · ${at[i].outcome}\nWin rate: ${v.toFixed(1)}%`));
-    }
-    // R:R scatter
-    const rrC=cv('asa-rr');
-    if(rrC){
-      const ctx=rrC.getContext('2d');const W=rrC.width,H=rrC.height;
-      const pL=12,pT=10,pB=16;
-      const dat=at.map((t,i)=>({rr:parseFloat(t.rr)||0,pnl:pnlArr[i],out:t.outcome}));
-      const mxRR=Math.max(...dat.map(d=>d.rr),4);
-      const mnP=Math.min(...dat.map(d=>d.pnl)),mxP=Math.max(...dat.map(d=>d.pnl));
-      const rP=Math.max(mxP-mnP,1);
-      dat.forEach(d=>{
-        const x=pL+(d.rr/mxRR)*(W-pL-pL);const y=pT+(1-(d.pnl-mnP)/rP)*(H-pT-pB);
-        const col=d.out==='Win'?C.G:d.out==='Loss'?C.R:C.O;
-        ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fillStyle=col+'99';ctx.fill();
-        ctx.strokeStyle=col;ctx.lineWidth=1;ctx.stroke();
-      });
-      ctx.fillStyle=C.TX;ctx.font='8px Inter';ctx.textAlign='center';ctx.textBaseline='bottom';
-      ctx.fillText('→ Risk:Reward',W/2,H);
-    }
-    // Day of week
-    const dowC=cv('asa-dow');
-    if(dowC){
-      const ctx=dowC.getContext('2d');const W=dowC.width,H=dowC.height;
-      const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-      const dm={Mon:{p:0,n:0},Tue:{p:0,n:0},Wed:{p:0,n:0},Thu:{p:0,n:0},Fri:{p:0,n:0},Sat:{p:0,n:0},Sun:{p:0,n:0}};
-      at.forEach((t,i)=>{const d=new Date(t.date+'T12:00:00');const k=DAYS[d.getDay()===0?6:d.getDay()-1];dm[k].p+=pnlArr[i];dm[k].n++;});
-      const vals=DAYS.map(d=>dm[d].p);const mxA=Math.max(...vals.map(Math.abs),1);
-      const pT=8,pB=22;const bw=(W-8)/7-4;
-      DAYS.forEach((day,i)=>{
-        const x=4+i*(bw+4);const pnl=vals[i];
-        const bH=Math.abs(pnl)/mxA*(H-pT-pB)*0.85;
-        const col=pnl>0?C.G:pnl<0?C.R:C.GR;const y=pT+(H-pT-pB)-bH;
-        if(bH>0)bar(ctx,x,y,bw,bH,3,col+'44',col);
-        ctx.fillStyle=dm[day].n>0?(pnl>=0?C.G:C.R):C.TX;
-        ctx.font=`${dm[day].n>0?'bold ':''}8px Inter`;ctx.textAlign='center';ctx.textBaseline='top';
-        ctx.fillText(day,x+bw/2,H-pB+3);
-        if(dm[day].n>0){ctx.fillStyle=C.TX;ctx.font='7px Inter';ctx.textBaseline='bottom';ctx.fillText(dm[day].n+'t',x+bw/2,y-1);}
-      });
-    }
-  }
-
-  // ── Breakdown tab ─────────────────────────────────────
-  if(activeTab==='breakdown'){
-    const COLS=[C.G,C.B,C.T,C.O,C.P,C.PK,C.OR,C.R];
-    hbarChart('asa-pairs', groupData(t=>t.pair), null);
-    hbarChart('asa-strat', groupData(t=>t.strategy||'No Strategy'), COLS);
-    hbarChart('asa-kz',    groupData(t=>t.kz||'Unknown'), COLS);
-    hbarChart('asa-emo',   groupData(t=>t.emotion||'Unknown'), COLS);
-    hbarChart('asa-rat',   groupData(t=>t.rating?t.rating+'★':'No Rating'), COLS);
-    // Buy vs Sell
-    const posEl=cv('asa-pos');
-    if(posEl){
-      const ctx=posEl.getContext('2d');const W=posEl.width,H=posEl.height;
-      const grps={Buy:{Win:0,Loss:0,BE:0,p:0},Sell:{Win:0,Loss:0,BE:0,p:0}};
-      at.forEach((t,i)=>{const g=grps[t.pos]||grps.Buy;g[t.outcome]=(g[t.outcome]||0)+1;g.p+=pnlArr[i];});
-      const OCOLS={Win:C.G,Loss:C.R,BE:C.O};
-      const pL=40,pT=12,pB=18;const grpW=(W-pL-8)/2-6;
-      Object.entries(grps).forEach(([pos,data],gi)=>{
-        const gx=pL+gi*(grpW+6);const tot=data.Win+data.Loss+data.BE||1;let cx=gx;
-        ['Win','Loss','BE'].forEach(out=>{if(!data[out])return;
-          const bw=(data[out]/tot)*grpW;bar(ctx,cx,pT,bw,H-pT-pB,3,OCOLS[out]+'55',OCOLS[out]);
-          if(bw>16){ctx.fillStyle=OCOLS[out];ctx.font='bold 8px Inter';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(data[out],cx+bw/2,pT+(H-pT-pB)/2);}cx+=bw+1;});
-        ctx.fillStyle=C.TX;ctx.font='bold 9px Inter';ctx.textAlign='center';ctx.textBaseline='top';
-        ctx.fillText(`${pos}  ${fmtV(data.p)}`,gx+grpW/2,H-pB+2);
-      });
-    }
-  }
-}
-
-
 
 function accCloseDetail() {
   const drawer = document.getElementById('acc-detail-drawer');
@@ -5413,14 +5088,11 @@ async function _executeSoftDelete(id) {
   }
 
   closeDetail();
-  // Immediately remove the row from the DOM
+  // Immediately remove the row from the DOM so it vanishes without waiting for _refreshAll
   const row = document.querySelector(`#trade-table-body tr[onclick*="openDetail(${id})"]`);
   if (row) { row.style.transition = 'opacity 0.15s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 150); }
   _refreshAll();
   renderTradeTable(trades);
-  // Re-render account drawer instantly if open
-  const _delDrawer = document.getElementById('acc-detail-drawer');
-  if (_delDrawer && _delDrawer.classList.contains('open') && t.account) accShowDetail(t.account);
   showToast(t.pair + ' moved to Trash', 'danger', { label: 'View Trash', fn: "nav('trash',null,'Trash')" });
 }
 
@@ -5584,133 +5256,6 @@ function openCalPopup(e, dateStr) {
 function closeCalPopup() { document.getElementById('cal-popup').style.display = 'none'; }
 document.addEventListener('click', e => { const p = document.getElementById('cal-popup'); if (p && !p.contains(e.target)) closeCalPopup(); });
 
-// ══════════════════════════════════════════════════════════
-// STANDALONE CALENDAR PAGE  (IDs: *-sa)
-// Completely independent from the inline dashboard calendar
-// ══════════════════════════════════════════════════════════
-let calMonthSA = new Date().getMonth();
-let calYearSA  = new Date().getFullYear();
-
-function calNavSA(dir) {
-  calMonthSA += dir;
-  if (calMonthSA > 11) { calMonthSA = 0; calYearSA++; }
-  if (calMonthSA < 0)  { calMonthSA = 11; calYearSA--; }
-  renderCalendarSA();
-}
-function _getAccSizeSA() { return parseFloat(document.getElementById('cal-acc-size-sa')?.value) || 5000; }
-function _getCalFilterSA() { const el = document.getElementById('cal-acc-filter-sa'); return el ? el.value : ''; }
-
-function _refreshCalSAFilter() {
-  const sel = document.getElementById('cal-acc-filter-sa'); if (!sel) return;
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">All active accounts</option>' +
-    (_getActiveAccounts()||[]).map(a => `<option value="${a.name}"${a.name===cur?' selected':''}>${a.name}</option>`).join('') ;
-}
-
-function _onCalSAFilterChange() {
-  const sel = document.getElementById('cal-acc-filter-sa'); if (!sel) return;
-  const accName = sel.value;
-  if (accName) {
-    const sz = getAccSizeForAccount(accName);
-    const el  = document.getElementById('cal-acc-size-sa');
-    if (el && sz > 0) el.value = sz;
-  }
-  renderCalendarSA();
-}
-
-function renderCalendarSA() {
-  const accSize   = _getAccSizeSA();
-  const accFilter = _getCalFilterSA();
-
-  const lbl = document.getElementById('cal-month-label-sa');
-  if (lbl) lbl.textContent = MONTH_NAMES_LONG[calMonthSA] + ' ' + calYearSA;
-
-  const ym = calYearSA + '-' + String(calMonthSA + 1).padStart(2, '0');
-  const monthTrades = trades.filter(t => t.date.startsWith(ym) && (!accFilter || t.account === accFilter));
-  const dayMap = groupTradesByDay(monthTrades);
-  const { winDays, lossDays, beDays, wr } = calculateCalendarWinrate(dayMap);
-  const tradingDays = Object.keys(dayMap).length;
-  const totalTrades = monthTrades.length;
-  const totalUSD    = pnlToUSD(monthTrades.reduce((a, t) => a + t.pnl, 0), accSize);
-
-  let bestDay = null, worstDay = null;
-  Object.entries(dayMap).forEach(([date, d]) => {
-    if (!bestDay || d.totalPnl > dayMap[bestDay].totalPnl) bestDay = date;
-    if (!worstDay || d.totalPnl < dayMap[worstDay].totalPnl) worstDay = date;
-  });
-
-  const kpiEl = document.getElementById('cal-kpi-row-sa');
-  if (kpiEl) {
-    const dn = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
-    const bestUSD  = bestDay  ? pnlToUSD(dayMap[bestDay].totalPnl, accSize)  : 0;
-    const worstUSD = worstDay ? pnlToUSD(dayMap[worstDay].totalPnl, accSize) : 0;
-    const wrColor  = wr >= 70 ? 'green' : wr >= 50 ? 'white' : 'red';
-    kpiEl.innerHTML =
-      `<div class="cal-kpi"><div class="cal-kpi-label">🗂 Trades</div><div class="cal-kpi-val white">${totalTrades}<span style="font-size:10px;color:var(--text3);margin-left:5px">${tradingDays}d</span></div></div>` +
-      `<div class="cal-kpi"><div class="cal-kpi-label">💰 P&L</div><div class="cal-kpi-val ${totalUSD>=0?'green':'red'}">${fmtUSD(totalUSD)}</div></div>` +
-      `<div class="cal-kpi"><div class="cal-kpi-label">📈 Best${bestDay?' ('+dn(bestDay)+')':''}</div><div class="cal-kpi-val green">${bestDay?fmtUSD(bestUSD):'—'}</div></div>` +
-      `<div class="cal-kpi"><div class="cal-kpi-label">📉 Worst${worstDay?' ('+dn(worstDay)+')':''}</div><div class="cal-kpi-val ${worstUSD<0?'red':'green'}">${worstDay?fmtUSD(worstUSD):'—'}</div></div>` +
-      `<div class="cal-kpi"><div class="cal-kpi-label">🎯 Day Win Rate</div><div class="cal-kpi-val ${wrColor}">${wr}%</div><div style="font-size:9px;color:var(--text3);margin-top:3px;display:flex;gap:5px"><span style="color:var(--green)">▲${winDays}W</span><span style="color:var(--red)">▼${lossDays}L</span><span>⬤${beDays}BE</span></div></div>`;
-  }
-
-  const daysEl = document.getElementById('cal-days-sa');
-  if (!daysEl) return;
-
-  const firstDay = new Date(calYearSA, calMonthSA, 1);
-  let startDow = firstDay.getDay() - 1; if (startDow < 0) startDow = 6;
-  const daysInMonth = new Date(calYearSA, calMonthSA + 1, 0).getDate();
-  const daysInPrev  = new Date(calYearSA, calMonthSA, 0).getDate();
-  const today = new Date().toISOString().slice(0, 10);
-  let cells = [];
-  for (let i = startDow - 1; i >= 0; i--) {
-    const pm = calMonthSA === 0 ? 12 : calMonthSA;
-    const py = calMonthSA === 0 ? calYearSA - 1 : calYearSA;
-    cells.push({ day: daysInPrev - i, month: pm, year: py, current: false });
-  }
-  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, month: calMonthSA + 1, year: calYearSA, current: true });
-  let nd = 1;
-  while (cells.length < 42) {
-    const nm = calMonthSA === 11 ? 1 : calMonthSA + 2;
-    const ny = calMonthSA === 11 ? calYearSA + 1 : calYearSA;
-    cells.push({ day: nd++, month: nm, year: ny, current: false });
-  }
-
-  daysEl.innerHTML = cells.map(c => {
-    const dateStr = c.year + '-' + String(c.month).padStart(2,'0') + '-' + String(c.day).padStart(2,'0');
-    const isToday = dateStr === today;
-    const dayData = dayMap[dateStr]; const hasTrades = !!dayData;
-    const outcome = hasTrades ? calculateDailyOutcome(dayData.totalPnl) : null;
-    let cls = 'cal-day';
-    if (!c.current) cls += ' other-month';
-    if (isToday) cls += ' today';
-    if (hasTrades) { cls += ' has-trades'; cls += outcome==='win'?' win-day':outcome==='loss'?' loss-day':' mixed-day'; }
-    const dn = isToday ? `<div class="cal-day-num"><span class="cal-today-badge">${c.day}</span></div>`
-                       : `<div class="cal-day-num">${String(c.day).padStart(2,'0')}</div>`;
-    let dot='', pnlH='', cnt='', pairs='';
-    if (hasTrades) {
-      const dotCol = outcome==='win'?'green':outcome==='loss'?'red':'blue';
-      dot   = `<div class="cal-day-dot ${dotCol}"></div>`;
-      const usd = pnlToUSD(dayData.totalPnl, accSize);
-      pnlH  = `<div class="cal-day-pnl ${usd>0?'green':usd<0?'red':'zero'}">${fmtUSD(usd)}</div>`;
-      cnt   = `<div class="cal-day-count">${dayData.trades.length} trade${dayData.trades.length>1?'s':''}</div>`;
-      pairs = `<div class="cal-day-pairs">${[...new Set(dayData.trades.map(t=>t.pair))].join(', ')}</div>`;
-    }
-    let click='', hover='';
-    if (c.current) {
-      if (hasTrades) {
-        click = `onclick="openCalPopup(event,'${dateStr}')"`;
-        hover = `onmouseenter="showCalTooltip(event,window._dayMapSA&&window._dayMapSA['${dateStr}'],'${dateStr}',${accSize})" onmouseleave="hideCalTooltip()"`;
-      } else {
-        click = `onclick="closeCalPopup();openModal({date:'${dateStr}'})"`;
-      }
-    }
-    return `<div class="${cls}" ${click} ${hover}>${dot}${dn}${pnlH}${cnt}${pairs}</div>`;
-  }).join('');
-
-  window._dayMapSA = dayMap;
-}
-
-
 // ── TRASH SYSTEM ──────────────────────────────────────
 let trashSettings = { autoDays: 30 };
 let _trashFilter = 'all';
@@ -5819,7 +5364,7 @@ function renderTrash() {
   list.innerHTML = html2;
 }
 
-async function quickDelete(id, accountName) {
+async function quickDelete(id) {
   const t = trades.find(x => x.id === id);
   if (!t) return;
   openGlassModal({
@@ -5832,15 +5377,11 @@ async function quickDelete(id, accountName) {
       deletedTrades.unshift({ ...t, deletedAt: new Date().toISOString(), originalId: t.id });
       trades = trades.filter(x => x.id !== id);
       delete tradeState[id];
-      // Immediately remove the row from the DOM
+      // Immediately remove the row from the DOM so it vanishes without waiting for _refreshAll
       const row = document.querySelector(`#trade-table-body tr[onclick*="openDetail(${id})"]`);
       if (row) { row.style.transition = 'opacity 0.15s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 150); }
       _refreshAll();
       renderTradeTable(trades);
-      // Re-render account drawer instantly if open
-      const _accName = accountName || t.account;
-      const drawer = document.getElementById('acc-detail-drawer');
-      if (drawer && drawer.classList.contains('open') && _accName) accShowDetail(_accName);
       showToast(t.pair + ' moved to Trash', 'danger', { label: 'View Trash', fn: "nav('trash',null,'Trash')" });
     }
   });
@@ -5879,10 +5420,6 @@ async function restoreTrade(originalId) {
   }
   _refreshAll();
   renderTrash();
-  renderTradeTable(trades);
-  // Re-render account drawer instantly if open
-  const _restDrawer = document.getElementById('acc-detail-drawer');
-  if (_restDrawer && _restDrawer.classList.contains('open') && t.account) accShowDetail(t.account);
   showToast(t.pair + ' restored to Trade Log', 'restore');
 }
 
@@ -6007,8 +5544,6 @@ function _refreshAll() {
   updateKPIs(); buildPairTable(); buildKillzoneTable(); buildStrategyTable(); buildMonthlyTable(); refreshPairFilter();
   buildSidebarYears(); renderCalendar(); renderTradeTable(trades); updateTrashBadge();
   buildAccounts();
-  // Also refresh standalone calendar page if it's currently visible
-  if (document.getElementById('page-calendar')?.classList.contains('active')) renderCalendarSA();
 }
 
 // ── USER BAR (shows logged-in user + sign out button) ──
@@ -6023,66 +5558,79 @@ function _injectUserBar(user) {
 // ══════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async function () {
 
-  // 1. Theme first (prevents flash)
+  // ── Helper: update splash UI ─────────────────────────────
+  const _splash = document.getElementById('boot-splash');
+  const _splashBar = document.getElementById('splash-bar');
+  const _splashStatus = document.getElementById('splash-status');
+  const _setSplash = (pct, msg) => {
+    if (_splashBar) _splashBar.style.width = pct + '%';
+    if (_splashStatus) _splashStatus.textContent = msg;
+  };
+  const _hideSplash = () => {
+    if (!_splash) return;
+    _splash.style.opacity = '0';
+    _splash.style.visibility = 'hidden';
+    setTimeout(() => { if (_splash) _splash.remove(); }, 380);
+  };
+
+  // ── PHASE 0: Instant setup (no network) ──────────────────
   loadTheme();
+  updateClock();
+  setInterval(updateClock, 1000);
+  _setSplash(10, 'Connecting…');
 
-  // 2. Auth guard — redirect to login if not signed in
+  // ── PHASE 1: Auth check ───────────────────────────────────
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) {
-    window.location.replace('./login.html');
-    return;
-  }
+  if (!session) { window.location.replace('./login.html'); return; }
   _currentUser = session.user;
-
-  // 3. Inject user bar + sign out
   _injectUserBar(_currentUser);
-
-  // 4. Also sign out if another tab signs out
+  _injectTopbarAvatar();
+  _setSplash(25, 'Authenticated — loading trades…');
   sb.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') window.location.replace('./login.html');
   });
 
-  // 5. Load data from Supabase - parallel for speed
+  // ── PHASE 2: Critical data only (trades + accounts) ──────
   loadTrashSettings();
   await Promise.all([
     loadTrades(),
     loadDeletedTrades(),
-    _wlLoad(),
-    _goalsLoad(),
-    _pbLoad(),
     _accLoad(),
-    _profileLoad(),
   ]);
   await runAutoCleanup();
+  _setSplash(75, 'Rendering dashboard…');
 
-  // 6. Render all UI
+  // ── PHASE 3: First paint — dashboard visible immediately ──
   updateKPIs();
   buildPairTable();
   buildKillzoneTable();
   buildStrategyTable();
   buildMonthlyTable();
   buildSidebarYears();
-  // Auto-highlight current quarter in sidebar on first load
-  const _bootYear = new Date().getFullYear();
-  const _bootQ    = getQuarter(new Date().toISOString().slice(0, 10));
-  const _bootSbEl = document.getElementById(`sb-q-${_bootYear}-${_bootQ}`);
-  if (_bootSbEl) _bootSbEl.classList.add('active');
   refreshPairFilter();
   updateTrashBadge();
-  buildWatchlist();
   buildAccounts();
-  _mt5ResumeAllPolling();
-  buildPlaybook();
-  buildGoals();
-  buildMonthlyReview();
   renderTradeTable(trades);
   _refreshCalendarAccountFilter();
   renderCalendar();
-  _injectTopbarAvatar();
+  // Auto-highlight current quarter in sidebar
+  const _bootYear = new Date().getFullYear();
+  const _bootQ    = getQuarter(new Date().toISOString().slice(0, 10));
+  const _bootSbEl = document.getElementById(\`sb-q-\${_bootYear}-\${_bootQ}\`);
+  if (_bootSbEl) _bootSbEl.classList.add('active');
+  _setSplash(100, 'Done');
 
-  // 7. Live clock
-  updateClock();
-  setInterval(updateClock, 1000);
+  // ── PHASE 3b: Remove splash — dashboard is now visible ───
+  _hideSplash();
+
+  // ── PHASE 4: Background loads — non-blocking ─────────────
+  _wlLoad().then(() => buildWatchlist());
+  _goalsLoad().then(() => buildGoals());
+  _pbLoad().then(() => buildPlaybook());
+  _profileLoad();
+  if (typeof _monthlyLoad === 'function') _monthlyLoad().then(() => buildMonthlyReview());
+  else buildMonthlyReview();
+  _mt5ResumeAllPolling();
 });
 
 // ── CUSTOM ACCOUNTS — Cloud-synced via journal_account_data ──────────────

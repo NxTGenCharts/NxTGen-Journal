@@ -2,6 +2,11 @@
 <html lang="en" data-theme="">
 <head>
 <meta charset="UTF-8">
+  <!-- Speed: preconnect to external resources -->
+  <link rel="preconnect" href="https://jlqgdwfbwdiieafhwisy.supabase.co" crossorigin>
+  <link rel="dns-prefetch" href="https://jlqgdwfbwdiieafhwisy.supabase.co">
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <meta name="description" content="NxTGen Trading Journal — Premium ICT Trading Dashboard with glassmorphism design">
 <meta name="theme-color" content="#080b12" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f1f5fb" media="(prefers-color-scheme: light)">
@@ -20,6 +25,28 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <!-- ── Boot splash — shown until Phase 3 render completes ── -->
+  <div id="boot-splash" style="
+    position:fixed;inset:0;z-index:9999;
+    background:var(--bg-base);
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:20px;
+    transition:opacity 0.35s ease, visibility 0.35s ease;
+  ">
+    <img src="logo.svg" alt="NxTGen" style="width:64px;height:64px;opacity:.9;animation:splashPulse 1.4s ease-in-out infinite">
+    <div style="text-align:center">
+      <div style="font-family:'Inter',sans-serif;font-size:15px;font-weight:700;color:rgba(248,250,252,.9);margin-bottom:6px">NxTGen Trading Journal</div>
+      <div id="splash-status" style="font-family:'Inter',sans-serif;font-size:12px;color:rgba(148,163,184,.7)">Connecting…</div>
+    </div>
+    <div style="width:180px;height:3px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden">
+      <div id="splash-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#60a5fa,#34d399);border-radius:99px;transition:width 0.4s ease"></div>
+    </div>
+  </div>
+  <style>
+    @keyframes splashPulse{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+  </style>
+
+
 
 <!-- ══ Background noise texture mesh ══ -->
 <div style="position:fixed;inset:0;pointer-events:none;z-index:0;
@@ -69,7 +96,6 @@
       <div class="sb-item" onclick="nav('tradelog',this,'Trade Log')"><span class="ico">☰</span><span class="lbl">Trade Log</span></div>
       <div class="sb-item" onclick="nav('watchlist',this,'Weekly Watchlist')"><span class="ico">📅</span><span class="lbl">Weekly Watchlist</span></div>
       <div class="sb-item" onclick="nav('accounts',this,'Account Tracker')"><span class="ico">💰</span><span class="lbl">Account Tracker</span></div>
-      <div class="sb-item" id="sb-cal-item" onclick="nav('calendar',this,'Calendar')"><span class="ico">📅</span><span class="lbl">Calendar</span></div>
     </div>
     <div class="sb-sep"></div>
     <div id="sb-years"></div>
@@ -97,6 +123,7 @@
       <div class="tab" id="tab-tradelog" onclick="nav('tradelog',null,'Trade Log')">Trade Log</div>
       <div class="tab" id="tab-watchlist" onclick="nav('watchlist',null,'Watchlist')">Watchlist</div>
       <div class="tab" id="tab-accounts" onclick="nav('accounts',null,'Accounts')">Accounts</div>
+      <div class="tab" id="tab-calendar" onclick="nav('calendar',null,'Calendar')">📅 Calendar</div>
       <div class="tab" id="tab-trash" onclick="nav('trash',null,'Trash')">🗑 Trash</div>
     </div>
 
@@ -104,130 +131,989 @@
          DASHBOARD PAGE
     ═══════════════════════════════════════════════ -->
     <div class="page active" id="page-dashboard">
-      <div class="dash-layout">
+      <div class="page-inner">
+        <div class="cover" id="dash-cover">
+          <div class="cover-label" id="dash-cover-period">QUARTERLY PERFORMANCE · 2026</div>
+          <div class="cover-title" id="dash-cover-title">Loading…</div>
+          <div class="cover-sub" id="dash-cover-sub"><span id="dash-cover-sub-text">Loading…</span> · <span id="dash-last-updated" style="opacity:.7">Loading...</span></div>
+        </div>
 
-        <!-- ── LEFT: Stats panel ── -->
-        <div class="dash-left">
-          <div class="cover" id="dash-cover">
-            <div class="cover-label" id="dash-cover-period">QUARTERLY PERFORMANCE · 2026</div>
-            <div class="cover-title" id="dash-cover-title">Loading…</div>
-            <div class="cover-sub" id="dash-cover-sub">
-              <span id="dash-cover-sub-text">Loading…</span> · <span id="dash-last-updated" style="opacity:.7">Loading...</span>
+        <div class="kpi-grid">
+          <div class="kpi-card"><div class="kpi-label">Total trades</div><div class="kpi-value blue" id="kpi-total">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Win rate</div><div class="kpi-value green" id="kpi-wr">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Net PnL</div><div class="kpi-value green" id="kpi-pnl">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Profit factor</div><div class="kpi-value gold" id="kpi-pf">—</div></div>
+        </div>
+        <div class="kpi-grid" style="margin-bottom:16px">
+          <div class="kpi-card"><div class="kpi-label">Avg win</div><div class="kpi-value green" id="kpi-aw">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Avg loss</div><div class="kpi-value red" id="kpi-al">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Risk:reward</div><div class="kpi-value blue" id="kpi-rr">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Win streak</div><div class="kpi-value teal" id="kpi-ws">—</div></div>
+        </div>
+
+        <div class="insight">
+          <span class="insight-ico">💡</span>
+          <span class="insight-text" id="dash-insight-text">Analysing your data…</span>
+        </div>
+
+        <div class="sec-head">Pair Performance</div>
+        <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Pair</th><th>Trades</th><th>Win%</th><th>Net PnL</th><th class="col-winbar">Win rate bar</th></tr></thead>
+          <tbody id="pair-table-body"></tbody>
+        </table>
+        </div>
+
+        <div class="sec-head">Killzone Breakdown</div>
+        <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Session</th><th>Trades</th><th>Win%</th><th>Avg PnL</th><th>Grade</th></tr></thead>
+          <tbody id="kz-table-body"></tbody>
+        </table>
+        </div>
+
+        <div class="sec-head">Strategy Performance</div>
+        <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Strategy</th><th>Trades</th><th>Win%</th><th>Avg PnL</th></tr></thead>
+          <tbody id="strategy-table-body"></tbody>
+        </table>
+        </div>
+
+        <div class="sec-head">Monthly PnL</div>
+        <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Month</th><th>Trades</th><th>Win%</th><th>Net PnL</th><th>Streak</th><th>Grade</th></tr></thead>
+          <tbody id="monthly-table-body"></tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         TRADE LOG PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-tradelog">
+      <div class="page-inner">
+        <div class="cover">
+          <div class="cover-label">Trade Database · All accounts</div>
+          <div class="cover-title">Trade Log</div>
+          <div class="cover-sub">Click any row to view details, upload charts and add notes</div>
+        </div>
+        <div class="filter-bar" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+          <input type="text" class="form-input" id="search-input" placeholder="Search pair, date, killzone…" oninput="filterTable()" style="flex:1;min-width:140px">
+          <select class="form-select" id="filter-outcome" onchange="filterTable()" style="flex:1;min-width:110px">
+            <option value="">All outcomes</option>
+            <option value="Win">Win</option>
+            <option value="Loss">Loss</option>
+            <option value="B.E">B.E</option>
+          </select>
+          <select class="form-select" id="filter-kz" onchange="filterTable()" style="flex:1;min-width:120px">
+            <option value="">All killzones</option>
+            <option value="London">London</option>
+            <option value="New York">New York</option>
+            <option value="Asian">Asian</option>
+          </select>
+          <select class="form-select" id="filter-pair" onchange="filterTable()" style="flex:1;min-width:100px">
+            <option value="">All pairs</option>
+          </select>
+        </div>
+        <div class="data-table-wrap">
+        <table class="data-table" id="trade-table">
+          <thead><tr><th>Date</th><th>Pair</th><th>Pos</th><th>R:R</th><th>PnL</th><th>Outcome</th><th>Killzone</th><th>Strategy</th><th>Account</th><th>★</th><th></th></tr></thead>
+          <tbody id="trade-table-body"></tbody>
+        </table>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:var(--text3)" id="trade-count"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         WATCHLIST PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-watchlist">
+      <div class="page-inner">
+        <div class="cover">
+          <div class="cover-label" id="wl-cover-label">Analysis Journal · Weekly Prep</div>
+          <div class="cover-title">Market Watchlist</div>
+          <div class="cover-sub">HTF → Daily → 4h → 1h → 30m → LTF Entry · Complete every Sunday</div>
+        </div>
+
+        <!-- Quarter Navigator -->
+        <div class="wl-quarter-nav" id="wl-quarter-nav"></div>
+
+        <!-- Week selector bar -->
+        <div class="wl-week-bar" id="wl-week-bar">
+          <div class="wl-week-scroll" id="wl-week-scroll"></div>
+          <button class="wl-add-week-btn" onclick="wlAddWeek()" title="Add new week">＋ New Week</button>
+        </div>
+
+        <!-- Active week content -->
+        <div id="wl-week-content">
+          <div class="wl-empty-state" id="wl-empty-state">
+            <div class="wl-empty-icon">📊</div>
+            <div class="wl-empty-title">No analysis yet</div>
+            <div class="wl-empty-sub">Click <strong>+ New Week</strong> to start your first weekly watchlist for this quarter.</div>
+          </div>
+        </div>
+
+        <!-- Modals -->
+        <div class="wl-modal-overlay" id="wl-modal-overlay" onclick="wlCloseModal()"></div>
+        <div class="wl-modal" id="wl-modal">
+          <div class="wl-modal-head">
+            <div class="wl-modal-title" id="wl-modal-title">New Week</div>
+            <button class="wl-modal-close" onclick="wlCloseModal()">✕</button>
+          </div>
+          <div class="wl-modal-body" id="wl-modal-body"></div>
+        </div>
+
+        <!-- Pair modal -->
+        <div class="wl-modal-overlay" id="wl-pair-modal-overlay" onclick="wlClosePairModal()"></div>
+        <div class="wl-modal wl-modal-wide" id="wl-pair-modal">
+          <div class="wl-modal-head">
+            <div class="wl-modal-title" id="wl-pair-modal-title">Pair Analysis</div>
+            <button class="wl-modal-close" onclick="wlClosePairModal()">✕</button>
+          </div>
+          <div class="wl-modal-body" id="wl-pair-modal-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         TRADE ENTRY PAGE
+    ═══════════════════════════════════════════════ -->
+
+    <!-- ═══════════════════════════════════════════════
+         ACCOUNTS PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-accounts">
+      <div class="page-inner">
+        <div class="cover">
+          <div class="cover-label">Funded &amp; Paper Accounts</div>
+          <div class="cover-title">Account Tracker</div>
+          <div class="cover-sub">Track drawdown, targets, and payouts across all accounts</div>
+        </div>
+
+        <!-- Account cards grid -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="sec-head" style="margin-bottom:0">Accounts</div>
+          <button class="wl-add-week-btn" onclick="_openManageAccounts()">⚙ Manage Accounts</button>
+        </div>
+        <div class="acc-grid" id="accounts-grid"></div>
+
+        <!-- Account detail drawer -->
+        <div class="acc-detail-drawer" id="acc-detail-drawer" style="display:none">
+          <div class="acc-detail-header">
+            <div class="acc-detail-title" id="acc-detail-title"></div>
+            <button class="wl-modal-close" onclick="accCloseDetail()">✕</button>
+          </div>
+          <div class="acc-detail-body" id="acc-detail-body"></div>
+        </div>
+
+        <!-- Payout Log -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:24px">
+          <div class="sec-head" style="margin-bottom:0">Payout Log</div>
+          <button class="wl-add-week-btn" onclick="accAddPayout()">＋ Add Payout</button>
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Account</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+            <tbody id="payout-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Milestones -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:24px">
+          <div class="sec-head" style="margin-bottom:0">Milestones</div>
+          <button class="wl-add-week-btn" onclick="accAddMilestone()">＋ Add Milestone</button>
+        </div>
+        <div class="checklist-grid" id="milestones-list"></div>
+
+        <!-- Payout modal -->
+        <div class="wl-modal-overlay" id="acc-payout-overlay" onclick="accClosePayoutModal()"></div>
+        <div class="wl-modal" id="acc-payout-modal">
+          <div class="wl-modal-head">
+            <div class="wl-modal-title" id="acc-payout-modal-title">Add Payout</div>
+            <button class="wl-modal-close" onclick="accClosePayoutModal()">✕</button>
+          </div>
+          <div class="wl-modal-body" id="acc-payout-modal-body"></div>
+        </div>
+
+        <!-- MT5 Connect modal -->
+        <div class="mt5-overlay" id="mt5-overlay" onclick="if(event.target===this)mt5CloseModal()"></div>
+        <div class="mt5-modal" id="mt5-modal">
+          <div class="mt5-modal-head">
+            <div class="mt5-modal-logo">
+              <span class="mt5-logo-icon">⑤</span>
+              <span class="mt5-logo-text">MetaTrader 5</span>
+              <span class="mt5-logo-badge">Connection</span>
             </div>
+            <button class="wl-modal-close" onclick="mt5CloseModal()">✕</button>
           </div>
+          <div class="mt5-modal-body" id="mt5-modal-body"></div>
+        </div>
+      </div>
+    </div>
 
-          <div class="kpi-grid">
-            <div class="kpi-card"><div class="kpi-label">Total trades</div><div class="kpi-value blue" id="kpi-total">—</div></div>
-            <div class="kpi-card"><div class="kpi-label">Win rate</div><div class="kpi-value green" id="kpi-wr">—</div></div>
-            <div class="kpi-card"><div class="kpi-label">Net PnL</div><div class="kpi-value green" id="kpi-pnl">—</div></div>
-            <div class="kpi-card"><div class="kpi-label">Profit factor</div><div class="kpi-value gold" id="kpi-pf">—</div></div>
+    <!-- ═══════════════════════════════════════════════
+         PLAYBOOK PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-playbook">
+      <div class="page-inner">
+        <div class="cover">
+          <div class="cover-label">Your Rules · Your Edge · Your System</div>
+          <div class="cover-title">Trading Playbook</div>
+          <div class="cover-sub">Read this every morning before trading</div>
+        </div>
+        <div class="sec-head">Entry Models</div>
+        <div id="model-cards"></div>
+        <div class="sec-head">10 Rules Never Broken</div>
+        <div id="rules-list"></div>
+        <div class="sec-head">Trading Schedule — WAT (Lagos)</div>
+        <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Session</th><th>WAT Time</th><th>Priority</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Asian Open</td><td class="mono">1:00–5:00 AM</td><td><span class="pill pill-gold">Monitor</span></td><td>Range forms, 3am sweep</td></tr>
+            <tr><td class="bold">London Open</td><td class="mono">8:00–12:00 PM</td><td><span class="pill pill-red">PRIMARY</span></td><td>1am manipulation plays out</td></tr>
+            <tr><td class="bold">London/NY Overlap</td><td class="mono">1:00–5:00 PM</td><td><span class="pill pill-red">PRIMARY</span></td><td>Highest volume, best entries</td></tr>
+            <tr><td>NY Afternoon</td><td class="mono">5:00–8:00 PM</td><td><span class="pill pill-gold">Monitor</span></td><td>Continuation only</td></tr>
+            <tr><td style="color:var(--text3)">No Trade Zone</td><td class="mono">8PM–1AM</td><td><span class="pill pill-grey">AVOID</span></td><td>Low liquidity</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         GOALS PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-goals">
+      <div class="page-inner">
+        <div class="cover">
+          <div class="cover-label">Set It · Track It · Achieve It</div>
+          <div class="cover-title">Goals & Milestones</div>
+          <div class="cover-sub">Review every quarter · 2026 Trading Plan</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div class="sec-head" style="margin-bottom:0" id="goals-section-head">Goals</div>
+          <button class="wl-add-week-btn" onclick="goalsAddGroup()">＋ Add Group</button>
+        </div>
+        <div id="goals-list"></div>
+        <div class="sec-head">Personal Bests <span style="font-size:10px;color:var(--text3);font-weight:400;font-family:var(--font-mono)">· computed from your trades</span></div>
+        <div class="data-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Metric</th><th>Record</th><th>Date</th><th>Pair</th></tr></thead>
+          <tbody id="goals-pb-tbody"></tbody>
+        </table>
+        </div>
+        <div class="sec-head">Morning Affirmations</div>
+        <div id="affirmations"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         QUARTER PAGE (dynamic)
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-quarter">
+      <div class="page-inner" id="quarter-page-inner">
+        <div style="color:var(--text2);padding:40px;text-align:center">Select a quarter from the sidebar</div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         MONTHLY REVIEW PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-monthly">
+      <div class="page-inner">
+        <!-- Dynamic header -->
+        <div class="cover">
+          <div class="cover-label" id="mr-cover-label">Deep Performance Review</div>
+          <div class="cover-title" id="mr-cover-title">Monthly Review</div>
+          <div class="cover-sub" id="mr-cover-sub"></div>
+        </div>
+
+        <!-- Month navigator -->
+        <div class="mr-nav">
+          <button class="mr-nav-btn" onclick="mrNav(-1)">‹</button>
+          <span class="mr-nav-label" id="mr-nav-label">Loading…</span>
+          <button class="mr-nav-btn" onclick="mrNav(1)">›</button>
+        </div>
+
+        <!-- KPI grid -->
+        <div class="month-summary-grid" id="mr-stats-grid"></div>
+
+        <!-- Loss Audit -->
+        <div class="sec-head">Loss Audit</div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Pair</th><th>Strategy</th><th>PnL</th><th>Notes</th></tr></thead>
+            <tbody id="mr-loss-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Pair breakdown -->
+        <div class="sec-head">Pair Breakdown</div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Pair</th><th>Trades</th><th>Win%</th><th>Net PnL</th></tr></thead>
+            <tbody id="mr-pair-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Reflection Journal -->
+        <div class="sec-head">Reflection Journal</div>
+        <div id="mr-reflections">
+          <div class="mr-reflect-block">
+            <div class="mr-reflect-label">What went well this month?</div>
+            <textarea class="notes-area mr-reflect-ta" id="mr-r1" placeholder="Discipline, executions, patterns that worked…" oninput="mrReflectDirty()"></textarea>
           </div>
-          <div class="kpi-grid" style="margin-bottom:16px">
-            <div class="kpi-card"><div class="kpi-label">Avg win</div><div class="kpi-value green" id="kpi-aw">—</div></div>
-            <div class="kpi-card"><div class="kpi-label">Avg loss</div><div class="kpi-value red" id="kpi-al">—</div></div>
-            <div class="kpi-card"><div class="kpi-label">Risk:reward</div><div class="kpi-value blue" id="kpi-rr">—</div></div>
-            <div class="kpi-card"><div class="kpi-label">Win streak</div><div class="kpi-value teal" id="kpi-ws">—</div></div>
+          <div class="mr-reflect-block">
+            <div class="mr-reflect-label">Key mistakes &amp; root causes</div>
+            <textarea class="notes-area mr-reflect-ta" id="mr-r2" placeholder="What went wrong and why?" oninput="mrReflectDirty()"></textarea>
           </div>
-
-          <div class="insight">
-            <span class="insight-ico">💡</span>
-            <span class="insight-text" id="dash-insight-text">Analysing your data…</span>
+          <div class="mr-reflect-block">
+            <div class="mr-reflect-label">Focus for next month</div>
+            <textarea class="notes-area mr-reflect-ta" id="mr-r3" placeholder="One or two things to lock in next month…" oninput="mrReflectDirty()"></textarea>
           </div>
-
-          <div class="sec-head">Pair Performance</div>
-          <div class="data-table-wrap">
-            <table class="data-table">
-              <thead><tr><th>Pair</th><th>Trades</th><th>Win%</th><th>Net PnL</th><th class="col-winbar">Win rate bar</th></tr></thead>
-              <tbody id="pair-table-body"></tbody>
-            </table>
+          <div style="display:flex;justify-content:flex-end;margin-top:10px">
+            <button class="wl-btn-primary" id="mr-save-btn" onclick="mrSaveReflections()" style="display:none">💾 Save Reflections</button>
           </div>
-
-          <div class="sec-head">Killzone Breakdown</div>
-          <div class="data-table-wrap">
-            <table class="data-table">
-              <thead><tr><th>Session</th><th>Trades</th><th>Win%</th><th>Avg PnL</th><th>Grade</th></tr></thead>
-              <tbody id="kz-table-body"></tbody>
-            </table>
-          </div>
-
-          <div class="sec-head">Strategy Performance</div>
-          <div class="data-table-wrap">
-            <table class="data-table">
-              <thead><tr><th>Strategy</th><th>Trades</th><th>Win%</th><th>Avg PnL</th></tr></thead>
-              <tbody id="strategy-table-body"></tbody>
-            </table>
-          </div>
-
-          <div class="sec-head">Monthly PnL</div>
-          <div class="data-table-wrap">
-            <table class="data-table">
-              <thead><tr><th>Month</th><th>Trades</th><th>Win%</th><th>Net PnL</th><th>Streak</th><th>Grade</th></tr></thead>
-              <tbody id="monthly-table-body"></tbody>
-            </table>
-          </div>
-        </div><!-- /dash-left -->
-
-        <!-- ── RIGHT: Calendar panel ── -->
-        <div class="dash-right">
-          <div class="dash-cal-card">
-            <div class="dash-cal-head">
-              <span class="dash-cal-title">📅 Trading Calendar</span>
-              <div class="dash-cal-filters">
-                <select class="form-select" id="cal-acc-filter" onchange="_onCalAccFilterChange()" title="Filter account">
-                  <option value="">All accounts</option>
-                </select>
-                <input type="number" class="acc-size-input" id="cal-acc-size" value="5000" oninput="renderCalendar()" title="Account size ($)" placeholder="Acc $">
-              </div>
-            </div>
-
-            <div class="cal-header">
-              <div class="cal-nav" onclick="calNav(-1)">‹</div>
-              <div class="cal-month-label" id="cal-month-label">Loading…</div>
-              <div class="cal-nav" onclick="calNav(1)">›</div>
-            </div>
-
-            <div class="cal-kpi-row" id="cal-kpi-row" style="grid-template-columns:repeat(3,1fr);gap:5px;padding-bottom:8px"></div>
-
-            <div class="cal-grid-wrap" style="flex:1;min-height:0">
-              <div class="cal-dow-row">
-                <div class="cal-dow">MON</div><div class="cal-dow">TUE</div><div class="cal-dow">WED</div>
-                <div class="cal-dow">THU</div><div class="cal-dow">FRI</div><div class="cal-dow">SAT</div><div class="cal-dow">SUN</div>
-              </div>
-              <div class="cal-days" id="cal-days"></div>
-            </div>
-          </div>
-        </div><!-- /dash-right -->
-
-      </div><!-- /dash-layout -->
-    </div><!-- /page-dashboard -->
+        </div>
+      </div>
+    </div>
 
     <!-- ═══════════════════════════════════════════════
          CALENDAR PAGE
     ═══════════════════════════════════════════════ -->
     <div class="page" id="page-calendar">
-      <div class="cal-standalone-wrap">
-        <div class="cal-sa-topbar">
-          <select class="form-select" id="cal-acc-filter-sa" onchange="_onCalSAFilterChange()" title="Filter account">
-            <option value="">All active accounts</option>
-          </select>
-          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-            <span style="font-size:11px;color:var(--text3)">Acc size:</span>
-            <input type="number" class="acc-size-input" id="cal-acc-size-sa" value="5000" oninput="renderCalendarSA()" placeholder="5000" style="width:80px">
+      <div style="display:flex;flex-direction:column;height:100%;padding:16px 20px;overflow:hidden">
+        <div class="acc-size-bar">
+          <span class="acc-size-label">Account size for USD calc:</span>
+          <input type="number" class="acc-size-input" id="cal-acc-size" value="5000" oninput="renderCalendar()">
+          <span class="acc-size-hint">PnL % × account size = daily USD</span>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <select class="form-select" id="cal-acc-filter" onchange="_onCalAccFilterChange()" style="width:160px;font-size:12px">
+              <option value="">All active accounts</option>
+            </select>
           </div>
         </div>
-        <div class="cal-header" style="padding:10px 0 8px">
-          <div class="cal-nav" onclick="calNavSA(-1)">‹</div>
-          <div class="cal-month-label" id="cal-month-label-sa">Loading…</div>
-          <div class="cal-nav" onclick="calNavSA(1)">›</div>
-        </div>
-        <div class="cal-kpi-row" id="cal-kpi-row-sa" style="grid-template-columns:repeat(5,1fr)"></div>
-        <div class="cal-grid-wrap" style="flex:1;min-height:0">
-          <div class="cal-dow-row">
-            <div class="cal-dow">MON</div><div class="cal-dow">TUE</div><div class="cal-dow">WED</div>
-            <div class="cal-dow">THU</div><div class="cal-dow">FRI</div><div class="cal-dow">SAT</div>
-            <div class="cal-dow">SUN</div>
+        <div class="cal-wrap">
+          <div class="cal-header">
+            <div class="cal-nav" onclick="calNav(-1)">‹</div>
+            <div class="cal-month-label" id="cal-month-label">May 2026</div>
+            <div class="cal-nav" onclick="calNav(1)">›</div>
           </div>
-          <div class="cal-days" id="cal-days-sa"></div>
+          <div class="cal-kpi-row" id="cal-kpi-row"></div>
+          <div class="cal-grid-wrap">
+            <div class="cal-dow-row">
+              <div class="cal-dow">MON</div><div class="cal-dow">TUE</div><div class="cal-dow">WED</div>
+              <div class="cal-dow">THU</div><div class="cal-dow">FRI</div><div class="cal-dow">SAT</div><div class="cal-dow">SUN</div>
+            </div>
+            <div class="cal-days" id="cal-days"></div>
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- ═══════════════════════════════════════════════
+         TRASH PAGE
+    ═══════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════
+         AI COACH PAGE
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-ai">
+      <div class="page-inner">
+
+        <!-- Page tabs: Coach vs Chat -->
+        <div class="ai-page-tabs">
+          <button class="ai-page-tab active" id="ai-tab-coach" onclick="aiPageTab('coach')">
+            <span>✦</span> AI Coach
+          </button>
+          <button class="ai-page-tab" id="ai-tab-chat" onclick="aiPageTab('chat')">
+            <span>💬</span> Chat
+            <span class="ai-chat-badge" id="ai-chat-badge" style="display:none"></span>
+          </button>
+        </div>
+
+        <!-- ══ COACH PANEL ══ -->
+        <div id="ai-coach-panel">
+
+        <!-- Cover -->
+        <div class="cover ai-cover">
+          <div class="cover-label">NxTGen Intelligence · Powered by Claude</div>
+          <div class="cover-title">AI Trading Coach</div>
+          <div class="cover-sub">Chart analysis · Pattern recognition · Psychology · Daily, weekly &amp; monthly reviews</div>
+        </div>
+
+        <!-- Mode selector tabs -->
+        <div class="ai-mode-bar">
+          <button class="ai-mode-btn active" data-mode="daily"   onclick="aiSetMode('daily')">📅 Daily Brief</button>
+          <button class="ai-mode-btn"         data-mode="weekly"  onclick="aiSetMode('weekly')">📊 Weekly Review</button>
+          <button class="ai-mode-btn"         data-mode="monthly" onclick="aiSetMode('monthly')">🗓 Monthly Review</button>
+          <button class="ai-mode-btn"         data-mode="pattern" onclick="aiSetMode('pattern')">🔬 Pattern Analysis</button>
+          <button class="ai-mode-btn"         data-mode="psych"   onclick="aiSetMode('psych')">🧠 Psychology</button>
+          <button class="ai-mode-btn"         data-mode="plan"    onclick="aiSetMode('plan')">🗺 Trading Plan</button>
+          <button class="ai-mode-btn"         data-mode="chart"   onclick="aiSetMode('chart')">📸 Chart Read</button>
+        </div>
+
+        <!-- Context panel — changes per mode -->
+        <div class="ai-context-panel" id="ai-context-panel"></div>
+
+        <!-- Chart upload (only visible in chart mode) -->
+        <div class="ai-chart-upload-wrap" id="ai-chart-upload-wrap" style="display:none">
+          <div class="ai-chart-upload-zone" id="ai-chart-upload-zone"
+               onclick="document.getElementById('ai-chart-file').click()">
+            <div class="ai-upload-icon">📸</div>
+            <div class="ai-upload-text">Drop chart screenshots here or click to upload</div>
+            <div class="ai-upload-hint">Supports PNG, JPG, WebP · Multiple files OK</div>
+          </div>
+          <input type="file" id="ai-chart-file" accept="image/*" multiple style="display:none"
+                 onchange="aiHandleChartUpload(this)">
+          <div class="ai-chart-thumbs" id="ai-chart-thumbs"></div>
+        </div>
+
+        <!-- Question / prompt area -->
+        <div class="ai-prompt-wrap">
+          <textarea class="ai-prompt-input" id="ai-prompt-input"
+            placeholder="Ask anything… or press Analyse to get an automatic deep-dive based on your trade data."
+            rows="3"></textarea>
+          <div class="ai-prompt-actions">
+            <div class="ai-prompt-chips" id="ai-prompt-chips"></div>
+            <button class="ai-analyse-btn" id="ai-analyse-btn" onclick="aiRun()">
+              <span class="ai-btn-icon">✦</span>
+              <span id="ai-btn-label">Analyse</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Response area -->
+        <div class="ai-response-wrap" id="ai-response-wrap" style="display:none">
+          <div class="ai-response-header">
+            <div class="ai-response-badge">
+              <span class="ai-badge-dot"></span>
+              <span id="ai-response-mode-label">Analysis</span>
+            </div>
+            <div class="ai-response-meta" id="ai-response-meta"></div>
+            <button class="wl-week-btn" onclick="aiCopyResponse()" style="font-size:10px">⎘ Copy</button>
+            <button class="wl-week-btn" onclick="aiClear()" style="font-size:10px">✕ Clear</button>
+          </div>
+          <div class="ai-response-body" id="ai-response-body"></div>
+        </div>
+
+        <!-- Chat history -->
+        <div class="ai-history-wrap" id="ai-history-wrap" style="display:none">
+          <div class="sec-head" style="margin-bottom:10px">Conversation</div>
+          <div class="ai-history" id="ai-history"></div>
+        </div>
+
+        </div><!-- /ai-coach-panel -->
+
+        <!-- ══ CHAT PANEL ══ -->
+        <div id="ai-chat-panel" style="display:none">
+          <div class="chat-container">
+
+            <!-- Chat header -->
+            <div class="chat-header">
+              <div class="chat-header-info">
+                <div class="chat-avatar">✦</div>
+                <div>
+                  <div class="chat-header-name">NxTGen AI</div>
+                  <div class="chat-header-status" id="chat-status">
+                    <span class="chat-online-dot"></span> Online · Your personal trading coach
+                  </div>
+                </div>
+              </div>
+              <div class="chat-header-actions">
+                <button class="chat-action-btn" onclick="chatClearHistory()" title="Clear chat">🗑</button>
+                <button class="chat-action-btn" onclick="chatExport()" title="Export chat">⬇</button>
+              </div>
+            </div>
+
+            <!-- Messages -->
+            <div class="chat-messages" id="chat-messages">
+              <!-- Welcome message injected by JS -->
+            </div>
+
+            <!-- Image preview strip (above input) -->
+            <div class="chat-image-preview" id="chat-image-preview" style="display:none"></div>
+
+            <!-- Slash command palette -->
+            <div class="chat-cmd-palette" id="chat-cmd-palette" style="display:none"></div>
+
+            <!-- Input area -->
+            <div class="chat-input-wrap" id="chat-input-wrap">
+              <button class="chat-attach-btn" onclick="document.getElementById('chat-file-input').click()" title="Attach chart">
+                📎
+              </button>
+              <input type="file" id="chat-file-input" accept="image/*" multiple style="display:none"
+                     onchange="chatHandleFiles(this)">
+              <textarea
+                class="chat-input"
+                id="chat-input"
+                placeholder="Ask anything… type / for commands"
+                rows="1"
+                onkeydown="chatKeyDown(event)"
+                oninput="chatInputChange(this)"
+              ></textarea>
+              <button class="chat-send-btn" id="chat-send-btn" onclick="chatSend()" title="Send">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Drag-drop overlay -->
+            <div class="chat-drop-overlay" id="chat-drop-overlay">
+              <div class="chat-drop-content">
+                <span>📸</span>
+                <span>Drop charts here</span>
+              </div>
+            </div>
+
+          </div>
+        </div><!-- /ai-chat-panel -->
+
+      </div>
+    </div>
+
+        <div class="page" id="page-trash">
+      <div class="page-inner">
+        <div class="cover" style="background:linear-gradient(135deg,#1a0a0a 0%,#2a1010 100%)">
+          <div class="cover-label" style="color:#e63946">Deleted Trades · Recycle Bin</div>
+          <div class="cover-title">Trash</div>
+          <div class="cover-sub">Deleted trades are kept here. Restore anytime or permanently delete.</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div id="trash-count" style="font-size:13px;color:var(--text2)"></div>
+          <button id="empty-trash-btn" class="btn" onclick="openEmptyTrashModal()" style="border-color:rgba(230,57,70,.3);color:var(--red);display:none">🗑 Empty Trash</button>
+        </div>
+        <div id="trash-list"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         PROFILE PAGE — Cloud synced
+    ═══════════════════════════════════════════════════════════ -->
+    <div class="page" id="page-profile">
+      <div class="page-inner">
+
+        <!-- Hero -->
+        <div class="profile-hero">
+          <div class="profile-hero-bg"></div>
+          <div class="profile-hero-content">
+            <div class="profile-avatar-wrap">
+              <div class="profile-avatar-ring">
+                <div class="profile-avatar" id="profile-avatar-display">TJ</div>
+              </div>
+              <button class="profile-avatar-edit-btn" onclick="document.getElementById('profile-avatar-upload').click()" title="Change avatar">✏️</button>
+              <input type="file" id="profile-avatar-upload" accept="image/*" style="display:none" onchange="profileHandleAvatar(event)">
+            </div>
+            <div class="profile-hero-info">
+              <div class="profile-hero-name" id="profile-hero-name">Trader</div>
+              <div class="profile-hero-email" id="profile-hero-email">—</div>
+              <div class="profile-hero-badges">
+                <span class="profile-badge blue">Free Plan</span>
+                <span class="profile-badge green">☁ Cloud Synced</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="profile-tabs">
+          <button class="profile-tab active" onclick="profileTab('account',this)">Account</button>
+          <button class="profile-tab" onclick="profileTab('billing',this)">Billing</button>
+          <button class="profile-tab" onclick="profileTab('settings',this)">Settings</button>
+          <button class="profile-tab" onclick="profileTab('security',this)">Security</button>
+        </div>
+
+        <!-- ── ACCOUNT ── -->
+        <div class="profile-section active" id="profile-tab-account">
+          <div class="profile-card">
+            <div class="profile-card-head">
+              <span class="profile-card-icon">👤</span>
+              <div>
+                <div class="profile-card-title">Personal Information</div>
+                <div class="profile-card-sub">Auto-filled from your registration — edit and save to sync across all devices</div>
+              </div>
+              <button class="btn btn-primary profile-save-btn" onclick="profileSaveAccount()">Save Changes</button>
+            </div>
+            <div class="profile-form-grid">
+              <div class="profile-field"><label class="profile-label">First Name</label><input class="profile-input" type="text" id="pf-fname" placeholder="e.g. Jordan"></div>
+              <div class="profile-field"><label class="profile-label">Last Name</label><input class="profile-input" type="text" id="pf-lname" placeholder="e.g. Williams"></div>
+              <div class="profile-field"><label class="profile-label">Display Name</label><input class="profile-input" type="text" id="pf-display" placeholder="How you appear in the app"></div>
+              <div class="profile-field"><label class="profile-label">Email</label><input class="profile-input" type="email" id="pf-email" placeholder="your@email.com" readonly style="opacity:.6;cursor:not-allowed"></div>
+              <div class="profile-field"><label class="profile-label">Phone (optional)</label><input class="profile-input" type="tel" id="pf-phone" placeholder="+1 234 567 8900"></div>
+              <div class="profile-field">
+                <label class="profile-label">Timezone</label>
+                <select class="profile-select" id="pf-timezone">
+                  <option value="Africa/Lagos">Nigeria (WAT, UTC+1)</option>
+                  <option value="Europe/London">United Kingdom (GMT/BST)</option>
+                  <option value="America/New_York">United States — EST/EDT</option>
+                  <option value="America/Chicago">United States — CST/CDT</option>
+                  <option value="Europe/Berlin">Germany (CET/CEST)</option>
+                  <option value="Asia/Dubai">UAE (GST, UTC+4)</option>
+                  <option value="Asia/Singapore">Singapore (SGT, UTC+8)</option>
+                </select>
+              </div>
+              <div class="profile-field full"><label class="profile-label">Address</label><input class="profile-input" type="text" id="pf-address" placeholder="e.g. 12 Baker St, London, UK"></div>
+              <div class="profile-field full"><label class="profile-label">Bio / Trading Goal</label><textarea class="profile-textarea" id="pf-bio" placeholder="e.g. ICT trader aiming for funded accounts and consistent growth…"></textarea></div>
+            </div>
+          </div>
+
+          <div class="profile-card">
+            <div class="profile-card-head">
+              <span class="profile-card-icon">📊</span>
+              <div>
+                <div class="profile-card-title">Trading Profile</div>
+                <div class="profile-card-sub">Your style, experience level and preferred markets — synced to cloud</div>
+              </div>
+              <button class="btn btn-primary profile-save-btn" onclick="profileSaveTrading()">Save</button>
+            </div>
+            <div class="profile-form-grid">
+              <div class="profile-field">
+                <label class="profile-label">Experience Level</label>
+                <select class="profile-select" id="pf-exp">
+                  <option>Beginner (0–1 yr)</option><option>Intermediate (1–3 yrs)</option>
+                  <option>Advanced (3–5 yrs)</option><option>Professional (5+ yrs)</option>
+                </select>
+              </div>
+              <div class="profile-field">
+                <label class="profile-label">Primary Market</label>
+                <select class="profile-select" id="pf-market">
+                  <option>Forex</option><option>Futures (ES, NQ)</option>
+                  <option>Crypto</option><option>Metals (Gold/Silver)</option><option>Mixed</option>
+                </select>
+              </div>
+              <div class="profile-field">
+                <label class="profile-label">Preferred Session</label>
+                <select class="profile-select" id="pf-session">
+                  <option>London</option><option>New York</option>
+                  <option>Asian</option><option>All sessions</option>
+                </select>
+              </div>
+              <div class="profile-field">
+                <label class="profile-label">Default Risk %</label>
+                <select class="profile-select" id="pf-risk">
+                  <option>0.5%</option><option>1%</option><option>1.5%</option><option>2%</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── BILLING ── -->
+        <div class="profile-section" id="profile-tab-billing">
+          <div class="profile-card">
+            <div class="profile-card-head">
+              <span class="profile-card-icon">💳</span>
+              <div><div class="profile-card-title">Current Plan</div><div class="profile-card-sub">Manage your subscription and billing cycle</div></div>
+            </div>
+            <div class="billing-plans">
+              <div class="billing-plan active">
+                <div class="billing-plan-name">Free</div>
+                <div class="billing-plan-price">$0 <span>/mo</span></div>
+                <ul class="billing-plan-features">
+                  <li>✅ Unlimited trade logging</li><li>✅ Dashboard analytics</li>
+                  <li>✅ Trade log &amp; calendar</li><li>✅ Cloud sync (all devices)</li>
+                  <li>❌ Unlimited AI Coach</li><li>❌ Priority support</li>
+                </ul>
+                <div class="billing-plan-current-badge">Current Plan</div>
+              </div>
+              <div class="billing-plan" style="position:relative">
+                <div class="billing-plan-badge">⚡ Popular</div>
+                <div class="billing-plan-name">Pro</div>
+                <div class="billing-plan-price">$12 <span>/mo</span></div>
+                <ul class="billing-plan-features">
+                  <li>✅ Everything in Free</li><li>✅ Unlimited AI Coach</li>
+                  <li>✅ Advanced pattern analysis</li><li>✅ Custom report export</li>
+                  <li>✅ Priority support</li><li>✅ White-label trade cards</li>
+                </ul>
+                <button class="btn btn-primary" style="width:100%;margin-top:12px">Upgrade to Pro</button>
+              </div>
+              <div class="billing-plan">
+                <div class="billing-plan-name">Elite</div>
+                <div class="billing-plan-price">$29 <span>/mo</span></div>
+                <ul class="billing-plan-features">
+                  <li>✅ Everything in Pro</li><li>✅ Multi-account tracking</li>
+                  <li>✅ Team / prop firm access</li><li>✅ 1-on-1 coaching session</li>
+                  <li>✅ White-label export</li><li>✅ Dedicated support</li>
+                </ul>
+                <button class="btn" style="width:100%;margin-top:12px">Upgrade to Elite</button>
+              </div>
+            </div>
+          </div>
+          <div class="profile-card">
+            <div class="profile-card-head">
+              <span class="profile-card-icon">🧾</span>
+              <div><div class="profile-card-title">Billing History</div><div class="profile-card-sub">Your past invoices and receipts</div></div>
+            </div>
+            <div class="billing-empty-state"><div style="font-size:28px;margin-bottom:8px">📭</div><div style="color:var(--text2);font-size:13px">No billing history yet</div></div>
+          </div>
+        </div>
+
+        <!-- ── SETTINGS ── -->
+        <div class="profile-section" id="profile-tab-settings">
+          <div class="profile-card">
+            <div class="profile-card-head">
+              <span class="profile-card-icon">⚙️</span>
+              <div><div class="profile-card-title">App Preferences</div><div class="profile-card-sub">Synced to your account — same on every device</div></div>
+              <button class="btn btn-primary profile-save-btn" onclick="profileSaveSettings()">Save</button>
+            </div>
+            <div class="profile-form-grid">
+              <div class="profile-field"><label class="profile-label">Default Date Range</label>
+                <select class="profile-select" id="pf-daterange"><option>This Month</option><option>This Quarter</option><option>This Year</option><option>All Time</option></select></div>
+              <div class="profile-field"><label class="profile-label">Currency Display</label>
+                <select class="profile-select" id="pf-currency"><option>% (Percentage)</option><option>USD ($)</option><option>GBP (£)</option><option>NGN (₦)</option><option>EUR (€)</option></select></div>
+              <div class="profile-field"><label class="profile-label">Week Starts On</label>
+                <select class="profile-select" id="pf-weekstart"><option>Monday</option><option>Sunday</option></select></div>
+              <div class="profile-field"><label class="profile-label">Dashboard Default View</label>
+                <select class="profile-select" id="pf-defaultview"><option>Quarterly</option><option>Monthly</option><option>Weekly</option></select></div>
+            </div>
+            <div style="margin-top:20px">
+              <div class="profile-toggle-row">
+                <div><div class="profile-toggle-label">Show Affirmation on Load</div><div class="profile-toggle-sub">Display a daily trading affirmation when the app opens</div></div>
+                <label class="profile-toggle-switch"><input type="checkbox" id="pf-affirmation" checked><span class="profile-toggle-track"></span></label>
+              </div>
+              <div class="profile-toggle-row">
+                <div><div class="profile-toggle-label">Sound Notifications</div><div class="profile-toggle-sub">Play a chime when a trade is saved or deleted</div></div>
+                <label class="profile-toggle-switch"><input type="checkbox" id="pf-sounds"><span class="profile-toggle-track"></span></label>
+              </div>
+              <div class="profile-toggle-row">
+                <div><div class="profile-toggle-label">Compact Table View</div><div class="profile-toggle-sub">Reduce row height in Trade Log for denser viewing</div></div>
+                <label class="profile-toggle-switch"><input type="checkbox" id="pf-compact"><span class="profile-toggle-track"></span></label>
+              </div>
+              <div class="profile-toggle-row">
+                <div><div class="profile-toggle-label">Auto-Save Drafts</div><div class="profile-toggle-sub">Automatically save unfinished trade forms</div></div>
+                <label class="profile-toggle-switch"><input type="checkbox" id="pf-autosave" checked><span class="profile-toggle-track"></span></label>
+              </div>
+            </div>
+          </div>
+          <div class="profile-card">
+            <div class="profile-card-head">
+              <span class="profile-card-icon">🗄️</span>
+              <div><div class="profile-card-title">Data Management</div><div class="profile-card-sub">Export your journal or manage your trade data</div></div>
+            </div>
+            <div class="profile-data-actions">
+              <button class="profile-data-btn" onclick="profileExportJSON()"><span>📥</span><div><div>Export Trades (JSON)</div><div class="profile-data-btn-sub">Full backup of all your trade data</div></div></button>
+              <button class="profile-data-btn" onclick="profileExportCSV()"><span>📊</span><div><div>Export Trades (CSV)</div><div class="profile-data-btn-sub">Open in Excel, Google Sheets, etc.</div></div></button>
+              <button class="profile-data-btn danger" onclick="profileConfirmClearData()"><span>🗑️</span><div><div>Clear All Trades</div><div class="profile-data-btn-sub">Permanently deletes all trade records from cloud</div></div></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SECURITY ── -->
+        <div class="profile-section" id="profile-tab-security">
+          <div class="profile-card">
+            <div class="profile-card-head">
+              <span class="profile-card-icon">🔐</span>
+              <div><div class="profile-card-title">Change Password</div><div class="profile-card-sub">Update your Supabase account password</div></div>
+            </div>
+            <div class="profile-form-grid" style="max-width:480px">
+              <div class="profile-field full"><label class="profile-label">Current Password</label><input class="profile-input" type="password" id="pf-pw-current" placeholder="Enter current password"></div>
+              <div class="profile-field full"><label class="profile-label">New Password</label><input class="profile-input" type="password" id="pf-pw-new" placeholder="Min. 8 characters"></div>
+              <div class="profile-field full"><label class="profile-label">Confirm New Password</label><input class="profile-input" type="password" id="pf-pw-confirm" placeholder="Repeat new password"></div>
+              <div class="profile-field full"><button class="btn btn-primary" onclick="profileChangePassword()" style="width:100%">Update Password</button></div>
+            </div>
+          </div>
+          <div class="profile-card">
+            <div class="profile-card-head">
+              <span class="profile-card-icon">🖥️</span>
+              <div><div class="profile-card-title">Active Sessions</div><div class="profile-card-sub">Devices currently logged in to your account</div></div>
+            </div>
+            <div class="profile-session-row">
+              <div class="profile-session-icon">🖥️</div>
+              <div>
+                <div class="profile-session-name">This device (Current session)</div>
+                <div class="profile-session-meta" id="profile-session-meta">Web browser · Active now</div>
+              </div>
+              <span class="pill pill-green" style="margin-left:auto;font-size:10px">Active</span>
+            </div>
+          </div>
+          <div class="profile-card danger-zone">
+            <div class="profile-card-head">
+              <span class="profile-card-icon">⚠️</span>
+              <div><div class="profile-card-title" style="color:var(--red)">Danger Zone</div><div class="profile-card-sub">Irreversible actions — proceed with caution</div></div>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+              <button class="btn" style="border-color:rgba(248,113,113,.3);color:var(--red)" onclick="profileSignOut()">🚪 Sign Out</button>
+              <button class="btn" style="border-color:rgba(248,113,113,.3);color:var(--red)" onclick="profileConfirmDeleteAccount()">🗑 Delete Account</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /profile page -->
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- ══ TRADE DETAIL PANEL ══ -->
+<div class="detail-panel" id="detail-panel">
+  <div id="detail-content"></div>
+  <input type="file" id="img-input" accept="image/*" style="display:none" onchange="handleImg(event)">
+</div>
+
+<!-- ══ NEW TRADE MODAL ══ -->
+<div class="modal-overlay" id="modal">
+  <div class="modal modal-box">
+    <div class="modal-head">
+      <div class="modal-title" style="display:flex;align-items:center;gap:10px">
+        <span style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,rgba(96,165,250,0.25),rgba(96,165,250,0.12));border:1px solid rgba(96,165,250,0.3);display:flex;align-items:center;justify-content:center;font-size:14px">+</span>
+        New Trade
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+    <div class="form-grid modal-form-grid">
+      <div class="form-field"><label class="form-label">Date</label><input type="date" class="form-input" id="m-date"></div>
+      <div class="form-field"><label class="form-label">Pair</label>
+        <div style="display:flex;gap:6px">
+          <select class="form-select" id="m-pair" onchange="syncCustomPair(this.value)" style="flex:1">
+            <option>GBPUSD</option><option>XAUUSD</option><option>EURUSD</option><option>GBPJPY</option>
+            <option>USDCAD</option><option>ES</option><option>EURGBP</option><option>USDJPY</option>
+            <option>NASDAQ</option><option>BTCUSDT</option><option>ETHUSDT</option><option>GBPAUD</option>
+            <option>AUDUSD</option><option>NZDUSD</option><option>EURJPY</option><option>CADJPY</option>
+            <option>GBPCAD</option><option>EURCAD</option><option>XAGUSD</option><option>US30</option>
+            <option value="__custom__">✏️ Custom pair…</option>
+          </select>
+          <input type="text" class="form-input" id="m-pair-custom" placeholder="e.g. AUDCAD" style="width:110px;display:none">
+        </div>
+      </div>
+      <div class="form-field"><label class="form-label">Position</label>
+        <select class="form-select" id="m-pos"><option>Buy</option><option>Sell</option></select>
+      </div>
+      <div class="form-field"><label class="form-label">R:R</label><input type="text" class="form-input" id="m-rr" placeholder="1:3"></div>
+      <div class="form-field"><label class="form-label">PnL %</label><input type="number" class="form-input" id="m-pnl" step="0.1" placeholder="3.5"></div>
+      <div class="form-field"><label class="form-label">Outcome</label>
+        <select class="form-select" id="m-outcome"><option>Win</option><option>Loss</option><option>B.E</option></select>
+      </div>
+      <div class="form-field"><label class="form-label">Killzone</label>
+        <select class="form-select" id="m-kz"><option>London</option><option>New York</option><option>Asian</option></select>
+      </div>
+      <div class="form-field"><label class="form-label">Strategy</label>
+        <select class="form-select" id="m-strat" onchange="syncCustomStrategy(this.value)">
+          <option>NxtGen - Mod</option>
+          <option>IRL &gt; ERL</option>
+          <option>ERL &gt; IRL</option>
+          <option value="__custom__">＋ Custom…</option>
+        </select>
+        <input type="text" class="form-input" id="m-strat-custom" placeholder="Enter strategy name…" style="display:none;margin-top:6px">
+      </div>
+      <div class="form-field"><label class="form-label">TF Alignment</label>
+        <select class="form-select" id="m-tf" onchange="syncCustomTF(this.value)">
+          <option>30m &gt; 3m</option>
+          <option>1h &gt; 5m</option>
+          <option>1h &gt; 3m</option>
+          <option>4h &gt; 15m</option>
+          <option>4h &gt; 5m</option>
+          <option>4h &gt; 3m</option>
+          <option>15m &gt; 3m</option>
+          <option value="__custom__">＋ Custom…</option>
+        </select>
+        <input type="text" class="form-input" id="m-tf-custom" placeholder="e.g. 2h &gt; 5m" style="display:none;margin-top:6px">
+      </div>
+      <div class="form-field"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Account <button type="button" onclick="_openManageAccounts()" style="font-size:10px;padding:2px 8px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);color:var(--blue);border-radius:4px;cursor:pointer;font-family:inherit;line-height:1.6">⚙ Manage</button></label>
+        <select class="form-select" id="m-acc"></select>
+      </div>
+      <div class="form-field"><label class="form-label">Rating</label>
+        <select class="form-select" id="m-rating"><option>★★★★★</option><option>★★★★☆</option><option>★★★☆☆</option><option>★★☆☆☆</option></select>
+      </div>
+      <div class="form-field"><label class="form-label">Risk Used</label>
+        <select class="form-select" id="m-risk"><option>0.5%</option><option>0.8%</option><option>1%</option><option>1.5%</option><option>2%</option></select>
+      </div>
+      <div class="form-field full"><label class="form-label">Pre-Trade Notes</label><textarea class="form-textarea" id="m-pretrade" placeholder="Brief bias, setup thesis…"></textarea></div>
+      <div class="form-field full"><label class="form-label">Post-Trade Reflection</label><textarea class="form-textarea" id="m-notes" placeholder="What happened? What did you learn?"></textarea></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTrade()">Save Trade</button>
+    </div>
+    </div><!-- /modal-body -->
+  </div>
+</div>
+
+<!-- ══ CALENDAR POPUP & TOOLTIP ══ -->
+<div class="cal-popup" id="cal-popup" style="display:none"></div>
+<div class="cal-tooltip" id="cal-tooltip" style="display:none"></div>
+
+<!-- ══ GLASS CONFIRM MODAL ══ -->
+<div class="glass-modal-overlay" id="glass-modal-overlay">
+  <div class="glass-modal" id="glass-modal">
+    <div class="glass-modal-icon" id="gm-icon">⚠️</div>
+    <div class="glass-modal-title" id="gm-title">Confirm</div>
+    <div class="glass-modal-body" id="gm-body"></div>
+    <div class="glass-modal-actions" id="gm-actions"></div>
+  </div>
+</div>
+
+<!-- ══ APP TOAST ══ -->
+<div class="app-toast" id="app-toast"></div>
+
+<!-- ══ Supabase SDK ══ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- ══ Mobile sidebar toggle ══ -->
+<script>
+  function toggleSidebar() {
+    const sb  = document.getElementById('sidebar');
+    const ov  = document.getElementById('mob-overlay');
+    const btn = document.getElementById('sb-toggle-btn');
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+      const isOpen = sb.classList.toggle('mob-open');
+      ov.classList.toggle('show', isOpen);
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+      if (btn) btn.classList.toggle('active', isOpen);
+    } else {
+      const isCollapsed = sb.classList.toggle('sb-collapsed');
+      document.getElementById('main-layout').classList.toggle('sidebar-hidden', isCollapsed);
+      if (btn) btn.classList.toggle('active', !isCollapsed);
+      localStorage.setItem('sb_collapsed', isCollapsed ? '1' : '0');
+    }
+  }
+  function closeSidebar() {
+    const sb  = document.getElementById('sidebar');
+    const ov  = document.getElementById('mob-overlay');
+    const btn = document.getElementById('sb-toggle-btn');
+    sb.classList.remove('mob-open');
+    ov.classList.remove('show');
+    document.body.style.overflow = '';
+    if (btn) btn.classList.remove('active');
+  }
+  // Restore sidebar collapsed state on desktop
+  (function() {
+    const collapsed = localStorage.getItem('sb_collapsed') === '1';
+    if (collapsed && window.innerWidth > 768) {
+      document.getElementById('sidebar').classList.add('sb-collapsed');
+      document.getElementById('main-layout').classList.add('sidebar-hidden');
+    } else if (window.innerWidth > 768) {
+      // Start with sidebar open on desktop by default
+      const btn = document.getElementById('sb-toggle-btn');
+      if (btn) btn.classList.add('active');
+    }
+  })();
+
+  // Close sidebar on any nav item click on mobile
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.sb-item').forEach(function(item) {
+      item.addEventListener('click', function() {
+        if (window.innerWidth <= 768) closeSidebar();
+      });
+    });
+  });
+  // Close on resize back to desktop
+  window.addEventListener('resize', function() {
+    if (window.innerWidth > 768) closeSidebar();
+  });
+</script>
+
+<!-- ══ App Script ══ -->
+<script src="app.js"></script>
+
+<!-- Share Modal — injected dynamically by openShareModal() -->
+<div id="share-modal-overlay"></div>
+</body>
+</html>
