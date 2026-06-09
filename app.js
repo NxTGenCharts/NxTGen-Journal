@@ -4817,8 +4817,8 @@ function updateKPIs() {
   const avgWDollars  = winDollars.length  ? winDollars.reduce((a, b) => a + b, 0)  / winDollars.length  : 0;
   const avgLDollars  = lossDollars.length ? lossDollars.reduce((a, b) => a + b, 0) / lossDollars.length : 0;
   const pf = lossDollars.length ? Math.abs(winDollars.reduce((a, b) => a + b, 0) / lossDollars.reduce((a, b) => a + b, 0)).toFixed(2) : '∞';
-  // Format: use pnlUnit directly — '%' trades sum as %, '$' trades sum as dollars
-  const allPct = trades.every(t => (t.pnlUnit || '%') === '%');
+  // Format: prefer % if all trades are % unit, else show $
+  const allPct = trades.every(t => !_isMt5Trade(t) && t.pnlUnit !== '$');
   const fmtKpi = (dollars, accSz) => {
     if (allPct && accSz > 0) { const pct = (dollars / accSz) * 100; return (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%'; }
     return (dollars >= 0 ? '+$' : '-$') + Math.abs(dollars).toFixed(2);
@@ -4831,19 +4831,26 @@ function updateKPIs() {
     accs.forEach(a => { const n = trades.filter(t => t.account === a.name).length; const sz = parseFloat(a.size) || 0; if (sz > 0 && n > 0) { blendedAccSize += sz * n; totalW += n; } });
     if (totalW > 0) blendedAccSize = blendedAccSize / totalW;
   }
-  // Net PnL — always use pnlUnit per trade as source of truth.
-  // If every trade is '%', sum raw pnl values and show as %.
-  // If any trade has pnlUnit='$', convert all to dollars.
+  // Net PnL — determine display format per trade type:
+  // Net PnL KPI — use account pnlMode as source of truth, not per-trade pnlUnit.
+  // Only MT5-sourced trades (source='mt5', mt5Ticket, or notes='MT5 Import') are truly dollar trades.
+  // A trade having pnlUnit='$' due to a UI slip should NOT flip the whole dashboard to dollars.
+  const hasTrueDollarTrade = trades.some(t =>
+    t.source === 'mt5' || !!t.mt5Ticket ||
+    (t.notes && t.notes.includes('MT5 Import'))
+  );
   let netPnlDisplay;
   let netPnl;
-  if (allPct) {
-    const totalPct = trades.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
-    netPnlDisplay = (totalPct >= 0 ? '+' : '') + totalPct.toFixed(1) + '%';
-    netPnl = totalPct.toFixed(1);
-  } else {
+  if (hasTrueDollarTrade) {
+    // Has real MT5 imports — convert everything to dollars
     const totalDollars = trades.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
     netPnlDisplay = (totalDollars >= 0 ? '+$' : '-$') + Math.abs(totalDollars).toFixed(2);
     netPnl = totalDollars.toFixed(1);
+  } else {
+    // All manual trades — sum raw pnl values as % directly
+    const totalPct = trades.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
+    netPnlDisplay = (totalPct >= 0 ? '+' : '') + totalPct.toFixed(1) + '%';
+    netPnl = totalPct.toFixed(1);
   }
   const rrNums = trades.map(t => { const m = (t.rr || '').match(/1:([\d.]+)/); return m ? parseFloat(m[1]) : null; }).filter(x => x !== null);
   const avgRR = rrNums.length ? (rrNums.reduce((a, b) => a + b, 0) / rrNums.length).toFixed(1) : null;
@@ -4854,7 +4861,8 @@ function updateKPIs() {
   for (const t of rev) { if (t.outcome === 'Win') streak++; else break; }
   document.getElementById('kpi-total').textContent = total;
   document.getElementById('kpi-wr').textContent = wr + '%';
-  document.getElementById('kpi-pnl').textContent = netPnlDisplay;
+  const _pctPnl = trades.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
+  document.getElementById('kpi-pnl').textContent = (_pctPnl >= 0 ? '+' : '') + _pctPnl.toFixed(1) + '%';
   document.getElementById('kpi-pf').textContent = pf + 'x';
   document.getElementById('kpi-aw').textContent = (avgWDollars >= 0 ? '+$' : '-$') + Math.abs(avgWDollars).toFixed(2);
   document.getElementById('kpi-al').textContent = (avgLDollars >= 0 ? '+$' : '-$') + Math.abs(avgLDollars).toFixed(2);
