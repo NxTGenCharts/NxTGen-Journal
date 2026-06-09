@@ -4832,22 +4832,18 @@ function updateKPIs() {
     if (totalW > 0) blendedAccSize = blendedAccSize / totalW;
   }
   // Net PnL — determine display format per trade type:
-  // Net PnL KPI — use account pnlMode as source of truth, not per-trade pnlUnit.
-  // Only MT5-sourced trades (source='mt5', mt5Ticket, or notes='MT5 Import') are truly dollar trades.
-  // A trade having pnlUnit='$' due to a UI slip should NOT flip the whole dashboard to dollars.
-  const hasTrueDollarTrade = trades.some(t =>
-    t.source === 'mt5' || !!t.mt5Ticket ||
-    (t.notes && t.notes.includes('MT5 Import'))
-  );
+  // If ANY trade is dollar-based (MT5 or pnlUnit='$'), show total in $.
+  // If ALL trades are %-based (the normal case), show pure % sum directly.
+  const hasDollarTrade = trades.some(t => _isMt5Trade(t) || t.pnlUnit === '$');
   let netPnlDisplay;
   let netPnl;
-  if (hasTrueDollarTrade) {
-    // Has real MT5 imports — convert everything to dollars
+  if (hasDollarTrade) {
+    // Mixed or all $: convert every trade to dollars via its own account size
     const totalDollars = trades.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
     netPnlDisplay = (totalDollars >= 0 ? '+$' : '-$') + Math.abs(totalDollars).toFixed(2);
     netPnl = totalDollars.toFixed(1);
   } else {
-    // All manual trades — sum raw pnl values as % directly
+    // All % trades — sum raw pnl values directly, no account size needed
     const totalPct = trades.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
     netPnlDisplay = (totalPct >= 0 ? '+' : '') + totalPct.toFixed(1) + '%';
     netPnl = totalPct.toFixed(1);
@@ -4861,8 +4857,7 @@ function updateKPIs() {
   for (const t of rev) { if (t.outcome === 'Win') streak++; else break; }
   document.getElementById('kpi-total').textContent = total;
   document.getElementById('kpi-wr').textContent = wr + '%';
-  const _pctPnl = trades.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
-  document.getElementById('kpi-pnl').textContent = (_pctPnl >= 0 ? '+' : '') + _pctPnl.toFixed(1) + '%';
+  document.getElementById('kpi-pnl').textContent = netPnlDisplay;
   document.getElementById('kpi-pf').textContent = pf + 'x';
   document.getElementById('kpi-aw').textContent = (avgWDollars >= 0 ? '+$' : '-$') + Math.abs(avgWDollars).toFixed(2);
   document.getElementById('kpi-al').textContent = (avgLDollars >= 0 ? '+$' : '-$') + Math.abs(avgLDollars).toFixed(2);
