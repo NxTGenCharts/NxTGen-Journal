@@ -4831,21 +4831,22 @@ function updateKPIs() {
     accs.forEach(a => { const n = trades.filter(t => t.account === a.name).length; const sz = parseFloat(a.size) || 0; if (sz > 0 && n > 0) { blendedAccSize += sz * n; totalW += n; } });
     if (totalW > 0) blendedAccSize = blendedAccSize / totalW;
   }
-  // Net PnL display logic:
-  // - If ALL trades are %-based: sum raw % values directly (no account size needed)
-  // - If mixed or all $-based: convert each trade to dollars using per-trade account size, show as $
+  // Net PnL — determine display format per trade type:
+  // If ANY trade is dollar-based (MT5 or pnlUnit='$'), show total in $.
+  // If ALL trades are %-based (the normal case), show pure % sum directly.
+  const hasDollarTrade = trades.some(t => _isMt5Trade(t) || t.pnlUnit === '$');
   let netPnlDisplay;
   let netPnl;
-  if (allPct) {
-    // All trades are %-based — sum the raw % values directly
-    const netPct = trades.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
-    netPnlDisplay = (netPct >= 0 ? '+' : '') + netPct.toFixed(1) + '%';
-    netPnl = netPct.toFixed(1);
+  if (hasDollarTrade) {
+    // Mixed or all $: convert every trade to dollars via its own account size
+    const totalDollars = trades.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
+    netPnlDisplay = (totalDollars >= 0 ? '+$' : '-$') + Math.abs(totalDollars).toFixed(2);
+    netPnl = totalDollars.toFixed(1);
   } else {
-    // Mixed or all $-based — convert each trade using its own account size
-    const netPnlDollars = trades.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
-    netPnlDisplay = (netPnlDollars >= 0 ? '+$' : '-$') + Math.abs(netPnlDollars).toFixed(2);
-    netPnl = netPnlDollars.toFixed(1);
+    // All % trades — sum raw pnl values directly, no account size needed
+    const totalPct = trades.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
+    netPnlDisplay = (totalPct >= 0 ? '+' : '') + totalPct.toFixed(1) + '%';
+    netPnl = totalPct.toFixed(1);
   }
   const rrNums = trades.map(t => { const m = (t.rr || '').match(/1:([\d.]+)/); return m ? parseFloat(m[1]) : null; }).filter(x => x !== null);
   const avgRR = rrNums.length ? (rrNums.reduce((a, b) => a + b, 0) / rrNums.length).toFixed(1) : null;
