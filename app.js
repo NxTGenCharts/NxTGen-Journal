@@ -4817,8 +4817,11 @@ function updateKPIs() {
   const avgWDollars  = winDollars.length  ? winDollars.reduce((a, b) => a + b, 0)  / winDollars.length  : 0;
   const avgLDollars  = lossDollars.length ? lossDollars.reduce((a, b) => a + b, 0) / lossDollars.length : 0;
   const pf = lossDollars.length ? Math.abs(winDollars.reduce((a, b) => a + b, 0) / lossDollars.reduce((a, b) => a + b, 0)).toFixed(2) : '∞';
-  // Format: prefer % if all trades are % unit, else show $
-  const allPct = trades.every(t => !_isMt5Trade(t) && t.pnlUnit !== '$');
+  // Format: prefer % if no trade is a genuine MT5/dollar-sourced trade.
+  // pnlUnit==='$' alone is NOT enough — it could be a UI slip on a manual trade.
+  // Only flag as dollar trade if it has a real MT5 origin signal.
+  const _isTrueDollar = t => t.source === 'mt5' || !!t.mt5Ticket || (t.notes && t.notes.includes('MT5 Import'));
+  const allPct = trades.every(t => !_isTrueDollar(t));
   const fmtKpi = (dollars, accSz) => {
     if (allPct && accSz > 0) { const pct = (dollars / accSz) * 100; return (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%'; }
     return (dollars >= 0 ? '+$' : '-$') + Math.abs(dollars).toFixed(2);
@@ -4831,10 +4834,9 @@ function updateKPIs() {
     accs.forEach(a => { const n = trades.filter(t => t.account === a.name).length; const sz = parseFloat(a.size) || 0; if (sz > 0 && n > 0) { blendedAccSize += sz * n; totalW += n; } });
     if (totalW > 0) blendedAccSize = blendedAccSize / totalW;
   }
-  // Net PnL — determine display format per trade type:
-  // Use allPct (already computed above) as the source of truth for display mode.
+  // Net PnL — use allPct (computed above) as source of truth for display mode.
   // allPct is true when every trade is a manual %-unit trade (not MT5/dollar-sourced).
-  // Only fall back to $ display when there are genuine dollar-unit trades mixed in.
+  // Only fall back to $ display when genuine dollar-unit trades exist.
   let netPnlDisplay;
   let netPnl;
   if (allPct) {
