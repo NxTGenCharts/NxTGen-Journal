@@ -1744,6 +1744,51 @@ function nav(pageId, sbEl, label, extra) {
 }
 
 // ── DASHBOARD: PAIR TABLE ────────────────────────────
+/* ─────────────────────────────────────────────────────────
+   SHARED PnL FORMATTER — dual $ + % display for tables/drilldowns
+   netDollars = sum already in $
+   tradeList  = the raw trades (used to compute % representation)
+   Returns e.g. "+$506.10 (+5.06%)" or "-$98.44 (-0.98%)"
+───────────────────────────────────────────────────────── */
+function _fmtGroupPnl(netDollars, tradeList) {
+  // Compute a blended account size for the group (weighted avg of each trade's account)
+  let totalWeight = 0, blended = 0;
+  tradeList.forEach(t => {
+    const sz = getAccSizeForAccount(t.account);
+    if (sz > 0) { blended += sz; totalWeight++; }
+  });
+  const avgAccSize = totalWeight > 0 ? blended / totalWeight : 0;
+
+  const abs = Math.abs(netDollars);
+  const sign = netDollars >= 0 ? '+' : '-';
+  const dolStr = abs >= 1000
+    ? sign + '$' + (abs / 1000).toFixed(1) + 'k'
+    : sign + '$' + abs.toFixed(2);
+
+  if (avgAccSize > 0) {
+    const pct = (netDollars / avgAccSize) * 100;
+    const pctStr = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+    return dolStr + ' (' + pctStr + ')';
+  }
+  return dolStr;
+}
+
+function _fmtAvgPnl(avgDollars, tradeList) {
+  const avgAccSize = (() => {
+    let tot = 0, n = 0;
+    tradeList.forEach(t => { const sz = getAccSizeForAccount(t.account); if (sz > 0) { tot += sz; n++; } });
+    return n > 0 ? tot / n : 0;
+  })();
+  const abs = Math.abs(avgDollars);
+  const sign = avgDollars >= 0 ? '+' : '-';
+  const dolStr = abs >= 1000 ? sign + '$' + (abs/1000).toFixed(1) + 'k' : sign + '$' + abs.toFixed(2);
+  if (avgAccSize > 0) {
+    const pct = (avgDollars / avgAccSize) * 100;
+    return dolStr + ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%)';
+  }
+  return dolStr;
+}
+
 function buildPairTable() {
   const pairs = [...new Set(trades.map(t => t.pair))].sort((a, b) => {
     const la = trades.filter(t => t.pair === a).length;
@@ -1761,11 +1806,12 @@ function buildPairTable() {
     if (!pt.length) return '';
     const wins = pt.filter(t => t.outcome === 'Win').length;
     const wr = pt.length ? Math.round(wins / pt.length * 100) : 0;
-    const netPnl = pt.reduce((a, t) => a + t.pnl, 0).toFixed(1);
+    const netDollars = pt.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
     const wrClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
-    const pnlClass = netPnl > 0 ? 'outcome-win' : 'outcome-loss';
+    const pnlClass = netDollars >= 0 ? 'outcome-win' : 'outcome-loss';
     const barColor = wr >= 70 ? 'green' : 'red';
-    return `<tr class="pair-row-clickable" onclick="openPairDrilldown('${p.replace(/'/g,"\\'")}')" title="View ${p} trades" style="cursor:pointer"><td class="bold">${p}</td><td>${pt.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass} mono">${netPnl > 0 ? '+' : ''}${netPnl}%</td><td class="col-winbar"><div class="win-bar-wrap"><div class="win-bar-bg"><div class="win-bar-fill ${barColor}" style="width:${wr}%"></div></div></div></td></tr>`;
+    const pnlDisp = _fmtGroupPnl(netDollars, pt);
+    return `<tr class="pair-row-clickable" onclick="openPairDrilldown('${p.replace(/'/g,"\\'")}')" title="View ${p} trades" style="cursor:pointer"><td class="bold">${p}</td><td>${pt.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass} mono" style="font-size:11px">${pnlDisp}</td><td class="col-winbar"><div class="win-bar-wrap"><div class="win-bar-bg"><div class="win-bar-fill ${barColor}" style="width:${wr}%"></div></div></div></td></tr>`;
   }).join('');
 }
 
@@ -1776,9 +1822,10 @@ function openPairDrilldown(pair) {
   const losses = pairTrades.filter(t => t.outcome === 'Loss').length;
   const be     = pairTrades.filter(t => t.outcome === 'B.E').length;
   const wr     = pairTrades.length ? Math.round(wins / pairTrades.length * 100) : 0;
-  const netPnl = pairTrades.reduce((s, t) => s + t.pnl, 0).toFixed(1);
+  const netDollars = pairTrades.reduce((s, t) => s + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
   const wrCls  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
-  const pnlColor = parseFloat(netPnl) > 0 ? 'var(--green)' : 'var(--red)';
+  const pnlColor = netDollars >= 0 ? 'var(--green)' : 'var(--red)';
+  const pnlDisp = _fmtGroupPnl(netDollars, pairTrades);
 
   const existing = document.getElementById('pair-drilldown-overlay');
   if (existing) existing.remove();
@@ -1814,7 +1861,7 @@ function openPairDrilldown(pair) {
           '<span class="pill ' + wrCls + '" style="font-size:11px">' + wr + '% win</span>' +
           '<span style="font-size:11px;color:var(--text2)">' + pairTrades.length + ' trade' + (pairTrades.length !== 1 ? 's' : '') + '</span>' +
           '<span style="font-size:11px;color:var(--text2)">' + wins + 'W &middot; ' + losses + 'L &middot; ' + be + 'BE</span>' +
-          '<span style="font-size:11px;font-weight:700;color:' + pnlColor + '">' + (parseFloat(netPnl) > 0 ? '+' : '') + netPnl + '%</span>' +
+          '<span style="font-size:11px;font-weight:700;color:' + pnlColor + '">' + pnlDisp + '</span>' +
         '</div>' +
         '<button onclick="document.getElementById(\'pair-drilldown-overlay\').remove()" class="acc-mgr-close">&times;</button>' +
       '</div>' +
@@ -1864,9 +1911,10 @@ function openKzDrilldown(session) {
   const losses = kzTrades.filter(t => t.outcome === 'Loss').length;
   const be     = kzTrades.filter(t => t.outcome === 'B.E').length;
   const wr     = kzTrades.length ? Math.round(wins / kzTrades.length * 100) : 0;
-  const netPnl = kzTrades.reduce((s,t) => s + t.pnl, 0).toFixed(1);
+  const netDollars = kzTrades.reduce((s,t) => s + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
   const wrCls  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
-  const pnlColor = parseFloat(netPnl) > 0 ? 'var(--green)' : 'var(--red)';
+  const pnlColor = netDollars >= 0 ? 'var(--green)' : 'var(--red)';
+  const pnlDisp  = _fmtGroupPnl(netDollars, kzTrades);
   const KZ_ICONS = { 'London':'🇬🇧', 'New York':'🗽', 'Asian':'🌏', 'Tokyo':'🗼' };
   const icon = KZ_ICONS[session] || '🕐';
 
@@ -1874,7 +1922,7 @@ function openKzDrilldown(session) {
     icon + ' ' + session,
     kzTrades.length + ' trade' + (kzTrades.length !== 1 ? 's' : ''),
     wins + 'W &middot; ' + losses + 'L &middot; ' + be + 'BE',
-    wr + '% win', wrCls, netPnl, pnlColor,
+    wr + '% win', wrCls, pnlDisp, pnlColor,
     _buildDrillRows(kzTrades),
     function() {
       nav('tradelog', null, 'Trade Log');
@@ -1899,15 +1947,16 @@ function openStratDrilldown(strategy) {
   const losses = stTrades.filter(t => t.outcome === 'Loss').length;
   const be     = stTrades.filter(t => t.outcome === 'B.E').length;
   const wr     = stTrades.length ? Math.round(wins / stTrades.length * 100) : 0;
-  const netPnl = stTrades.reduce((s,t) => s + t.pnl, 0).toFixed(1);
+  const netDollars = stTrades.reduce((s,t) => s + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
   const wrCls  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
-  const pnlColor = parseFloat(netPnl) > 0 ? 'var(--green)' : 'var(--red)';
+  const pnlColor = netDollars >= 0 ? 'var(--green)' : 'var(--red)';
+  const pnlDisp  = _fmtGroupPnl(netDollars, stTrades);
 
   _openDrillModal('strat-drilldown-overlay',
     '📋 ' + label,
     stTrades.length + ' trade' + (stTrades.length !== 1 ? 's' : ''),
     wins + 'W &middot; ' + losses + 'L &middot; ' + be + 'BE',
-    wr + '% win', wrCls, netPnl, pnlColor,
+    wr + '% win', wrCls, pnlDisp, pnlColor,
     _buildDrillRows(stTrades),
     function() {
       nav('tradelog', null, 'Trade Log');
@@ -1931,15 +1980,16 @@ function openMonthDrilldown(key) {
   const losses = moTrades.filter(t => t.outcome === 'Loss').length;
   const be     = moTrades.filter(t => t.outcome === 'B.E').length;
   const wr     = moTrades.length ? Math.round(wins / moTrades.length * 100) : 0;
-  const netPnl = moTrades.reduce((s,t) => s + t.pnl, 0).toFixed(1);
+  const netDollars = moTrades.reduce((s,t) => s + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
   const wrCls  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
-  const pnlColor = parseFloat(netPnl) > 0 ? 'var(--green)' : 'var(--red)';
+  const pnlColor = netDollars >= 0 ? 'var(--green)' : 'var(--red)';
+  const pnlDisp  = _fmtGroupPnl(netDollars, moTrades);
 
   _openDrillModal('month-drilldown-overlay',
     '📅 ' + label,
     moTrades.length + ' trade' + (moTrades.length !== 1 ? 's' : ''),
     wins + 'W &middot; ' + losses + 'L &middot; ' + be + 'BE',
-    wr + '% win', wrCls, netPnl, pnlColor,
+    wr + '% win', wrCls, pnlDisp, pnlColor,
     _buildDrillRows(moTrades),
     function() {
       nav('tradelog', null, 'Trade Log');
@@ -1974,7 +2024,7 @@ function _buildDrillRows(list) {
   }).join('');
 }
 
-function _openDrillModal(overlayId, title, countLabel, wlbeLabel, wrLabel, wrCls, netPnl, pnlColor, rows, onTradeLog) {
+function _openDrillModal(overlayId, title, countLabel, wlbeLabel, wrLabel, wrCls, pnlDisp, pnlColor, rows, onTradeLog) {
   const existing = document.getElementById(overlayId);
   if (existing) existing.remove();
 
@@ -1991,7 +2041,7 @@ function _openDrillModal(overlayId, title, countLabel, wlbeLabel, wrLabel, wrCls
           '<span class="pill ' + wrCls + '" style="font-size:11px">' + wrLabel + '</span>' +
           '<span style="font-size:11px;color:var(--text2)">' + countLabel + '</span>' +
           '<span style="font-size:11px;color:var(--text2)">' + wlbeLabel + '</span>' +
-          '<span style="font-size:11px;font-weight:700;color:' + pnlColor + '">' + (parseFloat(netPnl) > 0 ? '+' : '') + netPnl + '%</span>' +
+          '<span style="font-size:11px;font-weight:700;color:' + pnlColor + '">' + pnlDisp + '</span>' +
         '</div>' +
         '<button onclick="document.getElementById(\'' + overlayId + '\').remove()" class="acc-mgr-close">&times;</button>' +
       '</div>' +
@@ -2044,14 +2094,15 @@ function buildKillzoneTable() {
     const st   = trades.filter(t => t.kz === s);
     const wins = st.filter(t => t.outcome === 'Win').length;
     const wr   = Math.round((wins / st.length) * 100);
-    const pnls = st.reduce((a, t) => a + t.pnl, 0);
-    const avg  = (pnls / st.length).toFixed(1);
+    const netDollars = st.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
+    const avgDollars = netDollars / st.length;
     const wrClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
-    const pnlClass = avg >= 0 ? 'outcome-win' : 'outcome-loss';
+    const pnlClass = avgDollars >= 0 ? 'outcome-win' : 'outcome-loss';
     const grade = wr >= 80 ? 'A+' : wr >= 70 ? 'A' : wr >= 60 ? 'B' : wr >= 50 ? 'C' : 'D';
     const gradeClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
     const icon = (KZ_META[s] || {}).icon || '🕐';
-    return `<tr class="pair-row-clickable" onclick="openKzDrilldown(this.dataset.s)" data-s="${s}" title="View ${s} trades" style="cursor:pointer"><td class="bold">${icon} ${s}</td><td>${st.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}">${avg >= 0 ? '+' : ''}${avg}%</td><td><span class="pill ${gradeClass}">${grade}</span></td></tr>`;
+    const pnlDisp = _fmtAvgPnl(avgDollars, st);
+    return `<tr class="pair-row-clickable" onclick="openKzDrilldown(this.dataset.s)" data-s="${s}" title="View ${s} trades" style="cursor:pointer"><td class="bold">${icon} ${s}</td><td>${st.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}" style="font-size:11px">${pnlDisp}</td><td><span class="pill ${gradeClass}">${grade}</span></td></tr>`;
   }).join('');
 }
 
@@ -2071,18 +2122,22 @@ function buildStrategyTable() {
     const st   = tagged.filter(t => t.strategy === s);
     const wins = st.filter(t => t.outcome === 'Win').length;
     const wr   = Math.round((wins / st.length) * 100);
-    const avg  = (st.reduce((a, t) => a + t.pnl, 0) / st.length).toFixed(1);
+    const netDollars = st.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
+    const avgDollars = netDollars / st.length;
     const wrClass  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
-    const pnlClass = avg >= 0 ? 'outcome-win' : 'outcome-loss';
-    return `<tr class="pair-row-clickable" onclick="openStratDrilldown(this.dataset.s)" data-s="${s}" title="View ${s} trades" style="cursor:pointer"><td class="bold">${s}</td><td>${st.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}">${avg >= 0 ? '+' : ''}${avg}%</td></tr>`;
+    const pnlClass = avgDollars >= 0 ? 'outcome-win' : 'outcome-loss';
+    const pnlDisp  = _fmtAvgPnl(avgDollars, st);
+    return `<tr class="pair-row-clickable" onclick="openStratDrilldown(this.dataset.s)" data-s="${s}" title="View ${s} trades" style="cursor:pointer"><td class="bold">${s}</td><td>${st.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}" style="font-size:11px">${pnlDisp}</td></tr>`;
   });
   if (untagged.length) {
     const uw = untagged.filter(t => t.outcome === 'Win').length;
     const uwr = Math.round((uw / untagged.length) * 100);
-    const uavg = (untagged.reduce((a, t) => a + t.pnl, 0) / untagged.length).toFixed(1);
+    const uNetDollars = untagged.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
+    const uAvgDollars = uNetDollars / untagged.length;
     const uwc = uwr >= 70 ? 'pill-green' : uwr >= 50 ? 'pill-gold' : 'pill-red';
-    const upc = uavg >= 0 ? 'outcome-win' : 'outcome-loss';
-    rows.push(`<tr class="pair-row-clickable" onclick="openStratDrilldown('untagged')" title="View untagged trades" style="cursor:pointer"><td class="bold" style="color:var(--text2)">Untagged</td><td>${untagged.length}</td><td><span class="pill ${uwc}">${uwr}%</span></td><td class="${upc}">${uavg >= 0 ? '+' : ''}${uavg}%</td></tr>`);
+    const upc = uAvgDollars >= 0 ? 'outcome-win' : 'outcome-loss';
+    const uDisp = _fmtAvgPnl(uAvgDollars, untagged);
+    rows.push(`<tr class="pair-row-clickable" onclick="openStratDrilldown('untagged')" title="View untagged trades" style="cursor:pointer"><td class="bold" style="color:var(--text2)">Untagged</td><td>${untagged.length}</td><td><span class="pill ${uwc}">${uwr}%</span></td><td class="${upc}" style="font-size:11px">${uDisp}</td></tr>`);
   }
   tbody.innerHTML = rows.join('');
 }
@@ -2120,12 +2175,13 @@ function buildMonthlyTable() {
     const absNet = Math.abs(netDollars);
     const netFmt = (absNet >= 1000 ? (netDollars >= 0 ? '+$' : '-$') + (absNet/1000).toFixed(1) + 'k'
                                    : (netDollars >= 0 ? '+$' : '-$') + absNet.toFixed(2));
+    const pnlDisp = _fmtGroupPnl(netDollars, mt);
 
     return `<tr class="pair-row-clickable" onclick="openMonthDrilldown(this.dataset.k)" data-k="${key}" title="View ${MONTH_NAMES[mo-1]} ${yr} trades" style="cursor:pointer">
       <td class="bold">${MONTH_NAMES[mo - 1]} ${yr}</td>
       <td>${mt.length}</td>
       <td><span class="pill ${wrClass}">${wr}%</span></td>
-      <td class="${pnlClass} mono">${netFmt}</td>
+      <td class="${pnlClass} mono" style="font-size:11px">${pnlDisp}</td>
       <td>${bestStreak > 0 ? bestStreak + 'W' : '—'}</td>
       <td><span class="pill ${gradeClass}">${grade}</span></td>
     </tr>`;
