@@ -4817,11 +4817,8 @@ function updateKPIs() {
   const avgWDollars  = winDollars.length  ? winDollars.reduce((a, b) => a + b, 0)  / winDollars.length  : 0;
   const avgLDollars  = lossDollars.length ? lossDollars.reduce((a, b) => a + b, 0) / lossDollars.length : 0;
   const pf = lossDollars.length ? Math.abs(winDollars.reduce((a, b) => a + b, 0) / lossDollars.reduce((a, b) => a + b, 0)).toFixed(2) : '∞';
-  // Format: prefer % if no trade is a genuine MT5/dollar-sourced trade.
-  // pnlUnit==='$' alone is NOT enough — it could be a UI slip on a manual trade.
-  // Only flag as dollar trade if it has a real MT5 origin signal.
-  const _isTrueDollar = t => t.source === 'mt5' || !!t.mt5Ticket || (t.notes && t.notes.includes('MT5 Import'));
-  const allPct = trades.every(t => !_isTrueDollar(t));
+  // Format: use pnlUnit directly — '%' trades sum as %, '$' trades sum as dollars
+  const allPct = trades.every(t => (t.pnlUnit || '%') === '%');
   const fmtKpi = (dollars, accSz) => {
     if (allPct && accSz > 0) { const pct = (dollars / accSz) * 100; return (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%'; }
     return (dollars >= 0 ? '+$' : '-$') + Math.abs(dollars).toFixed(2);
@@ -4834,18 +4831,16 @@ function updateKPIs() {
     accs.forEach(a => { const n = trades.filter(t => t.account === a.name).length; const sz = parseFloat(a.size) || 0; if (sz > 0 && n > 0) { blendedAccSize += sz * n; totalW += n; } });
     if (totalW > 0) blendedAccSize = blendedAccSize / totalW;
   }
-  // Net PnL — use allPct (computed above) as source of truth for display mode.
-  // allPct is true when every trade is a manual %-unit trade (not MT5/dollar-sourced).
-  // Only fall back to $ display when genuine dollar-unit trades exist.
+  // Net PnL — always use pnlUnit per trade as source of truth.
+  // If every trade is '%', sum raw pnl values and show as %.
+  // If any trade has pnlUnit='$', convert all to dollars.
   let netPnlDisplay;
   let netPnl;
   if (allPct) {
-    // All manual %-unit trades — sum raw pnl values as % directly
     const totalPct = trades.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
     netPnlDisplay = (totalPct >= 0 ? '+' : '') + totalPct.toFixed(1) + '%';
     netPnl = totalPct.toFixed(1);
   } else {
-    // Has real MT5/dollar imports — convert everything to dollars
     const totalDollars = trades.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
     netPnlDisplay = (totalDollars >= 0 ? '+$' : '-$') + Math.abs(totalDollars).toFixed(2);
     netPnl = totalDollars.toFixed(1);
