@@ -4832,25 +4832,21 @@ function updateKPIs() {
     if (totalW > 0) blendedAccSize = blendedAccSize / totalW;
   }
   // Net PnL — determine display format per trade type:
-  // Net PnL KPI — use account pnlMode as source of truth, not per-trade pnlUnit.
-  // Only MT5-sourced trades (source='mt5', mt5Ticket, or notes='MT5 Import') are truly dollar trades.
-  // A trade having pnlUnit='$' due to a UI slip should NOT flip the whole dashboard to dollars.
-  const hasTrueDollarTrade = trades.some(t =>
-    t.source === 'mt5' || !!t.mt5Ticket ||
-    (t.notes && t.notes.includes('MT5 Import'))
-  );
+  // Use allPct (already computed above) as the source of truth for display mode.
+  // allPct is true when every trade is a manual %-unit trade (not MT5/dollar-sourced).
+  // Only fall back to $ display when there are genuine dollar-unit trades mixed in.
   let netPnlDisplay;
   let netPnl;
-  if (hasTrueDollarTrade) {
-    // Has real MT5 imports — convert everything to dollars
-    const totalDollars = trades.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
-    netPnlDisplay = (totalDollars >= 0 ? '+$' : '-$') + Math.abs(totalDollars).toFixed(2);
-    netPnl = totalDollars.toFixed(1);
-  } else {
-    // All manual trades — sum raw pnl values as % directly
+  if (allPct) {
+    // All manual %-unit trades — sum raw pnl values as % directly
     const totalPct = trades.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
     netPnlDisplay = (totalPct >= 0 ? '+' : '') + totalPct.toFixed(1) + '%';
     netPnl = totalPct.toFixed(1);
+  } else {
+    // Has real MT5/dollar imports — convert everything to dollars
+    const totalDollars = trades.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
+    netPnlDisplay = (totalDollars >= 0 ? '+$' : '-$') + Math.abs(totalDollars).toFixed(2);
+    netPnl = totalDollars.toFixed(1);
   }
   const rrNums = trades.map(t => { const m = (t.rr || '').match(/1:([\d.]+)/); return m ? parseFloat(m[1]) : null; }).filter(x => x !== null);
   const avgRR = rrNums.length ? (rrNums.reduce((a, b) => a + b, 0) / rrNums.length).toFixed(1) : null;
