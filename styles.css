@@ -2618,7 +2618,8 @@ body{
   box-shadow: -2px 0 16px rgba(37,99,235,0.14);
 }
 @media(min-width:1081px) {
-  .cal-slide-toggle { display: flex; }
+  /* JS will set display:'' (flex) when dashboard is active; hidden on all other pages */
+  .cal-slide-toggle { display: none; }
 }
 
 /* ── Calendar panel: full-height right drawer ── */

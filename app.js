@@ -1721,6 +1721,15 @@ function nav(pageId, sbEl, label, extra) {
   if (tab) tab.classList.add('active');
   if (sbEl) sbEl.classList.add('active');
   document.getElementById('topbar-page').textContent = label;
+  // Show the calendar slide-toggle only on the dashboard (desktop only — CSS hides on mobile)
+  const calBtn = document.getElementById('cal-slide-toggle');
+  if (calBtn) {
+    if (pageId === 'dashboard' && window.innerWidth > 1080) {
+      calBtn.style.display = 'flex';
+    } else {
+      calBtn.style.display = 'none';
+    }
+  }
   if (pageId === 'tradelog') renderTradeTable(trades);
   renderCalendar();
   if (pageId === 'quarter' && extra) { renderQuarterPage(extra.year, extra.q); }
