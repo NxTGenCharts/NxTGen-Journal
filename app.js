@@ -1733,8 +1733,8 @@ function nav(pageId, sbEl, label, extra) {
   if (pageId === 'tradelog') renderTradeTable(trades);
   renderCalendar();
   if (pageId === 'quarter' && extra) { renderQuarterPage(extra.year, extra.q); }
-  if (pageId === 'calendar') { _refreshCalendarAccountFilter(); setTimeout(renderCalendar, 0); }
-  if (pageId === 'dashboard') { _refreshCalendarAccountFilter(); setTimeout(renderCalendar, 0); }
+  if (pageId === 'calendar') { _refreshCalendarAccountFilter(); _restoreCalendarAccountSelection(); setTimeout(renderCalendar, 0); }
+  if (pageId === 'dashboard') { _refreshCalendarAccountFilter(); _restoreCalendarAccountSelection(); setTimeout(renderCalendar, 0); }
   if (pageId === 'trash') { setTimeout(renderTrash, 0); }
   if (pageId === 'monthly') { buildMonthlyReview(); }
   if (pageId === 'ai') { buildAI(); }
@@ -3939,7 +3939,7 @@ async function _accLoad() {
   if (!_currentUser) return;
   const { data, error } = await sb
     .from('journal_account_data')
-    .select('id, payouts, milestones, accounts')
+    .select('id, payouts, milestones, accounts, calendar_account')
     .eq('user_id', _currentUser.id)
     .maybeSingle();
   if (error) {
@@ -3954,16 +3954,20 @@ async function _accLoad() {
     _accData.accounts   = (data.accounts  || []).map(a =>
       typeof a === 'string' ? { name: a, status: 'active', type: '', notes: '', mt5: null } : { notes: '', ...a }
     );
+    _accData.calendarAccount = data.calendar_account || '';
+    // Keep localStorage in sync with cloud value
+    try { if (_accData.calendarAccount) localStorage.setItem('nxtgen_cal_account', _accData.calendarAccount); } catch(e) {}
   }
 }
 
 async function _accSave() {
   if (!_currentUser) return false;
   const row = {
-    user_id:    _currentUser.id,
-    payouts:    _accData.payouts,
-    milestones: _accData.milestones,
-    accounts:   _accData.accounts,
+    user_id:          _currentUser.id,
+    payouts:          _accData.payouts,
+    milestones:       _accData.milestones,
+    accounts:         _accData.accounts,
+    calendar_account: _accData.calendarAccount || '',
   };
   const { data, error } = await sb
     .from('journal_account_data')
@@ -4744,12 +4748,30 @@ function updateKPIs() {
   const wins = trades.filter(t => t.outcome === 'Win').length;
   const losses = trades.filter(t => t.outcome === 'Loss').length;
   const wr = total ? ((wins / total) * 100).toFixed(1) : 0;
+  // Compute dollar PnL per trade using its own account size for correct avg win/loss
+  const tradeDollars = trades.map(t => toPnlDollars(t, getAccSizeForAccount(t.account)));
+  const netDollars   = tradeDollars.reduce((a, b) => a + b, 0);
+  const winDollars   = tradeDollars.filter((d, i) => trades[i].pnl > 0);
+  const lossDollars  = tradeDollars.filter((d, i) => trades[i].pnl < 0);
+  const avgWDollars  = winDollars.length  ? winDollars.reduce((a, b) => a + b, 0)  / winDollars.length  : 0;
+  const avgLDollars  = lossDollars.length ? lossDollars.reduce((a, b) => a + b, 0) / lossDollars.length : 0;
+  const pf = lossDollars.length ? Math.abs(winDollars.reduce((a, b) => a + b, 0) / lossDollars.reduce((a, b) => a + b, 0)).toFixed(2) : '∞';
+  // Format: prefer % if all trades are % unit, else show $
+  const allPct = trades.every(t => !_isMt5Trade(t) && t.pnlUnit !== '$');
+  const fmtKpi = (dollars, accSz) => {
+    if (allPct && accSz > 0) { const pct = (dollars / accSz) * 100; return (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%'; }
+    return (dollars >= 0 ? '+$' : '-$') + Math.abs(dollars).toFixed(2);
+  };
+  // For headline KPIs, use a blended accSize (avg of all known account sizes weighted by trade count)
+  const accs = _getCustomAccounts ? _getCustomAccounts() : [];
+  let blendedAccSize = 0;
+  if (accs.length) {
+    let totalW = 0;
+    accs.forEach(a => { const n = trades.filter(t => t.account === a.name).length; const sz = parseFloat(a.size) || 0; if (sz > 0 && n > 0) { blendedAccSize += sz * n; totalW += n; } });
+    if (totalW > 0) blendedAccSize = blendedAccSize / totalW;
+  }
+  // Fall back to raw % display if no account sizes known
   const netPnl = trades.reduce((a, t) => a + t.pnl, 0).toFixed(1);
-  const winPnls = trades.filter(t => t.pnl > 0).map(t => t.pnl);
-  const lossPnls = trades.filter(t => t.pnl < 0).map(t => t.pnl);
-  const avgW = winPnls.length ? (winPnls.reduce((a, b) => a + b, 0) / winPnls.length).toFixed(1) : 0;
-  const avgL = lossPnls.length ? (lossPnls.reduce((a, b) => a + b, 0) / lossPnls.length).toFixed(1) : 0;
-  const pf = lossPnls.length ? Math.abs(winPnls.reduce((a, b) => a + b, 0) / lossPnls.reduce((a, b) => a + b, 0)).toFixed(2) : '∞';
   const rrNums = trades.map(t => { const m = (t.rr || '').match(/1:([\d.]+)/); return m ? parseFloat(m[1]) : null; }).filter(x => x !== null);
   const avgRR = rrNums.length ? (rrNums.reduce((a, b) => a + b, 0) / rrNums.length).toFixed(1) : null;
   const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date));
@@ -4761,8 +4783,8 @@ function updateKPIs() {
   document.getElementById('kpi-wr').textContent = wr + '%';
   document.getElementById('kpi-pnl').textContent = (netPnl > 0 ? '+' : '') + netPnl + '%';
   document.getElementById('kpi-pf').textContent = pf + 'x';
-  document.getElementById('kpi-aw').textContent = (avgW > 0 ? '+' : '') + avgW + '%';
-  document.getElementById('kpi-al').textContent = avgL + '%';
+  document.getElementById('kpi-aw').textContent = (avgWDollars >= 0 ? '+$' : '-$') + Math.abs(avgWDollars).toFixed(2);
+  document.getElementById('kpi-al').textContent = (avgLDollars >= 0 ? '+$' : '-$') + Math.abs(avgLDollars).toFixed(2);
   const rrEl = document.getElementById('kpi-rr'); if (rrEl) rrEl.textContent = avgRR ? '1:' + avgRR : '—';
   const wsEl = document.getElementById('kpi-ws'); if (wsEl) wsEl.textContent = streak > 0 ? streak + '↑ (best:' + maxStreak + ')' : maxStreak ? '0 (best:' + maxStreak + ')' : '0';
   document.querySelectorAll('.kpi-value').forEach(el => { el.style.transform = 'scale(1.04)'; el.style.transition = 'transform 0.3s ease'; setTimeout(() => el.style.transform = '', 320); });
@@ -4896,11 +4918,13 @@ function renderQuarterPage(year, q) {
   const bes = qt.filter(t => t.outcome === 'B.E').length;
   const wr = qt.length ? ((wins / qt.length) * 100).toFixed(1) : 0;
   const netPnl = qt.reduce((a, t) => a + t.pnl, 0).toFixed(1);
-  const winPnls = qt.filter(t => t.pnl > 0).map(t => t.pnl);
-  const lossPnls = qt.filter(t => t.pnl < 0).map(t => t.pnl);
-  const avgW = winPnls.length ? (winPnls.reduce((a, b) => a + b, 0) / winPnls.length).toFixed(1) : 0;
-  const avgL = lossPnls.length ? (lossPnls.reduce((a, b) => a + b, 0) / lossPnls.length).toFixed(1) : 0;
-  const pf = lossPnls.length ? Math.abs(winPnls.reduce((a, b) => a + b, 0) / lossPnls.reduce((a, b) => a + b, 0)).toFixed(2) : '∞';
+  // Compute dollar PnL per trade using its account size for correct avg
+  const qtDollars  = qt.map(t => toPnlDollars(t, getAccSizeForAccount(t.account)));
+  const winDollarsQ  = qtDollars.filter((d, i) => qt[i].pnl > 0);
+  const lossDollarsQ = qtDollars.filter((d, i) => qt[i].pnl < 0);
+  const avgW = winDollarsQ.length  ? (winDollarsQ.reduce((a,b)=>a+b,0)  / winDollarsQ.length).toFixed(2)  : 0;
+  const avgL = lossDollarsQ.length ? (lossDollarsQ.reduce((a,b)=>a+b,0) / lossDollarsQ.length).toFixed(2) : 0;
+  const pf = lossDollarsQ.length ? Math.abs(winDollarsQ.reduce((a,b)=>a+b,0) / lossDollarsQ.reduce((a,b)=>a+b,0)).toFixed(2) : '∞';
   const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const monthRows = months.map(m => {
     const mt = qt.filter(t => parseInt(t.date.slice(5, 7)) === m);
@@ -4929,7 +4953,7 @@ function renderQuarterPage(year, q) {
       <div class="kpi-card"><div class="kpi-label">Wins</div><div class="kpi-value green">${wins}</div></div>
       <div class="kpi-card"><div class="kpi-label">Losses</div><div class="kpi-value red">${losses}</div></div>
       <div class="kpi-card"><div class="kpi-label">Break evens</div><div class="kpi-value blue">${bes}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Avg win / loss</div><div class="kpi-value white" style="font-size:14px">+${avgW}% / ${avgL}%</div></div>
+      <div class="kpi-card"><div class="kpi-label">Avg win / loss</div><div class="kpi-value white" style="font-size:14px">+$${Math.abs(avgW)} / -$${Math.abs(avgL)}</div></div>
     </div>
     ${qt.length === 0 ? `<div style="text-align:center;padding:40px;color:var(--text3)">No trades logged for Q${q} ${year} yet.<br><br><button class="btn btn-primary" onclick="openModal()" style="margin-top:10px">+ Add Trade</button></div>` : `
     <div class="sec-head">Month Breakdown</div>
@@ -5142,12 +5166,32 @@ let calMonth = new Date().getMonth();
 function calNav(dir) { calMonth += dir; if (calMonth > 11) { calMonth = 0; calYear++; } if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); }
 function getAccSize() { return parseFloat(document.getElementById('cal-acc-size').value) || 5000; }
 function getCalFilter() { const el = document.getElementById('cal-acc-filter'); return el ? el.value : ''; }
-function pnlToUSD(pnl, accSize) { return (pnl / 100) * accSize; }
+// pnlToUSD: converts a single trade's pnl to USD correctly.
+// MT5/dollar trades already have pnl in $; only %-unit trades need (pnl/100)*accSize.
+function pnlToUSD(pnl, accSize, trade) {
+  if (trade) return toPnlDollars(trade, accSize);
+  // Legacy call-sites that don't pass a trade object: treat as % (old behaviour for manual/seed trades only)
+  return (pnl / 100) * accSize;
+}
 function fmtUSD(val) { const abs = Math.abs(val); const s = abs >= 1000 ? '$' + (abs / 1000).toFixed(1) + 'k' : '$' + abs.toFixed(2); return (val < 0 ? '-' : val > 0 ? '+' : '') + s; }
-function groupTradesByDay(tradeList) { const dayMap = {}; tradeList.forEach(t => { if (!dayMap[t.date]) dayMap[t.date] = { trades: [], totalPnl: 0, wins: 0, losses: 0, bes: 0 }; dayMap[t.date].trades.push(t); dayMap[t.date].totalPnl += t.pnl; if (t.outcome === 'Win') dayMap[t.date].wins++; else if (t.outcome === 'Loss') dayMap[t.date].losses++; else dayMap[t.date].bes++; }); return dayMap; }
-function calculateDailyOutcome(totalPnl) { if (totalPnl > 0) return 'win'; if (totalPnl < 0) return 'loss'; return 'breakeven'; }
-function calculateCalendarWinrate(dayMap) { const days = Object.values(dayMap); const winDays = days.filter(d => calculateDailyOutcome(d.totalPnl) === 'win').length; const lossDays = days.filter(d => calculateDailyOutcome(d.totalPnl) === 'loss').length; const beDays = days.filter(d => calculateDailyOutcome(d.totalPnl) === 'breakeven').length; const denom = winDays + lossDays; const wr = denom > 0 ? ((winDays / denom) * 100) : 0; return { winDays, lossDays, beDays, wr: parseFloat(wr.toFixed(2)) }; }
-function showCalTooltip(e, dayData, dateStr, accSize) { const tip = document.getElementById('cal-tooltip'); if (!tip || !dayData) return; const dt = new Date(dateStr + 'T12:00:00'); const dateLabel = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); const outcome = calculateDailyOutcome(dayData.totalPnl); const usd = pnlToUSD(dayData.totalPnl, accSize); const outLabel = outcome === 'win' ? '🟢 Winning Day' : outcome === 'loss' ? '🔴 Losing Day' : '⚪ Breakeven Day'; const outColor = outcome === 'win' ? 'var(--green)' : outcome === 'loss' ? 'var(--red)' : 'var(--text3)'; tip.innerHTML = `<div class="cal-tooltip-date">${dateLabel}</div><div class="cal-tooltip-row"><span class="k">Net PnL</span><span class="v" style="color:${usd >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtUSD(usd)}</span></div><div class="cal-tooltip-row"><span class="k">Total trades</span><span class="v">${dayData.trades.length}</span></div><div class="cal-tooltip-row"><span class="k">Wins</span><span class="v" style="color:var(--green)">${dayData.wins}</span></div><div class="cal-tooltip-row"><span class="k">Losses</span><span class="v" style="color:var(--red)">${dayData.losses}</span></div>${dayData.bes ? `<div class="cal-tooltip-row"><span class="k">Break evens</span><span class="v" style="color:var(--blue)">${dayData.bes}</span></div>` : ''}<hr class="cal-tooltip-divider"><div class="cal-tooltip-outcome" style="color:${outColor}">${outLabel}</div>`; const x = Math.min(e.clientX + 14, window.innerWidth - 224); const y = Math.min(e.clientY + 14, window.innerHeight - 200); tip.style.left = x + 'px'; tip.style.top = y + 'px'; tip.style.display = 'block'; }
+// groupTradesByDay: totalPnlUSD stores the sum in dollars using toPnlDollars per trade.
+// accSize is needed to convert %-based trades; it is provided by renderCalendar.
+function groupTradesByDay(tradeList, accSize) {
+  const dayMap = {};
+  tradeList.forEach(t => {
+    if (!dayMap[t.date]) dayMap[t.date] = { trades: [], totalPnl: 0, totalPnlUSD: 0, wins: 0, losses: 0, bes: 0 };
+    dayMap[t.date].trades.push(t);
+    dayMap[t.date].totalPnl += t.pnl;                          // raw (kept for outcome sign)
+    dayMap[t.date].totalPnlUSD += toPnlDollars(t, accSize || 0); // dollar-correct sum
+    if (t.outcome === 'Win') dayMap[t.date].wins++;
+    else if (t.outcome === 'Loss') dayMap[t.date].losses++;
+    else dayMap[t.date].bes++;
+  });
+  return dayMap;
+}
+function calculateDailyOutcome(totalPnlUSD) { if (totalPnlUSD > 0) return 'win'; if (totalPnlUSD < 0) return 'loss'; return 'breakeven'; }
+function calculateCalendarWinrate(dayMap) { const days = Object.values(dayMap); const winDays = days.filter(d => calculateDailyOutcome(d.totalPnlUSD !== undefined ? d.totalPnlUSD : d.totalPnl) === 'win').length; const lossDays = days.filter(d => calculateDailyOutcome(d.totalPnlUSD !== undefined ? d.totalPnlUSD : d.totalPnl) === 'loss').length; const beDays = days.filter(d => calculateDailyOutcome(d.totalPnlUSD !== undefined ? d.totalPnlUSD : d.totalPnl) === 'breakeven').length; const denom = winDays + lossDays; const wr = denom > 0 ? ((winDays / denom) * 100) : 0; return { winDays, lossDays, beDays, wr: parseFloat(wr.toFixed(2)) }; }
+function showCalTooltip(e, dayData, dateStr, accSize) { const tip = document.getElementById('cal-tooltip'); if (!tip || !dayData) return; const dt = new Date(dateStr + 'T12:00:00'); const dateLabel = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); const usd = dayData.totalPnlUSD !== undefined ? dayData.totalPnlUSD : dayData.trades.reduce((a, t) => a + toPnlDollars(t, accSize), 0); const outcome = calculateDailyOutcome(usd); const outLabel = outcome === 'win' ? '🟢 Winning Day' : outcome === 'loss' ? '🔴 Losing Day' : '⚪ Breakeven Day'; const outColor = outcome === 'win' ? 'var(--green)' : outcome === 'loss' ? 'var(--red)' : 'var(--text3)'; tip.innerHTML = `<div class="cal-tooltip-date">${dateLabel}</div><div class="cal-tooltip-row"><span class="k">Net PnL</span><span class="v" style="color:${usd >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtUSD(usd)}</span></div><div class="cal-tooltip-row"><span class="k">Total trades</span><span class="v">${dayData.trades.length}</span></div><div class="cal-tooltip-row"><span class="k">Wins</span><span class="v" style="color:var(--green)">${dayData.wins}</span></div><div class="cal-tooltip-row"><span class="k">Losses</span><span class="v" style="color:var(--red)">${dayData.losses}</span></div>${dayData.bes ? `<div class="cal-tooltip-row"><span class="k">Break evens</span><span class="v" style="color:var(--blue)">${dayData.bes}</span></div>` : ''}<hr class="cal-tooltip-divider"><div class="cal-tooltip-outcome" style="color:${outColor}">${outLabel}</div>`; const x = Math.min(e.clientX + 14, window.innerWidth - 224); const y = Math.min(e.clientY + 14, window.innerHeight - 200); tip.style.left = x + 'px'; tip.style.top = y + 'px'; tip.style.display = 'block'; }
 function hideCalTooltip() { const tip = document.getElementById('cal-tooltip'); if (tip) tip.style.display = 'none'; }
 
 function renderCalendar() {
@@ -5159,20 +5203,19 @@ function renderCalendar() {
   const label = document.getElementById('cal-month-label');
   const ym = calYear + '-' + String(calMonth + 1).padStart(2, '0');
   const monthTrades = trades.filter(t => t.date.startsWith(ym) && (!accFilter || t.account === accFilter));
-  const dayMap = groupTradesByDay(monthTrades);
+  const dayMap = groupTradesByDay(monthTrades, accSize);
   const { winDays, lossDays, beDays, wr } = calculateCalendarWinrate(dayMap);
   const tradingDays = Object.keys(dayMap);
   const totalTrades = monthTrades.length;
-  const totalPnlPct = monthTrades.reduce((a, t) => a + t.pnl, 0);
-  const totalUSD = pnlToUSD(totalPnlPct, accSize);
+  const totalUSD = monthTrades.reduce((a, t) => a + toPnlDollars(t, accSize), 0);
   let bestDay = null, worstDay = null;
-  Object.entries(dayMap).forEach(([date, d]) => { if (!bestDay || d.totalPnl > dayMap[bestDay].totalPnl) bestDay = date; if (!worstDay || d.totalPnl < dayMap[worstDay].totalPnl) worstDay = date; });
+  Object.entries(dayMap).forEach(([date, d]) => { if (!bestDay || d.totalPnlUSD > dayMap[bestDay].totalPnlUSD) bestDay = date; if (!worstDay || d.totalPnlUSD < dayMap[worstDay].totalPnlUSD) worstDay = date; });
   const kpiEl = document.getElementById('cal-kpi-row');
   const kpiEl2 = document.getElementById('cal-kpi-row-2');
   if (kpiEl || kpiEl2) {
     const dayName = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
-    const bestUSD = bestDay ? pnlToUSD(dayMap[bestDay].totalPnl, accSize) : 0;
-    const worstUSD = worstDay ? pnlToUSD(dayMap[worstDay].totalPnl, accSize) : 0;
+    const bestUSD = bestDay ? dayMap[bestDay].totalPnlUSD : 0;
+    const worstUSD = worstDay ? dayMap[worstDay].totalPnlUSD : 0;
     const wrColor = wr >= 70 ? 'green' : wr >= 50 ? 'white' : 'red';
     const _kpiHtml = `<div class="cal-kpi"><div class="cal-kpi-label">🗂 Trades</div><div class="cal-kpi-val white">${totalTrades}<span style="font-size:10px;color:var(--text3);font-family:var(--font-body);margin-left:5px">${tradingDays.length}d</span></div></div><div class="cal-kpi"><div class="cal-kpi-label">💰 P&L</div><div class="cal-kpi-val ${totalUSD >= 0 ? 'green' : 'red'}">${fmtUSD(totalUSD)}</div></div><div class="cal-kpi"><div class="cal-kpi-label">📈 Best${bestDay ? ' (' + dayName(bestDay) + ')' : ''}</div><div class="cal-kpi-val green">${bestDay ? fmtUSD(bestUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label">📉 Worst${worstDay ? ' (' + dayName(worstDay) + ')' : ''}</div><div class="cal-kpi-val ${worstUSD < 0 ? 'red' : 'green'}">${worstDay ? fmtUSD(worstUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label">🎯 Day Win Rate</div><div class="cal-kpi-val ${wrColor}">${wr}%</div><div style="font-size:9px;color:var(--text3);margin-top:3px;display:flex;gap:5px"><span style="color:var(--green)">▲${winDays}W</span><span style="color:var(--red)">▼${lossDays}L</span><span>⬤${beDays}BE</span></div></div>`;
     if (kpiEl) kpiEl.innerHTML = _kpiHtml;
@@ -5195,12 +5238,12 @@ function renderCalendar() {
   daysEl_target.innerHTML = cells.map(c => {
     const dateStr = c.year + '-' + String(c.month).padStart(2, '0') + '-' + String(c.day).padStart(2, '0');
     const isToday = dateStr === today; const dayData = dayMap[dateStr]; const hasTrades = !!dayData;
-    const outcome = hasTrades ? calculateDailyOutcome(dayData.totalPnl) : null;
+    const outcome = hasTrades ? calculateDailyOutcome(dayData.totalPnlUSD) : null;
     let cls = 'cal-day'; if (!c.current) cls += ' other-month'; if (isToday) cls += ' today';
     if (hasTrades) { cls += ' has-trades'; if (outcome === 'win') cls += ' win-day'; else if (outcome === 'loss') cls += ' loss-day'; else cls += ' mixed-day'; }
     const dayNumHTML = isToday ? `<div class="cal-day-num"><span class="cal-today-badge">${c.day}</span></div>` : `<div class="cal-day-num">${String(c.day).padStart(2, '0')}</div>`;
     let dotHTML = '', pnlHTML = '', countHTML = '', pairsHTML = '';
-    if (hasTrades) { const dotColor = outcome === 'win' ? 'green' : outcome === 'loss' ? 'red' : 'blue'; dotHTML = `<div class="cal-day-dot ${dotColor}"></div>`; const usd = pnlToUSD(dayData.totalPnl, accSize); pnlHTML = `<div class="cal-day-pnl ${usd > 0 ? 'green' : usd < 0 ? 'red' : 'zero'}">${fmtUSD(usd)}</div>`; countHTML = `<div class="cal-day-count">${dayData.trades.length} trade${dayData.trades.length > 1 ? 's' : ''}</div>`; const pairs = [...new Set(dayData.trades.map(t => t.pair))].join(', '); pairsHTML = `<div class="cal-day-pairs">${pairs}</div>`; }
+    if (hasTrades) { const dotColor = outcome === 'win' ? 'green' : outcome === 'loss' ? 'red' : 'blue'; dotHTML = `<div class="cal-day-dot ${dotColor}"></div>`; const usd = dayData.totalPnlUSD; pnlHTML = `<div class="cal-day-pnl ${usd > 0 ? 'green' : usd < 0 ? 'red' : 'zero'}">${fmtUSD(usd)}</div>`; countHTML = `<div class="cal-day-count">${dayData.trades.length} trade${dayData.trades.length > 1 ? 's' : ''}</div>`; const pairs = [...new Set(dayData.trades.map(t => t.pair))].join(', '); pairsHTML = `<div class="cal-day-pairs">${pairs}</div>`; }
     let clickAttr = '', hoverAttr = '';
     if (c.current) { if (hasTrades) { clickAttr = `onclick="openCalPopup(event,'${dateStr}')"`;  hoverAttr = `onmouseenter="showCalTooltip(event,window._dayMap&&window._dayMap['${dateStr}'],'${dateStr}',${accSize})" onmouseleave="hideCalTooltip()"`; } else { clickAttr = `onclick="closeCalPopup();openModal({date:'${dateStr}'})"` ; } }
     return `<div class="${cls}" ${clickAttr} ${hoverAttr}>${dotHTML}${dayNumHTML}${pnlHTML}${countHTML}${pairsHTML}</div>`;
@@ -5216,19 +5259,18 @@ function openCalPopup(e, dateStr) {
   const dayTrades = trades.filter(t => t.date === dateStr && (!accFilter || t.account === accFilter));
   if (!dayTrades.length) return;
 
-  const totalPnl = dayTrades.reduce((a, t) => a + t.pnl, 0);
-  const totalUSD = pnlToUSD(totalPnl, accSize);
+  const totalUSD = dayTrades.reduce((a, t) => a + toPnlDollars(t, accSize), 0);
   const wins     = dayTrades.filter(t => t.outcome === 'Win').length;
   const losses   = dayTrades.filter(t => t.outcome === 'Loss').length;
-  const outcome  = calculateDailyOutcome(totalPnl);
+  const outcome  = calculateDailyOutcome(totalUSD);
   const outColor = outcome === 'win' ? 'var(--green)' : outcome === 'loss' ? 'var(--red)' : 'var(--blue)';
   const outLabel = outcome === 'win' ? 'Winning Day ▲' : outcome === 'loss' ? 'Losing Day ▼' : 'Breakeven Day ⬤';
   const dt       = new Date(dateStr + 'T12:00:00');
   const dateLabel = dt.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
 
   const tradeRows = dayTrades.map(t => {
-    const pnlUSD = pnlToUSD(t.pnl, accSize);
-    const pnlC   = t.pnl > 0 ? 'var(--green)' : t.pnl < 0 ? 'var(--red)' : 'var(--blue)';
+    const pnlUSD = toPnlDollars(t, accSize);
+    const pnlC   = pnlUSD > 0 ? 'var(--green)' : pnlUSD < 0 ? 'var(--red)' : 'var(--blue)';
     const icon   = t.outcome === 'Win' ? '✅' : t.outcome === 'Loss' ? '❌' : '➖';
     return '<div class="cal-popup-trade" onclick="closeCalPopup();openDetail(' + t.id + ')">'
       + '<div style="font-size:16px">' + icon + '</div>'
@@ -5723,6 +5765,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   buildMonthlyReview();
   renderTradeTable(trades);
   _refreshCalendarAccountFilter();
+  _restoreCalendarAccountSelection();
   renderCalendar();
   _injectTopbarAvatar();
 
@@ -6057,7 +6100,45 @@ function _onCalAccFilterChange() {
     const sizeEl = document.getElementById('cal-acc-size');
     if (sizeEl && size > 0) sizeEl.value = size;
   }
+  // Persist selection to Supabase so it survives device switches
+  _saveCalendarAccountSelection(name);
   renderCalendar();
+}
+
+async function _saveCalendarAccountSelection(accountName) {
+  if (!_currentUser) return;
+  _accData.calendarAccount = accountName || '';
+  // Persist to localStorage immediately (instant, cross-session on same device)
+  try { localStorage.setItem('nxtgen_cal_account', _accData.calendarAccount); } catch(e) {}
+  // Also persist to Supabase so it survives device switches
+  try {
+    await sb.from('journal_account_data').upsert({
+      user_id: _currentUser.id,
+      payouts: _accData.payouts,
+      milestones: _accData.milestones,
+      accounts: _accData.accounts,
+      calendar_account: _accData.calendarAccount,
+    }, { onConflict: 'user_id' });
+  } catch(e) {
+    // Column may not exist yet — Supabase migration needed (see README)
+    console.warn('_saveCalendarAccountSelection: Supabase save failed (column may not exist):', e.message);
+  }
+}
+
+function _restoreCalendarAccountSelection() {
+  // Prefer cloud value (loaded in _accData), fallback to localStorage
+  const saved = _accData.calendarAccount
+    || (() => { try { return localStorage.getItem('nxtgen_cal_account') || ''; } catch(e) { return ''; } })();
+  if (!saved) return;
+  const sel = document.getElementById('cal-acc-filter');
+  if (!sel) return;
+  const opt = [...sel.options].find(o => o.value === saved);
+  if (!opt) return;
+  sel.value = saved;
+  const acc  = _getCustomAccounts().find(a => a.name === saved);
+  const size = parseFloat(acc?.size) || 0;
+  const sizeEl = document.getElementById('cal-acc-size');
+  if (sizeEl && size > 0) sizeEl.value = size;
 }
 
 function _refreshCalendarAccountFilter() {
