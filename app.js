@@ -5633,18 +5633,28 @@ function toggleDashCalendar() {
 }
 
 function _applyCalToggle(visible) {
-  const body = document.getElementById('dash-cal-body');
-  const icon = document.getElementById('cal-toggle-icon');
-  const btn  = document.getElementById('cal-toggle-btn');
-  if (!body) return;
+  const layout     = document.querySelector('.dash-layout');
+  const floatBtn   = document.getElementById('cal-slide-toggle');
+  const icon       = document.getElementById('cal-toggle-icon');
+
   if (visible) {
-    body.classList.remove('collapsed');
+    // Slide panel IN — grid expands right column
+    if (layout)   layout.classList.remove('cal-hidden');
+    if (floatBtn) {
+      floatBtn.classList.remove('cal-hidden');
+      floatBtn.style.right = '400px';
+      floatBtn.title = 'Hide calendar';
+    }
     if (icon) icon.style.transform = 'rotate(0deg)';
-    if (btn)  btn.title = 'Hide calendar';
   } else {
-    body.classList.add('collapsed');
+    // Slide panel OUT — grid collapses right column to 0
+    if (layout)   layout.classList.add('cal-hidden');
+    if (floatBtn) {
+      floatBtn.classList.add('cal-hidden');
+      floatBtn.style.right = '0px';
+      floatBtn.title = 'Show calendar';
+    }
     if (icon) icon.style.transform = 'rotate(180deg)';
-    if (btn)  btn.title = 'Show calendar';
   }
 }
 

@@ -639,12 +639,21 @@ body{
   -webkit-backdrop-filter:var(--blur-xl);
   border:1px solid var(--glass-border);
   border-radius:var(--r-xl);
-  width:640px;max-width:calc(100vw - 32px);max-height:88vh;overflow-y:auto;
+  width:640px;max-width:calc(100vw - 32px);max-height:88vh;
+  display:flex;flex-direction:column;
   box-shadow:var(--shadow-xl),inset 0 1px 0 var(--glass-shine);
   animation:slideUp 0.24s var(--ease-spring);
 }
-.modal-body{ padding:0 28px 4px }
-.modal-head{ padding:20px 28px 0; display:flex;align-items:center;justify-content:space-between;margin-bottom:18px }
+.modal-body{ padding:0 28px 4px; overflow-y:auto; flex:1; }
+.modal-head{ padding:20px 28px 0; display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-shrink:0; }
+.form-actions{
+  display:flex;gap:10px;justify-content:flex-end;
+  padding:16px 28px 20px;
+  border-top:1px solid var(--glass-border);
+  flex-shrink:0;
+  margin-top:0;
+}
+
 .modal-form-grid{ display:grid;grid-template-columns:1fr 1fr;gap:14px }
 .modal-title{font-family:var(--font-head);font-size:17px;font-weight:700;letter-spacing:-0.3px}
 .modal-close{
@@ -666,7 +675,7 @@ body{
   border-radius:var(--r-sm);padding:9px 12px;
   font-size:13px;color:var(--text);
   font-family:var(--font-body);transition:var(--t-fast);
-  outline:none;width:100%;
+  outline:none;width:100%;box-sizing:border-box;
   backdrop-filter:var(--blur-xs);
 }
 .form-input:focus,.form-select:focus,.form-textarea:focus{
@@ -679,10 +688,6 @@ body{
 }
 .form-select option{background:var(--bg2)}
 .form-textarea{resize:vertical;min-height:80px;line-height:1.55}
-.form-actions{
-  display:flex;gap:10px;justify-content:flex-end;
-  margin-top:20px;padding-top:16px;border-top:1px solid var(--glass-border);
-}
 
 /* ════════════ DETAIL PANEL ══════════════════════ */
 .detail-panel{
@@ -2528,63 +2533,151 @@ body{
 }
 
 /* ════════════ DASHBOARD TWO-COLUMN LAYOUT ══════════════ */
-.page#page-dashboard { overflow-y: auto; }
+.page#page-dashboard { overflow-y: auto; overflow-x: hidden; }
 .page#page-dashboard > .dash-layout { max-width: 1600px; margin: 0 auto; width: 100%; }
 
+/* Desktop: grid shrinks right col to 0 when cal hidden */
 .dash-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 400px;
-  gap: 24px;
-  padding: 20px 24px 40px;
+  gap: 0;
   align-items: start;
   width: 100%;
   box-sizing: border-box;
+  transition: grid-template-columns 0.40s cubic-bezier(0.4,0,0.2,1);
+}
+.dash-layout.cal-hidden {
+  grid-template-columns: minmax(0, 1fr) 0px;
 }
 
 .dash-left {
   min-width: 0;
   overflow: hidden;
+  padding: 20px 24px 40px;
+  box-sizing: border-box;
 }
 
-/* Right column — sticky calendar panel */
+/* Right column — full-height sticky drawer */
 .dash-right {
   position: sticky;
   top: 0;
   min-width: 0;
+  height: calc(100vh - var(--topbar));
+  overflow: hidden;
 }
 
-.dash-cal-panel {
-  background: var(--glass-1);
+/* ── Floating tab button that rides the panel edge ── */
+.cal-slide-toggle {
+  position: fixed;
+  top: 50%;
+  right: 400px;
+  transform: translateY(-50%);
+  z-index: 90;
+  width: 20px;
+  height: 56px;
+  border-radius: 10px 0 0 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
   border: 1px solid var(--glass-border);
-  border-radius: var(--r-xl);
-  padding: 16px;
-  backdrop-filter: blur(36px) saturate(1.8);
-  -webkit-backdrop-filter: blur(36px) saturate(1.8);
-  box-shadow: var(--shadow-lg), inset 0 1px 0 var(--glass-shine);
+  border-right: none;
+  color: var(--text3);
+  cursor: pointer;
+  display: none; /* shown on desktop only */
+  align-items: center;
+  justify-content: center;
+  transition: right 0.40s cubic-bezier(0.4,0,0.2,1),
+              background 0.18s, color 0.18s, box-shadow 0.18s;
+  box-shadow: -2px 0 14px rgba(0,0,0,0.30),
+              inset 1px 0 0 rgba(255,255,255,0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.cal-slide-toggle:hover {
+  background: linear-gradient(180deg, rgba(96,165,250,0.14) 0%, rgba(96,165,250,0.07) 100%);
+  color: var(--blue);
+  box-shadow: -2px 0 18px rgba(96,165,250,0.18),
+              inset 1px 0 0 rgba(96,165,250,0.12);
+}
+.cal-slide-toggle.cal-hidden {
+  right: 0;
+}
+.cal-slide-toggle svg {
+  display: block;
+  transition: transform 0.32s var(--ease-spring);
+}
+.cal-slide-toggle.cal-hidden svg {
+  transform: rotate(180deg);
+}
+[data-theme="light"] .cal-slide-toggle {
+  background: linear-gradient(180deg, rgba(255,255,255,0.88) 0%, rgba(248,250,252,0.80) 100%);
+  border-color: rgba(0,0,0,0.09);
+  box-shadow: -2px 0 12px rgba(0,0,0,0.09);
+  color: var(--text3);
+}
+[data-theme="light"] .cal-slide-toggle:hover {
+  color: var(--blue);
+  box-shadow: -2px 0 16px rgba(37,99,235,0.14);
+}
+@media(min-width:1081px) {
+  .cal-slide-toggle { display: flex; }
+}
+
+/* ── Calendar panel: full-height right drawer ── */
+.dash-cal-panel {
+  background: linear-gradient(180deg,
+    rgba(13,17,26,0.97) 0%,
+    rgba(11,15,24,0.96) 100%);
+  border-left: 1px solid var(--glass-border);
+  border-radius: 0;
+  padding: 20px 18px 24px;
+  backdrop-filter: blur(44px) saturate(2.0);
+  -webkit-backdrop-filter: blur(44px) saturate(2.0);
+  box-shadow: -6px 0 36px rgba(0,0,0,0.28),
+              inset 1px 0 0 rgba(255,255,255,0.04);
   position: relative;
-  overflow: hidden;
-  width: 100%;
+  width: 400px;
+  height: 100%;
   box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Slide out to the right when hidden */
+  transform: translateX(0);
+  opacity: 1;
+  transition: transform 0.40s cubic-bezier(0.4,0,0.2,1),
+              opacity  0.30s ease;
+}
+/* When grid collapses, slide the panel itself out */
+.dash-layout.cal-hidden .dash-cal-panel {
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
 }
 .dash-cal-panel::before {
   content: '';
   position: absolute;
-  top: -40%;
-  right: -20%;
-  width: 60%;
-  height: 60%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(96,165,250,0.05) 0%, transparent 65%);
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse 70% 45% at 60% 20%,
+    rgba(96,165,250,0.06) 0%, transparent 60%);
   pointer-events: none;
 }
+[data-theme="light"] .dash-cal-panel {
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.94) 0%,
+    rgba(248,250,252,0.90) 100%);
+  border-color: rgba(0,0,0,0.09);
+  box-shadow: -4px 0 24px rgba(0,0,0,0.07),
+              inset 1px 0 0 rgba(255,255,255,0.9);
+}
+
+/* Scrollbar inside cal panel */
+.dash-cal-panel::-webkit-scrollbar { width: 3px; }
+.dash-cal-panel::-webkit-scrollbar-thumb { background: var(--glass-2); border-radius: 99px; }
 
 .dash-cal-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
   gap: 8px;
-  flex-wrap: wrap;
 }
 .dash-cal-title {
   font-family: var(--font-head);
@@ -2603,111 +2696,73 @@ body{
   flex-shrink: 0;
 }
 
-/* Compact cal KPI inside dashboard */
+/* Compact KPI strip — 2 col */
 .dash-cal-panel .cal-kpi-row {
-  grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
-  padding: 0 0 8px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  padding: 0 0 10px;
 }
 .dash-cal-panel .cal-kpi {
-  padding: 7px 8px;
+  padding: 8px 10px;
   border-radius: var(--r-md);
 }
-.dash-cal-panel .cal-kpi-val {
-  font-size: 13px;
-}
-.dash-cal-panel .cal-kpi-label {
-  font-size: 8px;
-}
+.dash-cal-panel .cal-kpi-val { font-size: 14px; }
+.dash-cal-panel .cal-kpi-label { font-size: 8px; }
 
-/* Compact day cells inside dashboard */
+/* Calendar day cells */
 .dash-cal-panel .cal-day {
-  min-height: 56px;
+  min-height: 58px;
   padding: 5px 6px;
 }
-.dash-cal-panel .cal-day-num {
-  font-size: 10px;
-}
-.dash-cal-panel .cal-day-pnl {
-  font-size: 9px;
-}
-.dash-cal-panel .cal-day-count {
-  font-size: 8px;
-}
-.dash-cal-panel .cal-day-pairs {
-  font-size: 7px;
-}
-.dash-cal-panel .cal-month-label {
-  font-size: 14px;
-}
-.dash-cal-panel .cal-grid-wrap {
-  border-radius: var(--r-lg);
-}
-.dash-cal-panel .cal-dow {
-  font-size: 8px;
-  padding: 5px 0;
-}
-.dash-cal-panel .cal-nav {
-  width: 26px;
-  height: 26px;
-  font-size: 14px;
-}
+.dash-cal-panel .cal-day-num { font-size: 11px; }
+.dash-cal-panel .cal-day-pnl { font-size: 9.5px; }
+.dash-cal-panel .cal-day-count { font-size: 8px; }
+.dash-cal-panel .cal-day-pairs { font-size: 7px; }
+.dash-cal-panel .cal-month-label { font-size: 15px; }
+.dash-cal-panel .cal-grid-wrap { border-radius: var(--r-lg); }
+.dash-cal-panel .cal-dow { font-size: 8px; padding: 5px 0; }
+.dash-cal-panel .cal-nav { width: 28px; height: 28px; font-size: 15px; }
 
-/* Light theme */
-[data-theme="light"] .dash-cal-panel {
-  background: rgba(255,255,255,0.72);
-  border-color: rgba(0,0,0,0.08);
-  box-shadow: var(--shadow-md);
-}
-
-/* ── Responsive: stack on narrow screens ── */
+/* ── Responsive: stack on narrow viewport ── */
 @media (max-width: 1080px) {
   .dash-layout {
-    grid-template-columns: 1fr;
-    padding: 16px 16px 40px;
-    gap: 20px;
+    grid-template-columns: 1fr !important;
+    transition: none;
   }
   .dash-right {
     position: static;
+    height: auto;
+    overflow: visible;
+  }
+  .dash-cal-panel {
     width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--glass-border);
+    border-radius: var(--r-xl);
+    transform: none !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    box-shadow: var(--shadow-md);
+    height: auto;
+    overflow: visible;
+    padding: 16px;
+    background: var(--glass-1);
+    box-shadow: var(--shadow-lg), inset 0 1px 0 var(--glass-shine);
   }
-  /* On mid-size screens, show calendar in 2-col row layout for space efficiency */
-  .dash-cal-panel .cal-kpi-row {
-    grid-template-columns: repeat(4, 1fr);
-  }
-  .dash-cal-panel .cal-day {
-    min-height: 62px;
-  }
+  .cal-slide-toggle { display: none !important; }
+  .dash-cal-panel .cal-kpi-row { grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .dash-cal-panel .cal-day { min-height: 62px; }
 }
 
 @media (max-width: 640px) {
-  .dash-layout {
-    padding: 12px 12px 32px;
-    gap: 14px;
-  }
-  .dash-cal-panel .cal-kpi-row {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 4px;
-  }
+  .dash-left { padding: 12px 12px 20px; }
   .dash-cal-panel {
     padding: 12px;
     border-radius: var(--r-lg);
   }
-  .dash-cal-top {
-    flex-wrap: nowrap;
-    gap: 6px;
-  }
-  .dash-cal-controls {
-    flex-wrap: nowrap;
-    gap: 4px;
-  }
-  .dash-cal-controls #cal-acc-filter {
-    display: none; /* hide filter on very small screens, save space */
-  }
-  .dash-cal-panel .cal-day {
-    min-height: 46px;
-    padding: 3px 4px;
-  }
+  .dash-cal-panel .cal-kpi-row { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+  .dash-cal-controls #cal-acc-filter { display: none; }
+  .dash-cal-panel .cal-day { min-height: 46px; padding: 3px 4px; }
   .dash-cal-panel .cal-day-num { font-size: 9px; }
   .dash-cal-panel .cal-day-pnl { font-size: 8px; }
   .dash-cal-panel .cal-day-count { font-size: 7px; }
@@ -3517,59 +3572,102 @@ body{
   .form-textarea{ font-size:14px;padding:10px 12px;border-radius:var(--r-md) }
   .form-label{ font-size:10.5px;letter-spacing:0.04em }
 
-  /* ── Modal — full-screen bottom sheet ── */
+  /* ── Modal — compact bottom sheet, clear of bottom nav ── */
   .modal-overlay{ align-items:flex-end;padding:0 }
   .modal{
     width:100% !important;max-width:100% !important;
-    max-height:94vh;margin:0;
-    border-radius:var(--r-2xl) var(--r-2xl) 0 0;
-    position:fixed;bottom:0;left:0;right:0;
-    overflow-y:auto;
-    background:var(--bg2);
-    backdrop-filter:blur(60px) saturate(2.0);
-    -webkit-backdrop-filter:blur(60px) saturate(2.0);
+    /* Leave room for the bottom nav (62px + safe area) */
+    max-height: calc(100dvh - var(--topbar) - 62px - env(safe-area-inset-bottom,0px));
+    margin: 0;
+    border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+    position: fixed;
+    bottom: calc(62px + env(safe-area-inset-bottom,0px));
+    left: 0; right: 0;
+    overflow: hidden;  /* children scroll, not the modal itself */
+    display: flex;
+    flex-direction: column;
+    background: rgba(10,14,24,0.97);
+    backdrop-filter: blur(60px) saturate(2.0);
+    -webkit-backdrop-filter: blur(60px) saturate(2.0);
+    box-shadow: 0 -8px 40px rgba(0,0,0,0.55), 0 -1px 0 rgba(255,255,255,0.06);
   }
-  [data-theme="light"] .modal{ background:rgba(252,254,255,0.98) }
-  .modal.open .modal-box{ animation:slideUp 0.32s cubic-bezier(0.22,1,0.36,1) both }
-  /* Drag handle */
+  [data-theme="light"] .modal{
+    background: rgba(252,254,255,0.98);
+    box-shadow: 0 -6px 30px rgba(0,0,0,0.14), 0 -1px 0 rgba(0,0,0,0.07);
+  }
+  /* Drag handle at very top */
   .modal::before{
-    content:'';display:block;width:36px;height:4px;border-radius:var(--r-full);
-    background:var(--glass-border-h);margin:12px auto 0;
+    content:''; flex-shrink:0;
+    display:block; width:36px; height:4px; border-radius:var(--r-full);
+    background:var(--glass-border-h); margin:10px auto 0;
   }
+  /* Header: sticky, no scroll */
   .modal-head{
-    padding:12px 18px 10px;
-    position:sticky;top:0;z-index:2;
-    background:inherit;
-    backdrop-filter:inherit;
-    border-bottom:1px solid var(--glass-border);
+    flex-shrink: 0;
+    padding: 10px 16px 8px;
+    border-bottom: 1px solid var(--glass-border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: inherit;
   }
-  .modal-body{ padding:12px 18px 16px }
-  .modal-form-grid{ grid-template-columns:1fr 1fr;gap:10px }
-  /* Save button — always visible, sticky at bottom */
+  .modal-title { font-size: 15px !important; }
+  .modal-close { padding: 5px 9px; font-size: 15px; }
+
+  /* Body: scrollable flex area */
+  .modal-body{
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 10px 14px 6px;
+  }
+
+  /* Compact 2-col grid */
+  .modal-form-grid, .form-grid { grid-template-columns:1fr 1fr; gap:8px }
+  .form-field { gap: 3px; }
+  .form-label { font-size: 9.5px; letter-spacing: 0.06em; }
+  .form-input, .form-select { font-size: 14px; padding: 8px 10px; border-radius: var(--r-sm); }
+  .form-textarea {
+    font-size: 13px; padding: 7px 10px;
+    min-height: 52px; border-radius: var(--r-sm);
+  }
+
+  /* Save bar: always pinned at bottom of modal, never scrolls away */
   .form-actions{
-    position:sticky;bottom:0;z-index:2;
-    background:inherit;
-    padding:14px 18px calc(14px + var(--mob-safe));
-    margin-top:0;border-top:1px solid var(--glass-border);
-    backdrop-filter:inherit;
-    display:flex;
-    gap:10px;
-    justify-content:flex-end;
+    flex-shrink: 0;
+    position: static;     /* NOT sticky — it's at the end of flex column */
+    bottom: auto;
+    background: inherit;
+    padding: 10px 14px 12px;
+    margin-top: 0;
+    border-top: 1px solid var(--glass-border);
+    backdrop-filter: none;
+    display: flex;
+    gap: 8px;
+    justify-content: stretch;
   }
-  .form-actions .btn{
-    flex:1;max-width:160px;
-    padding:12px 16px;
-    font-size:13px;
-    font-weight:600;
-    border-radius:var(--r-md);
-    text-align:center;
+  .form-actions .btn {
+    flex: 1;
+    padding: 13px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: var(--r-md);
+    text-align: center;
+    justify-content: center;
   }
-  .form-actions .btn-primary{
-    background:linear-gradient(135deg,rgba(96,165,250,0.32),rgba(96,165,250,0.20));
-    border-color:rgba(96,165,250,0.55);
-    color:var(--blue);
-    box-shadow:var(--glow-blue);
-    max-width:200px;
+  /* Save button — prominent blue */
+  .form-actions .btn-primary {
+    flex: 2;
+    background: linear-gradient(135deg, rgba(96,165,250,0.30), rgba(96,165,250,0.18));
+    border-color: rgba(96,165,250,0.55);
+    color: var(--blue);
+    box-shadow: 0 0 20px rgba(96,165,250,0.20), var(--shadow-sm);
+    font-size: 14px;
+    font-weight: 700;
+  }
+  [data-theme="light"] .form-actions .btn-primary {
+    background: linear-gradient(135deg, rgba(37,99,235,0.18), rgba(37,99,235,0.10));
+    border-color: rgba(37,99,235,0.40);
+    color: var(--blue);
   }
 
   /* ── Detail panel ── */
@@ -3614,12 +3712,34 @@ body{
     max-width:calc(100vw - 24px);width:340px;z-index:600;
   }
 
-  /* ── Dashboard: single-column, calendar above KPIs on mobile ── */
-  .dash-layout{ display:flex !important;flex-direction:column;gap:14px;padding:12px 12px 80px }
-  .dash-right{ order:-1;width:100% }
-  .dash-cal-panel{ border-radius:var(--r-xl);overflow:hidden;width:100%;box-sizing:border-box }
+  /* ── Dashboard: single-column on mobile, cal below stats ── */
+  .dash-layout{
+    display: flex !important;
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    transition: none !important;
+  }
+  .dash-layout.cal-hidden { grid-template-columns: 1fr !important; }
+  .dash-left{ width:100%; min-width:0; padding:12px 12px 16px; }
+  .dash-right{ order:1; width:100%; position:static; height:auto; overflow:visible; }
+  .dash-cal-panel{
+    width:100% !important;
+    height:auto !important;
+    overflow:visible !important;
+    transform:none !important;
+    opacity:1 !important;
+    pointer-events:auto !important;
+    border-left:none;
+    border-top:1px solid var(--glass-border);
+    border-radius:0;
+    padding:14px 12px 80px;
+    background: var(--bg2);
+    box-shadow: none;
+  }
   .dash-cal-panel .cal-kpi-row{ grid-template-columns:repeat(2,1fr);gap:4px }
-  .dash-left{ width:100%;min-width:0 }
+  /* Hide the floating slide toggle on mobile — not needed */
+  .cal-slide-toggle{ display:none !important; }
 
   /* ── Misc ── */
   .insight{ font-size:12px;padding:12px 14px;border-radius:var(--r-md) }
@@ -3785,52 +3905,8 @@ body{
 }
 .mob-more-item:active .mob-more-icon{ background:var(--glass-3) }
 
-/* ══════════════════════════════════════════════════════
-   CALENDAR TOGGLE BUTTON (dashboard panel)
-   ══════════════════════════════════════════════════════ */
-.cal-toggle-btn{
-  width:28px;height:28px;border-radius:var(--r-sm);
-  background:var(--glass-2);border:1px solid var(--glass-border);
-  color:var(--text2);font-size:13px;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  transition:var(--t-fast);flex-shrink:0;
-  position:relative;overflow:hidden;
-}
-.cal-toggle-btn::before{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(135deg,rgba(96,165,250,0.08),transparent);
-  opacity:0;transition:opacity 0.2s;
-}
-.cal-toggle-btn:hover{ background:var(--glass-3);color:var(--text);border-color:var(--glass-border-h);box-shadow:var(--shadow-xs) }
-.cal-toggle-btn:hover::before{ opacity:1 }
-#cal-toggle-icon{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  transition:transform 0.28s var(--ease-spring);
-  line-height:1;
-  font-size:14px;
-}
-/* Rotate icon when body is collapsed (arrow points down = closed, up = open) */
-.dash-cal-body.collapsed ~ * #cal-toggle-icon,
-.dash-cal-panel.cal-collapsed #cal-toggle-icon {
-  transform: rotate(180deg);
-}
-/* Better: use data attr on the panel */
-.dash-cal-panel[data-collapsed="true"] #cal-toggle-icon {
-  transform: rotate(180deg);
-}
-.dash-cal-body{
-  overflow:hidden;
-  transition:max-height 0.38s cubic-bezier(0.4,0,0.2,1),
-             opacity 0.3s ease;
-  max-height:900px;
-  opacity:1;
-}
-.dash-cal-body.collapsed{
-  max-height:0;
-  opacity:0;
-}
+/* cal-toggle-btn removed — replaced by cal-slide-toggle */
+/* dash-cal-body collapse removed — now using grid slide */
 
 /* ══════════════════════════════════════════════════════
    GLASS BLUR ENHANCEMENTS (all components)

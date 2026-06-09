@@ -187,14 +187,7 @@
                 <select class="form-select" id="cal-acc-filter" onchange="_onCalAccFilterChange()" style="font-size:11px;padding:4px 8px;height:28px">
                   <option value="">All accounts</option>
                 </select>
-                <input type="number" class="acc-size-input" id="cal-acc-size" value="5000" oninput="renderCalendar()" title="Account size for USD calc" style="width:80px;font-size:11px;padding:4px 6px;height:28px">
-                <button class="cal-toggle-btn" id="cal-toggle-btn" onclick="toggleDashCalendar()" title="Toggle calendar">
-                  <span id="cal-toggle-icon">
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2 5L7 9L12 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                  </span>
-                </button>
+                <input type="number" class="acc-size-input" id="cal-acc-size" value="5000" oninput="renderCalendar()" title="Account size for USD calc" style="width:72px;font-size:11px;padding:4px 6px;height:28px">
               </div>
             </div>
 
@@ -980,6 +973,13 @@
   </div><!-- /main -->
 </div><!-- /layout -->
 
+<!-- ══ DESKTOP CALENDAR SLIDE TOGGLE ══ -->
+<button class="cal-slide-toggle" id="cal-slide-toggle" onclick="toggleDashCalendar()" title="Toggle calendar" aria-label="Toggle calendar panel">
+  <svg id="cal-toggle-icon" width="10" height="16" viewBox="0 0 10 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M7 2L2 8L7 14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</button>
+
 <!-- ══ TRADE DETAIL PANEL ══ -->
 <div class="detail-panel" id="detail-panel">
   <div id="detail-content"></div>
@@ -1057,11 +1057,12 @@
       <div class="form-field full"><label class="form-label">Pre-Trade Notes</label><textarea class="form-textarea" id="m-pretrade" placeholder="Brief bias, setup thesis…"></textarea></div>
       <div class="form-field full"><label class="form-label">Post-Trade Reflection</label><textarea class="form-textarea" id="m-notes" placeholder="What happened? What did you learn?"></textarea></div>
     </div>
+    </div><!-- /modal-body -->
+    <!-- Save bar — direct child of .modal flex column, never scrolls away -->
     <div class="form-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveTrade()">Save Trade</button>
+      <button class="btn btn-primary" onclick="saveTrade()">💾 Save Trade</button>
     </div>
-    </div><!-- /modal-body -->
   </div>
 </div>
 
