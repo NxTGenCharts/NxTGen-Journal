@@ -4831,8 +4831,20 @@ function updateKPIs() {
     accs.forEach(a => { const n = trades.filter(t => t.account === a.name).length; const sz = parseFloat(a.size) || 0; if (sz > 0 && n > 0) { blendedAccSize += sz * n; totalW += n; } });
     if (totalW > 0) blendedAccSize = blendedAccSize / totalW;
   }
-  // Fall back to raw % display if no account sizes known
-  const netPnl = trades.reduce((a, t) => a + t.pnl, 0).toFixed(1);
+  // Net PnL — always convert each trade to dollars first to avoid mixing % and $ units,
+  // then display as % (if blendedAccSize known and all trades are % mode) or as $.
+  const netPnlDollars = trades.reduce((a, t) => a + toPnlDollars(t, blendedAccSize), 0);
+  let netPnlDisplay;
+  if (allPct && blendedAccSize > 0) {
+    const pct = (netPnlDollars / blendedAccSize) * 100;
+    netPnlDisplay = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+  } else if (!allPct || blendedAccSize <= 0) {
+    netPnlDisplay = (netPnlDollars >= 0 ? '+$' : '-$') + Math.abs(netPnlDollars).toFixed(2);
+  } else {
+    const pct = (netPnlDollars / blendedAccSize) * 100;
+    netPnlDisplay = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+  }
+  const netPnl = netPnlDollars.toFixed(1); // keep for insight bar references
   const rrNums = trades.map(t => { const m = (t.rr || '').match(/1:([\d.]+)/); return m ? parseFloat(m[1]) : null; }).filter(x => x !== null);
   const avgRR = rrNums.length ? (rrNums.reduce((a, b) => a + b, 0) / rrNums.length).toFixed(1) : null;
   const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date));
@@ -4842,7 +4854,7 @@ function updateKPIs() {
   for (const t of rev) { if (t.outcome === 'Win') streak++; else break; }
   document.getElementById('kpi-total').textContent = total;
   document.getElementById('kpi-wr').textContent = wr + '%';
-  document.getElementById('kpi-pnl').textContent = (netPnl > 0 ? '+' : '') + netPnl + '%';
+  document.getElementById('kpi-pnl').textContent = netPnlDisplay;
   document.getElementById('kpi-pf').textContent = pf + 'x';
   document.getElementById('kpi-aw').textContent = (avgWDollars >= 0 ? '+$' : '-$') + Math.abs(avgWDollars).toFixed(2);
   document.getElementById('kpi-al').textContent = (avgLDollars >= 0 ? '+$' : '-$') + Math.abs(avgLDollars).toFixed(2);
