@@ -2105,9 +2105,10 @@ function buildMonthlyTable() {
     const mt    = trades.filter(t => t.date.startsWith(key));
     const wins  = mt.filter(t => t.outcome === 'Win').length;
     const wr    = Math.round((wins / mt.length) * 100);
-    const net   = mt.reduce((a, t) => a + t.pnl, 0).toFixed(1);
+    // Convert every trade to dollars using its own account size
+    const netDollars = mt.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
     const wrClass  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
-    const pnlClass = net >= 0 ? 'outcome-win' : 'outcome-loss';
+    const pnlClass = netDollars >= 0 ? 'outcome-win' : 'outcome-loss';
     const grade = wr >= 80 ? 'A+' : wr >= 70 ? 'A' : wr >= 60 ? 'B' : wr >= 50 ? 'C' : 'D';
     const gradeClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
 
@@ -2116,11 +2117,15 @@ function buildMonthlyTable() {
     let bestStreak = 0, cur = 0;
     sorted.forEach(t => { if (t.outcome === 'Win') { cur++; if (cur > bestStreak) bestStreak = cur; } else cur = 0; });
 
+    const absNet = Math.abs(netDollars);
+    const netFmt = (absNet >= 1000 ? (netDollars >= 0 ? '+$' : '-$') + (absNet/1000).toFixed(1) + 'k'
+                                   : (netDollars >= 0 ? '+$' : '-$') + absNet.toFixed(2));
+
     return `<tr class="pair-row-clickable" onclick="openMonthDrilldown(this.dataset.k)" data-k="${key}" title="View ${MONTH_NAMES[mo-1]} ${yr} trades" style="cursor:pointer">
       <td class="bold">${MONTH_NAMES[mo - 1]} ${yr}</td>
       <td>${mt.length}</td>
       <td><span class="pill ${wrClass}">${wr}%</span></td>
-      <td class="${pnlClass} mono">${net >= 0 ? '+$' : '-$'}${Math.abs(parseFloat(net)).toFixed(2)}</td>
+      <td class="${pnlClass} mono">${netFmt}</td>
       <td>${bestStreak > 0 ? bestStreak + 'W' : '—'}</td>
       <td><span class="pill ${gradeClass}">${grade}</span></td>
     </tr>`;
@@ -4858,14 +4863,18 @@ function updateKPIs() {
   const _cqT    = trades.filter(t => getYear(t.date) === _cqYear && getQuarter(t.date) === _cqQ);
   const _cqWins = _cqT.filter(t => t.outcome === 'Win').length;
   const _cqWr   = _cqT.length ? ((_cqWins / _cqT.length) * 100).toFixed(1) : '0.0';
-  const _cqPnl  = _cqT.reduce((a, t) => a + t.pnl, 0).toFixed(1);
+  const _cqNetD  = _cqT.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
+  const _cqAbs   = Math.abs(_cqNetD);
+  const _cqFmt   = _cqAbs >= 1000
+    ? (_cqNetD >= 0 ? '+$' : '-$') + (_cqAbs/1000).toFixed(1) + 'k'
+    : (_cqNetD >= 0 ? '+$' : '-$') + _cqAbs.toFixed(2);
   const periodEl = document.getElementById('dash-cover-period');
   const titleEl  = document.getElementById('dash-cover-title');
   const subTextEl = document.getElementById('dash-cover-sub-text');
   if (periodEl) periodEl.textContent = 'QUARTERLY PERFORMANCE · ' + _cqYear;
   if (titleEl)  titleEl.textContent  = 'Q' + _cqQ + ' ' + _cqYear + ' — ' + (Q_MONTHS[_cqQ] || '');
   if (subTextEl) subTextEl.textContent = _cqT.length
-    ? _cqT.length + ' trades · Win rate ' + _cqWr + '% · Net PnL ' + (_cqPnl > 0 ? '+' : '') + _cqPnl + '%'
+    ? _cqT.length + ' trades · Win rate ' + _cqWr + '% · Net PnL ' + _cqFmt
     : 'No trades yet this quarter — tap + New Trade to begin';
 }
 
@@ -4920,33 +4929,47 @@ function renderQuarterPage(year, q) {
   const netPnl = qt.reduce((a, t) => a + t.pnl, 0).toFixed(1);
   // Compute dollar PnL per trade using its account size for correct avg
   const qtDollars  = qt.map(t => toPnlDollars(t, getAccSizeForAccount(t.account)));
+  const netDollarsQ = qtDollars.reduce((a, b) => a + b, 0);
   const winDollarsQ  = qtDollars.filter((d, i) => qt[i].pnl > 0);
   const lossDollarsQ = qtDollars.filter((d, i) => qt[i].pnl < 0);
   const avgW = winDollarsQ.length  ? (winDollarsQ.reduce((a,b)=>a+b,0)  / winDollarsQ.length).toFixed(2)  : 0;
   const avgL = lossDollarsQ.length ? (lossDollarsQ.reduce((a,b)=>a+b,0) / lossDollarsQ.length).toFixed(2) : 0;
   const pf = lossDollarsQ.length ? Math.abs(winDollarsQ.reduce((a,b)=>a+b,0) / lossDollarsQ.reduce((a,b)=>a+b,0)).toFixed(2) : '∞';
+  // Format net dollars for display
+  const absNetQ = Math.abs(netDollarsQ);
+  const netDollarsFmt = (absNetQ >= 1000
+    ? (netDollarsQ >= 0 ? '+$' : '-$') + (absNetQ/1000).toFixed(1) + 'k'
+    : (netDollarsQ >= 0 ? '+$' : '-$') + absNetQ.toFixed(2));
   const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const monthRows = months.map(m => {
     const mt = qt.filter(t => parseInt(t.date.slice(5, 7)) === m);
     if (!mt.length) return `<tr><td style="color:var(--text3)">${MONTH_NAMES[m - 1]} ${year}</td><td style="color:var(--text3)">—</td><td>—</td><td>—</td><td>—</td></tr>`;
     const mw = mt.filter(t => t.outcome === 'Win').length;
     const mwr = ((mw / mt.length) * 100).toFixed(0);
-    const mpnl = mt.reduce((a, t) => a + t.pnl, 0).toFixed(1);
-    const pnlC = mpnl > 0 ? 'outcome-win' : 'outcome-loss';
-    return `<tr onclick="filterTableAndNav('${year}-${String(m).padStart(2, '0')}')"><td class="bold">${MONTH_NAMES[m - 1]} ${year}</td><td>${mt.length}</td><td><span class="pill ${mwr >= 70 ? 'pill-green' : mwr >= 50 ? 'pill-gold' : 'pill-red'}">${mwr}%</span></td><td class="${pnlC} mono">${mpnl > 0 ? '+' : ''}${mpnl}%</td><td>${mw}W / ${mt.filter(t => t.outcome === 'Loss').length}L / ${mt.filter(t => t.outcome === 'B.E').length}BE</td></tr>`;
+    const mDollars = mt.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
+    const absM = Math.abs(mDollars);
+    const mFmt = absM >= 1000
+      ? (mDollars >= 0 ? '+$' : '-$') + (absM/1000).toFixed(1) + 'k'
+      : (mDollars >= 0 ? '+$' : '-$') + absM.toFixed(2);
+    const pnlC = mDollars >= 0 ? 'outcome-win' : 'outcome-loss';
+    return `<tr onclick="filterTableAndNav('${year}-${String(m).padStart(2, '0')}')"><td class="bold">${MONTH_NAMES[m - 1]} ${year}</td><td>${mt.length}</td><td><span class="pill ${mwr >= 70 ? 'pill-green' : mwr >= 50 ? 'pill-gold' : 'pill-red'}">${mwr}%</span></td><td class="${pnlC} mono">${mFmt}</td><td>${mw}W / ${mt.filter(t => t.outcome === 'Loss').length}L / ${mt.filter(t => t.outcome === 'B.E').length}BE</td></tr>`;
   }).join('');
   const tradeRows = qt.map(t => {
-    const pnlC = t.pnl > 0 ? 'outcome-win' : t.pnl < 0 ? 'outcome-loss' : 'outcome-be';
+    const tDollars = toPnlDollars(t, getAccSizeForAccount(t.account));
+    const pnlFmt = _isMt5Trade(t) || t.pnlUnit === '$'
+      ? (tDollars >= 0 ? '+$' : '-$') + Math.abs(tDollars).toFixed(2)
+      : formatPnl(t, getAccSizeForAccount(t.account));
+    const pnlC = tDollars > 0 ? 'outcome-win' : tDollars < 0 ? 'outcome-loss' : 'outcome-be';
     const outC = t.outcome === 'Win' ? 'outcome-win' : t.outcome === 'Loss' ? 'outcome-loss' : 'outcome-be';
     const posC = t.pos === 'Buy' ? 'pos-buy' : 'pos-sell';
-    return `<tr onclick="openDetail(${t.id})" style="cursor:pointer"><td class="mono" style="color:var(--text2)">${t.date}</td><td class="bold">${t.pair}</td><td><span class="${posC}">${t.pos}</span></td><td class="mono">${t.rr}</td><td class="${pnlC} mono">${t.pnl > 0 ? '+' : ''}${t.pnl}%</td><td class="${outC}">${t.outcome}</td><td style="color:var(--text2)">${t.kz}</td><td style="color:var(--text2);font-size:12px">${t.strategy || '—'}</td><td class="stars">${starsHTML(t.rating)}</td></tr>`;
+    return `<tr onclick="openDetail(${t.id})" style="cursor:pointer"><td class="mono" style="color:var(--text2)">${t.date}</td><td class="bold">${t.pair}</td><td><span class="${posC}">${t.pos}</span></td><td class="mono">${t.rr}</td><td class="${pnlC} mono">${pnlFmt}</td><td class="${outC}">${t.outcome}</td><td style="color:var(--text2)">${t.kz}</td><td style="color:var(--text2);font-size:12px">${t.strategy || '—'}</td><td class="stars">${starsHTML(t.rating)}</td></tr>`;
   }).join('');
   document.getElementById('quarter-page-inner').innerHTML = `
-    <div class="cover"><div class="cover-label">Quarterly Performance · ${year}</div><div class="cover-title">Q${q} ${year} — ${Q_MONTHS[q]}</div><div class="cover-sub">${qt.length} trades · Win rate ${wr}% · Net PnL ${netPnl > 0 ? '+' : ''}${netPnl}%</div></div>
+    <div class="cover"><div class="cover-label">Quarterly Performance · ${year}</div><div class="cover-title">Q${q} ${year} — ${Q_MONTHS[q]}</div><div class="cover-sub">${qt.length} trades · Win rate ${wr}% · Net PnL ${netDollarsFmt}</div></div>
     <div class="kpi-grid" style="margin-bottom:16px">
       <div class="kpi-card"><div class="kpi-label">Total trades</div><div class="kpi-value blue">${qt.length || '—'}</div></div>
       <div class="kpi-card"><div class="kpi-label">Win rate</div><div class="kpi-value ${wr >= 65 ? 'green' : 'red'}">${wr}%</div></div>
-      <div class="kpi-card"><div class="kpi-label">Net PnL</div><div class="kpi-value ${netPnl > 0 ? 'green' : 'red'}">${netPnl > 0 ? '+' : ''}${netPnl}%</div></div>
+      <div class="kpi-card"><div class="kpi-label">Net PnL</div><div class="kpi-value ${netDollarsQ >= 0 ? 'green' : 'red'}">${netDollarsFmt}</div></div>
       <div class="kpi-card"><div class="kpi-label">Profit factor</div><div class="kpi-value gold">${pf}x</div></div>
     </div>
     <div class="kpi-grid" style="margin-bottom:20px">
@@ -5164,8 +5187,20 @@ const MONTH_NAMES_LONG = ['January', 'February', 'March', 'April', 'May', 'June'
 let calYear = new Date().getFullYear();
 let calMonth = new Date().getMonth();
 function calNav(dir) { calMonth += dir; if (calMonth > 11) { calMonth = 0; calYear++; } if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); }
-function getAccSize() { return parseFloat(document.getElementById('cal-acc-size').value) || 5000; }
-function getCalFilter() { const el = document.getElementById('cal-acc-filter'); return el ? el.value : ''; }
+function getAccSize() {
+  // Try desktop first, fall back to mobile
+  const el  = document.getElementById('cal-acc-size');
+  const el2 = document.getElementById('cal-acc-size-2');
+  const v1 = el  ? parseFloat(el.value)  || 0 : 0;
+  const v2 = el2 ? parseFloat(el2.value) || 0 : 0;
+  return v1 || v2 || 5000;
+}
+function getCalFilter() {
+  // Return whichever dropdown has a non-empty selection (they're kept in sync)
+  const el  = document.getElementById('cal-acc-filter');
+  const el2 = document.getElementById('cal-acc-filter-2');
+  return (el && el.value) || (el2 && el2.value) || '';
+}
 // pnlToUSD: converts a single trade's pnl to USD correctly.
 // MT5/dollar trades already have pnl in $; only %-unit trades need (pnl/100)*accSize.
 function pnlToUSD(pnl, accSize, trade) {
@@ -6091,16 +6126,19 @@ function _refreshAccountDropdowns() {
 }
 
 function _onCalAccFilterChange() {
-  // Auto-fill account size when user picks a specific account
   const sel  = document.getElementById('cal-acc-filter'); if (!sel) return;
   const name = sel.value;
   if (name) {
     const acc  = _getCustomAccounts().find(a => a.name === name);
     const size = parseFloat(acc?.size) || 0;
-    const sizeEl = document.getElementById('cal-acc-size');
-    if (sizeEl && size > 0) sizeEl.value = size;
+    ['cal-acc-size', 'cal-acc-size-2'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && size > 0) el.value = size;
+    });
   }
-  // Persist selection to Supabase so it survives device switches
+  // Sync mobile dropdown
+  const sel2 = document.getElementById('cal-acc-filter-2');
+  if (sel2) sel2.value = name;
   _saveCalendarAccountSelection(name);
   renderCalendar();
 }
@@ -6129,22 +6167,24 @@ function _restoreCalendarAccountSelection() {
   // Prefer cloud value (loaded in _accData), fallback to localStorage
   const saved = _accData.calendarAccount
     || (() => { try { return localStorage.getItem('nxtgen_cal_account') || ''; } catch(e) { return ''; } })();
-  if (!saved) return;
-  const sel = document.getElementById('cal-acc-filter');
-  if (!sel) return;
-  const opt = [...sel.options].find(o => o.value === saved);
-  if (!opt) return;
-  sel.value = saved;
-  const acc  = _getCustomAccounts().find(a => a.name === saved);
-  const size = parseFloat(acc?.size) || 0;
-  const sizeEl = document.getElementById('cal-acc-size');
-  if (sizeEl && size > 0) sizeEl.value = size;
+  // Restore both desktop and mobile dropdowns
+  ['cal-acc-filter', 'cal-acc-filter-2'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    const opt = [...sel.options].find(o => o.value === saved);
+    if (!opt) return;
+    sel.value = saved;
+    const acc  = _getCustomAccounts().find(a => a.name === saved);
+    const size = parseFloat(acc?.size) || 0;
+    const sizeElId = selId === 'cal-acc-filter' ? 'cal-acc-size' : 'cal-acc-size-2';
+    const sizeEl = document.getElementById(sizeElId);
+    if (sizeEl && size > 0) sizeEl.value = size;
+  });
 }
 
 function _refreshCalendarAccountFilter() {
-  const sel = document.getElementById('cal-acc-filter'); if (!sel) return;
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">All active accounts</option>' +
+  const buildOptions = (cur) =>
+    '<option value="">All active accounts</option>' +
     _getActiveAccounts().map(a =>
       `<option value="${a.name}"${a.name === cur ? ' selected' : ''}>${a.name}</option>`
     ).join('') +
@@ -6152,6 +6192,42 @@ function _refreshCalendarAccountFilter() {
       _getArchivedAccounts().map(a =>
         `<option value="${a.name}"${a.name === cur ? ' selected' : ''}>${a.name} (archived)</option>`
       ).join('') + '</optgroup>' : '');
+
+  // Desktop filter
+  const sel = document.getElementById('cal-acc-filter');
+  if (sel) { const cur = sel.value; sel.innerHTML = buildOptions(cur); }
+
+  // Mobile calendar page filter — keep in sync
+  const sel2 = document.getElementById('cal-acc-filter-2');
+  if (sel2) { const cur2 = sel2.value; sel2.innerHTML = buildOptions(cur2); }
+}
+
+// Mobile calendar filter/size handlers — mirror the desktop ones and keep both in sync
+function _onCalAccFilterChange2() {
+  const sel2 = document.getElementById('cal-acc-filter-2'); if (!sel2) return;
+  const name = sel2.value;
+  // Sync desktop dropdown
+  const sel = document.getElementById('cal-acc-filter');
+  if (sel) sel.value = name;
+  // Sync account size
+  if (name) {
+    const acc  = _getCustomAccounts().find(a => a.name === name);
+    const size = parseFloat(acc?.size) || 0;
+    ['cal-acc-size', 'cal-acc-size-2'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && size > 0) el.value = size;
+    });
+  }
+  _saveCalendarAccountSelection(name);
+  renderCalendar();
+}
+
+function _onCalAccSize2Change() {
+  const el2 = document.getElementById('cal-acc-size-2'); if (!el2) return;
+  // Sync desktop size input
+  const el = document.getElementById('cal-acc-size');
+  if (el) el.value = el2.value;
+  renderCalendar();
 }
 
 // ── SHARE MODAL ────────────────────────────────────────────────────────────

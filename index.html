@@ -517,9 +517,15 @@
     ═══════════════════════════════════════════════ -->
     <div class="page" id="page-calendar">
       <div style="display:flex;flex-direction:column;height:100%;padding:16px 20px;overflow:hidden">
-        <div class="acc-size-bar">
-          <span class="acc-size-label">Account size for USD calc:</span>
-          <span class="acc-size-hint" style="color:var(--text2)">Adjust from Dashboard → Calendar panel</span>
+        <!-- Account filter bar — mirrors the desktop dashboard calendar controls -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
+            <span style="font-size:11px;color:var(--text3);white-space:nowrap">📅 Trading Calendar</span>
+          </div>
+          <select class="form-select" id="cal-acc-filter-2" onchange="_onCalAccFilterChange2()" style="font-size:11px;padding:4px 8px;height:30px;flex:1;min-width:120px;max-width:200px">
+            <option value="">All accounts</option>
+          </select>
+          <input type="number" class="acc-size-input" id="cal-acc-size-2" value="5000" oninput="_onCalAccSize2Change()" title="Account size for USD calc" style="width:80px;font-size:11px;padding:4px 6px;height:30px">
         </div>
         <div class="cal-wrap">
           <div class="cal-header">
