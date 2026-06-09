@@ -4831,20 +4831,22 @@ function updateKPIs() {
     accs.forEach(a => { const n = trades.filter(t => t.account === a.name).length; const sz = parseFloat(a.size) || 0; if (sz > 0 && n > 0) { blendedAccSize += sz * n; totalW += n; } });
     if (totalW > 0) blendedAccSize = blendedAccSize / totalW;
   }
-  // Net PnL — always convert each trade to dollars first to avoid mixing % and $ units,
-  // then display as % (if blendedAccSize known and all trades are % mode) or as $.
-  const netPnlDollars = trades.reduce((a, t) => a + toPnlDollars(t, blendedAccSize), 0);
+  // Net PnL display logic:
+  // - If ALL trades are %-based: sum raw % values directly (no account size needed)
+  // - If mixed or all $-based: convert each trade to dollars using per-trade account size, show as $
   let netPnlDisplay;
-  if (allPct && blendedAccSize > 0) {
-    const pct = (netPnlDollars / blendedAccSize) * 100;
-    netPnlDisplay = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
-  } else if (!allPct || blendedAccSize <= 0) {
-    netPnlDisplay = (netPnlDollars >= 0 ? '+$' : '-$') + Math.abs(netPnlDollars).toFixed(2);
+  let netPnl;
+  if (allPct) {
+    // All trades are %-based — sum the raw % values directly
+    const netPct = trades.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
+    netPnlDisplay = (netPct >= 0 ? '+' : '') + netPct.toFixed(1) + '%';
+    netPnl = netPct.toFixed(1);
   } else {
-    const pct = (netPnlDollars / blendedAccSize) * 100;
-    netPnlDisplay = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+    // Mixed or all $-based — convert each trade using its own account size
+    const netPnlDollars = trades.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
+    netPnlDisplay = (netPnlDollars >= 0 ? '+$' : '-$') + Math.abs(netPnlDollars).toFixed(2);
+    netPnl = netPnlDollars.toFixed(1);
   }
-  const netPnl = netPnlDollars.toFixed(1); // keep for insight bar references
   const rrNums = trades.map(t => { const m = (t.rr || '').match(/1:([\d.]+)/); return m ? parseFloat(m[1]) : null; }).filter(x => x !== null);
   const avgRR = rrNums.length ? (rrNums.reduce((a, b) => a + b, 0) / rrNums.length).toFixed(1) : null;
   const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date));
