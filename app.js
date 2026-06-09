@@ -4832,18 +4832,22 @@ function updateKPIs() {
     if (totalW > 0) blendedAccSize = blendedAccSize / totalW;
   }
   // Net PnL — determine display format per trade type:
-  // If ANY trade is dollar-based (MT5 or pnlUnit='$'), show total in $.
-  // If ALL trades are %-based (the normal case), show pure % sum directly.
-  const hasDollarTrade = trades.some(t => _isMt5Trade(t) || t.pnlUnit === '$');
+  // Net PnL KPI — use account pnlMode as source of truth, not per-trade pnlUnit.
+  // Only MT5-sourced trades (source='mt5', mt5Ticket, or notes='MT5 Import') are truly dollar trades.
+  // A trade having pnlUnit='$' due to a UI slip should NOT flip the whole dashboard to dollars.
+  const hasTrueDollarTrade = trades.some(t =>
+    t.source === 'mt5' || !!t.mt5Ticket ||
+    (t.notes && t.notes.includes('MT5 Import'))
+  );
   let netPnlDisplay;
   let netPnl;
-  if (hasDollarTrade) {
-    // Mixed or all $: convert every trade to dollars via its own account size
+  if (hasTrueDollarTrade) {
+    // Has real MT5 imports — convert everything to dollars
     const totalDollars = trades.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
     netPnlDisplay = (totalDollars >= 0 ? '+$' : '-$') + Math.abs(totalDollars).toFixed(2);
     netPnl = totalDollars.toFixed(1);
   } else {
-    // All % trades — sum raw pnl values directly, no account size needed
+    // All manual trades — sum raw pnl values as % directly
     const totalPct = trades.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
     netPnlDisplay = (totalPct >= 0 ? '+' : '') + totalPct.toFixed(1) + '%';
     netPnl = totalPct.toFixed(1);
