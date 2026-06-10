@@ -4832,22 +4832,39 @@ function updateKPIs() {
     accs.forEach(a => { const n = trades.filter(t => t.account === a.name).length; const sz = parseFloat(a.size) || 0; if (sz > 0 && n > 0) { blendedAccSize += sz * n; totalW += n; } });
     if (totalW > 0) blendedAccSize = blendedAccSize / totalW;
   }
-  // Net PnL — toggle-aware: always compute both $ and % so tapping the card flips instantly.
+  // Net PnL — toggle-aware: compute both $ and % correctly.
+  // $ = sum of each trade converted to dollars via its own account size.
+  // % = sum of each trade converted to % via its own account size
+  //     (MT5/$ trades: dollars → % = (val/accSize)*100; manual % trades: use val directly).
   const _totalDollars = trades.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
-  const _totalPct     = trades.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
+  const _totalPct = trades.reduce((a, t) => {
+    const val = parseFloat(t.pnl) || 0;
+    const sz  = getAccSizeForAccount(t.account);
+    // If this trade's pnl is already in %, use it directly
+    if (!_isMt5Trade(t) && t.pnlUnit !== '$') return a + val;
+    // Otherwise it's a dollar value — convert to % using account size
+    if (sz > 0) return a + (toPnlDollars(t, sz) / sz) * 100;
+    return a; // no account size — skip from % sum
+  }, 0);
   const _netDollarFmt = (_totalDollars >= 0 ? '+$' : '-$') + Math.abs(_totalDollars).toFixed(2);
   const _netPctFmt    = (_totalPct >= 0 ? '+' : '') + _totalPct.toFixed(1) + '%';
   // _pnlToggleMode: '%' (default) | '$' — cycled by toggleNetPnl()
   const _showDollar   = (_pnlToggleMode === '$');
   const netPnlDisplay = _showDollar ? _netDollarFmt : _netPctFmt;
   const netPnl        = _showDollar ? _totalDollars.toFixed(1) : _totalPct.toFixed(1);
-  // Store both values on the element for zero-cost toggling
+  // Store both values + signs on the element for zero-cost toggling
   const _pnlEl = document.getElementById('kpi-pnl');
   if (_pnlEl) {
     _pnlEl.dataset.dollar    = _netDollarFmt;
     _pnlEl.dataset.pct       = _netPctFmt;
     _pnlEl.dataset.dollarPos = _totalDollars >= 0 ? '1' : '0';
     _pnlEl.dataset.pctPos    = _totalPct    >= 0 ? '1' : '0';
+  }
+  // Set correct colour class on load (not just on toggle)
+  const _pnlValueEl = document.getElementById('kpi-pnl');
+  if (_pnlValueEl) {
+    const _isPos = _showDollar ? (_totalDollars >= 0) : (_totalPct >= 0);
+    _pnlValueEl.className = 'kpi-value ' + (_isPos ? 'green' : 'red');
   }
   const rrNums = trades.map(t => { const m = (t.rr || '').match(/1:([\d.]+)/); return m ? parseFloat(m[1]) : null; }).filter(x => x !== null);
   const avgRR = rrNums.length ? (rrNums.reduce((a, b) => a + b, 0) / rrNums.length).toFixed(1) : null;
