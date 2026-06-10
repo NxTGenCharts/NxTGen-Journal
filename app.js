@@ -129,6 +129,7 @@ const AFFIRMATIONS=["I only take A+ setups. I am patient.","I follow my plan. I 
 // ── STATE ─────────────────────────────────────────────
 let trades = [];
 let deletedTrades = [];
+let _pnlToggleMode = '%'; // '%' (default) | '$' — toggled by tapping Net PnL card
 let tradeState = {};   // keyed by trade id — holds notes/charts/checklist
 let currentDetail = null;
 let currentUploadSlot = null;
@@ -4831,27 +4832,22 @@ function updateKPIs() {
     accs.forEach(a => { const n = trades.filter(t => t.account === a.name).length; const sz = parseFloat(a.size) || 0; if (sz > 0 && n > 0) { blendedAccSize += sz * n; totalW += n; } });
     if (totalW > 0) blendedAccSize = blendedAccSize / totalW;
   }
-  // Net PnL — determine display format per trade type:
-  // Only show $ if there is a TRUE dollar trade (real MT5 import via source/ticket/notes).
-  // A trade with pnlUnit='$' set manually is NOT treated as a dollar trade for display purposes
-  // unless it also has MT5 source markers — this prevents the Net PnL flipping to $ when the
-  // user just happens to have a manually-entered $ unit trade in their log.
-  const hasTrueDollarTrade = trades.some(t =>
-    t.source === 'mt5' || !!t.mt5Ticket ||
-    (t.notes && t.notes.includes('MT5 Import'))
-  );
-  let netPnlDisplay;
-  let netPnl;
-  if (hasTrueDollarTrade) {
-    // True MT5 imports present — convert everything to dollars for a consistent sum
-    const totalDollars = trades.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
-    netPnlDisplay = (totalDollars >= 0 ? '+$' : '-$') + Math.abs(totalDollars).toFixed(2);
-    netPnl = totalDollars.toFixed(1);
-  } else {
-    // All manual % trades — sum raw pnl% values directly (no account size conversion needed)
-    const totalPct = trades.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
-    netPnlDisplay = (totalPct >= 0 ? '+' : '') + totalPct.toFixed(1) + '%';
-    netPnl = totalPct.toFixed(1);
+  // Net PnL — toggle-aware: always compute both $ and % so tapping the card flips instantly.
+  const _totalDollars = trades.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
+  const _totalPct     = trades.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
+  const _netDollarFmt = (_totalDollars >= 0 ? '+$' : '-$') + Math.abs(_totalDollars).toFixed(2);
+  const _netPctFmt    = (_totalPct >= 0 ? '+' : '') + _totalPct.toFixed(1) + '%';
+  // _pnlToggleMode: '%' (default) | '$' — cycled by toggleNetPnl()
+  const _showDollar   = (_pnlToggleMode === '$');
+  const netPnlDisplay = _showDollar ? _netDollarFmt : _netPctFmt;
+  const netPnl        = _showDollar ? _totalDollars.toFixed(1) : _totalPct.toFixed(1);
+  // Store both values on the element for zero-cost toggling
+  const _pnlEl = document.getElementById('kpi-pnl');
+  if (_pnlEl) {
+    _pnlEl.dataset.dollar    = _netDollarFmt;
+    _pnlEl.dataset.pct       = _netPctFmt;
+    _pnlEl.dataset.dollarPos = _totalDollars >= 0 ? '1' : '0';
+    _pnlEl.dataset.pctPos    = _totalPct    >= 0 ? '1' : '0';
   }
   const rrNums = trades.map(t => { const m = (t.rr || '').match(/1:([\d.]+)/); return m ? parseFloat(m[1]) : null; }).filter(x => x !== null);
   const avgRR = rrNums.length ? (rrNums.reduce((a, b) => a + b, 0) / rrNums.length).toFixed(1) : null;
@@ -4864,18 +4860,13 @@ function updateKPIs() {
   document.getElementById('kpi-wr').textContent = wr + '%';
   document.getElementById('kpi-pnl').textContent = netPnlDisplay;
   document.getElementById('kpi-pf').textContent = pf + 'x';
-  // AVG WIN / AVG LOSS — show % when no true MT5 imports, else show $
-  if (hasTrueDollarTrade) {
-    document.getElementById('kpi-aw').textContent = (avgWDollars >= 0 ? '+$' : '-$') + Math.abs(avgWDollars).toFixed(2);
-    document.getElementById('kpi-al').textContent = (avgLDollars >= 0 ? '+$' : '-$') + Math.abs(avgLDollars).toFixed(2);
-  } else {
-    const winPcts  = trades.filter(t => t.pnl > 0).map(t => parseFloat(t.pnl) || 0);
-    const lossPcts = trades.filter(t => t.pnl < 0).map(t => parseFloat(t.pnl) || 0);
-    const avgWPct  = winPcts.length  ? winPcts.reduce((a, b) => a + b, 0)  / winPcts.length  : 0;
-    const avgLPct  = lossPcts.length ? lossPcts.reduce((a, b) => a + b, 0) / lossPcts.length : 0;
-    document.getElementById('kpi-aw').textContent = (avgWPct >= 0 ? '+' : '') + avgWPct.toFixed(2) + '%';
-    document.getElementById('kpi-al').textContent = avgLPct.toFixed(2) + '%';
-  }
+  // AVG WIN / AVG LOSS — always show % (raw pnl values); also store $ for reference
+  const _winPcts  = trades.filter(t => t.pnl > 0).map(t => parseFloat(t.pnl) || 0);
+  const _lossPcts = trades.filter(t => t.pnl < 0).map(t => parseFloat(t.pnl) || 0);
+  const _avgWPct  = _winPcts.length  ? _winPcts.reduce((a, b) => a + b, 0)  / _winPcts.length  : 0;
+  const _avgLPct  = _lossPcts.length ? _lossPcts.reduce((a, b) => a + b, 0) / _lossPcts.length : 0;
+  document.getElementById('kpi-aw').textContent = (_avgWPct >= 0 ? '+' : '') + _avgWPct.toFixed(2) + '%';
+  document.getElementById('kpi-al').textContent = _avgLPct.toFixed(2) + '%';
   const rrEl = document.getElementById('kpi-rr'); if (rrEl) rrEl.textContent = avgRR ? '1:' + avgRR : '—';
   const wsEl = document.getElementById('kpi-ws'); if (wsEl) wsEl.textContent = streak > 0 ? streak + '↑ (best:' + maxStreak + ')' : maxStreak ? '0 (best:' + maxStreak + ')' : '0';
   document.querySelectorAll('.kpi-value').forEach(el => { el.style.transform = 'scale(1.04)'; el.style.transition = 'transform 0.3s ease'; setTimeout(() => el.style.transform = '', 320); });
@@ -4963,6 +4954,26 @@ function updateKPIs() {
     ? _cqT.length + ' trades · Win rate ' + _cqWr + '% · Net PnL ' + _cqFmt
     : 'No trades yet this quarter — tap + New Trade to begin';
 }
+
+// ── Net PnL toggle ────────────────────────────────────
+function toggleNetPnl() {
+  // Cycle: % → $ → % …
+  _pnlToggleMode = (_pnlToggleMode === '%') ? '$' : '%';
+  const el = document.getElementById('kpi-pnl');
+  const card = document.getElementById('kpi-pnl-card');
+  if (!el) return;
+  // Animate flip
+  if (card) { card.classList.add('kpi-pnl-flipping'); setTimeout(() => card.classList.remove('kpi-pnl-flipping'), 300); }
+  // Swap value + colour instantly from stored data attributes
+  if (_pnlToggleMode === '$') {
+    el.textContent = el.dataset.dollar || '+$0.00';
+    el.className   = 'kpi-value ' + (el.dataset.dollarPos === '1' ? 'green' : 'red');
+  } else {
+    el.textContent = el.dataset.pct || '+0.0%';
+    el.className   = 'kpi-value ' + (el.dataset.pctPos === '1' ? 'green' : 'red');
+  }
+}
+
 
 // ── QUARTER / YEAR HELPERS ────────────────────────────
 function getQuarter(dateStr) { const m = parseInt(dateStr.slice(5, 7)); return m <= 3 ? 1 : m <= 6 ? 2 : m <= 9 ? 3 : 4; }
