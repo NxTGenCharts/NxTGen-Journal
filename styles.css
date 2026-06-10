@@ -6272,3 +6272,139 @@ select.acc-mgr-input option {
 .acc-trade-row:hover td {
   background: rgba(96,165,250,0.06) !important;
 }
+
+/* ══════════════════════════════════════════════════════
+   NXTGEN — NEW FEATURES CSS (v4 additions)
+   ══════════════════════════════════════════════════════ */
+
+/* ── Skeleton loaders ─────────────────────────────── */
+.skel {
+  background: linear-gradient(90deg,var(--glass-1) 25%,var(--glass-3) 50%,var(--glass-1) 75%);
+  background-size: 200% 100%;
+  animation: skel-shimmer 1.4s infinite;
+  border-radius: 4px;
+}
+@keyframes skel-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skel-kpi  { height: 28px; width: 70%; margin: 4px auto; border-radius: 6px; }
+.skel-name { height: 12px; width: 80%; }
+.skel-num  { height: 12px; width: 40%; }
+.skel-pill { height: 18px; width: 44px; border-radius: 99px; }
+
+/* ── Dashboard filter bar ─────────────────────────── */
+.dash-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: var(--glass-0);
+  border: 0.5px solid var(--glass-border);
+  border-radius: var(--r-md);
+}
+.dash-filter-btn {
+  background: var(--glass-1);
+  border: 0.5px solid var(--glass-border);
+  color: var(--text2);
+  border-radius: 99px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .15s;
+  font-family: var(--font-body);
+  letter-spacing: .02em;
+}
+.dash-filter-btn:hover { background: var(--glass-2); color: var(--text); }
+.dash-filter-btn.active {
+  background: rgba(58,134,255,.18);
+  border-color: rgba(58,134,255,.4);
+  color: var(--blue);
+}
+
+/* ── Sortable table headers ───────────────────────── */
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: color .15s;
+}
+.sortable-th:hover { color: var(--blue); }
+.sort-icon {
+  font-size: 10px;
+  opacity: .45;
+  margin-left: 3px;
+  display: inline-block;
+}
+.sort-icon.active { opacity: 1; color: var(--blue); }
+
+/* ── Empty state rows ─────────────────────────────── */
+.empty-state-row {
+  text-align: center;
+  padding: 28px 16px;
+  color: var(--text3);
+  font-size: 13px;
+}
+.empty-cta {
+  background: rgba(58,134,255,.15);
+  border: 1px solid rgba(58,134,255,.3);
+  color: var(--blue);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 6px;
+  font-family: var(--font-body);
+  transition: background .15s;
+}
+.empty-cta:hover { background: rgba(58,134,255,.25); }
+
+/* ── Bulk select in Trade Log ─────────────────────── */
+.bulk-chk { cursor: pointer; accent-color: var(--blue); width: 14px; height: 14px; }
+.bulk-selected { background: rgba(58,134,255,.06) !important; }
+.bulk-selected td { color: var(--text) !important; }
+
+/* ── Calendar weekly summary column ──────────────── */
+.cal-week-sum {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 4px 8px;
+  background: var(--glass-0);
+  border-radius: var(--r-sm);
+  border: 0.5px solid var(--glass-border);
+  min-width: 64px;
+  margin: 2px 0 2px 4px;
+  font-size: 10px;
+  grid-column: span 1;
+}
+.wsm-pnl  { font-weight: 600; font-family: var(--font-mono); font-size: 11px; }
+.wsm-meta { color: var(--text3); font-size: 10px; margin-top: 1px; }
+.wsm-empty { color: var(--text3); font-size: 11px; }
+
+/* ── Max drawdown KPI card (single wide) ─────────── */
+#kpi-dd-row { grid-template-columns: 1fr; }
+.kpi-grid.kpi-dd-row { margin-bottom: 10px; }
+
+/* ── Expectancy (PF toggle) ──────────────────────── */
+#kpi-pf-card .kpi-value { transition: color .2s; }
+
+/* Light mode overrides ───────────────────────────── */
+[data-theme="light"] .dash-filter-btn { background: rgba(0,0,0,.04); border-color: rgba(0,0,0,.1); color: var(--text2); }
+[data-theme="light"] .dash-filter-btn.active { background: rgba(37,99,235,.1); border-color: rgba(37,99,235,.3); }
+[data-theme="light"] .skel { background: linear-gradient(90deg,rgba(0,0,0,.06) 25%,rgba(0,0,0,.12) 50%,rgba(0,0,0,.06) 75%); background-size: 200% 100%; }
+[data-theme="light"] .bulk-selected { background: rgba(37,99,235,.05) !important; }
+[data-theme="light"] .cal-week-sum { background: rgba(0,0,0,.03); border-color: rgba(0,0,0,.08); }
+[data-theme="light"] .empty-cta { background: rgba(37,99,235,.08); border-color: rgba(37,99,235,.2); }
+
+/* Mobile adjustments ─────────────────────────────── */
+@media (max-width: 768px) {
+  .dash-filter-bar { gap: 4px; padding: 6px 8px; }
+  .dash-filter-btn { padding: 3px 9px; font-size: 10px; }
+  .cal-week-sum { display: none; } /* hide weekly sum on very small screens */
+  #bulk-action-bar { flex-wrap: wrap; }
+}

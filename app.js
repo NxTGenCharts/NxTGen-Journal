@@ -130,6 +130,22 @@ const AFFIRMATIONS=["I only take A+ setups. I am patient.","I follow my plan. I 
 let trades = [];
 let deletedTrades = [];
 let _pnlToggleMode = '%'; // '%' (default) | '$' — toggled by tapping Net PnL card
+// Dashboard date range filter — null means all-time
+let _dashFilter = { from: null, to: null, preset: 'all' };
+// Filtered trades for dashboard (all unless filter is active)
+function _getFilteredTrades() {
+  if (!_dashFilter.from && !_dashFilter.to) return trades;
+  return trades.filter(t => {
+    if (_dashFilter.from && t.date < _dashFilter.from) return false;
+    if (_dashFilter.to   && t.date > _dashFilter.to)   return false;
+    return true;
+  });
+}
+// Sort state for dashboard tables (col = column key, dir = 1 asc / -1 desc)
+let _sortPair     = { col: 'trades', dir: -1 };
+let _sortKz       = { col: 'trades', dir: -1 };
+let _sortStrategy = { col: 'trades', dir: -1 };
+let _sortMonthly  = { col: 'month',  dir: -1 };
 let tradeState = {};   // keyed by trade id — holds notes/charts/checklist
 let currentDetail = null;
 let currentUploadSlot = null;
@@ -183,7 +199,22 @@ function _rowToDeleted(row) {
 }
 
 /* Load all active trades for this user from Supabase */
+function _showSkeletons() {
+  ['pair-table-body','kz-table-body','strategy-table-body','monthly-table-body'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const cols = { 'pair-table-body': 5, 'kz-table-body': 5, 'strategy-table-body': 4, 'monthly-table-body': 8 }[id] || 5;
+    el.innerHTML = Array.from({length:4}, () =>
+      `<tr>${Array.from({length:cols}, (_,i) => `<td><div class="skel skel-${i===0?'name':i===1?'num':'pill'}"></div></td>`).join('')}</tr>`
+    ).join('');
+  });
+  const kpiEls = ['kpi-total','kpi-wr','kpi-pnl','kpi-pf','kpi-aw','kpi-al','kpi-rr','kpi-ws','kpi-dd'];
+  kpiEls.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = '<div class="skel skel-kpi"></div>'; });
+}
+function _hideSkeletons() { /* replaced by actual data rendering */ }
+
 async function loadTrades() {
+  _showSkeletons();
   const { data, error } = await sb
     .from('journal_trades')
     .select('*')
@@ -1745,6 +1776,14 @@ function nav(pageId, sbEl, label, extra) {
 }
 
 // ── DASHBOARD: PAIR TABLE ────────────────────────────
+function _sortIndicator(col, sortState) {
+  if (sortState.col !== col) return '<span class="sort-icon">⇅</span>';
+  return sortState.dir === -1 ? '<span class="sort-icon active">↓</span>' : '<span class="sort-icon active">↑</span>';
+}
+function _sortHeader(label, col, sortStateKey, buildFn, extra) {
+  const _sortMap = { _sortPair, _sortKz, _sortStrategy, _sortMonthly };
+  return `<th class="sortable-th" onclick="${buildFn}('${col}')" ${extra||''}>${label} ${_sortIndicator(col, _sortMap[sortStateKey] || {col:'',dir:-1})}</th>`;
+}
 /* ─────────────────────────────────────────────────────────
    SHARED PnL FORMATTER — dual $ + % display for tables/drilldowns
    netDollars = sum already in $
@@ -1804,29 +1843,61 @@ function _fmtAvgPnl(avgDollars, tradeList) {
   return dolStr;
 }
 
-function buildPairTable() {
-  const pairs = [...new Set(trades.map(t => t.pair))].sort((a, b) => {
-    const la = trades.filter(t => t.pair === a).length;
-    const lb = trades.filter(t => t.pair === b).length;
-    return lb - la;
-  });
+// ── Group PnL helpers (global, used by all build* table fns) ──────────────
+function _pctOfTrade(t) {
+  const val = parseFloat(t.pnl) || 0;
+  const sz  = getAccSizeForAccount(t.account);
+  if (!_isMt5Trade(t) && t.pnlUnit !== '$') return val;
+  if (sz > 0) return (toPnlDollars(t, sz) / sz) * 100;
+  return 0;
+}
+function _totalPctForGroup(list) {
+  return list.reduce((a, t) => a + _pctOfTrade(t), 0);
+}
+function _emptyRow(cols, msg) {
+  return `<tr><td colspan="${cols}" class="empty-state-row">${msg}</td></tr>`;
+}
+
+function buildPairTable(sortCol) {
+  const trades = _getFilteredTrades();
+  if (sortCol) {
+    if (_sortPair.col === sortCol) _sortPair.dir *= -1;
+    else { _sortPair.col = sortCol; _sortPair.dir = -1; }
+  }
+  const pairs = [...new Set(trades.map(t => t.pair))];
   const tbody = document.getElementById('pair-table-body');
+  const thead = document.getElementById('pair-table-head');
   if (!tbody) return;
   if (!pairs.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text3);text-align:center;font-style:italic;padding:16px">No trades logged yet</td></tr>';
+    tbody.innerHTML = _emptyRow(5, '📊 No trades logged yet — <button class="empty-cta" onclick="openModal()">+ Add your first trade</button>');
     return;
   }
-  tbody.innerHTML = pairs.map(p => {
-    const pt = trades.filter(t => t.pair === p);
-    if (!pt.length) return '';
+  let rows = pairs.map(p => {
+    const pt   = trades.filter(t => t.pair === p);
     const wins = pt.filter(t => t.outcome === 'Win').length;
-    const wr = pt.length ? Math.round(wins / pt.length * 100) : 0;
+    const wr   = pt.length ? Math.round(wins / pt.length * 100) : 0;
     const netDollars = pt.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
-    const wrClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
-    const pnlClass = netDollars >= 0 ? 'outcome-win' : 'outcome-loss';
+    const pnl  = _totalPctForGroup(pt);
+    return { p, count: pt.length, wr, netDollars, pnl, pt };
+  });
+  rows.sort((a, b) => {
+    if (_sortPair.col === 'pair') return a.p < b.p ? _sortPair.dir : a.p > b.p ? -_sortPair.dir : 0;
+    const av = _sortPair.col === 'wr' ? a.wr : _sortPair.col === 'pnl' ? a.pnl : a.count;
+    const bv = _sortPair.col === 'wr' ? b.wr : _sortPair.col === 'pnl' ? b.pnl : b.count;
+    return (av - bv) * _sortPair.dir;
+  });
+  if (thead) thead.innerHTML = `<tr>
+    <th class="sortable-th" onclick="buildPairTable('pair')">Pair ${_sortIndicator('pair',_sortPair)}</th>
+    <th class="sortable-th" onclick="buildPairTable('trades')">Trades ${_sortIndicator('trades',_sortPair)}</th>
+    <th class="sortable-th" onclick="buildPairTable('wr')">Win% ${_sortIndicator('wr',_sortPair)}</th>
+    <th class="sortable-th" onclick="buildPairTable('pnl')">Net PnL ${_sortIndicator('pnl',_sortPair)}</th>
+    <th class="col-winbar">Win rate bar</th></tr>`;
+  tbody.innerHTML = rows.map(({p,count,wr,netDollars,pnl,pt}) => {
+    const wrClass  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
+    const pnlClass = pnl >= 0 ? 'outcome-win' : 'outcome-loss';
     const barColor = wr >= 70 ? 'green' : 'red';
-    const pnlDisp = _fmtGroupPnl(netDollars, pt);
-    return `<tr class="pair-row-clickable" onclick="openPairDrilldown('${p.replace(/'/g,"\\'")}')" title="View ${p} trades" style="cursor:pointer"><td class="bold">${p}</td><td>${pt.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass} mono" style="font-size:11px">${pnlDisp}</td><td class="col-winbar"><div class="win-bar-wrap"><div class="win-bar-bg"><div class="win-bar-fill ${barColor}" style="width:${wr}%"></div></div></div></td></tr>`;
+    const pnlDisp  = _fmtGroupPnl(netDollars, pt);
+    return `<tr class="pair-row-clickable" onclick="openPairDrilldown('${p.replace(/'/g,"\'")}')" style="cursor:pointer"><td class="bold">${p}</td><td>${count}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass} mono" style="font-size:11px">${pnlDisp}</td><td class="col-winbar"><div class="win-bar-wrap"><div class="win-bar-bg"><div class="win-bar-fill ${barColor}" style="width:${wr}%"></div></div></div></td></tr>`;
   }).join('');
 }
 
@@ -2089,60 +2160,94 @@ function drillOpenTrade(id) {
 }
 
 
-function buildKillzoneTable() {
+function buildKillzoneTable(sortCol) {
+  const trades = _getFilteredTrades();
+  if (sortCol) {
+    if (_sortKz.col === sortCol) _sortKz.dir *= -1;
+    else { _sortKz.col = sortCol; _sortKz.dir = -1; }
+  }
   const tbody = document.getElementById('kz-table-body');
+  const thead = document.getElementById('kz-table-head');
   if (!tbody) return;
-  const KZ_META = {
-    'London':   { icon: '🇬🇧' },
-    'New York': { icon: '🗽' },
-    'Asian':    { icon: '🌏' },
-    'Tokyo':    { icon: '🗼' },
-  };
-  const sessions = [...new Set(trades.map(t => t.kz))].filter(Boolean)
-    .sort((a, b) => trades.filter(t => t.kz === b).length - trades.filter(t => t.kz === a).length);
-
+  const KZ_META = { 'London':{'icon':'🇬🇧'},'New York':{'icon':'🗽'},'Asian':{'icon':'🌏'},'Tokyo':{'icon':'🗼'} };
+  const sessions = [...new Set(trades.map(t => t.kz))].filter(Boolean);
   if (!sessions.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text3);text-align:center;font-style:italic;padding:16px">No trades logged yet</td></tr>';
+    tbody.innerHTML = _emptyRow(5, '⏰ No killzone data yet — tag your trades with a session');
     return;
   }
-  tbody.innerHTML = sessions.map(s => {
+  let rows = sessions.map(s => {
     const st   = trades.filter(t => t.kz === s);
     const wins = st.filter(t => t.outcome === 'Win').length;
     const wr   = Math.round((wins / st.length) * 100);
     const netDollars = st.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
     const avgDollars = netDollars / st.length;
-    const wrClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
-    const pnlClass = avgDollars >= 0 ? 'outcome-win' : 'outcome-loss';
-    const grade = wr >= 80 ? 'A+' : wr >= 70 ? 'A' : wr >= 60 ? 'B' : wr >= 50 ? 'C' : 'D';
+    const avgPct = _totalPctForGroup(st) / st.length;
+    const icon   = (KZ_META[s] || {}).icon || '🕐';
+    return { s, count: st.length, wr, avgDollars, avgPct, st, icon };
+  });
+  rows.sort((a, b) => {
+    if (_sortKz.col === 'session') return a.s < b.s ? _sortKz.dir : a.s > b.s ? -_sortKz.dir : 0;
+    const av = _sortKz.col === 'wr' ? a.wr : _sortKz.col === 'pnl' ? a.avgPct : a.count;
+    const bv = _sortKz.col === 'wr' ? b.wr : _sortKz.col === 'pnl' ? b.avgPct : b.count;
+    return (av - bv) * _sortKz.dir;
+  });
+  if (thead) thead.innerHTML = `<tr>
+    <th class="sortable-th" onclick="buildKillzoneTable('session')">Session ${_sortIndicator('session',_sortKz)}</th>
+    <th class="sortable-th" onclick="buildKillzoneTable('trades')">Trades ${_sortIndicator('trades',_sortKz)}</th>
+    <th class="sortable-th" onclick="buildKillzoneTable('wr')">Win% ${_sortIndicator('wr',_sortKz)}</th>
+    <th class="sortable-th" onclick="buildKillzoneTable('pnl')">Avg PnL ${_sortIndicator('pnl',_sortKz)}</th>
+    <th>Grade</th></tr>`;
+  tbody.innerHTML = rows.map(({s,count,wr,avgDollars,avgPct,st,icon}) => {
+    const wrClass    = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
+    const pnlClass   = avgPct >= 0 ? 'outcome-win' : 'outcome-loss';
+    const grade      = wr >= 80 ? 'A+' : wr >= 70 ? 'A' : wr >= 60 ? 'B' : wr >= 50 ? 'C' : 'D';
     const gradeClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
-    const icon = (KZ_META[s] || {}).icon || '🕐';
-    const pnlDisp = _fmtAvgPnl(avgDollars, st);
-    return `<tr class="pair-row-clickable" onclick="openKzDrilldown(this.dataset.s)" data-s="${s}" title="View ${s} trades" style="cursor:pointer"><td class="bold">${icon} ${s}</td><td>${st.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}" style="font-size:11px">${pnlDisp}</td><td><span class="pill ${gradeClass}">${grade}</span></td></tr>`;
+    const pnlDisp    = _fmtAvgPnl(avgDollars, st);
+    return `<tr class="pair-row-clickable" onclick="openKzDrilldown(this.dataset.s)" data-s="${s}" style="cursor:pointer"><td class="bold">${icon} ${s}</td><td>${count}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}" style="font-size:11px">${pnlDisp}</td><td><span class="pill ${gradeClass}">${grade}</span></td></tr>`;
   }).join('');
 }
 
-function buildStrategyTable() {
+function buildStrategyTable(sortCol) {
+  const trades = _getFilteredTrades();
+  if (sortCol) {
+    if (_sortStrategy.col === sortCol) _sortStrategy.dir *= -1;
+    else { _sortStrategy.col = sortCol; _sortStrategy.dir = -1; }
+  }
   const tbody = document.getElementById('strategy-table-body');
+  const thead = document.getElementById('strategy-table-head');
   if (!tbody) return;
   const tagged   = trades.filter(t => t.strategy && t.strategy.trim());
   const untagged = trades.filter(t => !t.strategy || !t.strategy.trim());
-  const strategies = [...new Set(tagged.map(t => t.strategy))]
-    .sort((a, b) => tagged.filter(t => t.strategy === b).length - tagged.filter(t => t.strategy === a).length);
-
+  const strategies = [...new Set(tagged.map(t => t.strategy))];
   if (!trades.length) {
-    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text3);text-align:center;font-style:italic;padding:16px">No trades logged yet</td></tr>';
+    tbody.innerHTML = _emptyRow(4, '📐 No strategies tagged yet — add a strategy when logging trades');
     return;
   }
-  const rows = strategies.map(s => {
+  let rows = strategies.map(s => {
     const st   = tagged.filter(t => t.strategy === s);
     const wins = st.filter(t => t.outcome === 'Win').length;
     const wr   = Math.round((wins / st.length) * 100);
     const netDollars = st.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
     const avgDollars = netDollars / st.length;
+    const avgPct = _totalPctForGroup(st) / st.length;
+    return { s, count: st.length, wr, avgDollars, avgPct, st };
+  });
+  rows.sort((a, b) => {
+    if (_sortStrategy.col === 'strategy') return a.s < b.s ? _sortStrategy.dir : a.s > b.s ? -_sortStrategy.dir : 0;
+    const av = _sortStrategy.col === 'wr' ? a.wr : _sortStrategy.col === 'pnl' ? a.avgPct : a.count;
+    const bv = _sortStrategy.col === 'wr' ? b.wr : _sortStrategy.col === 'pnl' ? b.avgPct : b.count;
+    return (av - bv) * _sortStrategy.dir;
+  });
+  if (thead) thead.innerHTML = `<tr>
+    <th class="sortable-th" onclick="buildStrategyTable('strategy')">Strategy ${_sortIndicator('strategy',_sortStrategy)}</th>
+    <th class="sortable-th" onclick="buildStrategyTable('trades')">Trades ${_sortIndicator('trades',_sortStrategy)}</th>
+    <th class="sortable-th" onclick="buildStrategyTable('wr')">Win% ${_sortIndicator('wr',_sortStrategy)}</th>
+    <th class="sortable-th" onclick="buildStrategyTable('pnl')">Avg PnL ${_sortIndicator('pnl',_sortStrategy)}</th></tr>`;
+  const htmlRows = rows.map(({s,count,wr,avgDollars,avgPct,st}) => {
     const wrClass  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
-    const pnlClass = avgDollars >= 0 ? 'outcome-win' : 'outcome-loss';
+    const pnlClass = avgPct >= 0 ? 'outcome-win' : 'outcome-loss';
     const pnlDisp  = _fmtAvgPnl(avgDollars, st);
-    return `<tr class="pair-row-clickable" onclick="openStratDrilldown(this.dataset.s)" data-s="${s}" title="View ${s} trades" style="cursor:pointer"><td class="bold">${s}</td><td>${st.length}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}" style="font-size:11px">${pnlDisp}</td></tr>`;
+    return `<tr class="pair-row-clickable" onclick="openStratDrilldown(this.dataset.s)" data-s="${s}" style="cursor:pointer"><td class="bold">${s}</td><td>${count}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}" style="font-size:11px">${pnlDisp}</td></tr>`;
   });
   if (untagged.length) {
     const uw = untagged.filter(t => t.outcome === 'Win').length;
@@ -2150,53 +2255,72 @@ function buildStrategyTable() {
     const uNetDollars = untagged.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
     const uAvgDollars = uNetDollars / untagged.length;
     const uwc = uwr >= 70 ? 'pill-green' : uwr >= 50 ? 'pill-gold' : 'pill-red';
-    const upc = uAvgDollars >= 0 ? 'outcome-win' : 'outcome-loss';
+    const upc = _totalPctForGroup(untagged)/untagged.length >= 0 ? 'outcome-win' : 'outcome-loss';
     const uDisp = _fmtAvgPnl(uAvgDollars, untagged);
-    rows.push(`<tr class="pair-row-clickable" onclick="openStratDrilldown('untagged')" title="View untagged trades" style="cursor:pointer"><td class="bold" style="color:var(--text2)">Untagged</td><td>${untagged.length}</td><td><span class="pill ${uwc}">${uwr}%</span></td><td class="${upc}" style="font-size:11px">${uDisp}</td></tr>`);
+    htmlRows.push(`<tr class="pair-row-clickable" onclick="openStratDrilldown('untagged')" style="cursor:pointer"><td class="bold" style="color:var(--text2)">Untagged</td><td>${untagged.length}</td><td><span class="pill ${uwc}">${uwr}%</span></td><td class="${upc}" style="font-size:11px">${uDisp}</td></tr>`);
   }
-  tbody.innerHTML = rows.join('');
+  tbody.innerHTML = htmlRows.join('');
 }
 
-function buildMonthlyTable() {
+function buildMonthlyTable(sortCol) {
+  const trades = _getFilteredTrades();
+  if (sortCol) {
+    if (_sortMonthly.col === sortCol) _sortMonthly.dir *= -1;
+    else { _sortMonthly.col = sortCol; _sortMonthly.dir = -1; }
+  }
   const tbody = document.getElementById('monthly-table-body');
+  const thead = document.getElementById('monthly-table-head');
   if (!tbody) return;
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
   if (!trades.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text3);text-align:center;font-style:italic;padding:16px">No trades logged yet</td></tr>';
+    tbody.innerHTML = _emptyRow(8, '📅 No trades logged yet — tap <strong>+ New Trade</strong> to begin');
     return;
   }
-
-  // Collect all year-month keys that have trades
-  const monthKeys = [...new Set(trades.map(t => t.date.slice(0, 7)))].sort().reverse();
-
-  tbody.innerHTML = monthKeys.map(key => {
+  const monthKeys = [...new Set(trades.map(t => t.date.slice(0, 7)))];
+  let rows = monthKeys.map(key => {
     const [yr, mo] = key.split('-').map(Number);
     const mt    = trades.filter(t => t.date.startsWith(key));
     const wins  = mt.filter(t => t.outcome === 'Win').length;
     const wr    = Math.round((wins / mt.length) * 100);
-    // Convert every trade to dollars using its own account size
     const netDollars = mt.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
-    const wrClass  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
-    const pnlClass = netDollars >= 0 ? 'outcome-win' : 'outcome-loss';
-    const grade = wr >= 80 ? 'A+' : wr >= 70 ? 'A' : wr >= 60 ? 'B' : wr >= 50 ? 'C' : 'D';
-    const gradeClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
-
-    // Compute current win streak for this month
+    const netPct = _totalPctForGroup(mt);
     const sorted = [...mt].sort((a, b) => a.date.localeCompare(b.date));
     let bestStreak = 0, cur = 0;
     sorted.forEach(t => { if (t.outcome === 'Win') { cur++; if (cur > bestStreak) bestStreak = cur; } else cur = 0; });
-
-    const absNet = Math.abs(netDollars);
-    const netFmt = (absNet >= 1000 ? (netDollars >= 0 ? '+$' : '-$') + (absNet/1000).toFixed(1) + 'k'
-                                   : (netDollars >= 0 ? '+$' : '-$') + absNet.toFixed(2));
-    const pnlDisp = _fmtGroupPnl(netDollars, mt);
-
-    return `<tr class="pair-row-clickable" onclick="openMonthDrilldown(this.dataset.k)" data-k="${key}" title="View ${MONTH_NAMES[mo-1]} ${yr} trades" style="cursor:pointer">
+    const _mWins = mt.filter(t => _pctOfTrade(t) > 0);
+    const _mLoss = mt.filter(t => _pctOfTrade(t) < 0);
+    const _mAvgW = _mWins.length ? (_mWins.reduce((a,t)=>a+_pctOfTrade(t),0)/_mWins.length).toFixed(1) : null;
+    const _mAvgL = _mLoss.length ? (_mLoss.reduce((a,t)=>a+_pctOfTrade(t),0)/_mLoss.length).toFixed(1) : null;
+    return { key, yr, mo, mt, wins, wr, netDollars, netPct, bestStreak, _mAvgW, _mAvgL };
+  });
+  // Sort
+  rows.sort((a, b) => {
+    if (_sortMonthly.col === 'month') return a.key < b.key ? _sortMonthly.dir : a.key > b.key ? -_sortMonthly.dir : 0;
+    const av = _sortMonthly.col === 'wr' ? a.wr : _sortMonthly.col === 'pnl' ? a.netPct : _sortMonthly.col === 'streak' ? a.bestStreak : a.mt.length;
+    const bv = _sortMonthly.col === 'wr' ? b.wr : _sortMonthly.col === 'pnl' ? b.netPct : _sortMonthly.col === 'streak' ? b.bestStreak : b.mt.length;
+    return (av - bv) * _sortMonthly.dir;
+  });
+  if (thead) thead.innerHTML = `<tr>
+    <th class="sortable-th" onclick="buildMonthlyTable('month')">Month ${_sortIndicator('month',_sortMonthly)}</th>
+    <th class="sortable-th" onclick="buildMonthlyTable('trades')">Trades ${_sortIndicator('trades',_sortMonthly)}</th>
+    <th class="sortable-th" onclick="buildMonthlyTable('wr')">Win% ${_sortIndicator('wr',_sortMonthly)}</th>
+    <th class="sortable-th" onclick="buildMonthlyTable('pnl')">Net PnL ${_sortIndicator('pnl',_sortMonthly)}</th>
+    <th>Avg Win</th><th>Avg Loss</th>
+    <th class="sortable-th" onclick="buildMonthlyTable('streak')">Streak ${_sortIndicator('streak',_sortMonthly)}</th>
+    <th>Grade</th></tr>`;
+  tbody.innerHTML = rows.map(({key,yr,mo,mt,wins,wr,netDollars,netPct,bestStreak,_mAvgW,_mAvgL}) => {
+    const wrClass    = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
+    const pnlClass   = netPct >= 0 ? 'outcome-win' : 'outcome-loss';
+    const grade      = wr >= 80 ? 'A+' : wr >= 70 ? 'A' : wr >= 60 ? 'B' : wr >= 50 ? 'C' : 'D';
+    const gradeClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
+    const pnlDisp    = _fmtGroupPnl(netDollars, mt);
+    return `<tr class="pair-row-clickable" onclick="openMonthDrilldown(this.dataset.k)" data-k="${key}" style="cursor:pointer">
       <td class="bold">${MONTH_NAMES[mo - 1]} ${yr}</td>
       <td>${mt.length}</td>
       <td><span class="pill ${wrClass}">${wr}%</span></td>
       <td class="${pnlClass} mono" style="font-size:11px">${pnlDisp}</td>
+      <td class="outcome-win mono" style="font-size:11px">${_mAvgW !== null ? '+'+_mAvgW+'%' : '—'}</td>
+      <td class="outcome-loss mono" style="font-size:11px">${_mAvgL !== null ? _mAvgL+'%' : '—'}</td>
       <td>${bestStreak > 0 ? bestStreak + 'W' : '—'}</td>
       <td><span class="pill ${gradeClass}">${grade}</span></td>
     </tr>`;
@@ -2213,13 +2337,19 @@ function refreshPairFilter() {
 
 // ── TRADE TABLE ───────────────────────────────────────
 function starsHTML(n) { n = Math.max(3, Math.min(5, n || 3)); return '★'.repeat(n) + '<span class="empty">' + '★'.repeat(5 - n) + '</span>'; }
+let _bulkSelected = new Set();
+
 function renderTradeTable(list) {
   const tbody = document.getElementById('trade-table-body');
-  tbody.innerHTML = list.map(t => {
+  const theadChk = document.getElementById('tl-select-all-th');
+  if (theadChk) theadChk.innerHTML = `<input type="checkbox" id="bulk-select-all" onchange="bulkSelectAll(this.checked)" title="Select all">`;
+  tbody.innerHTML = list.length ? list.map(t => {
     const pnlC = t.pnl > 0 ? 'outcome-win' : t.pnl < 0 ? 'outcome-loss' : 'outcome-be';
     const outC = t.outcome === 'Win' ? 'outcome-win' : t.outcome === 'Loss' ? 'outcome-loss' : 'outcome-be';
     const posC = t.pos === 'Buy' ? 'pos-buy' : 'pos-sell';
-    return `<tr class="trade-log-row" onmouseenter="showRowActions(${t.id},this)" onmouseleave="hideRowActions(${t.id})" onclick="openDetail(${t.id})">
+    const chk  = _bulkSelected.has(t.id) ? ' checked' : '';
+    return `<tr class="trade-log-row${_bulkSelected.has(t.id)?' bulk-selected':''}" onmouseenter="showRowActions(${t.id},this)" onmouseleave="hideRowActions(${t.id})" onclick="openDetail(${t.id})">
+      <td onclick="event.stopPropagation()" style="width:32px;padding:0 8px"><input type="checkbox" class="bulk-chk" data-id="${t.id}"${chk} onchange="bulkToggle(${t.id},this.checked)"></td>
       <td class="mono" style="color:var(--text2)">${t.date}</td>
       <td class="bold">${t.pair}</td>
       <td><span class="${posC}">${t.pos}</span></td>
@@ -2235,27 +2365,90 @@ function renderTradeTable(list) {
         <button onclick="event.stopPropagation();quickDelete(${t.id})" style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">🗑</button>
       </td>
     </tr>`;
-  }).join('');
+  }).join('') : _emptyRow(12, '📋 No trades match your filter — try adjusting the search or filters above');
   const countEl = document.getElementById('trade-count');
   if (countEl) countEl.textContent = `Showing ${list.length} of ${trades.length} trades · Sum PnL: ${list.reduce((a, t) => a + t.pnl, 0).toFixed(1)}%`;
+  _updateBulkBar();
   document.querySelectorAll('#trade-table-body tr').forEach((row, i) => {
     row.style.opacity = '0'; row.style.transform = 'translateY(6px)';
     row.style.transition = `opacity 0.18s ${i * 0.02}s ease,transform 0.18s ${i * 0.02}s ease`;
     setTimeout(() => { row.style.opacity = ''; row.style.transform = ''; }, 10);
   });
 }
+
+function bulkToggle(id, checked) {
+  if (checked) _bulkSelected.add(id); else _bulkSelected.delete(id);
+  const row = document.querySelector(`tr[class*="trade-log-row"] input[data-id="${id}"]`)?.closest('tr');
+  if (row) row.classList.toggle('bulk-selected', checked);
+  _updateBulkBar();
+}
+function bulkSelectAll(checked) {
+  document.querySelectorAll('.bulk-chk').forEach(chk => {
+    const id = parseInt(chk.dataset.id);
+    chk.checked = checked;
+    if (checked) _bulkSelected.add(id); else _bulkSelected.delete(id);
+    chk.closest('tr')?.classList.toggle('bulk-selected', checked);
+  });
+  _updateBulkBar();
+}
+function _updateBulkBar() {
+  const bar = document.getElementById('bulk-action-bar');
+  if (!bar) return;
+  const n = _bulkSelected.size;
+  bar.style.display = n > 0 ? 'flex' : 'none';
+  const lbl = bar.querySelector('#bulk-count-lbl');
+  if (lbl) lbl.textContent = n + ' trade' + (n !== 1 ? 's' : '') + ' selected';
+}
+async function bulkDeleteSelected() {
+  const n = _bulkSelected.size;
+  if (!n) return;
+  if (!confirm(`Move ${n} trade${n!==1?'s':''} to trash?`)) return;
+  const ids = [..._bulkSelected];
+  for (const id of ids) {
+    const t = trades.find(x => x.id === id);
+    if (t) await _cloudSoftDelete(t);
+  }
+  _bulkSelected.clear();
+  _updateBulkBar();
+  showToast(`${n} trade${n!==1?'s':''} moved to trash`, 'danger');
+}
 function showRowActions(id, row) { const el = document.getElementById('ra-' + id); if (el) el.style.opacity = '1'; }
 function hideRowActions(id) { const el = document.getElementById('ra-' + id); if (el) el.style.opacity = '0'; }
+let _lastFilteredList = [];
+
 function filterTable() {
-  const q = document.getElementById('search-input').value.toLowerCase();
+  const q  = document.getElementById('search-input').value.toLowerCase();
   const oc = document.getElementById('filter-outcome').value;
   const kz = document.getElementById('filter-kz').value;
   const pr = document.getElementById('filter-pair').value;
-  const filtered = trades.filter(t => {
-    const qs = !q || (t.pair.toLowerCase().includes(q) || t.date.includes(q) || t.kz.toLowerCase().includes(q) || t.strategy.toLowerCase().includes(q));
+  _lastFilteredList = trades.filter(t => {
+    // Extended full-text search: pair, date, killzone, strategy, notes, emotion, pretrade
+    const qs = !q || [t.pair, t.date, t.kz, t.strategy, t.notes, t.emotion, t.pretrade, t.mistakes]
+      .some(f => (f || '').toLowerCase().includes(q));
     return qs && (!oc || t.outcome === oc) && (!kz || t.kz === kz) && (!pr || t.pair === pr);
   });
-  renderTradeTable(filtered);
+  renderTradeTable(_lastFilteredList);
+}
+
+function exportTradesToCSV() {
+  const list = _lastFilteredList.length ? _lastFilteredList : trades;
+  if (!list.length) { showToast('No trades to export', 'danger'); return; }
+  const headers = ['Date','Pair','Position','R:R','PnL%','Outcome','Killzone','Strategy','Account','Rating','Notes','Emotion'];
+  const rows = list.map(t => [
+    t.date, t.pair, t.pos, t.rr,
+    (t.pnl > 0 ? '+' : '') + t.pnl + '%',
+    t.outcome, t.kz, t.strategy || '',
+    t.account, t.rating,
+    '"' + (t.notes || '').replace(/"/g, '""') + '"',
+    t.emotion || ''
+  ].join(','));
+  const csv  = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'NxTGen_Trades_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+  showToast('CSV exported ✓', 'restore');
 }
 
 // ── TRADE DETAIL PANEL ────────────────────────────────
@@ -4820,6 +5013,7 @@ async function buildMonthlyReview() {
 
 // ── KPIs ─────────────────────────────────────────────
 function updateKPIs() {
+  const trades = _getFilteredTrades(); // use date-filtered trades for all KPI calculations
   const total = trades.length;
   const wins = trades.filter(t => t.outcome === 'Win').length;
   const losses = trades.filter(t => t.outcome === 'Loss').length;
@@ -4851,15 +5045,7 @@ function updateKPIs() {
   // % = sum of each trade converted to % via its own account size
   //     (MT5/$ trades: dollars → % = (val/accSize)*100; manual % trades: use val directly).
   const _totalDollars = trades.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
-  const _totalPct = trades.reduce((a, t) => {
-    const val = parseFloat(t.pnl) || 0;
-    const sz  = getAccSizeForAccount(t.account);
-    // If this trade's pnl is already in %, use it directly
-    if (!_isMt5Trade(t) && t.pnlUnit !== '$') return a + val;
-    // Otherwise it's a dollar value — convert to % using account size
-    if (sz > 0) return a + (toPnlDollars(t, sz) / sz) * 100;
-    return a; // no account size — skip from % sum
-  }, 0);
+  const _totalPct = trades.reduce((a, t) => a + _pctOfTrade(t), 0);
   const _netDollarFmt = (_totalDollars >= 0 ? '+$' : '-$') + Math.abs(_totalDollars).toFixed(2);
   const _netPctFmt    = (_totalPct >= 0 ? '+' : '') + _totalPct.toFixed(1) + '%';
   // _pnlToggleMode: '%' (default) | '$' — cycled by toggleNetPnl()
@@ -4891,16 +5077,45 @@ function updateKPIs() {
   document.getElementById('kpi-wr').textContent = wr + '%';
   document.getElementById('kpi-pnl').textContent = netPnlDisplay;
   document.getElementById('kpi-pf').textContent = pf + 'x';
-  // AVG WIN / AVG LOSS — always show % (raw pnl values); also store $ for reference
-  const _winPcts  = trades.filter(t => t.pnl > 0).map(t => parseFloat(t.pnl) || 0);
-  const _lossPcts = trades.filter(t => t.pnl < 0).map(t => parseFloat(t.pnl) || 0);
+  // AVG WIN / AVG LOSS — use same % conversion as Net PnL (handles MT5 dollar trades properly)
+  // Note: _pctOfTrade is a global helper defined near buildPairTable
+  const _winPcts  = trades.filter(t => _pctOfTrade(t) > 0).map(_pctOfTrade);
+  const _lossPcts = trades.filter(t => _pctOfTrade(t) < 0).map(_pctOfTrade);
   const _avgWPct  = _winPcts.length  ? _winPcts.reduce((a, b) => a + b, 0)  / _winPcts.length  : 0;
   const _avgLPct  = _lossPcts.length ? _lossPcts.reduce((a, b) => a + b, 0) / _lossPcts.length : 0;
   document.getElementById('kpi-aw').textContent = (_avgWPct >= 0 ? '+' : '') + _avgWPct.toFixed(2) + '%';
   document.getElementById('kpi-al').textContent = _avgLPct.toFixed(2) + '%';
   const rrEl = document.getElementById('kpi-rr'); if (rrEl) rrEl.textContent = avgRR ? '1:' + avgRR : '—';
   const wsEl = document.getElementById('kpi-ws'); if (wsEl) wsEl.textContent = streak > 0 ? streak + '↑ (best:' + maxStreak + ')' : maxStreak ? '0 (best:' + maxStreak + ')' : '0';
+
+  // ── Max Drawdown — peak-to-trough on cumulative % equity curve ──
+  const _ddSorted = [...trades].sort((a, b) => a.date.localeCompare(b.date));
+  let _ddCum = 0, _ddPeak = 0, _maxDD = 0;
+  _ddSorted.forEach(t => {
+    _ddCum += _pctOfTrade(t);
+    if (_ddCum > _ddPeak) _ddPeak = _ddCum;
+    const dd = _ddPeak - _ddCum;
+    if (dd > _maxDD) _maxDD = dd;
+  });
+  const ddEl = document.getElementById('kpi-dd');
+  if (ddEl) {
+    ddEl.textContent = _maxDD > 0 ? '-' + _maxDD.toFixed(1) + '%' : '0.0%';
+    ddEl.className = 'kpi-value ' + (_maxDD > 5 ? 'red' : _maxDD > 2 ? 'gold' : 'green');
+  }
+
+  // ── Expectancy (for PF card toggle) ──
+  const _expPct = _winPcts.length && _lossPcts.length
+    ? (_avgWPct * (_winPcts.length / trades.length)) + (_avgLPct * (_lossPcts.length / trades.length))
+    : 0;
+  const pfEl = document.getElementById('kpi-pf');
+  const expEl = document.getElementById('kpi-exp');
+  if (pfEl) pfEl.dataset.pf  = pf + 'x';
+  if (pfEl) pfEl.dataset.exp = (_expPct >= 0 ? '+' : '') + _expPct.toFixed(2) + '%';
+  if (expEl) { expEl.dataset.pf = pf + 'x'; expEl.dataset.exp = pfEl?.dataset.exp || ''; }
   document.querySelectorAll('.kpi-value').forEach(el => { el.style.transform = 'scale(1.04)'; el.style.transition = 'transform 0.3s ease'; setTimeout(() => el.style.transform = '', 320); });
+
+  // ── Equity sparkline in Net PnL card ──
+  _drawSparkline();
   const subEl = document.getElementById('dash-last-updated');
   if (subEl) { const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' }); subEl.textContent = 'Last updated ' + now + ' WAT'; }
 
@@ -4986,6 +5201,103 @@ function updateKPIs() {
     : 'No trades yet this quarter — tap + New Trade to begin';
 }
 
+// ── Dashboard date range filter ──────────────────────
+function setDashPreset(preset, btn) {
+  document.querySelectorAll('.dash-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const today = new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  if (preset === 'all')   { _dashFilter = { from: null, to: null, preset }; }
+  else if (preset === 'week') {
+    d.setDate(d.getDate() - 7);
+    _dashFilter = { from: d.toISOString().slice(0,10), to: today, preset };
+  } else if (preset === 'month') {
+    _dashFilter = { from: today.slice(0,7)+'-01', to: today, preset };
+  } else if (preset === 'quarter') {
+    const q = getQuarter(today);
+    const qStart = [null,'01','04','07','10'][q];
+    _dashFilter = { from: today.slice(0,4)+'-'+qStart+'-01', to: today, preset };
+  } else if (preset === 'custom') {
+    const from = document.getElementById('dash-filter-from')?.value;
+    const to   = document.getElementById('dash-filter-to')?.value;
+    _dashFilter = { from: from||null, to: to||null, preset };
+  }
+  // Custom inputs visibility
+  const cust = document.getElementById('dash-filter-custom');
+  if (cust) cust.style.display = preset === 'custom' ? 'flex' : 'none';
+  // Rebuild all dashboard views with filtered trades
+  updateKPIs(); buildPairTable(); buildKillzoneTable(); buildStrategyTable(); buildMonthlyTable();
+}
+
+// ── Profit Factor / Expectancy toggle ─────────────────
+let _pfMode = 'pf'; // 'pf' | 'exp'
+function togglePf() {
+  _pfMode = _pfMode === 'pf' ? 'exp' : 'pf';
+  const el = document.getElementById('kpi-pf');
+  const card = document.getElementById('kpi-pf-card');
+  if (!el) return;
+  if (card) { card.classList.add('kpi-pnl-flipping'); setTimeout(() => card.classList.remove('kpi-pnl-flipping'), 300); }
+  if (_pfMode === 'exp') {
+    const lbl = card?.querySelector('.kpi-label');
+    if (lbl) lbl.childNodes[0].textContent = 'Expectancy ';
+    el.textContent = el.dataset.exp || '—';
+    const isPos = parseFloat(el.dataset.exp) >= 0;
+    el.className = 'kpi-value ' + (isPos ? 'green' : 'red');
+  } else {
+    const lbl = card?.querySelector('.kpi-label');
+    if (lbl) lbl.childNodes[0].textContent = 'Profit factor ';
+    el.textContent = el.dataset.pf || '—';
+    el.className = 'kpi-value gold';
+  }
+}
+
+// ── Equity sparkline ──────────────────────────────────
+function _drawSparkline() {
+  const canvas = document.getElementById('kpi-sparkline');
+  if (!canvas) return;
+  const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date));
+  if (sorted.length < 2) { canvas.style.display = 'none'; return; }
+  canvas.style.display = 'block';
+  const _pctOf = t => {
+    const val = parseFloat(t.pnl) || 0;
+    const sz  = getAccSizeForAccount(t.account);
+    if (!_isMt5Trade(t) && t.pnlUnit !== '$') return val;
+    if (sz > 0) return (toPnlDollars(t, sz) / sz) * 100;
+    return 0;
+  };
+  let cum = 0;
+  const points = [0, ...sorted.map(t => { cum += _pctOf(t); return cum; })];
+  const W = canvas.offsetWidth || 180, H = canvas.offsetHeight || 36;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  const min = Math.min(...points), max = Math.max(...points);
+  const range = max - min || 1;
+  const px = (i) => (i / (points.length - 1)) * W;
+  const py = (v) => H - ((v - min) / range) * (H - 4) - 2;
+  const isPos = points[points.length - 1] >= 0;
+  const col = isPos ? '#22c55e' : '#ef4444';
+  // gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, isPos ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.beginPath();
+  ctx.moveTo(px(0), py(points[0]));
+  points.forEach((v, i) => { if (i > 0) ctx.lineTo(px(i), py(v)); });
+  ctx.lineTo(px(points.length - 1), H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+  // line
+  ctx.beginPath();
+  ctx.moveTo(px(0), py(points[0]));
+  points.forEach((v, i) => { if (i > 0) ctx.lineTo(px(i), py(v)); });
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
 // ── Net PnL toggle ────────────────────────────────────
 function toggleNetPnl() {
   // Cycle: % → $ → % …
@@ -5003,6 +5315,8 @@ function toggleNetPnl() {
     el.textContent = el.dataset.pct || '+0.0%';
     el.className   = 'kpi-value ' + (el.dataset.pctPos === '1' ? 'green' : 'red');
   }
+  // Re-render calendar cells to match the new mode
+  renderCalendar();
 }
 
 
@@ -5092,19 +5406,31 @@ function renderQuarterPage(year, q) {
     const posC = t.pos === 'Buy' ? 'pos-buy' : 'pos-sell';
     return `<tr onclick="openDetail(${t.id})" style="cursor:pointer"><td class="mono" style="color:var(--text2)">${t.date}</td><td class="bold">${t.pair}</td><td><span class="${posC}">${t.pos}</span></td><td class="mono">${t.rr}</td><td class="${pnlC} mono">${pnlFmt}</td><td class="${outC}">${t.outcome}</td><td style="color:var(--text2)">${t.kz}</td><td style="color:var(--text2);font-size:12px">${t.strategy || '—'}</td><td class="stars">${starsHTML(t.rating)}</td></tr>`;
   }).join('');
+  // Compute % metrics using _pctOfTrade for quarter page
+  const qNetPct    = qt.reduce((a,t) => a+_pctOfTrade(t), 0);
+  const qWinPcts   = qt.filter(t=>_pctOfTrade(t)>0).map(t=>_pctOfTrade(t));
+  const qLossPcts  = qt.filter(t=>_pctOfTrade(t)<0).map(t=>_pctOfTrade(t));
+  const qAvgWinPct = qWinPcts.length  ? (qWinPcts.reduce((a,b)=>a+b,0)/qWinPcts.length).toFixed(2) : '—';
+  const qAvgLosPct = qLossPcts.length ? (qLossPcts.reduce((a,b)=>a+b,0)/qLossPcts.length).toFixed(2) : '—';
+  const qPfCalc    = qLossPcts.length ? Math.abs(qWinPcts.reduce((a,b)=>a+b,0)/qLossPcts.reduce((a,b)=>a+b,0)).toFixed(2) : '∞';
+  // Drawdown for this quarter
+  let _qCum=0,_qPeak=0,_qDD=0;
+  [...qt].sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{_qCum+=_pctOfTrade(t);if(_qCum>_qPeak)_qPeak=_qCum;const dd=_qPeak-_qCum;if(dd>_qDD)_qDD=dd;});
+  const qPnlPctFmt = (qNetPct>=0?'+':'')+qNetPct.toFixed(1)+'%';
+  const qDDStr = _qDD>0?'-'+_qDD.toFixed(1)+'%':'0.0%';
   document.getElementById('quarter-page-inner').innerHTML = `
-    <div class="cover"><div class="cover-label">Quarterly Performance · ${year}</div><div class="cover-title">Q${q} ${year} — ${Q_MONTHS[q]}</div><div class="cover-sub">${qt.length} trades · Win rate ${wr}% · Net PnL ${netDollarsFmt}</div></div>
+    <div class="cover"><div class="cover-label">Quarterly Performance · ${year}</div><div class="cover-title">Q${q} ${year} — ${Q_MONTHS[q]}</div><div class="cover-sub">${qt.length} trades · Win rate ${wr}% · Net PnL ${qPnlPctFmt} (${netDollarsFmt})</div></div>
     <div class="kpi-grid" style="margin-bottom:16px">
       <div class="kpi-card"><div class="kpi-label">Total trades</div><div class="kpi-value blue">${qt.length || '—'}</div></div>
       <div class="kpi-card"><div class="kpi-label">Win rate</div><div class="kpi-value ${wr >= 65 ? 'green' : 'red'}">${wr}%</div></div>
-      <div class="kpi-card"><div class="kpi-label">Net PnL</div><div class="kpi-value ${netDollarsQ >= 0 ? 'green' : 'red'}">${netDollarsFmt}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Profit factor</div><div class="kpi-value gold">${pf}x</div></div>
+      <div class="kpi-card"><div class="kpi-label">Net PnL</div><div class="kpi-value ${qNetPct >= 0 ? 'green' : 'red'}">${qPnlPctFmt}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Profit factor</div><div class="kpi-value gold">${qPfCalc}x</div></div>
     </div>
     <div class="kpi-grid" style="margin-bottom:20px">
       <div class="kpi-card"><div class="kpi-label">Wins</div><div class="kpi-value green">${wins}</div></div>
       <div class="kpi-card"><div class="kpi-label">Losses</div><div class="kpi-value red">${losses}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Break evens</div><div class="kpi-value blue">${bes}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Avg win / loss</div><div class="kpi-value white" style="font-size:14px">+$${Math.abs(avgW)} / -$${Math.abs(avgL)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Max drawdown</div><div class="kpi-value ${_qDD>5?'red':_qDD>2?'gold':'green'}">${qDDStr}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Avg win / Avg loss</div><div class="kpi-value white" style="font-size:14px">${qAvgWinPct!=='—'?'+'+qAvgWinPct+'%':'—'} / ${qAvgLosPct!=='—'?qAvgLosPct+'%':'—'}</div></div>
     </div>
     ${qt.length === 0 ? `<div style="text-align:center;padding:40px;color:var(--text3)">No trades logged for Q${q} ${year} yet.<br><br><button class="btn btn-primary" onclick="openModal()" style="margin-top:10px">+ Add Trade</button></div>` : `
     <div class="sec-head">Month Breakdown</div>
@@ -5406,13 +5732,62 @@ function renderCalendar() {
     if (hasTrades) { cls += ' has-trades'; if (outcome === 'win') cls += ' win-day'; else if (outcome === 'loss') cls += ' loss-day'; else cls += ' mixed-day'; }
     const dayNumHTML = isToday ? `<div class="cal-day-num"><span class="cal-today-badge">${c.day}</span></div>` : `<div class="cal-day-num">${String(c.day).padStart(2, '0')}</div>`;
     let dotHTML = '', pnlHTML = '', countHTML = '', pairsHTML = '';
-    if (hasTrades) { const dotColor = outcome === 'win' ? 'green' : outcome === 'loss' ? 'red' : 'blue'; dotHTML = `<div class="cal-day-dot ${dotColor}"></div>`; const usd = dayData.totalPnlUSD; pnlHTML = `<div class="cal-day-pnl ${usd > 0 ? 'green' : usd < 0 ? 'red' : 'zero'}">${fmtUSD(usd)}</div>`; countHTML = `<div class="cal-day-count">${dayData.trades.length} trade${dayData.trades.length > 1 ? 's' : ''}</div>`; const pairs = [...new Set(dayData.trades.map(t => t.pair))].join(', '); pairsHTML = `<div class="cal-day-pairs">${pairs}</div>`; }
+    if (hasTrades) { const dotColor = outcome === 'win' ? 'green' : outcome === 'loss' ? 'red' : 'blue'; dotHTML = `<div class="cal-day-dot ${dotColor}"></div>`; const usd = dayData.totalPnlUSD; const _calShowDollar = _pnlToggleMode === '$'; let _calPnlStr; if (_calShowDollar) { _calPnlStr = fmtUSD(usd); } else { const _calPct = dayData.trades.reduce((a,t)=>a+_pctOfTrade(t),0); _calPnlStr = (_calPct >= 0 ? '+' : '') + _calPct.toFixed(1) + '%'; } pnlHTML = `<div class="cal-day-pnl ${usd > 0 ? 'green' : usd < 0 ? 'red' : 'zero'}">${_calPnlStr}</div>`; countHTML = `<div class="cal-day-count">${dayData.trades.length} trade${dayData.trades.length > 1 ? 's' : ''}</div>`; const pairs = [...new Set(dayData.trades.map(t => t.pair))].join(', '); pairsHTML = `<div class="cal-day-pairs">${pairs}</div>`; }
     let clickAttr = '', hoverAttr = '';
     if (c.current) { if (hasTrades) { clickAttr = `onclick="openCalPopup(event,'${dateStr}')"`;  hoverAttr = `onmouseenter="showCalTooltip(event,window._dayMap&&window._dayMap['${dateStr}'],'${dateStr}',${accSize})" onmouseleave="hideCalTooltip()"`; } else { clickAttr = `onclick="closeCalPopup();openModal({date:'${dateStr}'})"` ; } }
     return `<div class="${cls}" ${clickAttr} ${hoverAttr}>${dotHTML}${dayNumHTML}${pnlHTML}${countHTML}${pairsHTML}</div>`;
   }).join(''); };
   _calDaysHTML_fn(daysEl); _calDaysHTML_fn(daysEl2);
   window._dayMap = dayMap;
+  // ── Weekly summary column ──
+  _buildWeeklySummary(daysEl, dayMap);
+  _buildWeeklySummary(daysEl2, dayMap);
+}
+
+function _buildWeeklySummary(gridEl, dayMap) {
+  if (!gridEl) return;
+  const weeks = gridEl.querySelectorAll('.cal-day');
+  if (weeks.length < 7) return;
+  // Remove existing weekly summaries
+  gridEl.querySelectorAll('.cal-week-sum').forEach(e => e.remove());
+  // Group cells into weeks of 7
+  const cells = [...weeks];
+  for (let w = 0; w < Math.ceil(cells.length / 7); w++) {
+    const weekCells = cells.slice(w * 7, w * 7 + 7);
+    let wPct = 0, wTrades = 0, wWins = 0;
+    weekCells.forEach(cell => {
+      const dateStr = cell.querySelector('.cal-day-num')?.textContent?.trim();
+      // find the date string from dayMap by checking cell content
+    });
+    // Compute from dayMap: find all dates whose day number matches cells in this week
+    const wDates = [];
+    weekCells.forEach(c => {
+      // Extract date from onclick attr or data if present
+      const onclick = c.getAttribute('onclick') || '';
+      const m = onclick.match(/openCalPopup\([^,]+,'(\d{4}-\d{2}-\d{2})'\)/);
+      if (m) wDates.push(m[1]);
+    });
+    wDates.forEach(d => {
+      const dd = dayMap[d];
+      if (!dd) return;
+      wTrades += dd.trades.length;
+      wWins   += dd.trades.filter(t => t.outcome === 'Win').length;
+      wPct    += dd.trades.reduce((a, t) => a + _pctOfTrade(t), 0);
+    });
+    const sumEl = document.createElement('div');
+    sumEl.className = 'cal-week-sum';
+    if (wTrades > 0) {
+      const wr = Math.round((wWins / wTrades) * 100);
+      const pctStr = (wPct >= 0 ? '+' : '') + wPct.toFixed(1) + '%';
+      const col = wPct >= 0 ? 'var(--green)' : 'var(--red)';
+      sumEl.innerHTML = `<div class="wsm-pnl" style="color:${col}">${pctStr}</div><div class="wsm-meta">${wTrades}T · ${wr}%WR</div>`;
+    } else {
+      sumEl.innerHTML = '<div class="wsm-empty">—</div>';
+    }
+    // Insert after last cell of this week
+    const lastCell = weekCells[weekCells.length - 1];
+    lastCell.after(sumEl);
+  }
 }
 
 function openCalPopup(e, dateStr) {
