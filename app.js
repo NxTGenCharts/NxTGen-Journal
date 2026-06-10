@@ -1752,7 +1752,14 @@ function nav(pageId, sbEl, label, extra) {
    Returns e.g. "+$506.10 (+5.06%)" or "-$98.44 (-0.98%)"
 ───────────────────────────────────────────────────────── */
 function _fmtGroupPnl(netDollars, tradeList) {
-  // Compute a blended account size for the group (weighted avg of each trade's account)
+  // If ALL trades in the group are manual %-based, sum their raw % values and show % only.
+  const allPct = tradeList.every(t => !_isMt5Trade(t) && t.pnlUnit !== '$');
+  if (allPct) {
+    const totalPct = tradeList.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
+    return (totalPct >= 0 ? '+' : '') + totalPct.toFixed(1) + '%';
+  }
+
+  // Mixed or all-dollar group: compute blended account size for % annotation
   let totalWeight = 0, blended = 0;
   tradeList.forEach(t => {
     const sz = getAccSizeForAccount(t.account);
@@ -1775,6 +1782,13 @@ function _fmtGroupPnl(netDollars, tradeList) {
 }
 
 function _fmtAvgPnl(avgDollars, tradeList) {
+  // If ALL trades are manual %-based, show the average % directly
+  const allPct = tradeList.every(t => !_isMt5Trade(t) && t.pnlUnit !== '$');
+  if (allPct) {
+    const totalPct = tradeList.reduce((a, t) => a + (parseFloat(t.pnl) || 0), 0);
+    const avgPct   = tradeList.length ? totalPct / tradeList.length : 0;
+    return (avgPct >= 0 ? '+' : '') + avgPct.toFixed(1) + '%';
+  }
   const avgAccSize = (() => {
     let tot = 0, n = 0;
     tradeList.forEach(t => { const sz = getAccSizeForAccount(t.account); if (sz > 0) { tot += sz; n++; } });
