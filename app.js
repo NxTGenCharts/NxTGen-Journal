@@ -215,9 +215,11 @@ function _hideSkeletons() { /* replaced by actual data rendering */ }
 
 async function loadTrades() {
   _showSkeletons();
+  // Exclude 'charts' (base64 image blobs) from initial load — fetched lazily on openDetail()
+  const _TRADE_COLS = 'id,user_id,trade_date,pair,pos,rr,pnl,pnl_unit,outcome,kz,strategy,tf,account,rating,risk,notes,pretrade,mistakes,emotion,checklist,chart_labels,source,mt5_ticket,created_at,updated_at';
   const { data, error } = await sb
     .from('journal_trades')
-    .select('*')
+    .select(_TRADE_COLS)
     .eq('user_id', _currentUser.id)
     .order('trade_date', { ascending: false });
 
@@ -236,13 +238,14 @@ async function loadTrades() {
     tradeState = {};
     data.forEach(row => {
       tradeState[row.id] = {
-        notes:       row.notes || '',
-        pretrade:    row.pretrade || '',
-        mistakes:    row.mistakes || '',
-        emotion:     row.emotion || 'Calm',
-        checklist:   row.checklist || [],
-        charts:      row.charts || [],
-        chartLabels: row.chart_labels || [...CHART_LABELS],
+        notes:        row.notes || '',
+        pretrade:     row.pretrade || '',
+        mistakes:     row.mistakes || '',
+        emotion:      row.emotion || 'Calm',
+        checklist:    row.checklist || [],
+        charts:       null,        // null = not yet lazy-loaded (saves bandwidth on boot)
+        chartLabels:  row.chart_labels || [...CHART_LABELS],
+        _chartsLoaded: false,
       };
     });
   }
@@ -326,7 +329,9 @@ async function _cloudSaveTrade(t) {
     pretrade:     s.pretrade !== undefined ? s.pretrade : (t.pretrade || ''),
     emotion:      s.emotion || t.emotion || 'Calm',
     checklist:    s.checklist || t.checklist || [],
-    charts:       s.charts || t.charts || [],
+    // Only include charts if they've been lazy-loaded (s._chartsLoaded true)
+    // Avoids overwriting existing charts with [] when detail opens before lazy fetch completes
+    charts:       s._chartsLoaded ? (s.charts || []) : (t.charts || []),
     chart_labels: s.chartLabels || t.chartLabels || [...CHART_LABELS],
     mistakes:     s.mistakes !== undefined ? s.mistakes : '',
     source:       t.source || '',
@@ -484,11 +489,38 @@ const _debouncedRename = _debounce(function(id, idx, val) {
 function getTS(id) {
   if (!tradeState[id]) tradeState[id] = {
     notes: '', pretrade: '', mistakes: '', emotion: 'Calm',
-    checklist: [], charts: [], chartLabels: [...CHART_LABELS],
+    checklist: [], charts: null, chartLabels: [...CHART_LABELS], _chartsLoaded: false,
   };
   if (!tradeState[id].chartLabels) tradeState[id].chartLabels = [...CHART_LABELS];
-  if (!tradeState[id].charts) tradeState[id].charts = [];
+  if (tradeState[id].charts === null) tradeState[id].charts = [];
   return tradeState[id];
+}
+
+// Lazy-load charts for a single trade from Supabase — called once on openDetail()
+// Returns immediately if already loaded. Re-renders detail panel when done.
+async function _fetchChartsForTrade(id) {
+  const s = tradeState[id];
+  if (!s || s._chartsLoaded) return; // already fetched or no state
+  s._chartsLoaded = true; // flag immediately to prevent double-fetch
+  try {
+    const { data, error } = await sb
+      .from('journal_trades')
+      .select('charts, chart_labels')
+      .eq('id', id)
+      .eq('user_id', _currentUser.id)
+      .single();
+    if (error || !data) { s._chartsLoaded = false; return; }
+    s.charts      = data.charts      || [];
+    s.chartLabels = data.chart_labels || s.chartLabels || [...CHART_LABELS];
+    // Update the main trades array too
+    const t = trades.find(x => x.id === id);
+    if (t) { t.charts = s.charts; t.chartLabels = s.chartLabels; }
+    // Re-render detail panel if still open on same trade
+    if (currentDetail === id) _renderDetail(id);
+  } catch (e) {
+    s._chartsLoaded = false;
+    console.warn('Chart lazy-load failed for trade', id, e);
+  }
 }
 
 
@@ -2459,6 +2491,8 @@ function openDetail(id, editMode) {
   if (!_detActiveTab) _detActiveTab = 'overview';
   _renderDetail(id);
   document.getElementById('detail-panel').classList.add('open');
+  // Lazy-load charts now that the panel is open (no-op if already loaded)
+  _fetchChartsForTrade(id);
 }
 
 function _renderDetail(id) {
@@ -2582,7 +2616,8 @@ function _renderDetail(id) {
         </div>
         <div class="chart-sort-grid" id="chart-sort-grid-${id}" data-tradeid="${id}">
           ${chartLabels.map((lbl, i) => {
-            const hasImg = !!(s.charts || [])[i];
+            const hasImg = !!(s.charts && s.charts[i]);
+                  const chartsLoading = s._chartsLoaded === false && !s.charts?.length;
             return `
             <div class="chart-sort-item${hasImg ? ' has-img' : ''}"
                  data-index="${i}"
@@ -2598,10 +2633,12 @@ function _renderDetail(id) {
                  ontouchend="cssTouchEnd(event,${id})">
               <div class="chart-sort-thumb${_detEditMode ? ' edit-mode' : ''}"
                    onclick="${hasImg && !_detEditMode ? `openLightboxById(${id},${i})` : (_detEditMode ? `triggerImg(${id},${i})` : '')}">
-                ${hasImg
-                  ? `<img src="${s.charts[i]}" alt="${lbl}" draggable="false">
-                     <div class="chart-sort-overlay">${_detEditMode ? '<span class="drag-handle">⠿</span>🔄' : '🔍 View'}</div>`
-                  : `<div class="chart-sort-empty"><span>📷</span><span>Add chart</span></div>`}
+                ${chartsLoading
+                  ? `<div class="chart-slot-loading" style="position:relative;width:100%;height:120px"><div class="skel" style="width:100%;height:100%;border-radius:6px;position:absolute;inset:0"></div><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:11px;color:var(--text3)">Loading…</div></div>`
+                  : hasImg
+                    ? `<img src="${s.charts[i]}" alt="${lbl}" draggable="false">
+                       <div class="chart-sort-overlay">${_detEditMode ? '<span class="drag-handle">⠿</span>🔄' : '🔍 View'}</div>`
+                    : `<div class="chart-sort-empty"><span>📷</span><span>Add chart</span></div>`}
               </div>
               <div class="chart-sort-footer">
                 <input type="text" class="chart-sort-label" value="${lbl}"
@@ -6141,8 +6178,14 @@ async function handleLogout() {
 
 // ── REFRESH ALL VIEWS ─────────────────────────────────
 function _refreshAll() {
-  updateKPIs(); buildPairTable(); buildKillzoneTable(); buildStrategyTable(); buildMonthlyTable(); refreshPairFilter();
-  buildSidebarYears(); renderCalendar(); renderTradeTable(trades); updateTrashBadge();
+  // Show skeletons immediately, then compute KPIs and tables after first paint
+  _showSkeletons();
+  setTimeout(() => {
+    updateKPIs(); buildPairTable(); buildKillzoneTable(); buildStrategyTable(); buildMonthlyTable(); refreshPairFilter();
+  }, 0);
+  buildSidebarYears(); renderTradeTable(trades); updateTrashBadge();
+  // Defer calendar render to after first paint — avoids blocking KPI display
+  (window.requestIdleCallback || (fn => setTimeout(fn, 80)))(renderCalendar);
   buildAccounts();
 }
 
@@ -6282,11 +6325,14 @@ document.addEventListener('DOMContentLoaded', async function () {
   await runAutoCleanup();
 
   // 6. Render all UI
-  updateKPIs();
-  buildPairTable();
-  buildKillzoneTable();
-  buildStrategyTable();
-  buildMonthlyTable();
+  _showSkeletons();
+  setTimeout(() => {
+    updateKPIs();
+    buildPairTable();
+    buildKillzoneTable();
+    buildStrategyTable();
+    buildMonthlyTable();
+  }, 0);
   buildSidebarYears();
   // Auto-highlight current quarter in sidebar on first load
   const _bootYear = new Date().getFullYear();
