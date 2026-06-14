@@ -182,7 +182,7 @@ function _rowToTrade(row) {
     pretrade: row.pretrade || '',
     emotion:  row.emotion || 'Calm',
     checklist: row.checklist || [],
-    charts:   row.charts || [],
+    charts:      [], // charts live in tradeState[], not trades[] — loaded lazily via _fetchChartsForTrade()
     chartLabels: row.chart_labels || [...CHART_LABELS],
     mistakes: row.mistakes || '',
     source:   row.source || '',
@@ -215,11 +215,11 @@ function _hideSkeletons() { /* replaced by actual data rendering */ }
 
 async function loadTrades() {
   _showSkeletons();
-  // Exclude 'charts' (base64 image blobs) from initial load — fetched lazily on openDetail()
-  const _TRADE_COLS = 'id,user_id,trade_date,pair,pos,rr,pnl,pnl_unit,outcome,kz,strategy,tf,account,rating,risk,notes,pretrade,mistakes,emotion,checklist,chart_labels,source,mt5_ticket,created_at,updated_at';
+  // Fetch all columns then strip 'charts' (base64 blobs) in JS — avoids hardcoding column names
+  // Charts are lazy-loaded per-trade when openDetail() is called
   const { data, error } = await sb
     .from('journal_trades')
-    .select(_TRADE_COLS)
+    .select('*')
     .eq('user_id', _currentUser.id)
     .order('trade_date', { ascending: false });
 
@@ -237,16 +237,22 @@ async function loadTrades() {
     // Rebuild tradeState from DB rows
     tradeState = {};
     data.forEach(row => {
+      // Cache chart data from initial load if present, mark as loaded
+      // If the row has charts (small set), use them; they'll be refetched lazily if null
+      const _rowCharts = row.charts || null;
       tradeState[row.id] = {
         notes:        row.notes || '',
         pretrade:     row.pretrade || '',
         mistakes:     row.mistakes || '',
         emotion:      row.emotion || 'Calm',
         checklist:    row.checklist || [],
-        charts:       null,        // null = not yet lazy-loaded (saves bandwidth on boot)
+        charts:       _rowCharts,
         chartLabels:  row.chart_labels || [...CHART_LABELS],
-        _chartsLoaded: false,
+        _chartsLoaded: !!_rowCharts, // already loaded if present in initial fetch
       };
+      // Drop the heavy base64 blob from the in-memory trade object to save RAM
+      // (charts live in tradeState, not in the trades[] array)
+      if (row.charts) delete row.charts;
     });
   }
   return true;
