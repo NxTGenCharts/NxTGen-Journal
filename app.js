@@ -182,7 +182,7 @@ function _rowToTrade(row) {
     pretrade: row.pretrade || '',
     emotion:  row.emotion || 'Calm',
     checklist: row.checklist || [],
-    charts:      [], // charts live in tradeState[], not trades[] — loaded lazily via _fetchChartsForTrade()
+    charts:   row.charts || [],
     chartLabels: row.chart_labels || [...CHART_LABELS],
     mistakes: row.mistakes || '',
     source:   row.source || '',
@@ -215,33 +215,11 @@ function _hideSkeletons() { /* replaced by actual data rendering */ }
 
 async function loadTrades() {
   _showSkeletons();
-  // Use direct REST fetch to exclude 'charts' column at the network level
-  // This prevents ~10MB of base64 image data from being transferred on every page load.
-  // Charts are fetched lazily via _fetchChartsForTrade() when a trade detail is opened.
-  const _TRADE_COLS = 'id,user_id,trade_date,pair,pos,rr,pnl,pnl_unit,outcome,kz,strategy,tf,account,rating,risk,notes,pretrade,emotion,checklist,chart_labels,mistakes,source,mt5_ticket,created_at,updated_at';
-  let data, error;
-  try {
-    const _resp = await fetch(
-      `${SUPABASE_URL}/rest/v1/journal_trades?select=${_TRADE_COLS}&user_id=eq.${_currentUser.id}&order=trade_date.desc`,
-      {
-        headers: {
-          'apikey':        SUPABASE_ANON,
-          'Authorization': `Bearer ${(await sb.auth.getSession()).data.session?.access_token || SUPABASE_ANON}`,
-          'Content-Type':  'application/json',
-        }
-      }
-    );
-    if (!_resp.ok) throw new Error(`HTTP ${_resp.status}`);
-    data  = await _resp.json();
-    error = null;
-  } catch (e) {
-    // Fallback to Supabase JS client if direct fetch fails for any reason
-    console.warn('Direct REST fetch failed, falling back to select(*)', e);
-    const _fb = await sb.from('journal_trades').select('*')
-      .eq('user_id', _currentUser.id).order('trade_date', { ascending: false });
-    data  = _fb.data;
-    error = _fb.error;
-  }
+  const { data, error } = await sb
+    .from('journal_trades')
+    .select('*')
+    .eq('user_id', _currentUser.id)
+    .order('trade_date', { ascending: false });
 
   if (error) {
     console.error('loadTrades error:', error.message);
@@ -257,17 +235,14 @@ async function loadTrades() {
     // Rebuild tradeState from DB rows
     tradeState = {};
     data.forEach(row => {
-      // charts NOT included in initial load (excluded from REST fetch to save bandwidth)
-      // they are fetched lazily via _fetchChartsForTrade() when a trade detail is opened
       tradeState[row.id] = {
-        notes:         row.notes || '',
-        pretrade:      row.pretrade || '',
-        mistakes:      row.mistakes || '',
-        emotion:       row.emotion || 'Calm',
-        checklist:     row.checklist || [],
-        charts:        null,
-        chartLabels:   row.chart_labels || [...CHART_LABELS],
-        _chartsLoaded: false,
+        notes:       row.notes || '',
+        pretrade:    row.pretrade || '',
+        mistakes:    row.mistakes || '',
+        emotion:     row.emotion || 'Calm',
+        checklist:   row.checklist || [],
+        charts:      row.charts || [],
+        chartLabels: row.chart_labels || [...CHART_LABELS],
       };
     });
   }
@@ -322,7 +297,6 @@ async function seedDemoTrades() {
       mistakes: '', emotion: row.emotion || 'Calm',
       checklist: row.checklist || [], charts: row.charts || [],
       chartLabels: [...CHART_LABELS],
-      _chartsLoaded: !!(row.charts && row.charts.length),
     };
   });
   showToast('Welcome! Demo trades loaded.', 'restore');
@@ -352,9 +326,7 @@ async function _cloudSaveTrade(t) {
     pretrade:     s.pretrade !== undefined ? s.pretrade : (t.pretrade || ''),
     emotion:      s.emotion || t.emotion || 'Calm',
     checklist:    s.checklist || t.checklist || [],
-    // Only include charts if they've been lazy-loaded (s._chartsLoaded true)
-    // Avoids overwriting existing charts with [] when detail opens before lazy fetch completes
-    charts:       s._chartsLoaded ? (s.charts || []) : (t.charts || []),
+    charts:       s.charts || t.charts || [],
     chart_labels: s.chartLabels || t.chartLabels || [...CHART_LABELS],
     mistakes:     s.mistakes !== undefined ? s.mistakes : '',
     source:       t.source || '',
@@ -512,38 +484,11 @@ const _debouncedRename = _debounce(function(id, idx, val) {
 function getTS(id) {
   if (!tradeState[id]) tradeState[id] = {
     notes: '', pretrade: '', mistakes: '', emotion: 'Calm',
-    checklist: [], charts: null, chartLabels: [...CHART_LABELS], _chartsLoaded: false,
+    checklist: [], charts: [], chartLabels: [...CHART_LABELS],
   };
   if (!tradeState[id].chartLabels) tradeState[id].chartLabels = [...CHART_LABELS];
-  if (tradeState[id].charts === null) tradeState[id].charts = [];
+  if (!tradeState[id].charts) tradeState[id].charts = [];
   return tradeState[id];
-}
-
-// Lazy-load charts for a single trade from Supabase — called once on openDetail()
-// Returns immediately if already loaded. Re-renders detail panel when done.
-async function _fetchChartsForTrade(id) {
-  const s = tradeState[id];
-  if (!s || s._chartsLoaded) return; // already fetched or no state
-  s._chartsLoaded = true; // flag immediately to prevent double-fetch
-  try {
-    const { data, error } = await sb
-      .from('journal_trades')
-      .select('charts, chart_labels')
-      .eq('id', id)
-      .eq('user_id', _currentUser.id)
-      .single();
-    if (error || !data) { s._chartsLoaded = false; return; }
-    s.charts      = data.charts      || [];
-    s.chartLabels = data.chart_labels || s.chartLabels || [...CHART_LABELS];
-    // Update the main trades array too
-    const t = trades.find(x => x.id === id);
-    if (t) { t.charts = s.charts; t.chartLabels = s.chartLabels; }
-    // Re-render detail panel if still open on same trade
-    if (currentDetail === id) _renderDetail(id);
-  } catch (e) {
-    s._chartsLoaded = false;
-    console.warn('Chart lazy-load failed for trade', id, e);
-  }
 }
 
 
@@ -2514,8 +2459,6 @@ function openDetail(id, editMode) {
   if (!_detActiveTab) _detActiveTab = 'overview';
   _renderDetail(id);
   document.getElementById('detail-panel').classList.add('open');
-  // Lazy-load charts now that the panel is open (no-op if already loaded)
-  _fetchChartsForTrade(id);
 }
 
 function _renderDetail(id) {
@@ -2639,8 +2582,7 @@ function _renderDetail(id) {
         </div>
         <div class="chart-sort-grid" id="chart-sort-grid-${id}" data-tradeid="${id}">
           ${chartLabels.map((lbl, i) => {
-            const hasImg = !!(s.charts && s.charts[i]);
-                  const chartsLoading = s._chartsLoaded === false && !s.charts?.length;
+            const hasImg = !!(s.charts || [])[i];
             return `
             <div class="chart-sort-item${hasImg ? ' has-img' : ''}"
                  data-index="${i}"
@@ -2656,12 +2598,10 @@ function _renderDetail(id) {
                  ontouchend="cssTouchEnd(event,${id})">
               <div class="chart-sort-thumb${_detEditMode ? ' edit-mode' : ''}"
                    onclick="${hasImg && !_detEditMode ? `openLightboxById(${id},${i})` : (_detEditMode ? `triggerImg(${id},${i})` : '')}">
-                ${chartsLoading
-                  ? `<div class="chart-slot-loading" style="position:relative;width:100%;height:120px"><div class="skel" style="width:100%;height:100%;border-radius:6px;position:absolute;inset:0"></div><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:11px;color:var(--text3)">Loading…</div></div>`
-                  : hasImg
-                    ? `<img src="${s.charts[i]}" alt="${lbl}" draggable="false">
-                       <div class="chart-sort-overlay">${_detEditMode ? '<span class="drag-handle">⠿</span>🔄' : '🔍 View'}</div>`
-                    : `<div class="chart-sort-empty"><span>📷</span><span>Add chart</span></div>`}
+                ${hasImg
+                  ? `<img src="${s.charts[i]}" alt="${lbl}" draggable="false">
+                     <div class="chart-sort-overlay">${_detEditMode ? '<span class="drag-handle">⠿</span>🔄' : '🔍 View'}</div>`
+                  : `<div class="chart-sort-empty"><span>📷</span><span>Add chart</span></div>`}
               </div>
               <div class="chart-sort-footer">
                 <input type="text" class="chart-sort-label" value="${lbl}"
@@ -3013,7 +2953,6 @@ async function saveTrade() {
   tradeState[t.id] = {
     notes: t.notes, pretrade: t.pretrade, emotion: 'Calm',
     checklist: [], charts: [], chartLabels: [...CHART_LABELS], mistakes: '',
-    _chartsLoaded: true, // new trade has no charts yet — nothing to lazy-load
   };
 
   closeModal();
@@ -6057,7 +5996,7 @@ async function restoreTrade(originalId) {
   deletedTrades = deletedTrades.filter(x => (x.originalId || x.id) != originalId);
   trades.push(restored);
   trades.sort((a, b) => b.date.localeCompare(a.date));
-  tradeState[restored.id] = { notes: restored.notes || '', pretrade: restored.pretrade || '', emotion: restored.emotion || 'Calm', checklist: restored.checklist || [], charts: null, _chartsLoaded: false, chartLabels: restored.chartLabels || [...CHART_LABELS], mistakes: restored.mistakes || '' };
+  tradeState[restored.id] = { notes: restored.notes || '', pretrade: restored.pretrade || '', emotion: restored.emotion || 'Calm', checklist: restored.checklist || [], charts: restored.charts || [], chartLabels: restored.chartLabels || [...CHART_LABELS], mistakes: restored.mistakes || '' };
 
   // If this was an MT5 trade, add the ticket back to importedTickets
   // (trade is live in the journal again — prevent re-import)
@@ -6202,14 +6141,8 @@ async function handleLogout() {
 
 // ── REFRESH ALL VIEWS ─────────────────────────────────
 function _refreshAll() {
-  // Show skeletons immediately, then compute KPIs and tables after first paint
-  _showSkeletons();
-  setTimeout(() => {
-    updateKPIs(); buildPairTable(); buildKillzoneTable(); buildStrategyTable(); buildMonthlyTable(); refreshPairFilter();
-  }, 0);
-  buildSidebarYears(); renderTradeTable(trades); updateTrashBadge();
-  // Defer calendar render to after first paint — avoids blocking KPI display
-  (window.requestIdleCallback || (fn => setTimeout(fn, 80)))(renderCalendar);
+  updateKPIs(); buildPairTable(); buildKillzoneTable(); buildStrategyTable(); buildMonthlyTable(); refreshPairFilter();
+  buildSidebarYears(); renderCalendar(); renderTradeTable(trades); updateTrashBadge();
   buildAccounts();
 }
 
@@ -6349,14 +6282,11 @@ document.addEventListener('DOMContentLoaded', async function () {
   await runAutoCleanup();
 
   // 6. Render all UI
-  _showSkeletons();
-  setTimeout(() => {
-    updateKPIs();
-    buildPairTable();
-    buildKillzoneTable();
-    buildStrategyTable();
-    buildMonthlyTable();
-  }, 0);
+  updateKPIs();
+  buildPairTable();
+  buildKillzoneTable();
+  buildStrategyTable();
+  buildMonthlyTable();
   buildSidebarYears();
   // Auto-highlight current quarter in sidebar on first load
   const _bootYear = new Date().getFullYear();
