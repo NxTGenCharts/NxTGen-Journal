@@ -6408,3 +6408,1739 @@ select.acc-mgr-input option {
   .cal-week-sum { display: none; } /* hide weekly sum on very small screens */
   #bulk-action-bar { flex-wrap: wrap; }
 }
+/* ══════════════════════════════════════════════════════════════════
+   NXTGEN — APPLE LIQUID GLASS PREMIUM LAYER v4
+   Applied ON TOP of the existing design system.
+   This file supersedes conflicting rules via specificity / cascade.
+   Every change preserves all existing functionality — only elevates.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ────────────────────────────────────────────────────────────────
+   1. FONT SYSTEM — SF Pro equivalent via system stack
+   ──────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900;1,14..32,400&display=swap');
+
+:root {
+  /* Override font stack with optical-size Inter + system SF Pro fallback */
+  --font-head: 'Inter', -apple-system, 'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
+  --font-body: 'Inter', -apple-system, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
+  
+  /* Apple Liquid Glass — refined token system */
+  /* Vibrancy levels — backdrop saturate is the key Apple technique */
+  --vibrancy-xs:  blur(10px)  saturate(1.6);
+  --vibrancy-sm:  blur(20px)  saturate(1.8);
+  --vibrancy-md:  blur(32px)  saturate(2.0);
+  --vibrancy-lg:  blur(48px)  saturate(2.2);
+  --vibrancy-xl:  blur(64px)  saturate(2.4);
+  --vibrancy-2xl: blur(80px)  saturate(2.6);
+
+  /* Liquid Glass specular — the refraction shimmer layers */
+  --glass-spec-top:    inset 0 1px 0 rgba(255,255,255,0.12), inset 0 0.5px 0 rgba(255,255,255,0.18);
+  --glass-spec-bot:    inset 0 -1px 0 rgba(0,0,0,0.10);
+  --glass-spec-full:   inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.08), inset 1px 0 0 rgba(255,255,255,0.04), inset -1px 0 0 rgba(255,255,255,0.04);
+  --glass-rim:         inset 0 0 0 0.5px rgba(255,255,255,0.12);
+  
+  /* Apple elevation system — richer than before */
+  --elev-1: 0 1px 3px rgba(0,0,0,0.22), 0 1px 1px rgba(0,0,0,0.16);
+  --elev-2: 0 3px 8px rgba(0,0,0,0.28), 0 1px 3px rgba(0,0,0,0.18), 0 0 1px rgba(0,0,0,0.10);
+  --elev-3: 0 8px 24px rgba(0,0,0,0.34), 0 3px 8px rgba(0,0,0,0.20), 0 1px 2px rgba(0,0,0,0.12);
+  --elev-4: 0 16px 48px rgba(0,0,0,0.42), 0 6px 16px rgba(0,0,0,0.24), 0 2px 4px rgba(0,0,0,0.14);
+  --elev-5: 0 32px 80px rgba(0,0,0,0.52), 0 12px 32px rgba(0,0,0,0.28), 0 4px 8px rgba(0,0,0,0.16);
+
+  /* Spring easing — authentic iOS feel */
+  --spring-1: cubic-bezier(0.175, 0.885, 0.320, 1.275);  /* gentle spring */
+  --spring-2: cubic-bezier(0.340, 1.560, 0.640, 1.000);  /* medium spring */
+  --spring-3: cubic-bezier(0.680, -0.550, 0.265, 1.550); /* bouncy spring */
+  
+  /* Transition overrides — more fluid */
+  --t-fast:   all 0.12s var(--spring-1);
+  --t-med:    all 0.22s cubic-bezier(0.25,0.46,0.45,0.94);
+  --t-slow:   all 0.38s cubic-bezier(0.25,0.46,0.45,0.94);
+  --t-spring: all 0.36s var(--spring-2);
+  
+  /* Topbar height refinement */
+  --topbar: 56px;
+  
+  /* Premium spacing */
+  --sidebar: 224px;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   2. GLOBAL BASE — Apple-grade rendering
+   ──────────────────────────────────────────────────────────────── */
+html {
+  font-feature-settings: 'cv01', 'cv02', 'cv03', 'cv04', 'cv05', 'cv06', 'cv11', 'ss01', 'ss02';
+  text-rendering: geometricPrecision;
+  -webkit-text-size-adjust: none;
+}
+
+body {
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
+}
+
+/* Smooth theme transitions — all surfaces */
+*, *::before, *::after {
+  transition-property: background-color, border-color, box-shadow, color, opacity;
+  transition-duration: 0.18s;
+  transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+/* Override for interactive elements that should have faster feedback */
+button, a, .sb-item, .tab, .cal-day, .kpi-card, .pill, .btn, input, select {
+  transition: all 0.14s var(--spring-1);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   3. BODY BACKGROUND — Richer iOS-style gradient mesh
+   ──────────────────────────────────────────────────────────────── */
+body {
+  background-image:
+    radial-gradient(ellipse 80% 60% at 10% -10%,  rgba(59,130,246,0.09) 0%,  transparent 50%),
+    radial-gradient(ellipse 60% 50% at 90% 110%,  rgba(139,92,246,0.07) 0%,  transparent 50%),
+    radial-gradient(ellipse 40% 35% at 50% 50%,   rgba(20,184,166,0.03) 0%,  transparent 65%),
+    radial-gradient(ellipse 70% 30% at 80% 20%,   rgba(59,130,246,0.04) 0%,  transparent 55%),
+    radial-gradient(ellipse 50% 40% at 20% 80%,   rgba(167,139,250,0.04) 0%, transparent 60%);
+  background-attachment: fixed;
+}
+
+[data-theme="light"] body {
+  background-image:
+    radial-gradient(ellipse 80% 60% at 10% -10%,  rgba(59,130,246,0.08) 0%,  transparent 50%),
+    radial-gradient(ellipse 60% 50% at 90% 110%,  rgba(99,102,241,0.06) 0%,  transparent 50%),
+    radial-gradient(ellipse 50% 40% at 60% 35%,   rgba(14,165,233,0.04) 0%,  transparent 60%),
+    radial-gradient(ellipse 40% 30% at 30% 70%,   rgba(124,58,237,0.03) 0%,  transparent 55%);
+  background-attachment: fixed;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   4. TOPBAR — Apple-grade vibrancy + premium status bar feel
+   ──────────────────────────────────────────────────────────────── */
+.topbar {
+  height: var(--topbar);
+  background: rgba(8,11,18,0.78);
+  backdrop-filter: var(--vibrancy-2xl);
+  -webkit-backdrop-filter: var(--vibrancy-2xl);
+  border-bottom: 0.5px solid rgba(255,255,255,0.09);
+  box-shadow:
+    var(--glass-spec-top),
+    0 1px 0 rgba(255,255,255,0.04),
+    var(--elev-1);
+  padding: 0 22px;
+}
+
+[data-theme="light"] .topbar {
+  background: rgba(250,252,255,0.82);
+  backdrop-filter: var(--vibrancy-2xl);
+  -webkit-backdrop-filter: var(--vibrancy-2xl);
+  border-bottom: 0.5px solid rgba(0,0,0,0.07);
+  box-shadow:
+    0 0.5px 0 rgba(255,255,255,0.8),
+    0 1px 3px rgba(0,0,0,0.06),
+    0 4px 16px rgba(0,0,0,0.04);
+}
+
+.topbar::after {
+  background: linear-gradient(90deg,
+    rgba(59,130,246,0.035) 0%, transparent 25%,
+    rgba(99,102,241,0.025) 75%, rgba(139,92,246,0.03) 100%);
+}
+
+/* Clock refinement */
+.topbar-clock {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text3);
+  padding: 5px 11px;
+  background: rgba(255,255,255,0.05);
+  border: 0.5px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  box-shadow: var(--glass-spec-top);
+}
+[data-theme="light"] .topbar-clock {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.07);
+}
+
+/* Avatar button — Apple style */
+.topbar-avatar {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(96,165,250,0.3), rgba(139,92,246,0.25));
+  border: 1.5px solid rgba(255,255,255,0.18);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.9);
+  cursor: pointer;
+  transition: all 0.18s var(--spring-2);
+  box-shadow: 0 2px 8px rgba(96,165,250,0.25), var(--glass-spec-top);
+  letter-spacing: -0.02em;
+}
+.topbar-avatar:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 16px rgba(96,165,250,0.35), var(--glass-spec-top);
+}
+[data-theme="light"] .topbar-avatar {
+  background: linear-gradient(135deg, rgba(37,99,235,0.22), rgba(124,58,237,0.18));
+  border-color: rgba(255,255,255,0.5);
+  color: #1e40af;
+  box-shadow: 0 2px 8px rgba(37,99,235,0.2);
+}
+
+/* Share button */
+.topbar-share-btn {
+  font-size: 12px !important;
+  padding: 6px 14px !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   5. SIDEBAR — Apple-quality floating panel with deep vibrancy
+   ──────────────────────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar);
+  background: rgba(10,13,22,0.82);
+  backdrop-filter: var(--vibrancy-2xl);
+  -webkit-backdrop-filter: var(--vibrancy-2xl);
+  border-right: 0.5px solid rgba(255,255,255,0.08);
+  box-shadow:
+    1px 0 0 rgba(255,255,255,0.04),
+    var(--elev-3);
+  padding: 16px 10px 20px;
+}
+
+[data-theme="light"] .sidebar {
+  background: rgba(248,251,255,0.88);
+  border-right: 0.5px solid rgba(0,0,0,0.06);
+  box-shadow: 1px 0 0 rgba(255,255,255,0.9), var(--elev-2);
+}
+
+/* Sidebar item — Apple highlight style */
+.sb-item {
+  padding: 8px 11px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  border: 0.5px solid transparent;
+  transition: all 0.14s var(--spring-1);
+}
+
+.sb-item:hover {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.08);
+}
+
+.sb-item.active {
+  background: linear-gradient(135deg,
+    rgba(96,165,250,0.18) 0%,
+    rgba(96,165,250,0.10) 60%,
+    rgba(96,165,250,0.06) 100%);
+  border-color: rgba(96,165,250,0.25);
+  box-shadow:
+    var(--glass-spec-top),
+    0 1px 8px rgba(96,165,250,0.12),
+    inset 0 0 0 0.5px rgba(96,165,250,0.15);
+}
+
+[data-theme="light"] .sb-item:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+[data-theme="light"] .sb-item.active {
+  background: linear-gradient(135deg,
+    rgba(37,99,235,0.14) 0%,
+    rgba(37,99,235,0.08) 60%,
+    rgba(37,99,235,0.04) 100%);
+  border-color: rgba(37,99,235,0.2);
+  box-shadow: 0 1px 6px rgba(37,99,235,0.10);
+}
+
+.sb-item .ico { font-size: 15px; }
+
+/* Section labels */
+.sb-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text3);
+  padding: 0 11px;
+  margin-bottom: 4px;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   6. TABS — Refined Apple-style segment control feel
+   ──────────────────────────────────────────────────────────────── */
+.tabs {
+  height: 42px;
+  background: rgba(8,11,18,0.72);
+  backdrop-filter: var(--vibrancy-md);
+  -webkit-backdrop-filter: var(--vibrancy-md);
+  border-bottom: 0.5px solid rgba(255,255,255,0.07);
+  box-shadow: var(--glass-spec-bot), 0 1px 0 rgba(255,255,255,0.03);
+  padding: 0 22px;
+}
+
+[data-theme="light"] .tabs {
+  background: rgba(248,251,255,0.78);
+  border-bottom: 0.5px solid rgba(0,0,0,0.06);
+  box-shadow: 0 -0.5px 0 rgba(255,255,255,0.9) inset, 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.tab {
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  padding: 10px 16px;
+}
+
+.tab.active {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tab.active::after {
+  height: 2px;
+  background: var(--blue);
+  box-shadow: 0 0 8px rgba(96,165,250,0.6), 0 0 16px rgba(96,165,250,0.3);
+  border-radius: 2px 2px 0 0;
+  left: 10px;
+  right: 10px;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   7. KPI CARDS — Authentic Apple glass with specular depth
+   ──────────────────────────────────────────────────────────────── */
+.kpi-card {
+  background: linear-gradient(145deg,
+    rgba(255,255,255,0.055) 0%,
+    rgba(255,255,255,0.028) 50%,
+    rgba(255,255,255,0.018) 100%);
+  backdrop-filter: var(--vibrancy-md);
+  -webkit-backdrop-filter: var(--vibrancy-md);
+  border: 0.5px solid rgba(255,255,255,0.10);
+  border-radius: 16px;
+  padding: 16px 18px;
+  box-shadow:
+    var(--glass-spec-full),
+    var(--elev-1),
+    inset 0 0 20px rgba(255,255,255,0.012);
+  transition: all 0.22s var(--spring-2);
+  transform-origin: center bottom;
+  will-change: transform;
+}
+
+.kpi-card:hover {
+  background: linear-gradient(145deg,
+    rgba(255,255,255,0.08) 0%,
+    rgba(255,255,255,0.045) 50%,
+    rgba(255,255,255,0.028) 100%);
+  border-color: rgba(255,255,255,0.14);
+  transform: translateY(-3px) scale(1.008);
+  box-shadow:
+    var(--glass-spec-full),
+    var(--elev-3),
+    inset 0 0 24px rgba(255,255,255,0.018);
+}
+
+/* KPI card top shimmer line — richer gradient */
+.kpi-card::before {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255,255,255,0.10) 30%,
+    rgba(255,255,255,0.18) 50%,
+    rgba(255,255,255,0.10) 70%,
+    transparent 100%);
+  height: 0.5px;
+}
+
+/* KPI values — larger, more impactful */
+.kpi-value {
+  font-size: 26px;
+  font-weight: 800;
+  font-optical-sizing: auto;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text3);
+  margin-bottom: 10px;
+}
+
+/* Light mode KPI cards */
+[data-theme="light"] .kpi-card {
+  background: linear-gradient(145deg,
+    rgba(255,255,255,0.92) 0%,
+    rgba(255,255,255,0.78) 100%);
+  border: 0.5px solid rgba(0,0,0,0.08);
+  box-shadow:
+    0 0.5px 0 rgba(255,255,255,0.95) inset,
+    0 -0.5px 0 rgba(0,0,0,0.04) inset,
+    0 2px 12px rgba(0,0,0,0.06),
+    0 1px 3px rgba(0,0,0,0.04);
+}
+
+[data-theme="light"] .kpi-card:hover {
+  background: linear-gradient(145deg,
+    rgba(255,255,255,0.97) 0%,
+    rgba(255,255,255,0.88) 100%);
+  box-shadow:
+    0 0.5px 0 rgba(255,255,255,1) inset,
+    0 -0.5px 0 rgba(0,0,0,0.05) inset,
+    0 6px 24px rgba(0,0,0,0.10),
+    0 2px 6px rgba(0,0,0,0.06);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   8. COVER BANNER — Premium gradient + depth
+   ──────────────────────────────────────────────────────────────── */
+.cover {
+  border-radius: 20px;
+  padding: 24px 28px;
+  border: 0.5px solid rgba(255,255,255,0.10);
+  box-shadow:
+    var(--glass-spec-top),
+    var(--elev-3),
+    inset 0 0 60px rgba(96,165,250,0.04);
+  background-size: 200% 200% !important;
+  animation: coverPulse 14s ease infinite;
+  backdrop-filter: var(--vibrancy-sm);
+  -webkit-backdrop-filter: var(--vibrancy-sm);
+}
+
+.cover-title {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.8px;
+  font-optical-sizing: auto;
+}
+
+.cover-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-shadow: none;
+  opacity: 0.75;
+}
+
+.cover-sub {
+  font-size: 12.5px;
+  margin-top: 6px;
+  opacity: 0.7;
+  letter-spacing: -0.01em;
+}
+
+[data-theme="light"] .cover {
+  border-color: rgba(255,255,255,0.22) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.35),
+    var(--elev-3);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   9. BUTTONS — Apple-quality with spring physics
+   ──────────────────────────────────────────────────────────────── */
+.btn {
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  padding: 7px 16px;
+  border: 0.5px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.07);
+  backdrop-filter: var(--vibrancy-xs);
+  transition: all 0.14s var(--spring-2);
+  box-shadow: var(--glass-spec-top), var(--elev-1);
+}
+
+.btn:hover {
+  background: rgba(255,255,255,0.11);
+  border-color: rgba(255,255,255,0.14);
+  transform: translateY(-1px);
+  box-shadow: var(--glass-spec-top), var(--elev-2);
+}
+
+.btn:active {
+  transform: scale(0.96);
+  box-shadow: var(--glass-spec-top), var(--elev-1);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg,
+    rgba(96,165,250,0.28) 0%,
+    rgba(96,165,250,0.16) 100%);
+  border-color: rgba(96,165,250,0.38);
+  color: var(--blue);
+  box-shadow:
+    var(--glass-spec-top),
+    0 0 20px rgba(96,165,250,0.15),
+    var(--elev-1);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg,
+    rgba(96,165,250,0.38) 0%,
+    rgba(96,165,250,0.24) 100%);
+  border-color: rgba(96,165,250,0.55);
+  box-shadow:
+    var(--glass-spec-top),
+    0 0 28px rgba(96,165,250,0.25),
+    var(--elev-2);
+}
+
+[data-theme="light"] .btn {
+  background: rgba(255,255,255,0.72);
+  border-color: rgba(0,0,0,0.08);
+  box-shadow: 0 0.5px 0 rgba(255,255,255,0.9) inset, var(--elev-1);
+}
+
+[data-theme="light"] .btn-primary {
+  background: linear-gradient(135deg, rgba(37,99,235,0.16), rgba(37,99,235,0.09));
+  border-color: rgba(37,99,235,0.28);
+  box-shadow: 0 0.5px 0 rgba(255,255,255,0.5) inset, 0 2px 8px rgba(37,99,235,0.12);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   10. PAGE TRANSITIONS — Apple fluid navigation
+   ──────────────────────────────────────────────────────────────── */
+@keyframes pageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.995);
+    filter: blur(0.5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.page.active .page-inner {
+  animation: pageSlideIn 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   11. DATA TABLES — Premium glass material
+   ──────────────────────────────────────────────────────────────── */
+.data-table-wrap {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 0.5px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.022);
+  backdrop-filter: var(--vibrancy-xs);
+  box-shadow: var(--elev-1), var(--glass-spec-top);
+  margin-bottom: 16px;
+}
+
+[data-theme="light"] .data-table-wrap {
+  background: rgba(255,255,255,0.72);
+  border-color: rgba(0,0,0,0.06);
+  box-shadow: 0 0.5px 0 rgba(255,255,255,0.95) inset, var(--elev-2);
+}
+
+.data-table th {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text3);
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.025);
+  border-bottom: 0.5px solid rgba(255,255,255,0.08);
+}
+
+[data-theme="light"] .data-table th {
+  background: rgba(0,0,0,0.025);
+  border-bottom-color: rgba(0,0,0,0.06);
+}
+
+.data-table td {
+  padding: 11px 14px;
+  font-size: 12.5px;
+  letter-spacing: -0.01em;
+  border-bottom: 0.5px solid rgba(255,255,255,0.04);
+}
+
+[data-theme="light"] .data-table td {
+  border-bottom-color: rgba(0,0,0,0.04);
+}
+
+.data-table tbody tr:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+[data-theme="light"] .data-table tbody tr:hover {
+  background: rgba(37,99,235,0.04);
+}
+
+.data-table tbody tr:hover td { color: var(--text); }
+
+/* ────────────────────────────────────────────────────────────────
+   12. MODAL — Authentic Apple sheet with deep glass
+   ──────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: var(--vibrancy-sm);
+  -webkit-backdrop-filter: var(--vibrancy-sm);
+}
+
+.modal {
+  background: linear-gradient(160deg,
+    rgba(18,24,40,0.97) 0%,
+    rgba(14,19,34,0.95) 100%);
+  backdrop-filter: var(--vibrancy-2xl);
+  -webkit-backdrop-filter: var(--vibrancy-2xl);
+  border: 0.5px solid rgba(255,255,255,0.10);
+  border-radius: 22px;
+  box-shadow:
+    var(--glass-spec-full),
+    var(--elev-5);
+  overflow: hidden;
+}
+
+[data-theme="light"] .modal {
+  background: rgba(252,254,255,0.98);
+  border-color: rgba(0,0,0,0.07);
+  box-shadow:
+    0 0.5px 0 rgba(255,255,255,0.95) inset,
+    var(--elev-5);
+}
+
+.modal-head {
+  padding: 18px 22px 14px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.07);
+  background: linear-gradient(to bottom, rgba(255,255,255,0.025), transparent);
+}
+
+.modal-title {
+  font-size: 16px !important;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.modal-close {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+  border: 0.5px solid rgba(255,255,255,0.10);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  transition: all 0.12s var(--spring-2);
+}
+.modal-close:hover {
+  background: rgba(248,113,113,0.20);
+  border-color: rgba(248,113,113,0.35);
+  color: var(--red);
+  transform: scale(1.1) rotate(90deg);
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(16px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+.modal-overlay.open .modal {
+  animation: modalIn 0.26s var(--spring-2);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   13. FORM INPUTS — Apple focus states
+   ──────────────────────────────────────────────────────────────── */
+.form-input, .form-select, .form-textarea {
+  background: rgba(255,255,255,0.06);
+  border: 0.5px solid rgba(255,255,255,0.10);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  backdrop-filter: var(--vibrancy-xs);
+  transition: all 0.16s var(--spring-1);
+  box-shadow: var(--glass-spec-bot);
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  background: rgba(255,255,255,0.09);
+  border-color: rgba(96,165,250,0.5);
+  box-shadow:
+    0 0 0 3px rgba(96,165,250,0.12),
+    var(--glass-spec-bot);
+  outline: none;
+}
+
+[data-theme="light"] .form-input,
+[data-theme="light"] .form-select,
+[data-theme="light"] .form-textarea {
+  background: rgba(255,255,255,0.85);
+  border-color: rgba(0,0,0,0.09);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04) inset;
+}
+
+[data-theme="light"] .form-input:focus,
+[data-theme="light"] .form-select:focus,
+[data-theme="light"] .form-textarea:focus {
+  background: rgba(255,255,255,0.97);
+  border-color: rgba(37,99,235,0.4);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.10), 0 1px 2px rgba(0,0,0,0.04) inset;
+}
+
+.form-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text3);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   14. DETAIL PANEL — Deep glass slide-in panel
+   ──────────────────────────────────────────────────────────────── */
+.detail-panel {
+  background: linear-gradient(170deg,
+    rgba(12,17,32,0.97) 0%,
+    rgba(10,14,28,0.96) 100%);
+  backdrop-filter: var(--vibrancy-2xl);
+  -webkit-backdrop-filter: var(--vibrancy-2xl);
+  border-left: 0.5px solid rgba(255,255,255,0.09);
+  box-shadow:
+    -1px 0 0 rgba(255,255,255,0.04),
+    var(--elev-4);
+}
+
+[data-theme="light"] .detail-panel {
+  background: linear-gradient(170deg,
+    rgba(253,254,255,0.98) 0%,
+    rgba(248,251,255,0.96) 100%);
+  border-left-color: rgba(0,0,0,0.06);
+  box-shadow: -1px 0 0 rgba(255,255,255,0.9), var(--elev-3);
+}
+
+.detail-pair {
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -1.2px;
+  font-optical-sizing: auto;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   15. CALENDAR — Apple Calendar-inspired grid
+   ──────────────────────────────────────────────────────────────── */
+.cal-grid-wrap {
+  border: 0.5px solid rgba(255,255,255,0.09);
+  border-radius: 16px;
+  box-shadow:
+    var(--glass-spec-top),
+    var(--elev-2),
+    inset 0 0 40px rgba(8,11,18,0.3);
+  overflow: hidden;
+}
+
+[data-theme="light"] .cal-grid-wrap {
+  border-color: rgba(0,0,0,0.06);
+  box-shadow: 0 0.5px 0 rgba(255,255,255,0.95) inset, var(--elev-2);
+}
+
+.cal-dow {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  padding: 8px 0;
+}
+
+.cal-day {
+  padding: 8px 9px;
+  min-height: 78px;
+  transition: background 0.12s, box-shadow 0.12s;
+}
+
+.cal-day.has-trades:hover {
+  background: rgba(255,255,255,0.04) !important;
+}
+
+.cal-day-num {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-today-badge {
+  width: 22px; height: 22px;
+  font-size: 10.5px;
+  font-weight: 900;
+  box-shadow: 0 2px 8px rgba(251,191,36,0.4), 0 0 0 1.5px rgba(251,191,36,0.3);
+}
+
+.cal-day-pnl {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Calendar month label */
+.cal-month-label {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+/* Calendar nav buttons */
+.cal-nav {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  border: 0.5px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: var(--vibrancy-xs);
+  box-shadow: var(--glass-spec-top);
+  transition: all 0.14s var(--spring-2);
+}
+
+.cal-nav:hover {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.15);
+  transform: scale(1.08);
+  box-shadow: var(--glass-spec-top), var(--elev-1);
+}
+
+.cal-nav:active { transform: scale(0.92); }
+
+/* Cal KPI cards */
+.cal-kpi {
+  background: linear-gradient(145deg,
+    rgba(255,255,255,0.05) 0%,
+    rgba(255,255,255,0.025) 100%);
+  border: 0.5px solid rgba(255,255,255,0.09);
+  border-radius: 14px;
+  backdrop-filter: var(--vibrancy-xs);
+  box-shadow: var(--glass-spec-top), var(--elev-1);
+}
+
+[data-theme="light"] .cal-kpi {
+  background: linear-gradient(145deg, rgba(255,255,255,0.88), rgba(255,255,255,0.72));
+  border-color: rgba(0,0,0,0.07);
+  box-shadow: 0 0.5px 0 rgba(255,255,255,0.95) inset, var(--elev-1);
+}
+
+/* Calendar popup */
+.cal-popup {
+  border: 0.5px solid rgba(255,255,255,0.12);
+  border-radius: 18px;
+  backdrop-filter: var(--vibrancy-2xl);
+  -webkit-backdrop-filter: var(--vibrancy-2xl);
+  box-shadow: var(--glass-spec-full), var(--elev-5);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   16. SECTION HEADERS — Refined Apple divider style
+   ──────────────────────────────────────────────────────────────── */
+.sec-head {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  margin: 24px 0 10px;
+}
+
+.sec-head::before {
+  width: 2.5px;
+  height: 13px;
+  background: linear-gradient(to bottom, var(--blue), rgba(96,165,250,0));
+  border-radius: 2px;
+}
+
+.sec-head::after {
+  background: linear-gradient(to right, rgba(255,255,255,0.08), transparent);
+}
+
+[data-theme="light"] .sec-head::after {
+  background: linear-gradient(to right, rgba(0,0,0,0.08), transparent);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   17. PILLS — Premium micro labels
+   ──────────────────────────────────────────────────────────────── */
+.pill {
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pill:hover { filter: brightness(1.10); }
+
+/* ────────────────────────────────────────────────────────────────
+   18. DASHBOARD LAYOUT — Better proportions
+   ──────────────────────────────────────────────────────────────── */
+#page-dashboard { overflow-y: auto; }
+
+.dash-layout {
+  min-height: 100%;
+}
+
+.dash-left {
+  padding: 20px 22px 32px;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   19. DASHBOARD CAL PANEL — Floating glass card
+   ──────────────────────────────────────────────────────────────── */
+.dash-cal-panel {
+  background: rgba(10,14,24,0.85);
+  backdrop-filter: var(--vibrancy-lg);
+  -webkit-backdrop-filter: var(--vibrancy-lg);
+  border-left: 0.5px solid rgba(255,255,255,0.08);
+  box-shadow:
+    -1px 0 0 rgba(255,255,255,0.03),
+    var(--elev-2);
+}
+
+[data-theme="light"] .dash-cal-panel {
+  background: rgba(248,251,255,0.90);
+  border-left-color: rgba(0,0,0,0.06);
+  box-shadow: -1px 0 0 rgba(255,255,255,0.9), var(--elev-1);
+}
+
+.dash-cal-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   20. INSIGHT BOX — Premium info card
+   ──────────────────────────────────────────────────────────────── */
+.insight {
+  background: linear-gradient(135deg,
+    rgba(96,165,250,0.09) 0%,
+    rgba(96,165,250,0.05) 100%);
+  border: 0.5px solid rgba(96,165,250,0.18);
+  border-radius: 14px;
+  padding: 14px 17px;
+  backdrop-filter: var(--vibrancy-xs);
+  box-shadow:
+    inset 0 1px 0 rgba(96,165,250,0.10),
+    var(--elev-1);
+}
+
+.insight-text {
+  font-size: 13px;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+}
+
+[data-theme="light"] .insight {
+  background: linear-gradient(135deg, rgba(37,99,235,0.07), rgba(37,99,235,0.03));
+  border-color: rgba(37,99,235,0.14);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   21. GLASS CARDS — Watchlist, Account, Playbook
+   ──────────────────────────────────────────────────────────────── */
+.wl-pair-card, .acc-card, .model-card, .wl-pair-card-v2 {
+  background: linear-gradient(145deg,
+    rgba(255,255,255,0.05) 0%,
+    rgba(255,255,255,0.025) 100%);
+  border: 0.5px solid rgba(255,255,255,0.09);
+  border-radius: 16px;
+  backdrop-filter: var(--vibrancy-xs);
+  box-shadow: var(--glass-spec-top), var(--elev-1);
+  transition: all 0.22s var(--spring-2);
+}
+
+.wl-pair-card:hover, .model-card:hover, .wl-pair-card-v2:hover {
+  background: linear-gradient(145deg,
+    rgba(255,255,255,0.08) 0%,
+    rgba(255,255,255,0.04) 100%);
+  border-color: rgba(255,255,255,0.14);
+  transform: translateY(-3px);
+  box-shadow: var(--glass-spec-top), var(--elev-3);
+}
+
+[data-theme="light"] .wl-pair-card,
+[data-theme="light"] .acc-card,
+[data-theme="light"] .model-card,
+[data-theme="light"] .wl-pair-card-v2 {
+  background: linear-gradient(145deg, rgba(255,255,255,0.88), rgba(255,255,255,0.72));
+  border-color: rgba(0,0,0,0.07);
+  box-shadow: 0 0.5px 0 rgba(255,255,255,0.95) inset, var(--elev-2);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   22. MOBILE BOTTOM NAV — iPhone tab bar style
+   ──────────────────────────────────────────────────────────────── */
+.mob-bottom-nav {
+  background: rgba(8,11,18,0.92);
+  backdrop-filter: var(--vibrancy-2xl);
+  -webkit-backdrop-filter: var(--vibrancy-2xl);
+  border-top: 0.5px solid rgba(255,255,255,0.09);
+  box-shadow:
+    0 -0.5px 0 rgba(255,255,255,0.05),
+    0 -1px 0 rgba(255,255,255,0.02),
+    var(--elev-4);
+}
+
+[data-theme="light"] .mob-bottom-nav {
+  background: rgba(248,251,255,0.95);
+  border-top: 0.5px solid rgba(0,0,0,0.06);
+  box-shadow: 0 -0.5px 0 rgba(255,255,255,0.9), var(--elev-3);
+}
+
+.mob-bottom-nav-item {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.mob-bottom-nav-item.active { color: var(--blue); }
+
+.mob-bottom-nav-item.active::before {
+  width: 28px; height: 2.5px;
+  border-radius: 0 0 2px 2px;
+  background: var(--blue);
+  box-shadow: 0 0 8px rgba(96,165,250,0.5);
+}
+
+/* Center + button — iOS action button style */
+.mob-nav-add-btn .mob-nav-icon {
+  width: 48px; height: 48px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #4da6ff, #2563eb);
+  box-shadow:
+    0 4px 20px rgba(96,165,250,0.45),
+    0 1px 4px rgba(0,0,0,0.25),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+  margin-top: -14px;
+  font-size: 22px !important;
+  transition: all 0.18s var(--spring-2);
+}
+
+.mob-nav-add-btn:active .mob-nav-icon {
+  transform: scale(0.88) translateY(2px);
+  box-shadow: 0 2px 10px rgba(96,165,250,0.3);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   23. MORE SHEET — iOS-style bottom sheet
+   ──────────────────────────────────────────────────────────────── */
+.mob-more-sheet {
+  background: rgba(10,13,22,0.97);
+  backdrop-filter: var(--vibrancy-2xl);
+  -webkit-backdrop-filter: var(--vibrancy-2xl);
+  border-radius: 26px 26px 0 0;
+  border-top: 0.5px solid rgba(255,255,255,0.10);
+  box-shadow: var(--glass-spec-top), var(--elev-5);
+}
+
+[data-theme="light"] .mob-more-sheet {
+  background: rgba(249,252,255,0.98);
+  border-top-color: rgba(0,0,0,0.06);
+}
+
+.mob-more-handle {
+  width: 34px; height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.22);
+  margin: 13px auto 8px;
+}
+[data-theme="light"] .mob-more-handle {
+  background: rgba(0,0,0,0.16);
+}
+
+.mob-more-icon {
+  width: 48px; height: 48px;
+  border-radius: 14px;
+  border: 0.5px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: var(--vibrancy-xs);
+  box-shadow: var(--glass-spec-top), var(--elev-1);
+  transition: all 0.14s var(--spring-2);
+  font-size: 21px;
+}
+[data-theme="light"] .mob-more-icon {
+  background: rgba(255,255,255,0.82);
+  border-color: rgba(0,0,0,0.07);
+  box-shadow: 0 0.5px 0 rgba(255,255,255,0.95) inset, var(--elev-1);
+}
+.mob-more-item:active .mob-more-icon {
+  background: rgba(255,255,255,0.14);
+  transform: scale(0.88);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   24. TOAST — Apple notification style
+   ──────────────────────────────────────────────────────────────── */
+.app-toast {
+  border-radius: 16px !important;
+  background: linear-gradient(135deg,
+    rgba(22,28,45,0.97) 0%,
+    rgba(18,24,40,0.96) 100%) !important;
+  backdrop-filter: var(--vibrancy-2xl);
+  -webkit-backdrop-filter: var(--vibrancy-2xl);
+  border: 0.5px solid rgba(255,255,255,0.10) !important;
+  box-shadow: var(--glass-spec-full), var(--elev-4) !important;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  padding: 12px 18px;
+  min-width: 280px;
+}
+
+[data-theme="light"] .app-toast {
+  background: rgba(253,254,255,0.97) !important;
+  border-color: rgba(0,0,0,0.07) !important;
+  box-shadow: 0 0.5px 0 rgba(255,255,255,0.95) inset, var(--elev-4) !important;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   25. THEME TOGGLE — Premium icon button
+   ──────────────────────────────────────────────────────────────── */
+.theme-toggle {
+  width: 32px; height: 32px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.07);
+  border: 0.5px solid rgba(255,255,255,0.10);
+  box-shadow: var(--glass-spec-top);
+  font-size: 14px;
+  transition: all 0.18s var(--spring-2);
+}
+
+.theme-toggle:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.16);
+  transform: rotate(20deg) scale(1.1);
+  box-shadow: var(--glass-spec-top), var(--elev-2);
+}
+
+.theme-toggle:active { transform: scale(0.88) rotate(0deg); }
+
+/* ────────────────────────────────────────────────────────────────
+   26. SCROLLBAR — Premium thin scrollbar
+   ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.20);
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.12);
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.20);
+}
+
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.12) transparent; }
+[data-theme="light"] * { scrollbar-color: rgba(0,0,0,0.12) transparent; }
+
+/* ────────────────────────────────────────────────────────────────
+   27. PROFILE PAGE — Premium card system
+   ──────────────────────────────────────────────────────────────── */
+.profile-card {
+  border-radius: 18px;
+  border: 0.5px solid rgba(255,255,255,0.09);
+  box-shadow: var(--glass-spec-top), var(--elev-1);
+  backdrop-filter: var(--vibrancy-xs);
+}
+[data-theme="light"] .profile-card {
+  border-color: rgba(0,0,0,0.06);
+  box-shadow: 0 0.5px 0 rgba(255,255,255,0.95) inset, var(--elev-2);
+}
+
+.profile-hero {
+  border-radius: 20px;
+  overflow: hidden;
+  margin-bottom: 22px;
+  box-shadow: var(--elev-3);
+}
+
+.profile-avatar-ring {
+  box-shadow: 0 0 0 3px rgba(96,165,250,0.4), 0 4px 16px rgba(0,0,0,0.35);
+}
+
+.profile-input, .profile-select, .profile-textarea {
+  border-radius: 10px;
+  border: 0.5px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06);
+  font-size: 13.5px;
+  letter-spacing: -0.01em;
+}
+
+.profile-input:focus, .profile-select:focus, .profile-textarea:focus {
+  border-color: rgba(96,165,250,0.45);
+  background: rgba(255,255,255,0.10);
+  box-shadow: 0 0 0 3px rgba(96,165,250,0.10);
+  outline: none;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   28. SIDEBAR TOGGLE BUTTON — Hamburger refinement
+   ──────────────────────────────────────────────────────────────── */
+.sb-toggle-btn {
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  background: rgba(255,255,255,0.06);
+  border: 0.5px solid rgba(255,255,255,0.09);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--glass-spec-top);
+  transition: all 0.14s var(--spring-2);
+  flex-shrink: 0;
+}
+
+.sb-toggle-btn:hover {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.14);
+  box-shadow: var(--glass-spec-top), var(--elev-1);
+}
+
+.sb-toggle-btn:active { transform: scale(0.9); }
+
+.sb-toggle-icon span {
+  display: block;
+  width: 16px; height: 1.5px;
+  background: var(--text2);
+  border-radius: 2px;
+  margin: 3px 0;
+  transition: all 0.2s var(--spring-2);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   29. WATCHLIST MODALS — Elevated glass panels
+   ──────────────────────────────────────────────────────────────── */
+.wl-modal {
+  background: var(--surface);
+  border: 0.5px solid rgba(255,255,255,0.10);
+  border-radius: 20px;
+  box-shadow: var(--glass-spec-top), var(--elev-5);
+  backdrop-filter: var(--vibrancy-xl);
+  -webkit-backdrop-filter: var(--vibrancy-xl);
+}
+
+[data-theme="light"] .wl-modal {
+  background: rgba(252,254,255,0.98);
+  border-color: rgba(0,0,0,0.07);
+}
+
+.wl-modal-close {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  border: 0.5px solid rgba(255,255,255,0.10);
+  transition: all 0.14s var(--spring-2);
+}
+.wl-modal-close:hover {
+  background: rgba(248,113,113,0.18);
+  border-color: rgba(248,113,113,0.35);
+  color: var(--red);
+  transform: scale(1.1) rotate(90deg);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   30. GLASS MODAL (generic) — elevated
+   ──────────────────────────────────────────────────────────────── */
+.glass-modal {
+  background: linear-gradient(145deg,
+    rgba(18,24,40,0.97) 0%,
+    rgba(14,19,34,0.95) 100%);
+  border: 0.5px solid rgba(255,255,255,0.10);
+  border-radius: 22px;
+  backdrop-filter: var(--vibrancy-2xl);
+  -webkit-backdrop-filter: var(--vibrancy-2xl);
+  box-shadow: var(--glass-spec-full), var(--elev-5);
+}
+
+[data-theme="light"] .glass-modal {
+  background: rgba(252,254,255,0.98);
+  border-color: rgba(0,0,0,0.07);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   31. ACCOUNT CARDS — Premium fintech style
+   ──────────────────────────────────────────────────────────────── */
+.acc-card {
+  border-radius: 18px;
+  padding: 20px;
+  transition: all 0.22s var(--spring-2);
+}
+.acc-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--glass-spec-top), var(--elev-3);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   32. FILTER BAR — Dashboard date filters
+   ──────────────────────────────────────────────────────────────── */
+.dash-filter-bar {
+  background: rgba(255,255,255,0.025);
+  border: 0.5px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 8px 12px;
+  backdrop-filter: var(--vibrancy-xs);
+}
+
+[data-theme="light"] .dash-filter-bar {
+  background: rgba(255,255,255,0.60);
+  border-color: rgba(0,0,0,0.07);
+}
+
+.dash-filter-btn {
+  border-radius: 99px;
+  padding: 5px 13px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  border: 0.5px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.05);
+  transition: all 0.14s var(--spring-2);
+}
+
+.dash-filter-btn:hover {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.14);
+  transform: scale(1.02);
+}
+
+.dash-filter-btn.active {
+  background: rgba(96,165,250,0.18);
+  border-color: rgba(96,165,250,0.38);
+  color: var(--blue);
+  box-shadow: 0 0 12px rgba(96,165,250,0.12);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   33. MONTHLY REVIEW STATS — Match KPI card style
+   ──────────────────────────────────────────────────────────────── */
+.month-stat {
+  background: linear-gradient(145deg,
+    rgba(255,255,255,0.05) 0%,
+    rgba(255,255,255,0.025) 100%);
+  border: 0.5px solid rgba(255,255,255,0.09);
+  border-radius: 14px;
+  backdrop-filter: var(--vibrancy-xs);
+  box-shadow: var(--glass-spec-top), var(--elev-1);
+}
+
+[data-theme="light"] .month-stat {
+  background: linear-gradient(145deg, rgba(255,255,255,0.88), rgba(255,255,255,0.72));
+  border-color: rgba(0,0,0,0.07);
+  box-shadow: 0 0.5px 0 rgba(255,255,255,0.95) inset, var(--elev-1);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   34. AI PAGE — Premium assistant UI
+   ──────────────────────────────────────────────────────────────── */
+.ai-mode-bar {
+  border-radius: 14px;
+  border: 0.5px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: var(--vibrancy-xs);
+  box-shadow: var(--glass-spec-top);
+}
+
+.ai-response-wrap {
+  border-radius: 16px;
+  border: 0.5px solid rgba(167,139,250,0.20);
+  backdrop-filter: var(--vibrancy-xs);
+  box-shadow: var(--glass-spec-top), 0 0 32px rgba(167,139,250,0.07), var(--elev-1);
+}
+
+.ai-prompt-wrap {
+  border-radius: 14px;
+  border: 0.5px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: var(--vibrancy-xs);
+  box-shadow: var(--glass-spec-bot);
+}
+
+.ai-prompt-wrap:focus-within {
+  border-color: rgba(167,139,250,0.42);
+  background: rgba(255,255,255,0.06);
+  box-shadow: 0 0 0 3px rgba(167,139,250,0.10), var(--glass-spec-bot);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   35. PLAYBOOK CARDS — Teaching moment cards
+   ──────────────────────────────────────────────────────────────── */
+.rule-card {
+  border: 0.5px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  backdrop-filter: var(--vibrancy-xs);
+  background: rgba(255,255,255,0.025);
+  transition: all 0.16s var(--spring-1);
+}
+.rule-card:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.11);
+  transform: translateX(3px);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   36. DETAIL STATS — In the trade detail panel
+   ──────────────────────────────────────────────────────────────── */
+.detail-stat {
+  background: rgba(255,255,255,0.04);
+  border: 0.5px solid rgba(255,255,255,0.09);
+  border-radius: 12px;
+  backdrop-filter: var(--vibrancy-xs);
+  box-shadow: var(--glass-spec-top);
+  transition: all 0.14s var(--spring-1);
+}
+.detail-stat:hover {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.13);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   37. GLASS BUTTON VARIANTS — Elevated
+   ──────────────────────────────────────────────────────────────── */
+.glass-btn {
+  border-radius: 12px;
+  backdrop-filter: var(--vibrancy-xs);
+  box-shadow: var(--glass-spec-top), var(--elev-1);
+  transition: all 0.16s var(--spring-2);
+}
+
+.glass-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--glass-spec-top), var(--elev-2);
+}
+
+.glass-btn:active { transform: scale(0.96); }
+
+/* ────────────────────────────────────────────────────────────────
+   38. EMOTION CHIPS — Richer interactive
+   ──────────────────────────────────────────────────────────────── */
+.emo-chip, .emo-btn {
+  border-radius: 20px;
+  border: 0.5px solid rgba(255,255,255,0.09);
+  backdrop-filter: var(--vibrancy-xs);
+  transition: all 0.14s var(--spring-2);
+}
+.emo-chip:hover, .emo-btn:hover {
+  transform: translateY(-1px) scale(1.03);
+}
+.emo-chip:active, .emo-btn:active {
+  transform: scale(0.94);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   39. IMAGE SLOTS — Premium chart upload zones
+   ──────────────────────────────────────────────────────────────── */
+.img-slot {
+  border: 1px dashed rgba(255,255,255,0.12);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: var(--vibrancy-xs);
+  transition: all 0.18s var(--spring-2);
+}
+.img-slot:hover {
+  border-color: rgba(96,165,250,0.45);
+  background: rgba(96,165,250,0.06);
+  transform: scale(1.03);
+  box-shadow: 0 4px 16px rgba(96,165,250,0.12);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   40. ACCESSIBILITY & REDUCED MOTION
+   ──────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .cover { animation: none !important; }
+}
+
+/* ────────────────────────────────────────────────────────────────
+   41. SHIMMER ANIMATION — On KPI card hover (refined)
+   ──────────────────────────────────────────────────────────────── */
+@keyframes glassShimmer {
+  0%   { transform: translateX(-120%) skewX(-12deg); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateX(220%) skewX(-12deg); opacity: 0; }
+}
+
+.kpi-card:hover::after {
+  content: '';
+  position: absolute; top: 0; bottom: 0; left: 0; width: 35%;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(255,255,255,0.06),
+    rgba(255,255,255,0.10),
+    rgba(255,255,255,0.06),
+    transparent);
+  animation: glassShimmer 0.65s ease forwards;
+  pointer-events: none; z-index: 1;
+  border-radius: inherit;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   42. SAVE BUTTON — Premium CTA
+   ──────────────────────────────────────────────────────────────── */
+.save-btn {
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  padding: 12px;
+  box-shadow: var(--glass-spec-top), var(--glow-blue), var(--elev-1);
+  transition: all 0.18s var(--spring-2);
+}
+
+.save-btn:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: var(--glass-spec-top), 0 0 32px rgba(96,165,250,0.3), var(--elev-3);
+}
+
+.save-btn:active {
+  transform: scale(0.97);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   43. WATCHLIST BUTTONS — Consistent style
+   ──────────────────────────────────────────────────────────────── */
+.wl-btn-primary {
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: all 0.16s var(--spring-2);
+}
+.wl-btn-primary:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: var(--glow-blue), var(--elev-2);
+}
+
+.wl-add-week-btn {
+  border-radius: 99px;
+  transition: all 0.14s var(--spring-2);
+}
+.wl-add-week-btn:hover {
+  transform: scale(1.04);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   44. MOBILE OVERLAY — Refined blur
+   ──────────────────────────────────────────────────────────────── */
+.mob-overlay {
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   45. SIDEBAR TOGGLE — Desktop collapse slide
+   ──────────────────────────────────────────────────────────────── */
+.cal-slide-toggle {
+  background: rgba(16,21,38,0.88);
+  border: 0.5px solid rgba(255,255,255,0.10);
+  backdrop-filter: var(--vibrancy-md);
+  -webkit-backdrop-filter: var(--vibrancy-md);
+  box-shadow: var(--glass-spec-top), var(--elev-2);
+  transition: all 0.18s var(--spring-2);
+}
+.cal-slide-toggle:hover {
+  background: rgba(24,31,55,0.95);
+  border-color: rgba(255,255,255,0.16);
+  box-shadow: var(--glass-spec-top), var(--elev-3);
+}
+
+[data-theme="light"] .cal-slide-toggle {
+  background: rgba(248,251,255,0.92);
+  border-color: rgba(0,0,0,0.08);
+  box-shadow: 0 0.5px 0 rgba(255,255,255,0.95) inset, var(--elev-2);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   46. MT5 MODAL — Premium connection UI
+   ──────────────────────────────────────────────────────────────── */
+.mt5-modal {
+  background: linear-gradient(145deg,
+    rgba(12,17,32,0.97) 0%,
+    rgba(10,14,28,0.96) 100%);
+  border: 0.5px solid rgba(255,255,255,0.10);
+  border-radius: 22px;
+  backdrop-filter: var(--vibrancy-2xl);
+  -webkit-backdrop-filter: var(--vibrancy-2xl);
+  box-shadow: var(--glass-spec-full), var(--elev-5);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   47. FOCUS VISIBLE — Keyboard navigation
+   ──────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid rgba(96,165,250,0.6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   48. SELECTION COLOR — Brand-consistent
+   ──────────────────────────────────────────────────────────────── */
+::selection {
+  background: rgba(96,165,250,0.25);
+  color: inherit;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   49. RESPONSIVE OVERRIDES — Mobile premium touches
+   ──────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .kpi-value { font-size: 22px; }
+  .cover-title { font-size: 20px; }
+  
+  .modal {
+    border-radius: 24px 24px 0 0;
+    backdrop-filter: var(--vibrancy-2xl);
+    -webkit-backdrop-filter: var(--vibrancy-2xl);
+  }
+  
+  .detail-panel {
+    border-radius: 24px 24px 0 0;
+    backdrop-filter: var(--vibrancy-2xl);
+    -webkit-backdrop-filter: var(--vibrancy-2xl);
+  }
+  
+  .kpi-card { border-radius: 14px; }
+  .cover { border-radius: 16px; }
+  
+  /* Touch targets minimum 44px */
+  .sb-item { min-height: 44px; }
+  .btn { min-height: 36px; }
+}
+
+@media (max-width: 420px) {
+  .kpi-value { font-size: 19px; }
+  .kpi-card { padding: 13px 14px; border-radius: 12px; }
+  .cover { padding: 18px 20px; border-radius: 14px; }
+}
+
+/* ────────────────────────────────────────────────────────────────
+   50. LARGE DESKTOP — Optimize for 1400px+
+   ──────────────────────────────────────────────────────────────── */
+@media (min-width: 1400px) {
+  :root { --sidebar: 240px; }
+  .kpi-value { font-size: 28px; }
+  .cover-title { font-size: 26px; }
+  .data-table th, .data-table td { padding: 12px 16px; }
+  .kpi-card { padding: 18px 20px; border-radius: 18px; }
+  .cover { padding: 26px 32px; border-radius: 22px; }
+}
+
+/* ────────────────────────────────────────────────────────────────
+   51. INLINE DATA TABLE WRAP — ensure rounded corners on tables
+   ──────────────────────────────────────────────────────────────── */
+div[style*="data-table"] .data-table-wrap,
+.page-inner > .data-table-wrap {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   52. NOTE AREAS & TEXTAREAS — consistent with glass system
+   ──────────────────────────────────────────────────────────────── */
+.notes-area {
+  background: rgba(255,255,255,0.05);
+  border: 0.5px solid rgba(255,255,255,0.09);
+  border-radius: 12px;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  backdrop-filter: var(--vibrancy-xs);
+  box-shadow: var(--glass-spec-bot);
+}
+.notes-area:focus {
+  border-color: rgba(96,165,250,0.45);
+  background: rgba(255,255,255,0.07);
+  box-shadow: 0 0 0 3px rgba(96,165,250,0.10), var(--glass-spec-bot);
+  outline: none;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   53. GRADIENT SYSTEM — Additional per-page accent colors
+   ──────────────────────────────────────────────────────────────── */
+#page-ai .cover {
+  background: linear-gradient(135deg,
+    rgba(16,8,38,0.98) 0%,
+    rgba(28,14,60,0.95) 40%,
+    rgba(20,12,50,0.97) 100%) !important;
+}
+
+#page-calendar {
+  padding: 16px 20px;
+  overflow: hidden;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   54. COVER BANNER — Animated shimmer effect (overlay)
+   ──────────────────────────────────────────────────────────────── */
+@keyframes coverShimmer {
+  0%   { background-position: -200% center; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { background-position: 200% center; opacity: 0; }
+}
+
+.cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255,255,255,0.04) 45%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.04) 55%,
+    transparent 100%);
+  background-size: 300% 100%;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: coverShimmer 6s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+/* Light mode cover — preserve text readability */
+[data-theme="light"] .cover::after {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255,255,255,0.12) 50%,
+    transparent 100%);
+  background-size: 300% 100%;
+  animation: coverShimmer 7s ease-in-out infinite;
+  animation-delay: 1.5s;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   55. SIDEBAR — Close button premium styling
+   ──────────────────────────────────────────────────────────────── */
+.sb-close-btn button {
+  background: rgba(255,255,255,0.07);
+  border: 0.5px solid rgba(255,255,255,0.10);
+  border-radius: 8px;
+  color: var(--text2);
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.14s var(--spring-2);
+  font-size: 12px;
+}
+.sb-close-btn button:hover {
+  background: rgba(248,113,113,0.16);
+  border-color: rgba(248,113,113,0.30);
+  color: var(--red);
+  transform: rotate(90deg) scale(1.08);
+}
