@@ -5218,7 +5218,10 @@ function setDashPreset(preset, btn) {
   const d = new Date();
   if (preset === 'all')   { _dashFilter = { from: null, to: null, preset }; }
   else if (preset === 'week') {
-    d.setDate(d.getDate() - 7);
+    // Current calendar week: Monday → today (not a rolling 7-day window)
+    const dow = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const daysToMon = dow === 0 ? 6 : dow - 1; // days back to reach this week's Monday
+    d.setDate(d.getDate() - daysToMon);
     _dashFilter = { from: d.toISOString().slice(0,10), to: today, preset };
   } else if (preset === 'month') {
     _dashFilter = { from: today.slice(0,7)+'-01', to: today, preset };
