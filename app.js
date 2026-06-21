@@ -547,7 +547,7 @@ function _aiSystemPrompt() {
 
   // Today's and this week's trades
   const today = new Date().toISOString().slice(0,10);
-  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().slice(0,10); })();
+  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().slice(0,10); })();
   const todayTrades = trades.filter(t => t.date === today);
   const weekTrades  = trades.filter(t => t.date >= weekStart);
   const monthKey    = today.slice(0,7);
@@ -622,7 +622,7 @@ function _aiUserPrompt(mode, customQuestion) {
   if (customQuestion) return customQuestion;
   const today     = new Date().toISOString().slice(0,10);
   const dayName   = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
-  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().slice(0,10); })();
+  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().slice(0,10); })();
   const monthKey  = today.slice(0,7);
 
   const todayTrades  = trades.filter(t => t.date === today);
@@ -951,7 +951,7 @@ function _aiRenderContextPanel(mode) {
 
   const today     = new Date().toISOString().slice(0,10);
   const dayName   = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
-  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().slice(0,10); })();
+  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().slice(0,10); })();
   const monthKey  = today.slice(0,7);
   const curQ      = getQuarter(today);
   const curQKey   = `${today.slice(0,4)}-Q${curQ}`;
@@ -5218,10 +5218,9 @@ function setDashPreset(preset, btn) {
   const d = new Date();
   if (preset === 'all')   { _dashFilter = { from: null, to: null, preset }; }
   else if (preset === 'week') {
-    // Current calendar week: Monday → today (not a rolling 7-day window)
+    // Current calendar week: Sunday → today (week starts on Sunday)
     const dow = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-    const daysToMon = dow === 0 ? 6 : dow - 1; // days back to reach this week's Monday
-    d.setDate(d.getDate() - daysToMon);
+    d.setDate(d.getDate() - dow); // days back to reach this week's Sunday
     _dashFilter = { from: d.toISOString().slice(0,10), to: today, preset };
   } else if (preset === 'month') {
     _dashFilter = { from: today.slice(0,7)+'-01', to: today, preset };
@@ -5733,7 +5732,7 @@ function renderCalendar() {
   const daysEl2 = document.getElementById('cal-days-2');
   if (!daysEl && !daysEl2) return;
   const firstDay = new Date(calYear, calMonth, 1);
-  let startDow = firstDay.getDay() - 1; if (startDow < 0) startDow = 6;
+  let startDow = firstDay.getDay(); // 0=Sun: no offset needed for Sun-start calendar
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
   const daysInPrev = new Date(calYear, calMonth, 0).getDate();
   const today = new Date().toISOString().slice(0, 10);
@@ -7026,7 +7025,7 @@ async function _profileLoad() {
       risk:         '1%',
       daterange:    'This Quarter',
       currency:     '% (Percentage)',
-      weekstart:    'Monday',
+      weekstart:    'Sunday',
       defaultview:  'Quarterly',
       affirmation:  true,
       sounds:       false,
