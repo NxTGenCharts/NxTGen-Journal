@@ -2910,15 +2910,24 @@ async function saveTrade() {
   const pairVal = getPairValue();
   const ratingVal = document.getElementById('m-rating').value.split('★').length - 1;
 
+  const rawPnl     = parseFloat(document.getElementById('m-pnl').value) || 0;
+  const rawOutcome = document.getElementById('m-outcome').value;
+
+  // Auto-correct outcome if it conflicts with PnL sign (prevents wrong WR display)
+  let outcome = rawOutcome;
+  if (rawPnl > 0 && rawOutcome === 'Loss') outcome = 'Win';
+  if (rawPnl < 0 && rawOutcome === 'Win')  outcome = 'Loss';
+  if (rawPnl === 0 && rawOutcome !== 'B.E') outcome = 'B.E';
+
   const newTrade = {
     user_id:      _currentUser.id,
     trade_date:   dateVal,
     pair:         pairVal,
     pos:          document.getElementById('m-pos').value,
     rr:           document.getElementById('m-rr').value || '1:3',
-    pnl:          parseFloat(document.getElementById('m-pnl').value) || 0,
+    pnl:          rawPnl,
     pnl_unit:     '%',
-    outcome:      document.getElementById('m-outcome').value,
+    outcome,
     kz:           document.getElementById('m-kz').value,
     strategy:     document.getElementById('m-strat').value === '__custom__'
                     ? (document.getElementById('m-strat-custom').value.trim() || 'NxtGen - Mod')
@@ -5255,7 +5264,7 @@ function togglePf() {
 function _drawSparkline() {
   const canvas = document.getElementById('kpi-sparkline');
   if (!canvas) return;
-  const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = [..._getFilteredTrades()].sort((a, b) => a.date.localeCompare(b.date));
   if (sorted.length < 2) { canvas.style.display = 'none'; return; }
   canvas.style.display = 'block';
   const _pctOf = t => {
@@ -5522,7 +5531,14 @@ async function _saveEdit(id) {
   if (posVal) t.pos = posVal;
   if (rrVal) t.rr = rrVal;
   if (pnlVal !== null) t.pnl = parseFloat(pnlVal) || 0;
-  if (outcomeVal) t.outcome = outcomeVal;
+  // Auto-correct outcome if it conflicts with PnL sign
+  if (outcomeVal) {
+    let correctedOutcome = outcomeVal;
+    if (t.pnl > 0 && outcomeVal === 'Loss') correctedOutcome = 'Win';
+    if (t.pnl < 0 && outcomeVal === 'Win')  correctedOutcome = 'Loss';
+    if (t.pnl === 0 && outcomeVal !== 'B.E') correctedOutcome = 'B.E';
+    t.outcome = correctedOutcome;
+  }
   if (kzVal) t.kz = kzVal;
   if (accVal && accVal !== '__custom__') t.account = accVal;
   if (stratVal) t.strategy = stratVal;
@@ -5781,12 +5797,10 @@ function _buildWeeklySummary(gridEl, dayMap) {
       const pctStr = (wPct >= 0 ? '+' : '') + wPct.toFixed(1) + '%';
       const col = wPct >= 0 ? 'var(--green)' : 'var(--red)';
       sumEl.innerHTML = `<div class="wsm-pnl" style="color:${col}">${pctStr}</div><div class="wsm-meta">${wTrades}T · ${wr}%WR</div>`;
-    } else {
-      sumEl.innerHTML = '<div class="wsm-empty">—</div>';
+      // Only insert the summary element when there are actual trades that week
+      const lastCell = weekCells[weekCells.length - 1];
+      lastCell.after(sumEl);
     }
-    // Insert after last cell of this week
-    const lastCell = weekCells[weekCells.length - 1];
-    lastCell.after(sumEl);
   }
 }
 
