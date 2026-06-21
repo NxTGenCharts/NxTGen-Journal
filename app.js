@@ -5767,53 +5767,6 @@ function renderCalendar() {
   }).join(''); };
   _calDaysHTML_fn(daysEl); _calDaysHTML_fn(daysEl2);
   window._dayMap = dayMap;
-  // ── Weekly summary column ──
-  _buildWeeklySummary(daysEl, dayMap);
-  _buildWeeklySummary(daysEl2, dayMap);
-}
-
-function _buildWeeklySummary(gridEl, dayMap) {
-  if (!gridEl) return;
-  const weeks = gridEl.querySelectorAll('.cal-day');
-  if (weeks.length < 7) return;
-  // Remove existing weekly summaries
-  gridEl.querySelectorAll('.cal-week-sum').forEach(e => e.remove());
-  // Group cells into weeks of 7
-  const cells = [...weeks];
-  for (let w = 0; w < Math.ceil(cells.length / 7); w++) {
-    const weekCells = cells.slice(w * 7, w * 7 + 7);
-    let wPct = 0, wTrades = 0, wWins = 0;
-    weekCells.forEach(cell => {
-      const dateStr = cell.querySelector('.cal-day-num')?.textContent?.trim();
-      // find the date string from dayMap by checking cell content
-    });
-    // Compute from dayMap: find all dates whose day number matches cells in this week
-    const wDates = [];
-    weekCells.forEach(c => {
-      // Extract date from onclick attr or data if present
-      const onclick = c.getAttribute('onclick') || '';
-      const m = onclick.match(/openCalPopup\([^,]+,'(\d{4}-\d{2}-\d{2})'\)/);
-      if (m) wDates.push(m[1]);
-    });
-    wDates.forEach(d => {
-      const dd = dayMap[d];
-      if (!dd) return;
-      wTrades += dd.trades.length;
-      wWins   += dd.trades.filter(t => t.outcome === 'Win').length;
-      wPct    += dd.trades.reduce((a, t) => a + _pctOfTrade(t), 0);
-    });
-    const sumEl = document.createElement('div');
-    sumEl.className = 'cal-week-sum';
-    if (wTrades > 0) {
-      const wr = Math.round((wWins / wTrades) * 100);
-      const pctStr = (wPct >= 0 ? '+' : '') + wPct.toFixed(1) + '%';
-      const col = wPct >= 0 ? 'var(--green)' : 'var(--red)';
-      sumEl.innerHTML = `<div class="wsm-pnl" style="color:${col}">${pctStr}</div><div class="wsm-meta">${wTrades}T · ${wr}%WR</div>`;
-      // Only insert the summary element when there are actual trades that week
-      const lastCell = weekCells[weekCells.length - 1];
-      lastCell.after(sumEl);
-    }
-  }
 }
 
 function openCalPopup(e, dateStr) {
