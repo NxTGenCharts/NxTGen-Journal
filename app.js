@@ -75,6 +75,16 @@ function getAccPnlMode(accountName) {
   return acc?.pnlMode || '%';
 }
 
+// ── Local date helper ─────────────────────────────────────────────────────
+// new Date().toISOString() returns UTC, which can be yesterday in WAT (UTC+1).
+// Always use this to get today's date in the user's local timezone.
+function localToday() {
+  const d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
 // Current authenticated user — set on boot
 let _currentUser = null;
 
@@ -546,8 +556,8 @@ function _aiSystemPrompt() {
   ).join('\n');
 
   // Today's and this week's trades
-  const today = new Date().toISOString().slice(0,10);
-  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().slice(0,10); })();
+  const today = localToday();
+  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
   const todayTrades = trades.filter(t => t.date === today);
   const weekTrades  = trades.filter(t => t.date >= weekStart);
   const monthKey    = today.slice(0,7);
@@ -620,9 +630,9 @@ RESPONSE STYLE:
 /* ── Build user prompt per mode ── */
 function _aiUserPrompt(mode, customQuestion) {
   if (customQuestion) return customQuestion;
-  const today     = new Date().toISOString().slice(0,10);
+  const today     = localToday();
   const dayName   = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
-  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().slice(0,10); })();
+  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
   const monthKey  = today.slice(0,7);
 
   const todayTrades  = trades.filter(t => t.date === today);
@@ -949,9 +959,9 @@ function _aiRenderContextPanel(mode) {
   const panel = document.getElementById('ai-context-panel');
   if (!panel) return;
 
-  const today     = new Date().toISOString().slice(0,10);
+  const today     = localToday();
   const dayName   = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
-  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().slice(0,10); })();
+  const weekStart = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
   const monthKey  = today.slice(0,7);
   const curQ      = getQuarter(today);
   const curQKey   = `${today.slice(0,4)}-Q${curQ}`;
@@ -1542,7 +1552,7 @@ function _chatHandleStats() {
   const wins  = trades.filter(t => t.outcome === 'Win').length;
   const wr    = total ? ((wins / total) * 100).toFixed(1) : 0;
   const pnl   = trades.reduce((a, t) => a + t.pnl, 0).toFixed(1);
-  const today = new Date().toISOString().slice(0,10);
+  const today = localToday();
   const todayT = trades.filter(t => t.date === today);
   return `**Quick Stats — ${today}**\n\n` +
     `• Total trades: ${total}\n` +
@@ -2850,7 +2860,7 @@ function openLightboxById(tradeId, slot) {
 
 // ── MODAL ─────────────────────────────────────────────
 function openModal(prefill) {
-  document.getElementById('m-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('m-date').value = localToday();
   document.getElementById('m-pair').value = 'GBPUSD';
   document.getElementById('m-pair-custom').style.display = 'none';
   document.getElementById('m-pos').value = 'Buy';
@@ -3068,7 +3078,7 @@ function _wlQuarterKey(dateStr) {
 
 /* ── Get all quarters that have data, plus current quarter ── */
 function _wlQuarters() {
-  const cur = _wlQuarterKey(new Date().toISOString().slice(0,10));
+  const cur = _wlQuarterKey(localToday());
   const qs  = [...new Set([..._wlData.map(w => w.quarter), cur])];
   qs.sort((a,b) => b.localeCompare(a));
   return qs;
@@ -3333,7 +3343,7 @@ async function _wlCalLoad(weekId, startDate, endDate, forceRefresh) {
 
   const wkStart  = new Date(startDate + 'T00:00:00');
   const wkEnd    = new Date((endDate || startDate) + 'T23:59:59');
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localToday();
   const isPastWeek = (endDate || startDate) < todayStr;
 
   // Helper: get monday of current week (YYYY-MM-DD)
@@ -3446,7 +3456,7 @@ async function _wlCalLoad(weekId, startDate, endDate, forceRefresh) {
 
 function _wlCalRenderIframe(body, startDate, weekId, endDate) {
   const ffUrl = _wlCalBuildFFUrl(startDate);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localToday();
   const isPastWeek = (endDate || startDate) < todayStr;
   const weekLabel = endDate && endDate !== startDate ? `${startDate} – ${endDate}` : startDate;
 
@@ -3519,7 +3529,7 @@ function _wlCalIframeFailed(weekId, startDate, endDate, iframe) {
 
 function _wlCalIframeError(weekId, startDate, endDate) {
   const ffUrl = _wlCalBuildFFUrl(startDate);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localToday();
   const isPastWeek = (endDate || startDate) < todayStr;
   const weekLabel = endDate && endDate !== startDate ? `${startDate} – ${endDate}` : startDate;
 
@@ -3694,7 +3704,7 @@ function _wlCalRender(weekId, events, startDate, endDate) {
     dayMap[d].push(e);
   });
 
-  const today = new Date().toISOString().slice(0,10);
+  const today = localToday();
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
   const daysHtml = Object.keys(dayMap).sort().map(day => {
@@ -4515,7 +4525,7 @@ function _showPayoutModal(editIdx) {
     <div class="wl-form-2col">
       <div class="wl-form-row">
         <label class="wl-form-label">Date</label>
-        <input type="date" class="wl-form-input" id="acc-p-date" value="${p ? p.date : new Date().toISOString().slice(0,10)}">
+        <input type="date" class="wl-form-input" id="acc-p-date" value="${p ? p.date : localToday()}">
       </div>
       <div class="wl-form-row">
         <label class="wl-form-label">Amount (USD)</label>
@@ -5191,7 +5201,7 @@ function updateKPIs() {
 
   // ── Dashboard cover: current quarter summary ──
   const _cqYear = new Date().getFullYear();
-  const _cqQ    = getQuarter(new Date().toISOString().slice(0, 10));
+  const _cqQ    = getQuarter(localToday());
   const _cqT    = trades.filter(t => getYear(t.date) === _cqYear && getQuarter(t.date) === _cqQ);
   const _cqWins = _cqT.filter(t => t.outcome === 'Win').length;
   const _cqWr   = _cqT.length ? ((_cqWins / _cqT.length) * 100).toFixed(1) : '0.0';
@@ -5214,7 +5224,7 @@ function updateKPIs() {
 function setDashPreset(preset, btn) {
   document.querySelectorAll('.dash-filter-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const d = new Date();
   if (preset === 'all')   { _dashFilter = { from: null, to: null, preset }; }
   else if (preset === 'week') {
@@ -5735,7 +5745,7 @@ function renderCalendar() {
   let startDow = firstDay.getDay(); // 0=Sun: no offset needed for Sun-start calendar
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
   const daysInPrev = new Date(calYear, calMonth, 0).getDate();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday(); // use local timezone, not UTC (avoids off-by-one near midnight in WAT)
   let cells = [];
   for (let i = startDow - 1; i >= 0; i--) { const prevMonth = calMonth === 0 ? 12 : calMonth; const prevYear = calMonth === 0 ? calYear - 1 : calYear; cells.push({ day: daysInPrev - i, month: prevMonth, year: prevYear, current: false }); }
   for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, month: calMonth + 1, year: calYear, current: true });
@@ -6306,7 +6316,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   buildSidebarYears();
   // Auto-highlight current quarter in sidebar on first load
   const _bootYear = new Date().getFullYear();
-  const _bootQ    = getQuarter(new Date().toISOString().slice(0, 10));
+  const _bootQ    = getQuarter(localToday());
   const _bootSbEl = document.getElementById(`sb-q-${_bootYear}-${_bootQ}`);
   if (_bootSbEl) _bootSbEl.classList.add('active');
   refreshPairFilter();
