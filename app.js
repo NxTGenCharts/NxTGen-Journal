@@ -3535,6 +3535,33 @@ function _wlBuildDailyGameplan(week) {
           Add pairs to your weekly watchlist first to log daily expectations per pair.
         </div>`}
 
+        <!-- ── Daily chart images ── -->
+        <div class="wl-day-charts-section">
+          <div class="wl-day-pairs-label" style="margin-top:16px">
+            <span>Analysis Screenshots</span>
+            <span style="font-size:10px;color:var(--text3);font-weight:400">Synced across devices</span>
+          </div>
+          ${(() => {
+            const imgs = plan.charts || [];
+            const thumbs = imgs.map((c, ci) => `
+              <div class="wl-day-chart-thumb-wrap">
+                <img class="wl-day-chart-thumb" src="${c.url}" alt="chart ${ci+1}"
+                  onclick="_wlOpenLightbox('${c.url}')">
+                <div class="wl-day-chart-label">${c.label || ''}</div>
+                <button class="wl-day-chart-del" onclick="_wlDeleteDayChart('${week.id}','${activeDay}',${ci})" title="Remove">✕</button>
+              </div>`).join('');
+            return `
+            ${imgs.length > 0 ? `<div class="wl-day-chart-grid" id="wl-day-chart-grid-${week.id}-${activeDay}">${thumbs}</div>` : `<div class="wl-day-chart-grid wl-day-chart-grid--empty" id="wl-day-chart-grid-${week.id}-${activeDay}"></div>`}
+            <label class="wl-day-upload-zone" id="wl-day-upload-zone-${week.id}-${activeDay}">
+              <input type="file" accept="image/*" multiple style="display:none"
+                onchange="_wlHandleDayChartUpload(this,'${week.id}','${activeDay}')">
+              <span class="wl-day-upload-icon">📸</span>
+              <span class="wl-day-upload-text">Upload screenshots — PNG, JPG, WebP</span>
+              <span class="wl-day-upload-hint">Charts sync automatically across all devices</span>
+            </label>`;
+          })()}
+        </div>
+
         <div class="wl-day-footer">
           <div class="wl-day-mindset-wrap">
             <label class="wl-form-label" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px;display:block">
@@ -3574,7 +3601,7 @@ async function _wlSaveDayNote(weekId, day, note) {
   const week = _wlData.find(w => w.id === weekId);
   if (!week) return;
   if (!week.dailyPlans) week.dailyPlans = {};
-  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '' };
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '', charts: [] };
   week.dailyPlans[day].note = note;
   await _wlSaveWeek(week);
 }
@@ -3584,7 +3611,7 @@ async function _wlSaveDayPairNote(weekId, day, pairName, note) {
   const week = _wlData.find(w => w.id === weekId);
   if (!week) return;
   if (!week.dailyPlans) week.dailyPlans = {};
-  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '' };
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '', charts: [] };
   const pairs = week.dailyPlans[day].pairs || [];
   const existing = pairs.find(p => p.name === pairName);
   if (existing) existing.note = note;
@@ -3598,7 +3625,7 @@ async function _wlCycleDayPairBias(weekId, day, pairName, btn) {
   const week = _wlData.find(w => w.id === weekId);
   if (!week) return;
   if (!week.dailyPlans) week.dailyPlans = {};
-  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '' };
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '', charts: [] };
   const pairs = week.dailyPlans[day].pairs || [];
   const existing = pairs.find(p => p.name === pairName);
   const cycle = { neu: 'bull', bull: 'bear', bear: 'neu' };
@@ -3619,7 +3646,7 @@ async function _wlSetDayMindset(weekId, day, mindset, btn) {
   const week = _wlData.find(w => w.id === weekId);
   if (!week) return;
   if (!week.dailyPlans) week.dailyPlans = {};
-  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '' };
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '', charts: [] };
   week.dailyPlans[day].mindset = mindset;
   // Update buttons instantly
   const container = document.getElementById(`wl-day-mindset-${weekId}-${day}`);
@@ -3633,9 +3660,72 @@ async function _wlClearDayPlan(weekId, day) {
   const week = _wlData.find(w => w.id === weekId);
   if (!week) return;
   if (!week.dailyPlans) week.dailyPlans = {};
-  week.dailyPlans[day] = { note: '', pairs: [], mindset: '' };
+  // Preserve charts when clearing text content
+  const existingCharts = (week.dailyPlans[day] || {}).charts || [];
+  week.dailyPlans[day] = { note: '', pairs: [], mindset: '', charts: existingCharts };
   await _wlSaveWeek(week);
   _wlRenderWeeks();
+}
+
+/* ── Upload chart images for a specific day ── */
+async function _wlHandleDayChartUpload(input, weekId, day) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+
+  // Show uploading state on the zone
+  const zone = document.getElementById(`wl-day-upload-zone-${weekId}-${day}`);
+  const hint = zone && zone.querySelector('.wl-day-upload-hint');
+  if (hint) hint.textContent = `Uploading ${files.length} image${files.length > 1 ? 's' : ''}…`;
+
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '', charts: [] };
+  if (!week.dailyPlans[day].charts) week.dailyPlans[day].charts = [];
+
+  for (const file of files) {
+    // Base64 fallback
+    const b64 = await new Promise(resolve => {
+      const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(file);
+    });
+    let finalUrl = b64;
+    if (_currentUser) {
+      const remote = await _wlUploadChart(file);
+      if (remote) finalUrl = remote;
+    }
+    const label = file.name.replace(/\.[^.]+$/, '');
+    week.dailyPlans[day].charts.push({ url: finalUrl, label });
+  }
+  input.value = '';
+  await _wlSaveWeek(week);
+
+  // Re-render only the chart grid + zone (no full re-render = no tab switch)
+  _wlRefreshDayChartGrid(weekId, day, week.dailyPlans[day].charts);
+}
+
+/* ── Delete a single day chart ── */
+async function _wlDeleteDayChart(weekId, day, idx) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week || !week.dailyPlans || !week.dailyPlans[day]) return;
+  week.dailyPlans[day].charts.splice(idx, 1);
+  await _wlSaveWeek(week);
+  _wlRefreshDayChartGrid(weekId, day, week.dailyPlans[day].charts);
+}
+
+/* ── Re-render just the chart grid without a full page re-render ── */
+function _wlRefreshDayChartGrid(weekId, day, charts) {
+  const grid = document.getElementById(`wl-day-chart-grid-${weekId}-${day}`);
+  if (!grid) return;
+  grid.innerHTML = (charts || []).map((c, ci) => `
+    <div class="wl-day-chart-thumb-wrap">
+      <img class="wl-day-chart-thumb" src="${c.url}" alt="chart ${ci+1}"
+        onclick="_wlOpenLightbox('${c.url}')">
+      <div class="wl-day-chart-label">${c.label || ''}</div>
+      <button class="wl-day-chart-del" onclick="_wlDeleteDayChart('${weekId}','${day}',${ci})" title="Remove">✕</button>
+    </div>`).join('');
+  // Restore hint text on the zone
+  const hint = document.querySelector(`#wl-day-upload-zone-${weekId}-${day} .wl-day-upload-hint`);
+  if (hint) hint.textContent = 'Charts sync automatically across all devices';
 }
 
 function _wlCalAutoLoad() {
