@@ -2570,7 +2570,7 @@ body{
 
 .dash-left {
   min-width: 0;
-  overflow: visible; /* was hidden — that clipped child data-table-wrap scroll */
+  overflow: visible; /* was hidden — clips child data-table-wrap scroll context */
   padding: 20px 24px 40px;
   box-sizing: border-box;
 }
@@ -3430,7 +3430,6 @@ body{
   -webkit-overflow-scrolling:touch;
   border-radius:var(--r-md);
   margin-bottom:0;
-  /* Ensure this element can establish its own scroll context */
   position:relative;
 }
 
@@ -3511,8 +3510,7 @@ body{
   /* ── Pages — scrollable content area ── */
   .page{
     padding:14px 14px calc(72px + env(safe-area-inset-bottom, 0px));
-    overflow-y:auto;
-    overflow-x:clip; /* clip ≠ hidden — doesn't create a new scroll container, child overflow-x:auto still works */
+    overflow-y:auto;overflow-x:clip;
     -webkit-overflow-scrolling:touch;
     overscroll-behavior-y:contain;
     height:100%;
@@ -3574,23 +3572,19 @@ body{
 
   /* ── Tables ── */
   .data-table-wrap,.table-wrap{
-    overflow-x:auto;
-    overflow-y:visible;
-    -webkit-overflow-scrolling:touch;
-    border-radius:var(--r-md);
-    margin-bottom:16px;
-    /* Show a thin scrollbar so user knows it's scrollable */
+    overflow-x:auto;overflow-y:visible;
+    -webkit-overflow-scrolling:touch;border-radius:var(--r-md);
+    margin-bottom:14px;
     scrollbar-width:thin;
     scrollbar-color:rgba(255,255,255,0.2) transparent;
   }
   .data-table-wrap::-webkit-scrollbar,.table-wrap::-webkit-scrollbar{ height:3px }
   .data-table-wrap::-webkit-scrollbar-thumb,.table-wrap::-webkit-scrollbar-thumb{
-    background:rgba(255,255,255,0.25);border-radius:3px;
+    background:rgba(255,255,255,0.22);border-radius:3px;
   }
-  /* Dashboard stat tables: 4-5 cols only, don't need 540px */
-  .data-table{ min-width:380px;font-size:12px }
-  /* Trade log has many cols — keep wider */
-  #page-tradelog .data-table{ min-width:540px }
+  /* Dashboard 4-5 col tables don't need 540px */
+  .data-table{ min-width:360px;font-size:12px }
+  #page-tradelog .data-table{ min-width:520px }
   .data-table th,.data-table td{ padding:8px 10px }
   .data-table th:nth-child(8),.data-table td:nth-child(8){ display:none }
   .data-table th:nth-child(9),.data-table td:nth-child(9){ display:none }
@@ -3609,103 +3603,108 @@ body{
   .form-textarea{ font-size:14px;padding:10px 12px;border-radius:var(--r-md) }
   .form-label{ font-size:10.5px;letter-spacing:0.04em }
 
-  /* ── Modal — full-height bottom sheet between topbar and bottom nav ── */
+  /* ── Modal — compact ~60% bottom sheet, sits above bottom nav ── */
   .modal-overlay{ align-items:flex-end;padding:0 }
   .modal{
     width:100% !important;max-width:100% !important;
-    /* Pin between topbar and bottom nav — fills 100% of the available gap */
-    position: fixed;
-    top: var(--topbar);
-    bottom: calc(62px + env(safe-area-inset-bottom,0px));
-    left: 0; right: 0;
-    height: auto !important;
-    max-height: none !important;
+    /* ~60% of screen height; never taller than the gap between topbar and nav */
+    height: 62vh;
+    max-height: calc(100dvh - var(--topbar) - 62px - env(safe-area-inset-bottom,0px) - 8px);
+    min-height: 340px;
     margin: 0;
     border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+    position: fixed;
+    bottom: calc(62px + env(safe-area-inset-bottom,0px));
+    left: 0; right: 0;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     background: rgba(10,14,24,0.97);
     backdrop-filter: blur(60px) saturate(2.0);
     -webkit-backdrop-filter: blur(60px) saturate(2.0);
-    box-shadow: 0 -8px 40px rgba(0,0,0,0.55), 0 -1px 0 rgba(255,255,255,0.06);
+    box-shadow: 0 -8px 48px rgba(0,0,0,0.65), 0 -1px 0 rgba(255,255,255,0.07);
+    animation: none !important; /* disable desktop slide-up on mobile */
   }
   [data-theme="light"] .modal{
     background: rgba(252,254,255,0.99);
-    box-shadow: 0 -6px 30px rgba(0,0,0,0.14), 0 -1px 0 rgba(0,0,0,0.07);
+    box-shadow: 0 -6px 32px rgba(0,0,0,0.14), 0 -1px 0 rgba(0,0,0,0.07);
   }
-  /* No drag handle needed — modal fills screen */
-  .modal::before{ display:none !important }
-  /* Header: sticky */
+  /* Drag handle pill */
+  .modal::before{
+    content:''; flex-shrink:0;
+    display:block; width:36px; height:4px; border-radius:var(--r-full);
+    background:rgba(255,255,255,0.18); margin:10px auto 0;
+  }
+  [data-theme="light"] .modal::before{ background:rgba(0,0,0,0.14) }
+
+  /* Header: fixed height, never scrolls */
   .modal-head{
     flex-shrink: 0;
-    padding: 14px 16px 10px;
+    padding: 8px 16px 8px;
     border-bottom: 1px solid var(--glass-border);
     display: flex; align-items: center; justify-content: space-between;
     background: inherit;
   }
-  .modal-title { font-size: 15px !important; }
-  .modal-close { padding: 5px 9px; font-size: 15px; }
+  .modal-title { font-size: 14px !important; font-weight: 700 !important; }
+  .modal-close { padding: 4px 8px; font-size: 14px; }
 
-  /* Body: the scrollable region — flex:1 + min-height:0 makes it shrink to fit */
+  /* Body: scrollable — flex:1 + min-height:0 is the key combo */
   .modal-body{
     flex: 1;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    padding: 12px 14px 8px;
+    overscroll-behavior: contain;
+    padding: 10px 14px 4px;
   }
 
-  /* Compact 2-col grid — fits all fields without needing to scroll past form */
-  .modal-form-grid, .form-grid { grid-template-columns:1fr 1fr; gap:8px }
-  .form-field { gap: 2px; }
-  .form-label { font-size: 9px; letter-spacing: 0.07em; }
+  /* Tight 2-col grid so all fields are visible with minimal scrolling */
+  .modal-form-grid, .form-grid { grid-template-columns:1fr 1fr; gap:7px }
+  .form-field { gap: 2px; display:flex; flex-direction:column; }
+  .form-label { font-size: 9px; letter-spacing: 0.07em; margin-bottom:1px; }
   .form-input, .form-select {
-    font-size: 15px; /* ≥16px prevents iOS zoom, 15 is fine on Android, use 16 on iOS */
-    padding: 9px 10px; border-radius: var(--r-sm);
+    font-size: 16px; /* exactly 16px prevents iOS auto-zoom */
+    padding: 8px 10px;
+    border-radius: var(--r-sm);
+    line-height: 1.2;
   }
   .form-textarea {
-    font-size: 14px; padding: 7px 10px;
-    min-height: 48px; border-radius: var(--r-sm);
+    font-size: 14px; padding: 6px 10px;
+    min-height: 44px; border-radius: var(--r-sm);
   }
 
-  /* Save bar: always pinned at bottom of modal, never scrolls away */
+  /* Save bar: pinned, never scrolls */
   .form-actions{
     flex-shrink: 0;
-    position: static;     /* NOT sticky — it's at the end of flex column */
-    bottom: auto;
     background: inherit;
-    padding: 10px 14px 12px;
+    padding: 8px 14px calc(10px);
     margin-top: 0;
     border-top: 1px solid var(--glass-border);
-    backdrop-filter: none;
     display: flex;
     gap: 8px;
-    justify-content: stretch;
   }
   .form-actions .btn {
     flex: 1;
-    padding: 13px 12px;
+    padding: 12px 10px;
     font-size: 13px;
     font-weight: 600;
     border-radius: var(--r-md);
     text-align: center;
     justify-content: center;
   }
-  /* Save button — prominent blue */
   .form-actions .btn-primary {
     flex: 2;
-    background: linear-gradient(135deg, rgba(96,165,250,0.30), rgba(96,165,250,0.18));
+    background: linear-gradient(135deg, rgba(96,165,250,0.28), rgba(96,165,250,0.16));
     border-color: rgba(96,165,250,0.55);
     color: var(--blue);
-    box-shadow: 0 0 20px rgba(96,165,250,0.20), var(--shadow-sm);
-    font-size: 14px;
+    box-shadow: 0 0 18px rgba(96,165,250,0.18), var(--shadow-sm);
+    font-size: 13px;
     font-weight: 700;
   }
   [data-theme="light"] .form-actions .btn-primary {
-    background: linear-gradient(135deg, rgba(37,99,235,0.18), rgba(37,99,235,0.10));
-    border-color: rgba(37,99,235,0.40);
+    background: linear-gradient(135deg, rgba(37,99,235,0.16), rgba(37,99,235,0.09));
+    border-color: rgba(37,99,235,0.38);
     color: var(--blue);
   }
 
@@ -3803,7 +3802,7 @@ body{
   .kpi-grid{ gap:6px }
   .kpi-value{ font-size:18px }
   .cover-title{ font-size:18px }
-  .data-table{ min-width:340px }
+  .data-table{ min-width:320px }
   #page-tradelog .data-table{ min-width:460px }
   .modal-form-grid{ grid-template-columns:1fr }
   .form-grid{ grid-template-columns:1fr }
@@ -3835,6 +3834,11 @@ body{
 }
 @media(min-width:769px){ .mob-bottom-nav{ display:none !important } }
 @media(max-width:768px){ .mob-bottom-nav{ display:flex } }
+/* Also hide mobile-only sheets on desktop */
+@media(min-width:769px){
+  .mob-more-sheet{ display:none !important }
+  .mob-more-overlay{ display:none !important }
+}
 
 .mob-bottom-nav-item{
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
@@ -3902,12 +3906,10 @@ body{
 
 .mob-more-sheet{
   position:fixed;
-  /* Sit directly above the bottom nav bar */
   bottom:calc(62px + env(safe-area-inset-bottom,0px));
   left:0;right:0;z-index:500;
   border-radius:var(--r-2xl) var(--r-2xl) 0 0;
   border-top:1px solid var(--glass-border);
-  /* Sheet can grow up to fill space between topbar and nav */
   max-height:calc(100dvh - var(--topbar) - 62px - env(safe-area-inset-bottom,0px) - 8px);
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
@@ -3919,9 +3921,8 @@ body{
   transition:transform 0.32s cubic-bezier(0.22,1,0.36,1);
 }
 [data-theme="light"] .mob-more-sheet{
-  background:rgba(248,251,255,0.99);
+  background:rgba(248,251,255,0.98);
   box-shadow:0 -4px 36px rgba(0,0,0,0.12);
-  border-top:1px solid rgba(0,0,0,0.07);
 }
 .mob-more-sheet.open{ transform:translateY(0) }
 
@@ -3936,7 +3937,7 @@ body{
 }
 .mob-more-grid{
   display:grid;grid-template-columns:repeat(4,1fr);gap:0;
-  padding:0 8px 20px;
+  padding:0 8px 18px;
 }
 .mob-more-item{
   display:flex;flex-direction:column;align-items:center;gap:6px;
@@ -9336,6 +9337,10 @@ select[id="filter-kz"] option[value="London"] {
 
 @media (min-width: 769px) { .mob-bottom-nav { display: none !important; } }
 @media (max-width: 768px) { .mob-bottom-nav { display: flex !important; } }
+@media (min-width: 769px) {
+  .mob-more-sheet { display: none !important; }
+  .mob-more-overlay { display: none !important; }
+}
 
 /* Items sit above pseudo layers */
 .mob-bottom-nav-item {
