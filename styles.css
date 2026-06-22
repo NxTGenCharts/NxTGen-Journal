@@ -3507,7 +3507,7 @@ body{
 
   /* ── Pages — scrollable content area ── */
   .page{
-    padding:14px 14px 24px;
+    padding:14px 14px calc(72px + env(safe-area-inset-bottom, 0px));
     overflow-y:auto;overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
     overscroll-behavior-y:contain;
@@ -8554,6 +8554,39 @@ div[style*="data-table"] .data-table-wrap,
 }
 .wl-day-clear-btn:hover { opacity: 1; }
 
+/* ── Daily plan action buttons (Save / Edit / Delete) ─────────── */
+.wl-day-action-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.wl-day-save-btn {
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(52,211,153,0.35);
+  background: rgba(52,211,153,0.1);
+  color: var(--green);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.14s, opacity 0.14s;
+  font-weight: 600;
+}
+.wl-day-save-btn:hover { background: rgba(52,211,153,0.18); }
+.wl-day-edit-btn {
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(96,165,250,0.3);
+  background: rgba(96,165,250,0.08);
+  color: var(--blue);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.14s;
+}
+.wl-day-edit-btn:hover { background: rgba(96,165,250,0.15); }
+
 /* ── Light theme overrides ───────────────────────────────────── */
 [data-theme="light"] .wl-daily-section { background: rgba(0,0,0,0.02); }
 [data-theme="light"] .wl-daily-header  { background: rgba(0,0,0,0.02); }
@@ -8576,8 +8609,13 @@ div[style*="data-table"] .data-table-wrap,
   }
   .wl-day-pair-name { font-size: 11px; }
   .wl-day-footer { flex-direction: column; align-items: stretch; }
+  .wl-day-action-btns { align-self: flex-end; }
   .wl-day-clear-btn { align-self: flex-end; }
   .wl-daily-header { padding: 12px 14px 10px; }
+  /* 7-day tabs — shrink to fit on narrow screens */
+  .wl-day-tab { min-width: 44px; padding: 8px 4px 6px; }
+  .wl-day-tab-short { font-size: 10px; letter-spacing: 0; }
+  .wl-day-tab-date { font-size: 9px; }
 }
 
 /* ────────────────────────────────────────────────────────────────

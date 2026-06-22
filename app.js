@@ -3402,23 +3402,23 @@ function _wlRenderWeekContent(week, container) {
 /* ══════════════════════════════════════════════════════════════════
    DAILY GAMEPLAN — per-day sub-analysis within a week
    ══════════════════════════════════════════════════════════════════ */
-const _WL_DAYS = ['mon','tue','wed','thu','fri'];
-const _WL_DAY_LABELS = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday' };
-const _WL_DAY_SHORT  = { mon:'MON', tue:'TUE', wed:'WED', thu:'THU', fri:'FRI' };
+const _WL_DAYS = ['sun','mon','tue','wed','thu','fri','sat'];
+const _WL_DAY_LABELS = { sun:'Sunday', mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday', sat:'Saturday' };
+const _WL_DAY_SHORT  = { sun:'SUN', mon:'MON', tue:'TUE', wed:'WED', thu:'THU', fri:'FRI', sat:'SAT' };
 
-// Derive actual dates for each day of the week from weekDate (YYYY-MM-DD = Monday)
+// Derive actual dates for each day of the week from weekDate (YYYY-MM-DD)
+// Week runs Sun–Sat. weekDate can be any day within the week (we normalise to Sunday).
 function _wlWeekDates(weekDate) {
   const base = new Date(weekDate + 'T00:00:00');
-  // weekDate is always Monday; if the calendar starts Sun, adjust
-  const dow = base.getDay(); // 0=Sun
-  // Normalize to Monday of the week
-  const mon = new Date(base);
-  if (dow === 0) mon.setDate(base.getDate() + 1);
-  else if (dow !== 1) mon.setDate(base.getDate() - (dow - 1));
+  const dow = base.getDay(); // 0=Sun … 6=Sat
+  // Find the Sunday of this week
+  const sun = new Date(base);
+  sun.setDate(base.getDate() - dow);
   const dates = {};
+  // _WL_DAYS order: sun, mon, tue, wed, thu, fri, sat  (indices 0–6)
   _WL_DAYS.forEach((d, i) => {
-    const dd = new Date(mon);
-    dd.setDate(mon.getDate() + i);
+    const dd = new Date(sun);
+    dd.setDate(sun.getDate() + i);
     dates[d] = dd.toISOString().slice(0, 10);
   });
   return dates;
@@ -3576,9 +3576,17 @@ function _wlBuildDailyGameplan(week) {
               }).join('')}
             </div>
           </div>
-          <button class="wl-day-clear-btn" onclick="_wlClearDayPlan('${week.id}','${activeDay}')">
-            🗑 Clear Day
-          </button>
+          <div class="wl-day-action-btns">
+            <button class="wl-day-save-btn" onclick="_wlSaveDayPlanManual('${week.id}','${activeDay}')" title="Save day plan">
+              💾 Save
+            </button>
+            <button class="wl-day-edit-btn" onclick="_wlEditDayPlan('${week.id}','${activeDay}')" title="Edit day plan">
+              ✎ Edit
+            </button>
+            <button class="wl-day-clear-btn" onclick="_wlClearDayPlan('${week.id}','${activeDay}')">
+              🗑 Delete
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -3656,6 +3664,39 @@ async function _wlSetDayMindset(weekId, day, mindset, btn) {
 }
 
 /* ── Clear an entire day's plan ── */
+
+
+/* ── Manual Save: flush current textarea values then save to cloud ── */
+async function _wlSaveDayPlanManual(weekId, day) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  // Flush overall note textarea
+  const noteTA = document.getElementById(`wl-day-note-${weekId}-${day}`);
+  if (noteTA) await _wlSaveDayNote(weekId, day, noteTA.value);
+  // Flush pair note textareas
+  if (week.pairs) {
+    for (const p of week.pairs) {
+      const rows = document.querySelectorAll(`.wl-day-pair-note`);
+      rows.forEach(ta => {
+        if (ta.getAttribute('data-pair') === p.name || (ta.placeholder || '').includes(p.name)) {
+          _wlSaveDayPairNote(weekId, day, p.name, ta.value);
+        }
+      });
+    }
+  }
+  await _wlSaveWeek(week);
+  showToast('Day plan saved ✓', 'success');
+}
+
+/* ── Edit: scroll to the note textarea and focus it ── */
+function _wlEditDayPlan(weekId, day) {
+  const noteTA = document.getElementById(`wl-day-note-${weekId}-${day}`);
+  if (noteTA) {
+    noteTA.focus();
+    noteTA.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
 async function _wlClearDayPlan(weekId, day) {
   const week = _wlData.find(w => w.id === weekId);
   if (!week) return;
