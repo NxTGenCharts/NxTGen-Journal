@@ -1949,7 +1949,7 @@ function openPairDrilldown(pair) {
       '<td class="mono">' + (t.rr || '—') + '</td>',
       '<td class="' + pnlCls + ' mono">' + formatPnl(t, getAccSizeForAccount(t.account)) + '</td>',
       '<td><span class="pill ' + outCls + '" style="font-size:10px">' + t.outcome + '</span></td>',
-      '<td style="font-size:11px;color:var(--text2)">' + (t.kz || '—') + '</td>',
+      '<td>' + kzPill(t.kz) + '</td>',
       '<td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">' + (t.account || '—') + '</td>',
       '</tr>'
     ].join('');
@@ -2120,7 +2120,7 @@ function _buildDrillRows(list) {
       '<td class="mono">' + (t.rr || '—') + '</td>',
       '<td class="' + pnlCls + ' mono">' + formatPnl(t, getAccSizeForAccount(t.account)) + '</td>',
       '<td><span class="pill ' + outCls + '" style="font-size:10px">' + t.outcome + '</span></td>',
-      '<td style="font-size:11px;color:var(--text2)">' + (t.kz || '—') + '</td>',
+      '<td>' + kzPill(t.kz) + '</td>',
       '<td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">' + (t.account || '—') + '</td>',
       '</tr>'
     ].join('');
@@ -2220,7 +2220,8 @@ function buildKillzoneTable(sortCol) {
     const grade      = wr >= 80 ? 'A+' : wr >= 70 ? 'A' : wr >= 60 ? 'B' : wr >= 50 ? 'C' : 'D';
     const gradeClass = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
     const pnlDisp    = _fmtAvgPnl(avgDollars, st);
-    return `<tr class="pair-row-clickable" onclick="openKzDrilldown(this.dataset.s)" data-s="${s}" style="cursor:pointer"><td class="bold">${icon} ${s}</td><td>${count}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}" style="font-size:11px">${pnlDisp}</td><td><span class="pill ${gradeClass}">${grade}</span></td></tr>`;
+    const kzRowClass = s === 'London' ? 'kz-row-london' : s === 'New York' ? 'kz-row-ny' : s === 'Asian' ? 'kz-row-asian' : '';
+    return `<tr class="pair-row-clickable ${kzRowClass}" onclick="openKzDrilldown(this.dataset.s)" data-s="${s}" style="cursor:pointer"><td class="bold">${kzPill(s)}</td><td>${count}</td><td><span class="pill ${wrClass}">${wr}%</span></td><td class="${pnlClass}" style="font-size:11px">${pnlDisp}</td><td><span class="pill ${gradeClass}">${grade}</span></td></tr>`;
   }).join('');
 }
 
@@ -2354,6 +2355,27 @@ function refreshPairFilter() {
 
 // ── TRADE TABLE ───────────────────────────────────────
 function starsHTML(n) { n = Math.max(3, Math.min(5, n || 3)); return '★'.repeat(n) + '<span class="empty">' + '★'.repeat(5 - n) + '</span>'; }
+
+/* Semantic killzone pill — maps session name → colour class */
+function kzPill(session) {
+  if (!session) return '<span class="pill pill-grey">—</span>';
+  const map = {
+    'London':   'kz-pill-london',
+    'New York': 'kz-pill-ny',
+    'Asian':    'kz-pill-asian',
+    'Tokyo':    'kz-pill-asian'
+  };
+  const cls = map[session] || 'pill pill-grey';
+  const icons = { 'London': '🇬🇧 ', 'New York': '🗽 ', 'Asian': '🌏 ', 'Tokyo': '🌏 ' };
+  const icon = icons[session] || '';
+  return `<span class="${cls}">${icon}${session}</span>`;
+}
+
+/* Semantic killzone text colour (for plain-text cells) */
+function kzColor(session) {
+  const map = { 'London': 'var(--kz-london)', 'New York': 'var(--kz-ny)', 'Asian': 'var(--kz-asian)', 'Tokyo': 'var(--kz-asian)' };
+  return map[session] || 'var(--text2)';
+}
 let _bulkSelected = new Set();
 
 function renderTradeTable(list) {
@@ -2373,7 +2395,7 @@ function renderTradeTable(list) {
       <td class="mono">${t.rr}</td>
       <td class="${pnlC} mono">${t.pnl > 0 ? '+' : ''}${t.pnl}%</td>
       <td class="${outC}">${t.outcome}</td>
-      <td style="color:var(--text2)">${t.kz}</td>
+      <td>${kzPill(t.kz)}</td>
       <td style="color:var(--text2);font-size:12px">${t.strategy || '—'}</td>
       <td style="color:var(--text2);font-size:12px">${t.account}</td>
       <td class="stars">${starsHTML(t.rating)}</td>
@@ -2510,7 +2532,7 @@ function _renderDetail(id) {
       <span class="pill ${t.outcome === 'Win' ? 'pill-green' : t.outcome === 'Loss' ? 'pill-red' : 'pill-blue'}">${t.outcome}</span>
       <span class="pill ${t.pos === 'Buy' ? 'pill-green' : 'pill-red'}">${t.pos}</span>
       <span class="pill pill-grey">${t.rr}</span>
-      <span class="pill pill-grey">${t.kz}</span>
+      <span class="pill pill-grey">${kzPill(t.kz)}</span>
     </div>`;
 
   const tabsHTML = ['overview', 'charts', 'notes', 'review'].map(tab => `
@@ -6169,7 +6191,7 @@ function renderQuarterPage(year, q) {
     const pnlC = tDollars > 0 ? 'outcome-win' : tDollars < 0 ? 'outcome-loss' : 'outcome-be';
     const outC = t.outcome === 'Win' ? 'outcome-win' : t.outcome === 'Loss' ? 'outcome-loss' : 'outcome-be';
     const posC = t.pos === 'Buy' ? 'pos-buy' : 'pos-sell';
-    return `<tr onclick="openDetail(${t.id})" style="cursor:pointer"><td class="mono" style="color:var(--text2)">${t.date}</td><td class="bold">${t.pair}</td><td><span class="${posC}">${t.pos}</span></td><td class="mono">${t.rr}</td><td class="${pnlC} mono">${pnlFmt}</td><td class="${outC}">${t.outcome}</td><td style="color:var(--text2)">${t.kz}</td><td style="color:var(--text2);font-size:12px">${t.strategy || '—'}</td><td class="stars">${starsHTML(t.rating)}</td></tr>`;
+    return `<tr onclick="openDetail(${t.id})" style="cursor:pointer"><td class="mono" style="color:var(--text2)">${t.date}</td><td class="bold">${t.pair}</td><td><span class="${posC}">${t.pos}</span></td><td class="mono">${t.rr}</td><td class="${pnlC} mono">${pnlFmt}</td><td class="${outC}">${t.outcome}</td><td>${kzPill(t.kz)}</td><td style="color:var(--text2);font-size:12px">${t.strategy || '—'}</td><td class="stars">${starsHTML(t.rating)}</td></tr>`;
   }).join('');
   // Compute % metrics using _pctOfTrade for quarter page
   const qNetPct    = qt.reduce((a,t) => a+_pctOfTrade(t), 0);

@@ -13,8 +13,8 @@
 <!-- Google Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900;1,14..32,400&family=JetBrains+Mono:wght@400;500;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900;1,14..32,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900;1,14..32,400&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900;1,14..32,400&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet"></noscript>
 
 <!-- App Stylesheet -->
 <link rel="stylesheet" href="styles.css">
@@ -144,26 +144,27 @@
             </div>
           </div>
 
-          <div class="kpi-grid">
-            <div class="kpi-card"><div class="kpi-label">Total trades</div><div class="kpi-value blue" id="kpi-total">—</div></div>
-            <div class="kpi-card"><div class="kpi-label">Win rate</div><div class="kpi-value green" id="kpi-wr">—</div></div>
-            <div class="kpi-card kpi-card--toggle" id="kpi-pnl-card" onclick="toggleNetPnl()" title="Tap to toggle $ / %">
+          <div class="kpi-grid kpi-grid-bento">
+            <div class="kpi-card kpi-card-hero" style="grid-column:1/3">
+              <div class="kpi-label">Win rate</div>
+              <div class="kpi-value green" id="kpi-wr">—</div>
+            </div>
+            <div class="kpi-card kpi-card-hero pnl-hero kpi-card--toggle" id="kpi-pnl-card" onclick="toggleNetPnl()" title="Tap to toggle $ / %" style="grid-column:3/5">
               <div class="kpi-label">Net PnL <span class="kpi-toggle-hint">tap to toggle</span></div>
               <div class="kpi-value green" id="kpi-pnl">—</div>
               <canvas id="kpi-sparkline" style="width:100%;height:36px;margin-top:6px;display:none"></canvas>
             </div>
+            <div class="kpi-card"><div class="kpi-label">Total trades</div><div class="kpi-value blue" id="kpi-total">—</div></div>
             <div class="kpi-card kpi-card--toggle" id="kpi-pf-card" onclick="togglePf()" title="Tap to toggle Profit Factor / Expectancy">
               <div class="kpi-label">Profit factor <span class="kpi-toggle-hint">tap to toggle</span></div>
               <div class="kpi-value gold" id="kpi-pf">—</div>
             </div>
-          </div>
-          <div class="kpi-grid" style="margin-bottom:16px">
-            <div class="kpi-card"><div class="kpi-label">Avg win</div><div class="kpi-value green" id="kpi-aw">—</div></div>
-            <div class="kpi-card"><div class="kpi-label">Avg loss</div><div class="kpi-value red" id="kpi-al">—</div></div>
             <div class="kpi-card"><div class="kpi-label">Risk:reward</div><div class="kpi-value blue" id="kpi-rr">—</div></div>
             <div class="kpi-card"><div class="kpi-label">Win streak</div><div class="kpi-value teal" id="kpi-ws">—</div></div>
           </div>
-          <div class="kpi-grid" style="margin-bottom:16px">
+          <div class="kpi-grid" style="margin-bottom:10px">
+            <div class="kpi-card"><div class="kpi-label">Avg win</div><div class="kpi-value green" id="kpi-aw">—</div></div>
+            <div class="kpi-card"><div class="kpi-label">Avg loss</div><div class="kpi-value red" id="kpi-al">—</div></div>
             <div class="kpi-card"><div class="kpi-label">Max drawdown</div><div class="kpi-value green" id="kpi-dd">—</div></div>
             <div class="kpi-card" title="% of trades rated 4★ or 5★ — your execution quality score">
               <div class="kpi-label">Consistency score</div>
