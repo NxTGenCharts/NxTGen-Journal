@@ -3408,10 +3408,11 @@ const _WL_DAY_SHORT  = { sun:'SUN', mon:'MON', tue:'TUE', wed:'WED', thu:'THU', 
 
 // Derive actual dates for each day of the week from weekDate (YYYY-MM-DD)
 // Week runs Sun–Sat. weekDate can be any day within the week (we normalise to Sunday).
+// IMPORTANT: use local date parts (not toISOString) to avoid UTC timezone shift bugs.
 function _wlWeekDates(weekDate) {
   const base = new Date(weekDate + 'T00:00:00');
   const dow = base.getDay(); // 0=Sun … 6=Sat
-  // Find the Sunday of this week
+  // Find the Sunday of this week (local time)
   const sun = new Date(base);
   sun.setDate(base.getDate() - dow);
   const dates = {};
@@ -3419,7 +3420,11 @@ function _wlWeekDates(weekDate) {
   _WL_DAYS.forEach((d, i) => {
     const dd = new Date(sun);
     dd.setDate(sun.getDate() + i);
-    dates[d] = dd.toISOString().slice(0, 10);
+    // Use local date parts to avoid UTC offset shifting the date
+    const yy = dd.getFullYear();
+    const mm = String(dd.getMonth() + 1).padStart(2, '0');
+    const dy = String(dd.getDate()).padStart(2, '0');
+    dates[d] = `${yy}-${mm}-${dy}`;
   });
   return dates;
 }
