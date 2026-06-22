@@ -6933,9 +6933,19 @@ function mobNavActivate(pageId) {
 }
 
 function mobNavMore() {
-  document.getElementById('mob-more-sheet')?.classList.add('open');
-  document.getElementById('mob-more-overlay')?.classList.add('show');
-  document.body.style.overflow = 'hidden';
+  const sheet = document.getElementById('mob-more-sheet');
+  const overlay = document.getElementById('mob-more-overlay');
+  if (!sheet) return;
+  const isOpen = sheet.classList.contains('open');
+  if (isOpen) {
+    sheet.classList.remove('open');
+    overlay?.classList.remove('show');
+    document.body.style.overflow = '';
+  } else {
+    sheet.classList.add('open');
+    overlay?.classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
 }
 
 function mobMoreClose() {
@@ -8751,26 +8761,3 @@ function _mt5FreqLabel(ms) {
   return `${ms/3600000}h`;
 }
 
-
-/* ═══ Mobile: Table horizontal scroll — fade mask helper ═══ */
-(function() {
-  function initTableScrollMasks() {
-    document.querySelectorAll('.data-table-wrap, .table-wrap').forEach(function(wrap) {
-      function update() {
-        const atEnd = wrap.scrollLeft + wrap.clientWidth >= wrap.scrollWidth - 4;
-        wrap.classList.toggle('scroll-end', atEnd);
-      }
-      wrap.addEventListener('scroll', update, { passive: true });
-      update();
-    });
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initTableScrollMasks);
-  } else {
-    initTableScrollMasks();
-  }
-  // Re-init after dynamic content renders
-  const _origBuildPairTable = window.buildPairTable;
-  const _origBuildKzTable   = window.buildKillzoneTable;
-  setTimeout(initTableScrollMasks, 800);
-})();
