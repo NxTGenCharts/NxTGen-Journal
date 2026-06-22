@@ -140,6 +140,9 @@ const AFFIRMATIONS=["I only take A+ setups. I am patient.","I follow my plan. I 
 let trades = [];
 let deletedTrades = [];
 let _pnlToggleMode = '%'; // '%' (default) | '$' — toggled by tapping Net PnL card
+let _modalChecklist = []; // checked items in new-trade modal
+let _checklistWarningAcked = false; // allows bypass on second save click
+let _eqCurveMode = 'pct'; // equity curve display mode
 // Dashboard date range filter — null means all-time
 let _dashFilter = { from: null, to: null, preset: 'all' };
 // Filtered trades for dashboard (all unless filter is active)
@@ -196,6 +199,8 @@ function _rowToTrade(row) {
     chartLabels: row.chart_labels || [...CHART_LABELS],
     mistakes: row.mistakes || '',
     source:   row.source || '',
+    plannedRr: row.planned_rr || '',
+    wouldRetake: row.would_retake !== undefined ? row.would_retake : null,
   };
 }
 
@@ -340,6 +345,8 @@ async function _cloudSaveTrade(t) {
     chart_labels: s.chartLabels || t.chartLabels || [...CHART_LABELS],
     mistakes:     s.mistakes !== undefined ? s.mistakes : '',
     source:       t.source || '',
+    planned_rr:   t.plannedRr || '',
+    would_retake: s.wouldRetake !== undefined ? s.wouldRetake : (t.wouldRetake !== undefined ? t.wouldRetake : null),
   };
 
   let error;
@@ -2506,9 +2513,9 @@ function _renderDetail(id) {
       <span class="pill pill-grey">${t.kz}</span>
     </div>`;
 
-  const tabsHTML = ['overview', 'charts', 'notes'].map(tab => `
+  const tabsHTML = ['overview', 'charts', 'notes', 'review'].map(tab => `
     <div class="det-tab${_detActiveTab === tab ? ' active' : ''}" data-tab="${tab}" onclick="_switchDetTab('${tab}',${id})">
-      ${tab === 'overview' ? 'Overview' : tab === 'charts' ? '📷 Charts' : '📝 Notes'}
+      ${tab === 'overview' ? 'Overview' : tab === 'charts' ? '📷 Charts' : tab === 'notes' ? '📝 Notes' : '🔍 Review'}
     </div>`).join('');
 
   const viewStats = `
@@ -2654,6 +2661,91 @@ function _renderDetail(id) {
       <button class="save-btn" id="det-save" onclick="detSave(${id})">💾 Save Notes</button>
     </div>`;
 
+  // ── Review Tab ─────────────────────────────────────────────────────────
+  const plannedRrVal = t.plannedRr || '';
+  const actualRrNum  = (() => { const m = (t.rr || '').match(/1:([\d.]+)/); return m ? parseFloat(m[1]) : null; })();
+  const plannedRrNum = (() => { const m = plannedRrVal.match(/1:([\d.]+)/); return m ? parseFloat(m[1]) : null; })();
+  const rrDiff = (actualRrNum && plannedRrNum) ? (actualRrNum - plannedRrNum).toFixed(2) : null;
+  const rrDiffColor = rrDiff === null ? 'var(--text3)' : parseFloat(rrDiff) >= 0 ? 'var(--green)' : 'var(--red)';
+  const retakeState = s.wouldRetake !== undefined ? s.wouldRetake : t.wouldRetake;
+  const checklistScore = ((s.checklist || t.checklist || []).length / CHECKLIST_ITEMS.length * 100).toFixed(0);
+
+  const reviewContent = `
+    <div class="det-tab-content${_detActiveTab === 'review' ? ' active' : ''}" data-tab="review">
+      <div class="detail-section">
+        <div class="detail-section-label">R:R Analysis</div>
+        <div class="review-rr-grid">
+          <div class="review-stat"><div class="review-stat-label">Planned R:R</div>
+            ${_detEditMode
+              ? `<input type="text" class="form-input" id="e-planned-rr" value="${plannedRrVal}" placeholder="1:3" style="margin-top:4px">`
+              : `<div class="review-stat-val">${plannedRrVal || '—'}</div>`}
+          </div>
+          <div class="review-stat"><div class="review-stat-label">Actual R:R</div><div class="review-stat-val">${t.rr || '—'}</div></div>
+          <div class="review-stat"><div class="review-stat-label">Difference</div>
+            <div class="review-stat-val" style="color:${rrDiffColor}">${rrDiff !== null ? (parseFloat(rrDiff) >= 0 ? '+' : '') + rrDiff + 'R' : '—'}</div>
+          </div>
+        </div>
+        ${rrDiff !== null ? `<div style="font-size:11px;color:var(--text3);margin-top:8px;padding:8px;background:var(--glass-0);border-radius:var(--r-sm);border:1px solid var(--glass-border)">
+          ${parseFloat(rrDiff) >= 0 ? '✅ You captured more R than planned — good patience.' : '⚠️ You captured less R than planned — did you cut early or move SL?'}
+        </div>` : ''}
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-label">Checklist Score</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+          <div style="flex:1;height:8px;background:var(--glass-border);border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${checklistScore}%;background:${parseInt(checklistScore)>=80?'var(--green)':parseInt(checklistScore)>=50?'var(--gold)':'var(--red)'};border-radius:4px;transition:width .4s"></div>
+          </div>
+          <span style="font-size:13px;font-weight:600;color:${parseInt(checklistScore)>=80?'var(--green)':parseInt(checklistScore)>=50?'var(--gold)':'var(--red)'}">${checklistScore}%</span>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px">${(s.checklist||t.checklist||[]).length} of ${CHECKLIST_ITEMS.length} criteria met</div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-label">Would You Take This Trade Again?</div>
+        <div style="display:flex;gap:10px;margin-top:8px">
+          <button class="retake-btn${retakeState === true ? ' active-yes' : ''}" onclick="_setRetake(${id},true)">✅ Yes, same setup</button>
+          <button class="retake-btn${retakeState === false ? ' active-no' : ''}" onclick="_setRetake(${id},false)">❌ No, avoid next time</button>
+        </div>
+        ${retakeState !== null && retakeState !== undefined ? `
+        <div style="margin-top:10px;padding:10px;background:var(--glass-0);border:1px solid var(--glass-border);border-radius:var(--r-sm);font-size:12px;color:var(--text2)">
+          ${retakeState
+            ? '✅ Marked as a replicable setup. Add it to your playbook if it isn\'t already.'
+            : '❌ Marked to avoid. Review what made this trade suboptimal and document the lesson.'}
+        </div>` : ''}
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-label">Trade Quality Score</div>
+        <div style="margin-top:8px">
+          ${(() => {
+            let score = 0, max = 0;
+            // Rating (max 30)
+            max += 30; score += ((t.rating || 3) / 5) * 30;
+            // Checklist (max 30)
+            max += 30; score += (parseInt(checklistScore) / 100) * 30;
+            // R:R hit/miss (max 20)
+            max += 20;
+            if (rrDiff !== null) score += parseFloat(rrDiff) >= 0 ? 20 : Math.max(0, 20 + parseFloat(rrDiff) * 5);
+            // Would retake (max 20)
+            max += 20; if (retakeState === true) score += 20; else if (retakeState === false) score += 0; else score += 10;
+            const pct = Math.round((score / max) * 100);
+            const grade = pct >= 85 ? 'A' : pct >= 70 ? 'B' : pct >= 55 ? 'C' : pct >= 40 ? 'D' : 'F';
+            const col = pct >= 85 ? 'var(--green)' : pct >= 70 ? 'var(--teal)' : pct >= 55 ? 'var(--gold)' : 'var(--red)';
+            return `<div style="display:flex;align-items:center;gap:16px">
+              <div style="font-size:36px;font-weight:700;color:${col};font-family:var(--font-mono)">${grade}</div>
+              <div style="flex:1">
+                <div style="height:8px;background:var(--glass-border);border-radius:4px;overflow:hidden;margin-bottom:6px">
+                  <div style="height:100%;width:${pct}%;background:${col};border-radius:4px;transition:width .4s"></div>
+                </div>
+                <div style="font-size:12px;color:var(--text3)">${pct}/100 — based on rating, checklist, R:R execution &amp; replay vote</div>
+              </div>
+            </div>`;
+          })()}
+        </div>
+      </div>
+    </div>`;
+
   const overviewContent = `
     <div class="det-tab-content${_detActiveTab === 'overview' ? ' active' : ''}" data-tab="overview">
       ${_detEditMode ? editForm : viewStats}
@@ -2663,7 +2755,7 @@ function _renderDetail(id) {
   document.getElementById('detail-content').innerHTML =
     panelHeader + header +
     `<div class="det-tabs">${tabsHTML}</div>` +
-    overviewContent + chartsContent + notesContent;
+    overviewContent + chartsContent + notesContent + reviewContent;
 }
 
 function closeDetail() {
@@ -2687,6 +2779,11 @@ function toggleCheck(id, idx) {
 }
 function setEmo(id, val) {
   getTS(id).emotion = val;
+  _renderDetail(id);
+  _bgSave(id);
+}
+function _setRetake(id, val) {
+  getTS(id).wouldRetake = val;
   _renderDetail(id);
   _bgSave(id);
 }
@@ -2865,6 +2962,7 @@ function openModal(prefill) {
   document.getElementById('m-pair-custom').style.display = 'none';
   document.getElementById('m-pos').value = 'Buy';
   document.getElementById('m-rr').value = '';
+  const mPlannedRr = document.getElementById('m-planned-rr'); if (mPlannedRr) mPlannedRr.value = '';
   document.getElementById('m-pnl').value = '';
   document.getElementById('m-outcome').value = 'Win';
   document.getElementById('m-kz').value = 'London';
@@ -2883,10 +2981,32 @@ function openModal(prefill) {
   document.getElementById('m-risk').value = '0.5%';
   document.getElementById('m-pretrade').value = '';
   document.getElementById('m-notes').value = '';
+  // Reset modal checklist
+  _modalChecklist = [];
+  _checklistWarningAcked = false;
+  const mcw = document.getElementById('modal-checklist-warn');
+  if (mcw) mcw.style.display = 'none';
+  const mcg = document.getElementById('modal-checklist-grid');
+  if (mcg) mcg.innerHTML = CHECKLIST_ITEMS.map((item, i) =>
+    `<div class="mcl-item" id="mcl-${i}" onclick="_toggleModalCheck(${i})">
+      <div class="cl-box"></div><span class="cl-text">${item}</span>
+    </div>`).join('');
   if (prefill && prefill.date) document.getElementById('m-date').value = prefill.date;
   document.getElementById('modal').classList.add('open');
 }
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
+function _toggleModalCheck(i) {
+  const idx = _modalChecklist.indexOf(i);
+  if (idx >= 0) _modalChecklist.splice(idx, 1); else _modalChecklist.push(i);
+  const el = document.getElementById('mcl-' + i);
+  if (!el) return;
+  el.classList.toggle('checked', _modalChecklist.includes(i));
+  el.querySelector('.cl-box').textContent = _modalChecklist.includes(i) ? '✓' : '';
+  // Hide warning if user is ticking items
+  const mcw = document.getElementById('modal-checklist-warn');
+  if (mcw) mcw.style.display = 'none';
+  _checklistWarningAcked = false;
+}
 function syncCustomPair(val) {
   const ci = document.getElementById('m-pair-custom');
   if (val === '__custom__') { ci.style.display = 'block'; ci.focus(); } else ci.style.display = 'none';
@@ -2913,6 +3033,24 @@ function getPairValue() {
 async function saveTrade() {
   const dateVal = document.getElementById('m-date').value;
   if (!dateVal) { alert('Please select a date'); return; }
+
+  // ── Pre-trade checklist enforcement ──────────────────────────────────
+  // Key checklist items that should be confirmed before saving (indices match CHECKLIST_ITEMS)
+  const coreChecks = [0, 2, 4, 6]; // HTF PDA, Liquidity Sweep, CISD, Active Killzone
+  const missedCore = coreChecks.filter(i => !_modalChecklist.includes(i)).map(i => CHECKLIST_ITEMS[i]);
+  if (missedCore.length > 0 && !_checklistWarningAcked) {
+    // Show inline warning but allow override
+    const warnEl = document.getElementById('modal-checklist-warn');
+    if (warnEl) {
+      warnEl.style.display = 'flex';
+      warnEl.querySelector('.mcw-items').textContent = missedCore.join(' · ');
+      _checklistWarningAcked = true; // allow second click to bypass
+    }
+    const btn = document.querySelector('#modal .btn-primary');
+    if (btn) { btn.disabled = false; btn.textContent = '💾 Save Trade'; }
+    return;
+  }
+  _checklistWarningAcked = false;
 
   const btn = document.querySelector('#modal .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
@@ -2950,8 +3088,9 @@ async function saveTrade() {
     risk:         document.getElementById('m-risk').value,
     notes:        document.getElementById('m-notes').value,
     pretrade:     document.getElementById('m-pretrade').value,
+    planned_rr:   document.getElementById('m-planned-rr').value.trim() || '',
     emotion:      'Calm',
-    checklist:    [],
+    checklist:    [..._modalChecklist],
     charts:       [],
     chart_labels: [...CHART_LABELS],
     mistakes:     '',
@@ -5135,6 +5274,10 @@ function updateKPIs() {
 
   // ── Equity sparkline in Net PnL card ──
   _drawSparkline();
+  // ── New feature renders ──
+  _renderConsistencyKPI(trades);
+  _checkDailyLossLimit(trades);
+  setTimeout(() => { _drawEquityCurve(); _renderHeatmap(trades); }, 50);
   const subEl = document.getElementById('dash-last-updated');
   if (subEl) { const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' }); subEl.textContent = 'Last updated ' + now + ' WAT'; }
 
@@ -5248,6 +5391,7 @@ function setDashPreset(preset, btn) {
   if (cust) cust.style.display = preset === 'custom' ? 'flex' : 'none';
   // Rebuild all dashboard views with filtered trades
   updateKPIs(); buildPairTable(); buildKillzoneTable(); buildStrategyTable(); buildMonthlyTable();
+  _drawEquityCurve(); _renderHeatmap(_getFilteredTrades()); _renderConsistencyKPI(_getFilteredTrades()); _checkDailyLossLimit(trades);
 }
 
 // ── Profit Factor / Expectancy toggle ─────────────────
@@ -5317,6 +5461,226 @@ function _drawSparkline() {
   ctx.strokeStyle = col;
   ctx.lineWidth = 1.5;
   ctx.stroke();
+}
+
+// ── Equity Curve (full chart on dashboard) ────────────────────────────────
+function setEqMode(mode, btn) {
+  _eqCurveMode = mode;
+  document.querySelectorAll('#eq-btn-pct,#eq-btn-usd').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _drawEquityCurve();
+}
+function _drawEquityCurve() {
+  const canvas = document.getElementById('equity-curve-canvas');
+  const emptyEl = document.getElementById('equity-curve-empty');
+  if (!canvas) return;
+  const trades = _getFilteredTrades();
+  const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date));
+  if (sorted.length < 2) {
+    canvas.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'block';
+    return;
+  }
+  canvas.style.display = 'block';
+  if (emptyEl) emptyEl.style.display = 'none';
+  const useDollar = _eqCurveMode === 'usd';
+  const _val = t => {
+    if (useDollar) return toPnlDollars(t, getAccSizeForAccount(t.account));
+    return _pctOfTrade(t);
+  };
+  let cum = 0;
+  const points = [{ x: 0, y: 0, date: 'Start' }];
+  sorted.forEach((t, i) => { cum += _val(t); points.push({ x: i + 1, y: cum, date: t.date, pair: t.pair, outcome: t.outcome }); });
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth - 32 || 600;
+  const H = 180;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 16, right: 16, bottom: 28, left: 52 };
+  const cW = W - pad.left - pad.right;
+  const cH = H - pad.top - pad.bottom;
+  const ys = points.map(p => p.y);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const rangeY = maxY - minY || 1;
+  const px = i => pad.left + (i / (points.length - 1)) * cW;
+  const py = v => pad.top + cH - ((v - minY) / rangeY) * cH;
+
+  // Zero line
+  const zeroY = py(0);
+  ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(pad.left + cW, zeroY);
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+
+  // Y axis labels
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = '10px system-ui,sans-serif'; ctx.textAlign = 'right';
+  [minY, (minY + maxY) / 2, maxY].forEach(v => {
+    const label = useDollar ? (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(0) : (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+    ctx.fillText(label, pad.left - 6, py(v) + 4);
+  });
+
+  // X axis date labels (first + last + midpoint)
+  ctx.textAlign = 'center';
+  [[0, points[0].date], [Math.floor(points.length / 2), points[Math.floor(points.length / 2)]?.date], [points.length - 1, points[points.length - 1].date]].forEach(([i, d]) => {
+    if (d && d !== 'Start') ctx.fillText(d.slice(5), px(i), H - 6);
+  });
+
+  const isPos = points[points.length - 1].y >= 0;
+  const colPos = '#22c55e', colNeg = '#ef4444';
+
+  // Gradient fill — split at zero
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + cH);
+  grad.addColorStop(0, isPos ? 'rgba(34,197,94,0.28)' : 'rgba(239,68,68,0.28)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.beginPath();
+  ctx.moveTo(px(0), py(points[0].y));
+  points.forEach((p, i) => { if (i > 0) ctx.lineTo(px(i), py(p.y)); });
+  ctx.lineTo(px(points.length - 1), py(0));
+  ctx.lineTo(px(0), py(0));
+  ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  // Main line — colour by segment
+  for (let i = 1; i < points.length; i++) {
+    ctx.beginPath();
+    ctx.moveTo(px(i - 1), py(points[i - 1].y));
+    ctx.lineTo(px(i), py(points[i].y));
+    ctx.strokeStyle = points[i].outcome === 'Win' ? colPos : points[i].outcome === 'Loss' ? colNeg : '#60a5fa';
+    ctx.lineWidth = 2; ctx.stroke();
+  }
+
+  // Dots on each trade
+  points.forEach((p, i) => {
+    if (i === 0) return;
+    ctx.beginPath();
+    ctx.arc(px(i), py(p.y), 3, 0, Math.PI * 2);
+    ctx.fillStyle = p.outcome === 'Win' ? colPos : p.outcome === 'Loss' ? colNeg : '#60a5fa';
+    ctx.fill();
+  });
+
+  // Current value label
+  const last = points[points.length - 1];
+  const lastLabel = useDollar ? (last.y >= 0 ? '+$' : '-$') + Math.abs(last.y).toFixed(2) : (last.y >= 0 ? '+' : '') + last.y.toFixed(2) + '%';
+  ctx.font = 'bold 12px system-ui,sans-serif'; ctx.textAlign = 'left';
+  ctx.fillStyle = last.y >= 0 ? colPos : colNeg;
+  ctx.fillText(lastLabel, px(points.length - 1) - 40, py(last.y) - 8);
+}
+
+// ── Consistency Score KPI ─────────────────────────────────────────────────
+function _renderConsistencyKPI(trades) {
+  const el = document.getElementById('kpi-consistency');
+  const sub = document.getElementById('kpi-consistency-sub');
+  if (!el) return;
+  if (!trades.length) { el.textContent = '—'; if (sub) sub.textContent = ''; return; }
+  const highQuality = trades.filter(t => (t.rating || 0) >= 4).length;
+  const score = Math.round((highQuality / trades.length) * 100);
+  el.textContent = score + '%';
+  el.className = 'kpi-value ' + (score >= 80 ? 'green' : score >= 60 ? 'gold' : 'red');
+  if (sub) {
+    const streak = _calcConsistencyStreak(trades);
+    sub.textContent = streak > 1 ? streak + ' quality trades in a row' : highQuality + '/' + trades.length + ' rated 4★+';
+  }
+}
+function _calcConsistencyStreak(trades) {
+  const sorted = [...trades].sort((a, b) => b.date.localeCompare(a.date));
+  let streak = 0;
+  for (const t of sorted) { if ((t.rating || 0) >= 4) streak++; else break; }
+  return streak;
+}
+
+// ── Daily Loss Limit Alert ─────────────────────────────────────────────────
+function _checkDailyLossLimit(allTrades) {
+  const alertEl = document.getElementById('daily-loss-alert');
+  if (!alertEl) return;
+  const today = localToday();
+  const todayTrades = allTrades.filter(t => t.date === today);
+  if (!todayTrades.length) { alertEl.style.display = 'none'; return; }
+  const todayPnl = todayTrades.reduce((a, t) => a + _pctOfTrade(t), 0);
+  const riskPct = parseFloat((_profileData.risk || '1%').replace('%', '')) || 1;
+  const dailyLimit = riskPct * 3; // 3x single-trade risk = daily stop
+  const lossCount = todayTrades.filter(t => t.outcome === 'Loss').length;
+  const titleEl = document.getElementById('daily-loss-alert-title');
+  const bodyEl = document.getElementById('daily-loss-alert-body');
+  if (todayPnl <= -dailyLimit) {
+    alertEl.style.display = 'flex';
+    if (titleEl) titleEl.textContent = `🚨 Daily Loss Limit Reached (${todayPnl.toFixed(1)}%)`;
+    if (bodyEl) bodyEl.textContent = `You've hit your ${dailyLimit.toFixed(1)}% daily limit. Step away — protect your account.`;
+  } else if (lossCount >= 2 && todayPnl < 0) {
+    alertEl.style.display = 'flex';
+    if (titleEl) titleEl.textContent = `⚠️ ${lossCount} Losses Today (${todayPnl.toFixed(1)}%)`;
+    if (bodyEl) bodyEl.textContent = `Two consecutive losses detected. Consider pausing and reviewing your bias before the next trade.`;
+  } else {
+    alertEl.style.display = 'none';
+  }
+}
+
+// ── Correlation Heatmap (Pair × Session) ─────────────────────────────────
+function _renderHeatmap(trades) {
+  const wrap = document.getElementById('corr-heatmap-wrap');
+  if (!wrap) return;
+  const sessions = ['London', 'New York', 'Asian'];
+  // Get top pairs by trade count (max 8)
+  const pairCount = {};
+  trades.forEach(t => { pairCount[t.pair] = (pairCount[t.pair] || 0) + 1; });
+  const pairs = Object.entries(pairCount).sort((a, b) => b[1] - a[1]).slice(0, 8).map(e => e[0]);
+  if (!pairs.length) { wrap.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">No trade data yet</div>'; return; }
+
+  // Build matrix: pairs × sessions
+  const matrix = {};
+  pairs.forEach(p => {
+    matrix[p] = {};
+    sessions.forEach(s => { matrix[p][s] = { wins: 0, total: 0 }; });
+  });
+  trades.forEach(t => {
+    if (matrix[t.pair] && matrix[t.pair][t.kz]) {
+      matrix[t.pair][t.kz].total++;
+      if (t.outcome === 'Win') matrix[t.pair][t.kz].wins++;
+    }
+  });
+
+  const cellColor = (wins, total) => {
+    if (!total) return 'rgba(255,255,255,0.04)';
+    const wr = wins / total;
+    if (wr >= 0.7) return 'rgba(34,197,94,0.5)';
+    if (wr >= 0.5) return 'rgba(34,197,94,0.25)';
+    if (wr >= 0.35) return 'rgba(251,191,36,0.3)';
+    return 'rgba(239,68,68,0.35)';
+  };
+  const cellText = (wins, total) => {
+    if (!total) return '—';
+    return Math.round((wins / total) * 100) + '%<br><span style="font-size:9px;opacity:.6">' + total + 't</span>';
+  };
+
+  wrap.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:6px 10px;color:var(--text3);font-weight:500;font-size:11px">Pair</th>
+          ${sessions.map(s => `<th style="text-align:center;padding:6px 10px;color:var(--text3);font-weight:500;font-size:11px">${s}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${pairs.map(p => `
+          <tr>
+            <td style="padding:5px 10px;font-weight:600;color:var(--text);font-size:12px;white-space:nowrap">${p}</td>
+            ${sessions.map(s => {
+              const { wins, total } = matrix[p][s];
+              return `<td style="padding:5px 8px;text-align:center;border-radius:6px;background:${cellColor(wins, total)};color:var(--text);font-family:var(--font-mono);line-height:1.4">${cellText(wins, total)}</td>`;
+            }).join('')}
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="display:flex;gap:16px;margin-top:10px;padding:0 4px">
+      ${[['≥70% WR','rgba(34,197,94,0.5)'],['50–69%','rgba(34,197,94,0.25)'],['35–49%','rgba(251,191,36,0.3)'],['<35%','rgba(239,68,68,0.35)'],['No data','rgba(255,255,255,0.04)']].map(([lbl,col]) =>
+        `<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3)">
+          <div style="width:12px;height:12px;border-radius:3px;background:${col};flex-shrink:0"></div>${lbl}
+        </div>`).join('')}
+    </div>`;
 }
 
 // ── Net PnL toggle ────────────────────────────────────
@@ -5556,6 +5920,8 @@ async function _saveEdit(id) {
   if (stratVal) t.strategy = stratVal;
   if (tfVal && tfVal !== '__custom__') t.tf = tfVal;
   t.rating = ratingVal;
+  const plannedRrEdit = document.getElementById('e-planned-rr');
+  if (plannedRrEdit) t.plannedRr = plannedRrEdit.value.trim();
   trades.sort((a, b) => b.date.localeCompare(a.date));
 
   // Instant UI update — no waiting
@@ -6123,6 +6489,7 @@ function _refreshAll() {
   updateKPIs(); buildPairTable(); buildKillzoneTable(); buildStrategyTable(); buildMonthlyTable(); refreshPairFilter();
   buildSidebarYears(); renderCalendar(); renderTradeTable(trades); updateTrashBadge();
   buildAccounts();
+  setTimeout(() => { _drawEquityCurve(); _renderHeatmap(_getFilteredTrades()); }, 60);
 }
 
 // ── USER BAR (shows logged-in user + sign out button) ──
@@ -6759,8 +7126,8 @@ function openShareModal(id) {
           </div>
           <div class="sm-rule"></div>
           <div class="sm-stats">
-            <div class="sm-stat"><div class="sm-stat-lbl">RISK · REWARD</div><div class="sm-stat-val" id="sm-rr">${t.rr}</div></div>
-            <div class="sm-stat sm-stat-center"><div class="sm-stat-lbl">TF ALIGNMENT</div><div class="sm-stat-val" id="sm-tf">${t.tf || '—'}</div></div>
+            <div class="sm-stat"><div class="sm-stat-lbl">PLANNED R:R</div><div class="sm-stat-val" id="sm-planned-rr">${t.plannedRr || '—'}</div></div>
+            <div class="sm-stat sm-stat-center"><div class="sm-stat-lbl">ACTUAL R:R</div><div class="sm-stat-val" id="sm-rr">${t.rr}</div></div>
             <div class="sm-stat"><div class="sm-stat-lbl">STRATEGY</div><div class="sm-stat-val sm-stat-val-sm" id="sm-strategy">${t.strategy || '—'}</div></div>
           </div>
           <div class="sm-rule"></div>
@@ -6812,6 +7179,7 @@ function smPopulateCard(id) {
   if (badge){badge.textContent=bl;badge.className='sm-badge '+bc;}
   const arr=document.getElementById('sm-dir-arrow');
   if(arr){arr.textContent=t.pos==='Buy'?'▲':'▼';arr.className='sm-dir-arrow '+(t.pos==='Buy'?'arr-buy':'arr-sell');}
+  const prrEl = document.getElementById('sm-planned-rr'); if (prrEl) prrEl.textContent = t.plannedRr || '—';
   const glow=document.getElementById('sm-glow');
   if(glow)glow.className='sm-glow-blob '+(t.outcome==='Win'?'glow-win':t.outcome==='Loss'?'glow-loss':'glow-be');
   const chartColor=t.outcome==='Win'?'#34d399':t.outcome==='Loss'?'#f87171':'#fbbf24';

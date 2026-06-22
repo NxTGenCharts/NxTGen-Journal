@@ -135,6 +135,15 @@
               <button class="dash-filter-btn active" onclick="setDashPreset('custom',this)" style="padding:4px 10px">Apply</button>
             </div>
           </div>
+          <!-- Daily Loss Limit Alert -->
+          <div id="daily-loss-alert" style="display:none;margin-bottom:14px;padding:12px 16px;border-radius:var(--r-md);background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.35);display:flex;align-items:center;gap:10px">
+            <span style="font-size:18px">🚨</span>
+            <div>
+              <div style="font-weight:600;color:var(--red);font-size:13px" id="daily-loss-alert-title">Daily Loss Limit Reached</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:2px" id="daily-loss-alert-body">Consider stopping for the day to protect your account.</div>
+            </div>
+          </div>
+
           <div class="kpi-grid">
             <div class="kpi-card"><div class="kpi-label">Total trades</div><div class="kpi-value blue" id="kpi-total">—</div></div>
             <div class="kpi-card"><div class="kpi-label">Win rate</div><div class="kpi-value green" id="kpi-wr">—</div></div>
@@ -156,6 +165,11 @@
           </div>
           <div class="kpi-grid" style="margin-bottom:16px">
             <div class="kpi-card"><div class="kpi-label">Max drawdown</div><div class="kpi-value green" id="kpi-dd">—</div></div>
+            <div class="kpi-card" title="% of trades rated 4★ or 5★ — your execution quality score">
+              <div class="kpi-label">Consistency score</div>
+              <div class="kpi-value blue" id="kpi-consistency">—</div>
+              <div style="font-size:10px;color:var(--text3);margin-top:2px" id="kpi-consistency-sub"></div>
+            </div>
           </div>
 
           <!-- Insight -->
@@ -198,6 +212,25 @@
               <thead id="monthly-table-head"><tr><th class="sortable-th" onclick="buildMonthlyTable('month')">Month ⇅</th><th class="sortable-th" onclick="buildMonthlyTable('trades')">Trades ⇅</th><th class="sortable-th" onclick="buildMonthlyTable('wr')">Win% ⇅</th><th class="sortable-th" onclick="buildMonthlyTable('pnl')">Net PnL ⇅</th><th>Avg Win</th><th>Avg Loss</th><th class="sortable-th" onclick="buildMonthlyTable('streak')">Streak ⇅</th><th>Grade</th></tr></thead>
               <tbody id="monthly-table-body"></tbody>
             </table>
+          </div>
+
+          <!-- Equity Curve -->
+          <div class="sec-head" style="display:flex;align-items:center;justify-content:space-between">
+            Equity Curve
+            <div style="display:flex;gap:6px">
+              <button class="dash-filter-btn active" id="eq-btn-pct" onclick="setEqMode('pct',this)" style="font-size:10px;padding:3px 8px">%</button>
+              <button class="dash-filter-btn" id="eq-btn-usd" onclick="setEqMode('usd',this)" style="font-size:10px;padding:3px 8px">$</button>
+            </div>
+          </div>
+          <div style="background:var(--glass-0);border:1px solid var(--glass-border);border-radius:var(--r-md);padding:16px;margin-bottom:20px;position:relative">
+            <canvas id="equity-curve-canvas" style="width:100%;height:180px;display:block"></canvas>
+            <div id="equity-curve-empty" style="display:none;text-align:center;padding:40px;color:var(--text3);font-size:13px">No trades to chart yet</div>
+          </div>
+
+          <!-- Correlation Heatmap -->
+          <div class="sec-head">Pair × Session Heatmap <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-left:6px">Win rate %</span></div>
+          <div style="background:var(--glass-0);border:1px solid var(--glass-border);border-radius:var(--r-md);padding:16px;margin-bottom:20px;overflow-x:auto">
+            <div id="corr-heatmap-wrap"></div>
           </div>
         </div>
 
@@ -1055,6 +1088,7 @@
         <select class="form-select" id="m-pos"><option>Buy</option><option>Sell</option></select>
       </div>
       <div class="form-field"><label class="form-label">R:R</label><input type="text" class="form-input" id="m-rr" placeholder="1:3"></div>
+      <div class="form-field"><label class="form-label">Planned R:R <span style="font-size:10px;color:var(--text3);font-weight:400">(before entry)</span></label><input type="text" class="form-input" id="m-planned-rr" placeholder="1:3"></div>
       <div class="form-field"><label class="form-label">PnL %</label><input type="number" class="form-input" id="m-pnl" step="0.1" placeholder="3.5"></div>
       <div class="form-field"><label class="form-label">Outcome</label>
         <select class="form-select" id="m-outcome"><option>Win</option><option>Loss</option><option>B.E</option></select>
@@ -1095,6 +1129,20 @@
       </div>
       <div class="form-field full"><label class="form-label">Pre-Trade Notes</label><textarea class="form-textarea" id="m-pretrade" placeholder="Brief bias, setup thesis…"></textarea></div>
       <div class="form-field full"><label class="form-label">Post-Trade Reflection</label><textarea class="form-textarea" id="m-notes" placeholder="What happened? What did you learn?"></textarea></div>
+      <!-- Pre-Trade Checklist -->
+      <div class="form-field full">
+        <label class="form-label">Pre-Trade Checklist <span style="font-size:10px;color:var(--text3);font-weight:400">(tick before entry)</span></label>
+        <div class="modal-checklist-grid" id="modal-checklist-grid"></div>
+      </div>
+      <!-- Checklist warning -->
+      <div id="modal-checklist-warn" style="display:none;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:var(--r-sm);background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);margin-top:4px" class="form-field full">
+        <span style="font-size:16px;flex-shrink:0">⚠️</span>
+        <div style="font-size:12px;color:var(--text2)">
+          <strong style="color:var(--gold)">Incomplete checklist</strong> — these items aren't ticked:<br>
+          <span class="mcw-items" style="color:var(--text3);font-size:11px"></span><br>
+          <span style="font-size:11px;color:var(--text3)">Click Save again to log anyway.</span>
+        </div>
+      </div>
     </div>
     </div><!-- /modal-body -->
     <!-- Save bar — direct child of .modal flex column, never scrolls away -->

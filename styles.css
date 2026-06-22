@@ -8144,3 +8144,136 @@ div[style*="data-table"] .data-table-wrap,
   color: var(--red);
   transform: rotate(90deg) scale(1.08);
 }
+
+/* ────────────────────────────────────────────────────────────────
+   56. NEW FEATURES — Equity Curve, Heatmap, Review Tab,
+       Consistency KPI, Daily Loss Alert, Pre-Trade Checklist
+   ──────────────────────────────────────────────────────────────── */
+
+/* ── Modal Pre-Trade Checklist ─────────────────────────────────── */
+.modal-checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+.mcl-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  background: var(--glass-0);
+  border: 1px solid var(--glass-border);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  font-size: 12px;
+  color: var(--text2);
+  user-select: none;
+}
+.mcl-item:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.15); }
+.mcl-item.checked { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.35); color: var(--text); }
+.mcl-item .cl-box {
+  width: 16px; height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid var(--glass-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--green);
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+.mcl-item.checked .cl-box { border-color: var(--green); background: rgba(34,197,94,0.18); }
+.mcl-item .cl-text { line-height: 1.3; }
+
+/* ── Daily Loss Alert ──────────────────────────────────────────── */
+#daily-loss-alert {
+  animation: alertSlideIn 0.3s var(--spring-2);
+}
+@keyframes alertSlideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Review Tab ────────────────────────────────────────────────── */
+.review-rr-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 8px;
+}
+.review-stat {
+  background: var(--glass-0);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+}
+.review-stat-label {
+  font-size: 10px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.review-stat-val {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+/* Would-retake buttons */
+.retake-btn {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-0);
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.retake-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); }
+.retake-btn.active-yes { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); color: var(--green); font-weight: 600; }
+.retake-btn.active-no  { background: rgba(239,68,68,0.15);  border-color: rgba(239,68,68,0.4);  color: var(--red);   font-weight: 600; }
+
+/* ── Equity Curve Canvas ────────────────────────────────────────── */
+#equity-curve-canvas {
+  display: block;
+  width: 100%;
+  height: 180px;
+  border-radius: var(--r-sm);
+}
+
+/* ── Heatmap table ──────────────────────────────────────────────── */
+#corr-heatmap-wrap table td {
+  transition: opacity 0.15s;
+}
+#corr-heatmap-wrap table tr:hover td { opacity: 0.88; }
+
+/* ── Consistency KPI sub-label ──────────────────────────────────── */
+#kpi-consistency-sub {
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+/* ── Mobile tweaks for new features ─────────────────────────────── */
+@media (max-width: 600px) {
+  .modal-checklist-grid { grid-template-columns: 1fr 1fr; }
+  .review-rr-grid { grid-template-columns: 1fr 1fr; }
+  .review-rr-grid .review-stat:last-child { grid-column: span 2; }
+  .retake-btn { font-size: 11px; padding: 8px 8px; }
+  #equity-curve-canvas { height: 140px; }
+  .mcl-item { font-size: 11px; padding: 6px 8px; }
+}
+
+[data-theme="light"] .mcl-item { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); }
+[data-theme="light"] .mcl-item:hover { background: rgba(0,0,0,0.07); }
+[data-theme="light"] .mcl-item.checked { background: rgba(34,197,94,0.08); }
+[data-theme="light"] .retake-btn { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.12); color: var(--text2); }
+[data-theme="light"] .review-stat { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.08); }
