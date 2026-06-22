@@ -3155,15 +3155,16 @@ async function _wlLoad() {
     .order('week_date', { ascending: false });
   if (error) { console.error('wlLoad error:', error.message); return; }
   _wlData = (data || []).map(r => ({
-    id:        r.id,
-    quarter:   r.quarter,      // "2026-Q2"
+    id:          r.id,
+    quarter:     r.quarter,
     weekLabel:   r.week_label,
     weekDate:    r.week_date,
     weekDateEnd: r.week_date_end || null,
-    dxy:       r.dxy_bias || 'neu',
-    market:    r.market_bias || 'neu',
-    pairs:     r.pairs || [],
-    checklist: r.checklist || [],
+    dxy:         r.dxy_bias || 'neu',
+    market:      r.market_bias || 'neu',
+    pairs:       r.pairs || [],
+    checklist:   r.checklist || [],
+    dailyPlans:  r.daily_plans || {},
   }));
 }
 
@@ -3178,6 +3179,7 @@ async function _wlSaveWeek(week) {
     market_bias:  week.market,
     pairs:        week.pairs,
     checklist:    week.checklist,
+    daily_plans:  week.dailyPlans || {},
   };
   if (week.id) {
     const { error } = await sb.from('journal_watchlist').update(row).eq('id', week.id);
@@ -3365,6 +3367,9 @@ function _wlRenderWeekContent(week, container) {
       </div>
     </div>
 
+    <!-- ── Daily Gameplan ─────────────────────────────────────────── -->
+    ${_wlBuildDailyGameplan(week)}
+
     <!-- Economic Calendar -->
     <div class="wl-cal-section">
       <div class="wl-cal-header">
@@ -3392,6 +3397,245 @@ function _wlRenderWeekContent(week, container) {
   // Kick off calendar fetch after DOM is ready
   // Use setTimeout so the DOM is painted before fetch starts
   setTimeout(() => _wlCalAutoLoad(), 0);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DAILY GAMEPLAN — per-day sub-analysis within a week
+   ══════════════════════════════════════════════════════════════════ */
+const _WL_DAYS = ['mon','tue','wed','thu','fri'];
+const _WL_DAY_LABELS = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday' };
+const _WL_DAY_SHORT  = { mon:'MON', tue:'TUE', wed:'WED', thu:'THU', fri:'FRI' };
+
+// Derive actual dates for each day of the week from weekDate (YYYY-MM-DD = Monday)
+function _wlWeekDates(weekDate) {
+  const base = new Date(weekDate + 'T00:00:00');
+  // weekDate is always Monday; if the calendar starts Sun, adjust
+  const dow = base.getDay(); // 0=Sun
+  // Normalize to Monday of the week
+  const mon = new Date(base);
+  if (dow === 0) mon.setDate(base.getDate() + 1);
+  else if (dow !== 1) mon.setDate(base.getDate() - (dow - 1));
+  const dates = {};
+  _WL_DAYS.forEach((d, i) => {
+    const dd = new Date(mon);
+    dd.setDate(mon.getDate() + i);
+    dates[d] = dd.toISOString().slice(0, 10);
+  });
+  return dates;
+}
+
+// Determine which day tab is active — default to today if within this week, else mon
+function _wlActiveDayDefault(week) {
+  const today = localToday();
+  const dates = _wlWeekDates(week.weekDate);
+  const match = _WL_DAYS.find(d => dates[d] === today);
+  return match || 'mon';
+}
+
+let _wlActiveDayTab = {}; // weekId → active day key
+
+function _wlBuildDailyGameplan(week) {
+  if (!_wlActiveDayTab[week.id]) {
+    _wlActiveDayTab[week.id] = _wlActiveDayDefault(week);
+  }
+  const activeDay = _wlActiveDayTab[week.id];
+  const dates = _wlWeekDates(week.weekDate);
+  const today = localToday();
+
+  const tabsHtml = _WL_DAYS.map(d => {
+    const isActive = d === activeDay;
+    const isToday  = dates[d] === today;
+    const plan     = (week.dailyPlans || {})[d] || {};
+    const hasContent = (plan.note && plan.note.trim()) || (plan.pairs || []).some(pp => pp.note && pp.note.trim());
+    return `<button class="wl-day-tab${isActive ? ' active' : ''}${isToday ? ' today' : ''}"
+      onclick="_wlSetDayTab('${week.id}','${d}')">
+      <span class="wl-day-tab-short">${_WL_DAY_SHORT[d]}</span>
+      <span class="wl-day-tab-date">${dates[d] ? dates[d].slice(5) : ''}</span>
+      ${hasContent ? '<span class="wl-day-tab-dot"></span>' : ''}
+    </button>`;
+  }).join('');
+
+  const plan = (week.dailyPlans || {})[activeDay] || {};
+  const pairPlans = week.pairs.map((p, pi) => {
+    const pp = (plan.pairs || []).find(x => x.name === p.name) || {};
+    const bias = pp.bias || p.bias || 'neu';
+    const bClass = bias === 'bull' ? 'bull' : bias === 'bear' ? 'bear' : 'neu';
+    const bLabel = bias === 'bull' ? '↑ Bull' : bias === 'bear' ? '↓ Bear' : '→ Neu';
+    return `
+    <div class="wl-day-pair-row">
+      <div class="wl-day-pair-name">${p.name}</div>
+      <div class="wl-day-pair-bias-wrap">
+        <button class="wl-day-bias-btn ${bClass}" onclick="_wlCycleDayPairBias('${week.id}','${activeDay}','${p.name}',this)">
+          ${bLabel}
+        </button>
+      </div>
+      <textarea class="wl-day-pair-note"
+        placeholder="What do you want to see on ${p.name} ${_WL_DAY_LABELS[activeDay]}? (key levels, entry model, confirmation…)"
+        onblur="_wlSaveDayPairNote('${week.id}','${activeDay}','${p.name}',this.value)"
+        >${pp.note || ''}</textarea>
+    </div>`;
+  }).join('');
+
+  const sessionLabel = (() => {
+    const d = dates[activeDay];
+    if (!d) return '';
+    const trades_today = trades.filter(t => t.date === d);
+    if (!trades_today.length) return '';
+    const wins = trades_today.filter(t => t.outcome === 'Win').length;
+    const pnl  = trades_today.reduce((a, t) => a + _pctOfTrade(t), 0);
+    const col  = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    return `<div class="wl-day-traded-badge" style="color:${col}">
+      ${trades_today.length}T · ${wins}W · ${pnl >= 0 ? '+' : ''}${pnl.toFixed(1)}% logged
+    </div>`;
+  })();
+
+  return `
+  <div class="wl-daily-section">
+    <div class="wl-daily-header">
+      <div class="wl-daily-title">
+        <span class="wl-daily-icon">📋</span>
+        Daily Gameplan
+      </div>
+      <div class="wl-daily-subtitle">What do you want to see each day? Log your bias &amp; expectations before the session.</div>
+    </div>
+
+    <div class="wl-day-tabs" id="wl-day-tabs-${week.id}">${tabsHtml}</div>
+
+    <div class="wl-day-content" id="wl-day-content-${week.id}">
+      <div class="wl-day-content-inner">
+        <div class="wl-day-content-top">
+          <div class="wl-day-full-label">
+            ${_WL_DAY_LABELS[activeDay]} · <span style="color:var(--text3)">${dates[activeDay] || ''}</span>
+            ${sessionLabel}
+          </div>
+        </div>
+
+        <div class="wl-form-row" style="margin-bottom:12px">
+          <label class="wl-form-label" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">
+            Overall Market Notes
+          </label>
+          <textarea class="wl-day-overall-note"
+            id="wl-day-note-${week.id}-${activeDay}"
+            placeholder="DXY expectation, macro context, session bias, news to watch, what overall scenario you're looking for…"
+            onblur="_wlSaveDayNote('${week.id}','${activeDay}',this.value)"
+            rows="3">${plan.note || ''}</textarea>
+        </div>
+
+        ${week.pairs.length > 0 ? `
+        <div class="wl-day-pairs-section">
+          <div class="wl-day-pairs-label">
+            <span>Pair Expectations</span>
+            <span style="font-size:10px;color:var(--text3);font-weight:400">Click bias to cycle · notes autosave on blur</span>
+          </div>
+          <div class="wl-day-pair-rows" id="wl-day-pairs-${week.id}-${activeDay}">
+            ${pairPlans}
+          </div>
+        </div>` : `
+        <div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">
+          Add pairs to your weekly watchlist first to log daily expectations per pair.
+        </div>`}
+
+        <div class="wl-day-footer">
+          <div class="wl-day-mindset-wrap">
+            <label class="wl-form-label" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px;display:block">
+              Mindset Check
+            </label>
+            <div class="wl-day-mindset-btns" id="wl-day-mindset-${week.id}-${activeDay}">
+              ${['🧘 Focused','⚡ Eager','😴 Tired','😤 Frustrated','😐 Neutral'].map(m => {
+                const mKey = m.split(' ')[1];
+                const isSelected = plan.mindset === mKey;
+                return `<button class="wl-day-mindset-btn${isSelected ? ' selected' : ''}"
+                  onclick="_wlSetDayMindset('${week.id}','${activeDay}','${mKey}',this)">${m}</button>`;
+              }).join('')}
+            </div>
+          </div>
+          <button class="wl-day-clear-btn" onclick="_wlClearDayPlan('${week.id}','${activeDay}')">
+            🗑 Clear Day
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ── Daily plan tab switching ── */
+function _wlSetDayTab(weekId, day) {
+  _wlActiveDayTab[weekId] = day;
+  // Re-render only the daily section to avoid losing focus on other elements
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  const container = document.getElementById('wl-week-content');
+  if (!container) return;
+  _wlRenderWeeks(); // full re-render keeps it simple and consistent
+}
+
+/* ── Save overall day note (autosave on blur) ── */
+async function _wlSaveDayNote(weekId, day, note) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '' };
+  week.dailyPlans[day].note = note;
+  await _wlSaveWeek(week);
+}
+
+/* ── Save per-pair note within a day (autosave on blur) ── */
+async function _wlSaveDayPairNote(weekId, day, pairName, note) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '' };
+  const pairs = week.dailyPlans[day].pairs || [];
+  const existing = pairs.find(p => p.name === pairName);
+  if (existing) existing.note = note;
+  else pairs.push({ name: pairName, note, bias: 'neu' });
+  week.dailyPlans[day].pairs = pairs;
+  await _wlSaveWeek(week);
+}
+
+/* ── Cycle bias for a pair on a specific day ── */
+async function _wlCycleDayPairBias(weekId, day, pairName, btn) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '' };
+  const pairs = week.dailyPlans[day].pairs || [];
+  const existing = pairs.find(p => p.name === pairName);
+  const cycle = { neu: 'bull', bull: 'bear', bear: 'neu' };
+  const curBias = existing ? existing.bias : 'neu';
+  const newBias = cycle[curBias];
+  if (existing) existing.bias = newBias;
+  else pairs.push({ name: pairName, note: '', bias: newBias });
+  week.dailyPlans[day].pairs = pairs;
+  // Update button instantly without full re-render
+  const bLabel = newBias === 'bull' ? '↑ Bull' : newBias === 'bear' ? '↓ Bear' : '→ Neu';
+  btn.textContent = bLabel;
+  btn.className = `wl-day-bias-btn ${newBias}`;
+  await _wlSaveWeek(week);
+}
+
+/* ── Set mindset for a day ── */
+async function _wlSetDayMindset(weekId, day, mindset, btn) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '' };
+  week.dailyPlans[day].mindset = mindset;
+  // Update buttons instantly
+  const container = document.getElementById(`wl-day-mindset-${weekId}-${day}`);
+  if (container) container.querySelectorAll('.wl-day-mindset-btn').forEach(b => b.classList.remove('selected'));
+  if (btn) btn.classList.add('selected');
+  await _wlSaveWeek(week);
+}
+
+/* ── Clear an entire day's plan ── */
+async function _wlClearDayPlan(weekId, day) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  week.dailyPlans[day] = { note: '', pairs: [], mindset: '' };
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
 }
 
 function _wlCalAutoLoad() {
