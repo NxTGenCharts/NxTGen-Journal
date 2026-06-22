@@ -9162,3 +9162,455 @@ select[id="filter-kz"] option[value="London"] {
 ::-webkit-scrollbar { width: 2px; height: 2px; }
 ::-webkit-scrollbar-thumb { border-radius: 99px; }
 
+
+/* ════════════════════════════════════════════════════════════════
+   ██╗     ██╗ ██████╗ ██╗   ██╗██╗██████╗      ██████╗ ██╗      █████╗ ███████╗███████╗
+   ██║     ██║██╔═══██╗██║   ██║██║██╔══██╗    ██╔════╝ ██║     ██╔══██╗██╔════╝██╔════╝
+   ██║     ██║██║   ██║██║   ██║██║██║  ██║    ██║  ███╗██║     ███████║███████╗███████╗
+   ██║     ██║██║▄▄ ██║██║   ██║██║██║  ██║    ██║   ██║██║     ██╔══██║╚════██║╚════██║
+   ███████╗██║╚██████╔╝╚██████╔╝██║██████╔╝    ╚██████╔╝███████╗██║  ██║███████║███████║
+   ╚══════╝╚═╝ ╚══▀▀═╝  ╚═════╝ ╚═╝╚═════╝      ╚═════╝ ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝
+   TRUE LIQUID GLASS OVERRIDE — Telegram-style floating pill nav + glass everything
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── LIQUID GLASS TOKENS ─────────────────────────────────────────
+   Real transparency: you see what's behind, tinted + blurred
+   ─────────────────────────────────────────────────────────────── */
+:root {
+  --lg-bg-dark:         rgba(12, 16, 28, 0.45);
+  --lg-bg-dark-hover:   rgba(20, 26, 46, 0.55);
+  --lg-bg-nav:          rgba(10, 14, 26, 0.38);
+  --lg-border-top:      rgba(255, 255, 255, 0.14);
+  --lg-border:          rgba(255, 255, 255, 0.10);
+  --lg-border-inner:    rgba(255, 255, 255, 0.06);
+  --lg-shine-top:       rgba(255, 255, 255, 0.18);
+  --lg-shine-inner:     rgba(255, 255, 255, 0.08);
+  --lg-blur-nav:        blur(48px) saturate(2.2) brightness(1.05);
+  --lg-blur-sidebar:    blur(36px) saturate(1.9) brightness(1.02);
+  --lg-blur-surface:    blur(24px) saturate(1.8);
+  --lg-shadow-nav:      0 -8px 40px rgba(0,0,0,0.28),
+                        0 -1px 0 rgba(255,255,255,0.06),
+                        0 2px 0 rgba(0,0,0,0.15);
+  --lg-shadow-float:    0 20px 60px rgba(0,0,0,0.5),
+                        0 8px 20px rgba(0,0,0,0.3),
+                        0 0 0 0.5px rgba(255,255,255,0.12);
+  --lg-active-pill:     rgba(96, 165, 250, 0.18);
+  --lg-nav-radius:      26px; /* Telegram-style generous pill corners */
+}
+
+[data-theme="light"] {
+  --lg-bg-dark:         rgba(235, 241, 255, 0.42);
+  --lg-bg-dark-hover:   rgba(220, 232, 255, 0.55);
+  --lg-bg-nav:          rgba(240, 245, 255, 0.40);
+  --lg-border-top:      rgba(0, 0, 0, 0.08);
+  --lg-border:          rgba(0, 0, 0, 0.06);
+  --lg-border-inner:    rgba(0, 0, 0, 0.04);
+  --lg-shine-top:       rgba(255, 255, 255, 0.85);
+  --lg-shine-inner:     rgba(255, 255, 255, 0.6);
+  --lg-blur-nav:        blur(48px) saturate(2.5) brightness(1.08);
+  --lg-shadow-nav:      0 -8px 32px rgba(0,0,0,0.10),
+                        0 -1px 0 rgba(255,255,255,0.9),
+                        0 2px 0 rgba(0,0,0,0.04);
+  --lg-shadow-float:    0 20px 60px rgba(0,0,0,0.15),
+                        0 8px 20px rgba(0,0,0,0.08),
+                        0 0 0 0.5px rgba(0,0,0,0.08);
+  --lg-active-pill:     rgba(37, 99, 235, 0.12);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   1. BOTTOM NAV — Telegram floating pill style
+   ════════════════════════════════════════════════════════════════ */
+
+/* Wrapper: floating above content, NOT edge-to-edge */
+.mob-bottom-nav {
+  display: none;
+  position: fixed !important;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+  left: 12px !important;
+  right: 12px !important;
+  width: auto !important;
+
+  /* Pill shape — Telegram style */
+  border-radius: var(--lg-nav-radius) !important;
+
+  /* TRUE liquid glass: low opacity so content bleeds through */
+  background: var(--lg-bg-nav) !important;
+  backdrop-filter: var(--lg-blur-nav) !important;
+  -webkit-backdrop-filter: var(--lg-blur-nav) !important;
+
+  /* Glass border: bright on top (light catches top edge), dim on sides */
+  border: 0px !important;
+  box-shadow:
+    inset 0 1px 0 var(--lg-shine-top),
+    inset 0 -0.5px 0 var(--lg-border-inner),
+    inset 1px 0 0 var(--lg-border-inner),
+    inset -1px 0 0 var(--lg-border-inner),
+    var(--lg-shadow-float) !important;
+
+  /* Height with padding for the pill shape */
+  height: auto !important;
+  padding: 8px 8px calc(8px) !important;
+  padding-bottom: 8px !important;
+
+  z-index: 1000 !important;
+  overflow: hidden !important;
+}
+
+/* Glass refraction layer — pseudo shimmer across the pill */
+.mob-bottom-nav::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--lg-nav-radius);
+  background: linear-gradient(
+    168deg,
+    rgba(255,255,255,0.12) 0%,
+    rgba(255,255,255,0.03) 30%,
+    transparent 60%,
+    rgba(255,255,255,0.04) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Edge glow — subtle ambient from bottom (floor bounce) */
+.mob-bottom-nav::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 15%; right: 15%;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(96,165,250,0.35) 30%,
+    rgba(167,139,250,0.35) 70%,
+    transparent 100%
+  );
+  border-radius: 0 0 var(--lg-nav-radius) var(--lg-nav-radius);
+  pointer-events: none;
+}
+
+[data-theme="light"] .mob-bottom-nav::after {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(37,99,235,0.2) 30%,
+    rgba(124,58,237,0.2) 70%,
+    transparent 100%
+  );
+}
+
+@media (min-width: 769px) { .mob-bottom-nav { display: none !important; } }
+@media (max-width: 768px) { .mob-bottom-nav { display: flex !important; } }
+
+/* Items sit above pseudo layers */
+.mob-bottom-nav-item {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 4px;
+  border-radius: calc(var(--lg-nav-radius) - 6px);
+  transition: color 0.2s ease, background 0.2s ease, transform 0.2s var(--ease-spring);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Active state: glass pill highlight */
+.mob-bottom-nav-item.active {
+  background: var(--lg-active-pill) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(96,165,250,0.25),
+    0 0 16px rgba(96,165,250,0.12);
+  color: var(--blue) !important;
+}
+
+/* Remove old top-notch indicator, replace with pill glow */
+.mob-bottom-nav-item.active::before {
+  content: '' !important;
+  position: absolute !important;
+  inset: 0 !important;
+  border-radius: calc(var(--lg-nav-radius) - 6px) !important;
+  background: radial-gradient(ellipse at 50% 0%, rgba(96,165,250,0.22) 0%, transparent 65%) !important;
+  width: auto !important;
+  height: auto !important;
+  transform: none !important;
+  top: 0 !important;
+  left: 0 !important;
+  box-shadow: none !important;
+}
+
+.mob-bottom-nav-item:active {
+  transform: scale(0.88) !important;
+}
+
+.mob-nav-icon {
+  font-size: 21px;
+  line-height: 1;
+  transition: transform 0.22s var(--ease-spring);
+  filter: drop-shadow(0 0 0 transparent);
+}
+
+.mob-bottom-nav-item.active .mob-nav-icon {
+  transform: translateY(-1px) scale(1.08) !important;
+  filter: drop-shadow(0 0 8px rgba(96,165,250,0.5));
+}
+
+.mob-nav-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+/* FAB center button — glass orb */
+.mob-nav-add-btn .mob-nav-icon {
+  width: 46px !important;
+  height: 46px !important;
+  border-radius: 14px !important;
+  background: linear-gradient(145deg,
+    rgba(96, 165, 250, 0.85) 0%,
+    rgba(37, 99, 235, 0.9) 100%
+  ) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  box-shadow:
+    0 4px 20px rgba(96,165,250,0.5),
+    0 1px 4px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.4),
+    inset 0 -1px 0 rgba(0,0,0,0.15) !important;
+  margin-top: -12px !important;
+  font-size: 22px !important;
+  transition: all 0.2s var(--ease-spring) !important;
+}
+
+.mob-nav-add-btn:active .mob-nav-icon {
+  transform: scale(0.88) translateY(2px) !important;
+  box-shadow:
+    0 2px 10px rgba(96,165,250,0.35),
+    0 1px 2px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.3) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   2. SIDEBAR — True liquid glass (not flat colour)
+   ════════════════════════════════════════════════════════════════ */
+
+.sidebar {
+  background: rgba(8, 12, 22, 0.35) !important;
+  backdrop-filter: var(--lg-blur-sidebar) !important;
+  -webkit-backdrop-filter: var(--lg-blur-sidebar) !important;
+  border-right: 0.5px solid rgba(255,255,255,0.08) !important;
+  box-shadow:
+    inset -1px 0 0 rgba(255,255,255,0.04),
+    4px 0 32px rgba(0,0,0,0.25) !important;
+}
+
+/* Subtle inner shimmer on sidebar */
+.sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 120px;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.05) 0%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+[data-theme="light"] .sidebar {
+  background: rgba(240, 245, 255, 0.38) !important;
+  border-right: 0.5px solid rgba(0,0,0,0.06) !important;
+  box-shadow:
+    inset -1px 0 0 rgba(255,255,255,0.7),
+    4px 0 24px rgba(0,0,0,0.08) !important;
+}
+
+/* Mobile: sidebar drawer gets glass treatment */
+@media (max-width: 768px) {
+  .sidebar.mob-open {
+    background: rgba(8, 12, 22, 0.42) !important;
+    backdrop-filter: blur(52px) saturate(2.4) brightness(1.05) !important;
+    -webkit-backdrop-filter: blur(52px) saturate(2.4) brightness(1.05) !important;
+    box-shadow:
+      inset 0 0 0 0.5px rgba(255,255,255,0.10),
+      8px 0 40px rgba(0,0,0,0.5) !important;
+  }
+
+  [data-theme="light"] .sidebar.mob-open {
+    background: rgba(245, 248, 255, 0.48) !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   3. TOPBAR — Glass strip
+   ════════════════════════════════════════════════════════════════ */
+
+.topbar {
+  background: rgba(8, 12, 22, 0.32) !important;
+  backdrop-filter: blur(40px) saturate(2) brightness(1.03) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(2) brightness(1.03) !important;
+  border-bottom: 0.5px solid rgba(255,255,255,0.08) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.10),
+    inset 0 -0.5px 0 rgba(255,255,255,0.04),
+    0 2px 24px rgba(0,0,0,0.2) !important;
+}
+
+[data-theme="light"] .topbar {
+  background: rgba(245, 248, 255, 0.40) !important;
+  border-bottom: 0.5px solid rgba(0,0,0,0.06) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.85),
+    0 2px 16px rgba(0,0,0,0.06) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   4. TABS bar — glass
+   ════════════════════════════════════════════════════════════════ */
+
+.tabs {
+  background: rgba(10, 14, 28, 0.28) !important;
+  backdrop-filter: blur(28px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.8) !important;
+  border-bottom: 0.5px solid rgba(255,255,255,0.07) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    0 1px 16px rgba(0,0,0,0.12) !important;
+}
+
+[data-theme="light"] .tabs {
+  background: rgba(240, 245, 255, 0.35) !important;
+  border-bottom: 0.5px solid rgba(0,0,0,0.06) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.8),
+    0 1px 12px rgba(0,0,0,0.05) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   5. KPI CARDS — liquid glass surface
+   ════════════════════════════════════════════════════════════════ */
+
+.kpi-card, .glass-card {
+  background: rgba(15, 20, 38, 0.40) !important;
+  backdrop-filter: blur(20px) saturate(1.7) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.7) !important;
+  border: 0.5px solid rgba(255,255,255,0.09) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.10),
+    inset 0 -0.5px 0 rgba(0,0,0,0.2),
+    0 4px 24px rgba(0,0,0,0.25) !important;
+}
+
+[data-theme="light"] .kpi-card,
+[data-theme="light"] .glass-card {
+  background: rgba(255,255,255,0.42) !important;
+  border: 0.5px solid rgba(0,0,0,0.06) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.85),
+    0 4px 20px rgba(0,0,0,0.07) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   6. MODAL — Deep liquid glass overlay
+   ════════════════════════════════════════════════════════════════ */
+
+.modal {
+  background: rgba(8, 12, 22, 0.42) !important;
+  backdrop-filter: blur(52px) saturate(2.2) brightness(1.04) !important;
+  -webkit-backdrop-filter: blur(52px) saturate(2.2) brightness(1.04) !important;
+  border: 0.5px solid rgba(255,255,255,0.11) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    inset 0 -0.5px 0 rgba(255,255,255,0.04),
+    0 32px 80px rgba(0,0,0,0.6),
+    0 8px 24px rgba(0,0,0,0.4) !important;
+}
+
+[data-theme="light"] .modal {
+  background: rgba(248, 251, 255, 0.52) !important;
+  border: 0.5px solid rgba(0,0,0,0.07) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    0 32px 80px rgba(0,0,0,0.18),
+    0 8px 24px rgba(0,0,0,0.10) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   7. DETAIL PANEL
+   ════════════════════════════════════════════════════════════════ */
+
+.detail-panel {
+  background: rgba(10, 14, 26, 0.38) !important;
+  backdrop-filter: blur(36px) saturate(2) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(2) !important;
+  border-left: 0.5px solid rgba(255,255,255,0.08) !important;
+}
+
+[data-theme="light"] .detail-panel {
+  background: rgba(242, 246, 255, 0.40) !important;
+  border-left: 0.5px solid rgba(0,0,0,0.06) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   8. SIDEBAR OVERLAY (mobile backdrop) — dim glass
+   ════════════════════════════════════════════════════════════════ */
+
+.sidebar-overlay {
+  background: rgba(4, 6, 14, 0.55) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   9. SB-ITEM active — refined glass pill
+   ════════════════════════════════════════════════════════════════ */
+
+.sb-item.active {
+  background: rgba(96, 165, 250, 0.14) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(96,165,250,0.20),
+    inset 0 -0.5px 0 rgba(96,165,250,0.08),
+    0 0 14px rgba(96,165,250,0.08) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   10. BODY / APP BACKGROUND — more aggressive ambient glow
+       so the glass actually has something luminous to refract
+   ════════════════════════════════════════════════════════════════ */
+
+body {
+  background-image:
+    radial-gradient(ellipse 80% 60% at 20% -10%, rgba(96,165,250,0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 50% at 80% 110%, rgba(167,139,250,0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 60% 40%,  rgba(45,212,191,0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 30% 70%,  rgba(251,191,36,0.04) 0%, transparent 60%) !important;
+}
+
+[data-theme="light"] body {
+  background-image:
+    radial-gradient(ellipse 80% 60% at 20% -10%, rgba(37,99,235,0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 50% at 80% 110%, rgba(124,58,237,0.07) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 30% at 55% 45%,  rgba(16,185,129,0.05) 0%, transparent 60%) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   11. DATA TABLE HEADERS — faint glass tint
+   ════════════════════════════════════════════════════════════════ */
+
+.data-table th {
+  background: rgba(15,20,38,0.35) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+[data-theme="light"] .data-table th {
+  background: rgba(240,245,255,0.50) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   END LIQUID GLASS OVERRIDE
+   ════════════════════════════════════════════════════════════════ */
