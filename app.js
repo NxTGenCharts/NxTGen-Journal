@@ -1920,6 +1920,7 @@ function buildPairTable(sortCol) {
 
 
 function openPairDrilldown(pair) {
+  const trades = _getFilteredTrades();
   const pairTrades = trades.filter(t => t.pair === pair).sort((a,b) => new Date(b.date) - new Date(a.date));
   const wins   = pairTrades.filter(t => t.outcome === 'Win').length;
   const losses = pairTrades.filter(t => t.outcome === 'Loss').length;
@@ -2009,6 +2010,7 @@ function pairDrillOpenTrade(id) {
    KILLZONE DRILLDOWN
 ───────────────────────────────────────────────────────── */
 function openKzDrilldown(session) {
+  const trades = _getFilteredTrades();
   const kzTrades = trades.filter(t => t.kz === session).sort((a,b) => new Date(b.date) - new Date(a.date));
   const wins   = kzTrades.filter(t => t.outcome === 'Win').length;
   const losses = kzTrades.filter(t => t.outcome === 'Loss').length;
@@ -2041,6 +2043,7 @@ function openKzDrilldown(session) {
    STRATEGY DRILLDOWN
 ───────────────────────────────────────────────────────── */
 function openStratDrilldown(strategy) {
+  const trades = _getFilteredTrades();
   const isUntagged = strategy === 'untagged';
   const stTrades = isUntagged
     ? trades.filter(t => !t.strategy || !t.strategy.trim()).sort((a,b) => new Date(b.date) - new Date(a.date))
@@ -2075,6 +2078,7 @@ function openStratDrilldown(strategy) {
    MONTHLY DRILLDOWN
 ───────────────────────────────────────────────────────── */
 function openMonthDrilldown(key) {
+  const trades = _getFilteredTrades();
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const [yr, mo] = key.split('-').map(Number);
   const label    = MONTH_NAMES[mo - 1] + ' ' + yr;

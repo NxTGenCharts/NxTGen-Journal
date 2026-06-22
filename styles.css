@@ -4,7 +4,7 @@
    Apple-inspired · Fintech quality · Full dark/light parity
    ════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
 
 /* ════════════════════════════════════════════════════════
    NXTGEN — LIQUID GLASS PREMIUM DESIGN SYSTEM v3
@@ -94,9 +94,9 @@
   --topbar:  52px;
 
   /* Typography */
-  --font-head: 'DM Sans', 'Inter', system-ui, -apple-system, sans-serif;
-  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'DM Mono', ui-monospace, 'SF Mono', monospace;
+  --font-head: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
   --surface:   #0d1117;
 
   /* Easing */
@@ -4903,7 +4903,7 @@ body{
 .acc-manager-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(4,8,18,0.75);
+  background: rgba(4,8,18,0.55);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   z-index: 4000;
@@ -4915,16 +4915,18 @@ body{
   transition: opacity 0.2s;
 }
 .acc-manager-overlay.open { opacity: 1; }
-[data-theme="light"] .acc-manager-overlay { background: rgba(15,23,42,0.60); }
+[data-theme="light"] .acc-manager-overlay { background: rgba(15,23,42,0.42); }
 
 .acc-manager-modal {
   width: 100%;
   max-width: 460px;
-  background: var(--bg2);
+  background: rgba(13,17,26,0.78);
+  backdrop-filter: blur(24px) saturate(1.7);
+  -webkit-backdrop-filter: blur(24px) saturate(1.7);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-lg, 14px);
   overflow: hidden;
-  box-shadow: 0 32px 80px rgba(0,0,0,0.60);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.32), var(--glass-spec-top, inset 0 1px 0 rgba(255,255,255,0.10));
   transform: translateY(16px) scale(0.97);
   transition: transform 0.22s cubic-bezier(0.22,1,0.36,1);
   max-height: 90vh;
@@ -4958,6 +4960,10 @@ body{
 .acc-mgr-close:hover { background: rgba(248,113,113,0.15); color: var(--red); border-color: rgba(248,113,113,0.3); }
 
 .acc-manager-body { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+/* Prevent the table wrap from being squashed to fit the visible area —
+   it must keep its full natural height so THIS element (not the table)
+   is what scrolls inside .acc-manager-body. */
+.acc-manager-body .data-table-wrap { flex-shrink: 0; }
 .acc-mgr-list { display: flex; flex-direction: column; gap: 6px; }
 .acc-mgr-item {
   display: flex;
@@ -5033,7 +5039,7 @@ body{
   transition: background 0.15s, border-color 0.15s;
 }
 .acc-mgr-add-btn:hover { background: rgba(251,191,36,0.20); border-color: rgba(251,191,36,0.50); }
-[data-theme="light"] .acc-manager-modal { background: #fff; border-color: rgba(0,0,0,0.09); }
+[data-theme="light"] .acc-manager-modal { background: rgba(255,255,255,0.80); border-color: rgba(0,0,0,0.09); }
 [data-theme="light"] .acc-manager-header { background: rgba(0,0,0,0.02); border-color: rgba(0,0,0,0.07); }
 [data-theme="light"] .acc-mgr-item { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.07); }
 [data-theme="light"] .acc-mgr-input { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.09); }
@@ -5118,7 +5124,7 @@ body{
   overflow: hidden;
   isolation: isolate;
   border-radius: 0;
-  font-family: 'Inter', var(--font-sans, system-ui), sans-serif;
+  font-family: var(--font-body);
 }
 .sm-card.dark {
   background: linear-gradient(145deg, #0d1424 0%, #0a0f1c 60%, #0d1530 100%);
@@ -5827,10 +5833,9 @@ body{
   opacity: 0.7;
 }
 
-/* ══ Manage Accounts — Dark mode redesign ══ */
-.acc-manager-modal {
-  background: var(--bg2) !important;
-}
+/* ══ Manage Accounts — Dark mode redesign ══
+   (background/blur now handled in the base .acc-manager-modal rule
+   for a consistent frosted-glass look) */
 
 /* Deleted tab styling */
 .acc-mgr-tab-del { color: var(--red) !important; opacity: .75; }
@@ -6418,13 +6423,13 @@ select.acc-mgr-input option {
 /* ────────────────────────────────────────────────────────────────
    1. FONT SYSTEM — SF Pro equivalent via system stack
    ──────────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900;1,14..32,400&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
 
 :root {
-  /* Override font stack: DM Sans for display headings, Inter for body, DM Mono for all numeric data */
-  --font-head: 'DM Sans', -apple-system, 'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
-  --font-body: 'Inter', -apple-system, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
-  --font-mono: 'DM Mono', ui-monospace, 'SF Mono', monospace;
+  /* Override font stack: Plus Jakarta Sans for headings & body, JetBrains Mono for all numeric data */
+  --font-head: 'Plus Jakarta Sans', -apple-system, 'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
+  --font-body: 'Plus Jakarta Sans', -apple-system, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
   
   /* Apple Liquid Glass — refined token system */
   /* Vibrancy levels — backdrop saturate is the key Apple technique */
@@ -8898,14 +8903,14 @@ div[style*="data-table"] .data-table-wrap,
 .wl-cal-meta-val,
 .sm-pnl-main,
 .sm-stat-val {
-  font-family: 'DM Mono', ui-monospace, 'SF Mono', monospace;
+  font-family: var(--font-mono);
   font-feature-settings: 'tnum', 'zero';
 }
 
 /* DM Mono for all KPI on calendar right panel */
 .dash-cal-panel .cal-kpi-val,
 .dash-cal-panel .cal-day-pnl {
-  font-family: 'DM Mono', ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-feature-settings: 'tnum';
 }
 
@@ -8964,7 +8969,7 @@ div[style*="data-table"] .data-table-wrap,
   .data-table td.col-pair {
     font-weight: 700;
     color: var(--text);
-    font-family: 'DM Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
   }
 
@@ -8978,7 +8983,7 @@ div[style*="data-table"] .data-table-wrap,
   .data-table td.col-pnl {
     font-size: 13px;
     font-weight: 700;
-    font-family: 'DM Mono', monospace;
+    font-family: var(--font-mono);
   }
 }
 
@@ -9018,7 +9023,7 @@ div[style*="data-table"] .data-table-wrap,
   display: inline-flex; align-items: center; gap: 5px;
   padding: 2px 9px; border-radius: 99px;
   font-size: 11px; font-weight: 600;
-  font-family: 'DM Mono', monospace;
+  font-family: var(--font-mono);
   background: var(--kz-london-dim);
   color: var(--kz-london);
   border: 1px solid var(--kz-london-border);
@@ -9027,7 +9032,7 @@ div[style*="data-table"] .data-table-wrap,
   display: inline-flex; align-items: center; gap: 5px;
   padding: 2px 9px; border-radius: 99px;
   font-size: 11px; font-weight: 600;
-  font-family: 'DM Mono', monospace;
+  font-family: var(--font-mono);
   background: var(--kz-ny-dim);
   color: var(--kz-ny);
   border: 1px solid var(--kz-ny-border);
@@ -9036,7 +9041,7 @@ div[style*="data-table"] .data-table-wrap,
   display: inline-flex; align-items: center; gap: 5px;
   padding: 2px 9px; border-radius: 99px;
   font-size: 11px; font-weight: 600;
-  font-family: 'DM Mono', monospace;
+  font-family: var(--font-mono);
   background: var(--kz-asian-dim);
   color: var(--kz-asian);
   border: 1px solid var(--kz-asian-border);
@@ -9055,7 +9060,7 @@ div[style*="data-table"] .data-table-wrap,
 .kpi-delta {
   display: inline-flex; align-items: center; gap: 3px;
   font-size: 10px; font-weight: 600;
-  font-family: 'DM Mono', monospace;
+  font-family: var(--font-mono);
   margin-top: 5px;
   opacity: 0.8;
 }
@@ -9069,25 +9074,25 @@ div[style*="data-table"] .data-table-wrap,
 
 /* ── 13. TABLE HEADER SORT INDICATOR — DM Mono ──────────────────*/
 .sortable-th {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   cursor: pointer;
 }
 .sort-icon {
-  font-family: 'DM Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
 }
 
 /* ── 14. DATA TABLE PAIR CELL — always DM Mono ──────────────────*/
 .data-table td:first-child,
 .data-table .col-pair {
-  font-family: 'DM Mono', monospace;
+  font-family: var(--font-mono);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 
 /* ── 15. CALENDAR PNL CELLS — tighter DM Mono ───────────────────*/
 .cal-day-pnl {
-  font-family: 'DM Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: -0.3px;
@@ -9096,7 +9101,7 @@ div[style*="data-table"] .data-table-wrap,
 
 /* ── 16. DETAIL PANEL PAIR HEADING — DM Sans ─────────────────────*/
 .detail-pair {
-  font-family: 'DM Sans', 'Inter', sans-serif;
+  font-family: var(--font-head);
   font-size: 30px;
   font-weight: 800;
   letter-spacing: -1px;
@@ -9104,26 +9109,26 @@ div[style*="data-table"] .data-table-wrap,
 
 /* ── 17. COVER TITLE — DM Sans for max display weight ───────────*/
 .cover-title {
-  font-family: 'DM Sans', 'Inter', sans-serif;
+  font-family: var(--font-head);
   font-weight: 800;
 }
 
 /* ── 18. ACCOUNT TRACKER VALUES — DM Mono ───────────────────────*/
 .acc-ds-val {
-  font-family: 'DM Mono', monospace;
+  font-family: var(--font-mono);
   font-feature-settings: 'tnum';
 }
 
 /* ── 19. TOPBAR CLOCK — tighter DM Mono ─────────────────────────*/
 .topbar-clock {
-  font-family: 'DM Mono', monospace;
+  font-family: var(--font-mono);
   font-feature-settings: 'tnum';
   letter-spacing: 0.03em;
 }
 
 /* ── 20. SIDEBAR ACTIVE BADGE — keep consistent ─────────────────*/
 .sb-badge {
-  font-family: 'DM Mono', monospace;
+  font-family: var(--font-mono);
   letter-spacing: 0;
 }
 
