@@ -2551,7 +2551,7 @@ body{
 }
 
 /* ════════════ DASHBOARD TWO-COLUMN LAYOUT ══════════════ */
-.page#page-dashboard { overflow-y: auto; overflow-x: hidden; }
+.page#page-dashboard { overflow-y: auto; overflow-x: clip; }
 .page#page-dashboard > .dash-layout { max-width: 1600px; margin: 0 auto; width: 100%; }
 
 /* Desktop: grid shrinks right col to 0 when cal hidden */
@@ -3508,7 +3508,7 @@ body{
   /* ── Pages — scrollable content area ── */
   .page{
     padding:14px 14px calc(72px + env(safe-area-inset-bottom, 0px));
-    overflow-y:auto;overflow-x:hidden;
+    overflow-y:auto;overflow-x:clip;
     -webkit-overflow-scrolling:touch;
     overscroll-behavior-y:contain;
     height:100%;
@@ -3570,9 +3570,26 @@ body{
 
   /* ── Tables ── */
   .data-table-wrap,.table-wrap{
-    overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--r-md)
+    overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--r-md);
+    /* Subtle shadow hint that table scrolls */
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);
+    mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);
+  }
+  /* Remove mask when scrolled to end */
+  .data-table-wrap.scroll-end,.table-wrap.scroll-end{
+    -webkit-mask-image:none;mask-image:none;
   }
   .data-table{ min-width:540px;font-size:12px }
+  /* Dashboard stat tables (pair perf, killzone, strategy) have 4-5 cols — don't need 540px */
+  #pair-table-body ~ *,.data-table-wrap:has(#pair-table-body) .data-table,
+  #kz-table-body ~ *,.data-table-wrap:has(#kz-table-body) .data-table,
+  #strategy-table-body ~ *,.data-table-wrap:has(#strategy-table-body) .data-table,
+  #monthly-table-body ~ *,.data-table-wrap:has(#monthly-table-body) .data-table{ min-width:0 }
+  /* Target wraps directly */
+  .data-table-wrap:has(#pair-table-body) .data-table,
+  .data-table-wrap:has(#kz-table-body) .data-table,
+  .data-table-wrap:has(#strategy-table-body) .data-table{ min-width:340px }
+  .data-table-wrap:has(#monthly-table-body) .data-table{ min-width:460px }
   .data-table th,.data-table td{ padding:8px 10px }
   .data-table th:nth-child(8),.data-table td:nth-child(8){ display:none }
   .data-table th:nth-child(9),.data-table td:nth-child(9){ display:none }
@@ -3595,8 +3612,9 @@ body{
   .modal-overlay{ align-items:flex-end;padding:0 }
   .modal{
     width:100% !important;max-width:100% !important;
-    /* Leave room for the bottom nav (62px + safe area) */
+    /* Dynamically fill available space between topbar and bottom nav */
     max-height: calc(100dvh - var(--topbar) - 62px - env(safe-area-inset-bottom,0px));
+    height: calc(100dvh - var(--topbar) - 62px - env(safe-area-inset-bottom,0px));
     margin: 0;
     border-radius: var(--r-2xl) var(--r-2xl) 0 0;
     position: fixed;
@@ -3634,6 +3652,7 @@ body{
   /* Body: scrollable flex area */
   .modal-body{
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
@@ -3762,6 +3781,12 @@ body{
 
   /* ── Misc ── */
   .insight{ font-size:12px;padding:12px 14px;border-radius:var(--r-md) }
+  /* Dashboard table wraps — add margin and show thin scrollbar */
+  .data-table-wrap{ margin-bottom:16px }
+  .data-table-wrap::-webkit-scrollbar{ height:3px }
+  .data-table-wrap::-webkit-scrollbar-thumb{ background:var(--glass-3);border-radius:var(--r-full) }
+  .table-wrap::-webkit-scrollbar{ height:3px }
+  .table-wrap::-webkit-scrollbar-thumb{ background:var(--glass-3);border-radius:var(--r-full) }
   .trash-card{ flex-wrap:wrap;gap:8px;padding:12px;border-radius:var(--r-md) }
   .trash-card-actions{ width:100%;justify-content:flex-end;margin-top:4px }
   .trash-card-info{ font-size:11px }
@@ -3783,7 +3808,9 @@ body{
   .kpi-grid{ gap:6px }
   .kpi-value{ font-size:18px }
   .cover-title{ font-size:18px }
-  .data-table{ min-width:460px }
+  /* Trade log table — slightly narrower */
+  #page-tradelog .data-table{ min-width:420px }
+  .data-table-wrap:has(#monthly-table-body) .data-table{ min-width:380px }
   .modal-form-grid{ grid-template-columns:1fr }
   .form-grid{ grid-template-columns:1fr }
   .det-tab{ padding:5px 10px;font-size:11px }
@@ -3791,6 +3818,9 @@ body{
   .dash-cal-panel .cal-day{ min-height:40px;padding:2px 3px }
   .dash-cal-panel .cal-kpi-val{ font-size:12px }
   .dash-cal-panel .cal-kpi-label{ font-size:7px }
+  /* More sheet — tighter on tiny screens */
+  .mob-more-icon{ width:40px;height:40px;font-size:18px }
+  .mob-more-item{ font-size:10px;padding:10px 4px 8px }
 }
 
 /* ══════════════════════════════════════════════════════
@@ -3887,6 +3917,10 @@ body{
   box-shadow:0 -4px 48px rgba(0,0,0,0.55);
   transform:translateY(110%);
   transition:transform 0.32s cubic-bezier(0.22,1,0.36,1);
+  /* Allow sheet to scroll if content overflows on tiny screens */
+  max-height:70dvh;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
 }
 [data-theme="light"] .mob-more-sheet{
   background:rgba(248,251,255,0.98);
@@ -3905,7 +3939,7 @@ body{
 }
 .mob-more-grid{
   display:grid;grid-template-columns:repeat(4,1fr);gap:0;
-  padding:0 8px 18px;
+  padding:0 8px 8px;
 }
 .mob-more-item{
   display:flex;flex-direction:column;align-items:center;gap:6px;

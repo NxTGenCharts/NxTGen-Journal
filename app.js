@@ -8751,3 +8751,26 @@ function _mt5FreqLabel(ms) {
   return `${ms/3600000}h`;
 }
 
+
+/* ═══ Mobile: Table horizontal scroll — fade mask helper ═══ */
+(function() {
+  function initTableScrollMasks() {
+    document.querySelectorAll('.data-table-wrap, .table-wrap').forEach(function(wrap) {
+      function update() {
+        const atEnd = wrap.scrollLeft + wrap.clientWidth >= wrap.scrollWidth - 4;
+        wrap.classList.toggle('scroll-end', atEnd);
+      }
+      wrap.addEventListener('scroll', update, { passive: true });
+      update();
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTableScrollMasks);
+  } else {
+    initTableScrollMasks();
+  }
+  // Re-init after dynamic content renders
+  const _origBuildPairTable = window.buildPairTable;
+  const _origBuildKzTable   = window.buildKillzoneTable;
+  setTimeout(initTableScrollMasks, 800);
+})();
