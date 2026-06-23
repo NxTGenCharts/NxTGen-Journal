@@ -1,234 +1,208 @@
 /* ════════════════════════════════════════════════════════════════════════════
-   NxTGen Trading Journal — realtime-sync.js
+   NxTGen Trading Journal — realtime-sync.js  (v2 — fixed column mapping)
    Supabase Realtime subscriptions for instant cross-device sync.
 
-   HOW TO ADD TO YOUR PROJECT:
-   1. Enable Realtime on each table in Supabase Dashboard:
-      → Table Editor → (table name) → "Realtime" toggle → ON
-      Do this for: journal_trades, journal_deleted_trades, journal_watchlist,
-                   journal_account_data, journal_playbook, journal_goals,
-                   journal_monthly, journal_profiles
-   2. Place this file next to app.js in your repo.
-   3. In index.html, add BEFORE <script src="app.js">:
-      <script src="realtime-sync.js"></script>
-
-   WHAT IT DOES:
-   - Listens to INSERT / UPDATE / DELETE on all 8 Supabase tables.
-   - Merges incoming rows into the in-memory arrays (trades, deletedTrades, etc.)
-     without touching anything that already matches.
-   - Re-renders only the affected UI panels so the page never fully reloads.
-   - Shows a tiny toast notification ("Synced ✓") so users know an update arrived.
-   - Filters all events to the signed-in user's user_id (RLS still enforces this
-     on the server; this is just a belt-and-suspenders client guard).
+   SETUP (one-time):
+   1. Supabase Dashboard → each table below → enable Realtime toggle:
+        journal_trades, journal_deleted_trades, journal_watchlist,
+        journal_account_data, journal_playbook, journal_goals,
+        journal_monthly, journal_profiles
+   2. In index.html, BEFORE <script src="app.js">:
+        <script src="realtime-sync.js"></script>
    ════════════════════════════════════════════════════════════════════════════ */
 
 (function () {
   'use strict';
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Internal state
-  // ─────────────────────────────────────────────────────────────────────────
   let _realtimeChannel = null;
   let _toastTimer      = null;
-  let _pendingRender   = {};   // debounce flags per panel
+  let _pendingRender   = {};
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Toast notification
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── Toast ────────────────────────────────────────────────────────────────
   function _showSyncToast(msg) {
     let toast = document.getElementById('rt-sync-toast');
     if (!toast) {
       toast = document.createElement('div');
       toast.id = 'rt-sync-toast';
       toast.style.cssText = [
-        'position:fixed', 'bottom:24px', 'right:24px', 'z-index:99999',
-        'background:rgba(30,40,55,.92)', 'color:#e2e8f0',
-        'border:1px solid rgba(58,134,255,.35)',
-        'border-radius:10px', 'padding:9px 18px',
-        'font-size:12.5px', 'font-family:inherit',
+        'position:fixed','bottom:24px','right:24px','z-index:99999',
+        'background:rgba(30,40,55,.93)','color:#e2e8f0',
+        'border:1px solid rgba(58,134,255,.4)',
+        'border-radius:10px','padding:9px 18px',
+        'font-size:12.5px','font-family:inherit',
         'box-shadow:0 4px 24px rgba(0,0,0,.35)',
-        'opacity:0', 'transform:translateY(12px)',
+        'opacity:0','transform:translateY(12px)',
         'transition:opacity .25s,transform .25s',
-        'pointer-events:none', 'white-space:nowrap',
+        'pointer-events:none','white-space:nowrap',
       ].join(';');
       document.body.appendChild(toast);
     }
-    toast.textContent = msg || '⚡ Synced across devices';
+    toast.textContent = msg || '⚡ Synced';
     toast.style.opacity = '1';
     toast.style.transform = 'translateY(0)';
     clearTimeout(_toastTimer);
     _toastTimer = setTimeout(function () {
       toast.style.opacity = '0';
       toast.style.transform = 'translateY(12px)';
-    }, 2200);
+    }, 2400);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Debounced re-render helpers (prevents flooding renders on bulk changes)
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── Debounced render scheduler ───────────────────────────────────────────
   function _scheduleRender(key, fn, delay) {
-    delay = delay || 120;
     if (_pendingRender[key]) return;
     _pendingRender[key] = setTimeout(function () {
       delete _pendingRender[key];
       try { fn(); } catch (e) { console.warn('[RT] render error:', e); }
-    }, delay);
+    }, delay || 120);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Map a raw Supabase row → the trade object shape app.js uses
-  // (mirrors the mapping inside loadTrades)
-  // ─────────────────────────────────────────────────────────────────────────
-  function _rowToTrade(row) {
+  // ─── Row mappers — must exactly mirror app.js _rowToTrade / _rowToDeleted ─
+  // app.js uses: row.trade_date (NOT row.date), plus chartLabels, mistakes, etc.
+  function _mapRow(row) {
+    const LABELS = (typeof CHART_LABELS !== 'undefined')
+      ? CHART_LABELS
+      : ['Daily HTF','4h Structure','1h Confirm','30m Trigger','3m/5m Entry','Result'];
     return {
-      id:        row.id,
-      date:      row.date,
-      pair:      row.pair,
-      pos:       row.pos,
-      rr:        row.rr,
-      pnl:       row.pnl,
-      pnlUnit:   row.pnl_unit || '%',
-      outcome:   row.outcome,
-      kz:        row.kz,
-      strategy:  row.strategy,
-      tf:        row.tf,
-      account:   row.account,
-      rating:    row.rating,
-      notes:     row.notes,
-      pretrade:  row.pretrade,
-      emotion:   row.emotion,
-      risk:      row.risk,
-      checklist: row.checklist  || [],
-      charts:    row.charts     || [],
-      source:    row.source,
-      mt5Ticket: row.mt5_ticket,
-      user_id:   row.user_id,
+      id:          row.id,
+      date:        row.trade_date,          // ← critical: column is trade_date
+      pair:        row.pair,
+      pos:         row.pos,
+      rr:          row.rr,
+      pnl:         parseFloat(row.pnl) || 0,
+      pnlUnit:     row.pnl_unit && row.pnl_unit !== '%'
+                     ? row.pnl_unit
+                     : (row.source === 'mt5' || (row.notes && row.notes.includes('MT5 Import')) ? '$' : '%'),
+      outcome:     row.outcome,
+      kz:          row.kz,
+      strategy:    row.strategy   || '',
+      tf:          row.tf         || '',
+      account:     row.account,
+      rating:      row.rating     || 5,
+      risk:        row.risk       || '0.5%',
+      notes:       row.notes      || '',
+      pretrade:    row.pretrade   || '',
+      emotion:     row.emotion    || 'Calm',
+      checklist:   row.checklist  || [],
+      charts:      row.charts     || [],
+      chartLabels: row.chart_labels || [...LABELS],
+      mistakes:    row.mistakes   || '',
+      source:      row.source     || '',
+      plannedRr:   row.planned_rr || '',
+      wouldRetake: row.would_retake !== undefined ? row.would_retake : null,
     };
   }
 
-  function _rowToDeletedTrade(row) {
-    return {
-      id:        row.original_id || row.id,
-      date:      row.date,
-      pair:      row.pair,
-      pos:       row.pos,
-      rr:        row.rr,
-      pnl:       row.pnl,
-      pnlUnit:   row.pnl_unit || '%',
-      outcome:   row.outcome,
-      kz:        row.kz,
-      strategy:  row.strategy,
-      tf:        row.tf,
-      account:   row.account,
-      rating:    row.rating,
-      notes:     row.notes,
-      pretrade:  row.pretrade,
-      emotion:   row.emotion,
-      risk:      row.risk,
-      checklist: row.checklist  || [],
-      charts:    row.charts     || [],
-      deletedAt: row.deleted_at,
-      user_id:   row.user_id,
+  function _mapDeletedRow(row) {
+    return Object.assign(_mapRow(row), {
+      deletedAt:  row.deleted_at,
+      originalId: row.original_id,
+    });
+  }
+
+  // ─── Update tradeState to match (notes, charts, checklist live here) ───────
+  function _syncTradeState(row) {
+    if (typeof tradeState === 'undefined') return;
+    const LABELS = (typeof CHART_LABELS !== 'undefined')
+      ? CHART_LABELS
+      : ['Daily HTF','4h Structure','1h Confirm','30m Trigger','3m/5m Entry','Result'];
+    tradeState[row.id] = {
+      notes:       row.notes       || '',
+      pretrade:    row.pretrade    || '',
+      mistakes:    row.mistakes    || '',
+      emotion:     row.emotion     || 'Calm',
+      checklist:   row.checklist   || [],
+      charts:      row.charts      || [],
+      chartLabels: row.chart_labels || [...LABELS],
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Handlers — journal_trades
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── Re-render all trade-related panels ──────────────────────────────────
+  function _renderTradePanels() {
+    if (typeof renderTradeTable   === 'function') renderTradeTable(trades);
+    if (typeof updateKPIs         === 'function') updateKPIs();
+    if (typeof buildPairTable     === 'function') buildPairTable();
+    if (typeof buildKillzoneTable === 'function') buildKillzoneTable();
+    if (typeof buildStrategyTable === 'function') buildStrategyTable();
+    if (typeof buildMonthlyTable  === 'function') buildMonthlyTable();
+    if (typeof buildSidebarYears  === 'function') buildSidebarYears();
+    if (typeof renderCalendar     === 'function') renderCalendar();
+    if (typeof updateTrashBadge   === 'function') updateTrashBadge();
+  }
+
+  // ─── journal_trades ───────────────────────────────────────────────────────
   function _onTradeChange(payload) {
-    if (!window.trades) return;
     const uid = window._currentUser && window._currentUser.id;
 
     if (payload.eventType === 'INSERT') {
       const row = payload.new;
       if (uid && row.user_id !== uid) return;
-      if (window.trades.find(function (t) { return t.id === row.id; })) return;
-      window.trades.push(_rowToTrade(row));
-      _scheduleTradePanels();
+      if (trades.find(function (t) { return t.id === row.id; })) return;
+      trades.push(_mapRow(row));
+      _syncTradeState(row);
+      _scheduleRender('trades', _renderTradePanels);
       _showSyncToast('⚡ New trade synced');
 
     } else if (payload.eventType === 'UPDATE') {
       const row = payload.new;
       if (uid && row.user_id !== uid) return;
-      const idx = window.trades.findIndex(function (t) { return t.id === row.id; });
+      const idx = trades.findIndex(function (t) { return t.id === row.id; });
       if (idx !== -1) {
-        window.trades[idx] = _rowToTrade(row);
+        trades[idx] = _mapRow(row);
       } else {
-        window.trades.push(_rowToTrade(row));
+        trades.push(_mapRow(row));
       }
-      _scheduleTradePanels();
+      _syncTradeState(row);
+      _scheduleRender('trades', _renderTradePanels);
       _showSyncToast('⚡ Trade updated');
 
     } else if (payload.eventType === 'DELETE') {
       const id = payload.old.id;
-      const before = window.trades.length;
-      window.trades = window.trades.filter(function (t) { return t.id !== id; });
-      if (window.trades.length !== before) {
-        _scheduleTradePanels();
-        _showSyncToast('⚡ Trade removed');
+      const before = trades.length;
+      trades = trades.filter(function (t) { return t.id !== id; });
+      if (typeof tradeState !== 'undefined') delete tradeState[id];
+      if (trades.length !== before) {
+        _scheduleRender('trades', _renderTradePanels);
       }
     }
   }
 
-  function _scheduleTradePanels() {
-    _scheduleRender('trades', function () {
-      if (typeof renderTradeTable  === 'function') renderTradeTable(window.trades);
-      if (typeof updateKPIs        === 'function') updateKPIs();
-      if (typeof buildPairTable    === 'function') buildPairTable();
-      if (typeof buildKillzoneTable=== 'function') buildKillzoneTable();
-      if (typeof buildStrategyTable=== 'function') buildStrategyTable();
-      if (typeof buildMonthlyTable === 'function') buildMonthlyTable();
-      if (typeof buildSidebarYears === 'function') buildSidebarYears();
-      if (typeof renderCalendar    === 'function') renderCalendar();
-      if (typeof updateTrashBadge  === 'function') updateTrashBadge();
-    });
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Handlers — journal_deleted_trades
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── journal_deleted_trades ───────────────────────────────────────────────
   function _onDeletedTradeChange(payload) {
-    if (!window.deletedTrades) return;
     const uid = window._currentUser && window._currentUser.id;
 
     if (payload.eventType === 'INSERT') {
       const row = payload.new;
       if (uid && row.user_id !== uid) return;
-      const mapped = _rowToDeletedTrade(row);
-      if (!window.deletedTrades.find(function (t) { return t.id === mapped.id; })) {
-        window.deletedTrades.push(mapped);
-      }
-      // also remove from live trades if it somehow snuck in
-      if (window.trades) {
-        window.trades = window.trades.filter(function (t) { return t.id !== mapped.id; });
+      const mapped = _mapDeletedRow(row);
+      const origId = mapped.originalId || mapped.id;
+      // Remove from live trades
+      trades = trades.filter(function (t) { return t.id !== origId; });
+      if (typeof tradeState !== 'undefined') delete tradeState[origId];
+      // Add to deletedTrades if not already present
+      if (!deletedTrades.find(function (t) { return (t.originalId || t.id) === origId; })) {
+        deletedTrades.unshift(mapped);
       }
       _scheduleRender('trash', function () {
-        if (typeof renderTrashTab   === 'function') renderTrashTab();
-        if (typeof updateTrashBadge === 'function') updateTrashBadge();
-        if (typeof renderTradeTable === 'function') renderTradeTable(window.trades);
+        _renderTradePanels();
+        if (typeof renderTrash === 'function') renderTrash();
       });
-      _showSyncToast('⚡ Trade trashed');
+      _showSyncToast('⚡ Trade moved to trash');
 
     } else if (payload.eventType === 'DELETE') {
-      // permanently deleted or restored
-      const id = payload.old.original_id || payload.old.id;
-      window.deletedTrades = window.deletedTrades.filter(function (t) { return t.id !== id; });
+      // Permanently deleted or restored — remove from deletedTrades
+      const origId = payload.old.original_id || payload.old.id;
+      deletedTrades = deletedTrades.filter(function (t) {
+        return (t.originalId || t.id) !== origId;
+      });
       _scheduleRender('trash', function () {
-        if (typeof renderTrashTab   === 'function') renderTrashTab();
+        if (typeof renderTrash    === 'function') renderTrash();
         if (typeof updateTrashBadge === 'function') updateTrashBadge();
       });
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Handlers — journal_watchlist
-  // ─────────────────────────────────────────────────────────────────────────
-  function _onWatchlistChange(payload) {
-    const uid = window._currentUser && window._currentUser.id;
-
-    // Re-fetch from Supabase (watchlist rows contain complex nested JSON)
-    // and re-render. Throttle to avoid hammering on rapid keystrokes from
-    // another device (autosave fires on blur).
+  // ─── journal_watchlist ────────────────────────────────────────────────────
+  function _onWatchlistChange() {
     _scheduleRender('watchlist', function () {
       if (typeof _wlLoad === 'function') {
         _wlLoad().then(function () {
@@ -239,24 +213,20 @@
     _showSyncToast('⚡ Watchlist synced');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Handlers — journal_account_data
-  // ─────────────────────────────────────────────────────────────────────────
-  function _onAccountDataChange(payload) {
+  // ─── journal_account_data ─────────────────────────────────────────────────
+  function _onAccountDataChange() {
     _scheduleRender('accounts', function () {
       if (typeof _accLoad === 'function') {
         _accLoad().then(function () {
-          if (typeof buildAccounts === 'function') buildAccounts();
-          if (typeof renderCalendar=== 'function') renderCalendar();
+          if (typeof buildAccounts  === 'function') buildAccounts();
+          if (typeof renderCalendar === 'function') renderCalendar();
         });
       }
     }, 300);
     _showSyncToast('⚡ Accounts synced');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Handlers — journal_playbook
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── journal_playbook ─────────────────────────────────────────────────────
   function _onPlaybookChange() {
     _scheduleRender('playbook', function () {
       if (typeof _pbLoad === 'function') {
@@ -268,9 +238,7 @@
     _showSyncToast('⚡ Playbook synced');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Handlers — journal_goals
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── journal_goals ────────────────────────────────────────────────────────
   function _onGoalsChange() {
     _scheduleRender('goals', function () {
       if (typeof _goalsLoad === 'function') {
@@ -282,9 +250,7 @@
     _showSyncToast('⚡ Goals synced');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Handlers — journal_monthly
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── journal_monthly ──────────────────────────────────────────────────────
   function _onMonthlyChange() {
     _scheduleRender('monthly', function () {
       if (typeof buildMonthlyReview === 'function') buildMonthlyReview();
@@ -292,9 +258,7 @@
     _showSyncToast('⚡ Monthly review synced');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Handlers — journal_profiles
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── journal_profiles ─────────────────────────────────────────────────────
   function _onProfileChange() {
     _scheduleRender('profile', function () {
       if (typeof _profileLoad === 'function') {
@@ -306,95 +270,46 @@
     _showSyncToast('⚡ Profile synced');
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Master subscribe function
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── Subscribe ────────────────────────────────────────────────────────────
   function _subscribe() {
-    if (_realtimeChannel) return;   // already subscribed
-
-    // sb is the Supabase client created in app.js — it is a global variable
+    if (_realtimeChannel) return;
     if (typeof sb === 'undefined') {
-      console.warn('[RT] Supabase client (sb) not found. Retrying in 1s…');
       setTimeout(_subscribe, 1000);
       return;
     }
 
     _realtimeChannel = sb
-      .channel('nxtgen-journal-realtime')
-
-      // ── journal_trades ──────────────────────────────────────────────────
-      .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'journal_trades' },
-          _onTradeChange)
-
-      // ── journal_deleted_trades ──────────────────────────────────────────
-      .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'journal_deleted_trades' },
-          _onDeletedTradeChange)
-
-      // ── journal_watchlist ───────────────────────────────────────────────
-      .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'journal_watchlist' },
-          _onWatchlistChange)
-
-      // ── journal_account_data ────────────────────────────────────────────
-      .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'journal_account_data' },
-          _onAccountDataChange)
-
-      // ── journal_playbook ────────────────────────────────────────────────
-      .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'journal_playbook' },
-          _onPlaybookChange)
-
-      // ── journal_goals ───────────────────────────────────────────────────
-      .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'journal_goals' },
-          _onGoalsChange)
-
-      // ── journal_monthly ─────────────────────────────────────────────────
-      .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'journal_monthly' },
-          _onMonthlyChange)
-
-      // ── journal_profiles ────────────────────────────────────────────────
-      .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'journal_profiles' },
-          _onProfileChange)
-
+      .channel('nxtgen-journal-v2')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_trades' },          _onTradeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_deleted_trades' },  _onDeletedTradeChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_watchlist' },       _onWatchlistChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_account_data' },    _onAccountDataChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_playbook' },        _onPlaybookChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_goals' },           _onGoalsChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_monthly' },         _onMonthlyChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_profiles' },        _onProfileChange)
       .subscribe(function (status, err) {
         if (status === 'SUBSCRIBED') {
-          console.log('[RT] ✅ Realtime sync active across all tables.');
+          console.log('[RT] ✅ Realtime sync active.');
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('[RT] Realtime subscription error:', err || status, '— reconnecting in 5s…');
+          console.warn('[RT] Connection error:', err || status, '— retrying in 5s…');
           _realtimeChannel = null;
           setTimeout(_subscribe, 5000);
         } else if (status === 'CLOSED') {
-          console.log('[RT] Channel closed.');
           _realtimeChannel = null;
         }
       });
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Visibility-based reconnect
-  // When a tab/device wakes from sleep or comes back to the foreground,
-  // Supabase websockets may have dropped. Re-subscribe if needed.
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── Reconnect when tab becomes visible again (after sleep/background) ────
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible' && !_realtimeChannel) {
-      console.log('[RT] Tab visible — re-subscribing…');
       _subscribe();
     }
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Boot: wait for DOMContentLoaded so app.js has set up sb and _currentUser
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─── Boot after app.js auth has had time to run ───────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
-    // Give app.js time to authenticate and set _currentUser before we
-    // subscribe (auth happens inside DOMContentLoaded in app.js too, so we
-    // add a small delay to ensure that block finishes first).
     setTimeout(_subscribe, 1500);
   });
 
