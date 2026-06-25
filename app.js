@@ -142,6 +142,8 @@ let deletedTrades = [];
 let _pnlToggleMode = '%'; // '%' (default) | '$' — toggled by tapping Net PnL card
 let _modalChecklist = []; // checked items in new-trade modal
 let _checklistWarningAcked = false; // allows bypass on second save click
+let _modalMentalState = 'Focused'; // mental state for new-trade modal
+let _modalFollowedPlan = 'Yes';    // followed plan for new-trade modal
 let _eqCurveMode = 'pct'; // equity curve display mode
 // Dashboard date range filter — null means all-time
 let _dashFilter = { from: null, to: null, preset: 'all' };
@@ -201,6 +203,8 @@ function _rowToTrade(row) {
     source:   row.source || '',
     plannedRr: row.planned_rr || '',
     wouldRetake: row.would_retake !== undefined ? row.would_retake : null,
+    lossReason:  row.loss_reason || '',
+    followedPlan: row.followed_plan || 'Yes',
   };
 }
 
@@ -347,6 +351,8 @@ async function _cloudSaveTrade(t) {
     source:       t.source || '',
     planned_rr:   t.plannedRr || '',
     would_retake: s.wouldRetake !== undefined ? s.wouldRetake : (t.wouldRetake !== undefined ? t.wouldRetake : null),
+    loss_reason:  t.lossReason || '',
+    followed_plan: t.followedPlan || 'Yes',
   };
 
   let error;
@@ -398,6 +404,8 @@ async function _cloudSoftDelete(t) {
     chart_labels: t.chartLabels || [...CHART_LABELS],
     mistakes:     t.mistakes || '',
     deleted_at:   new Date().toISOString(),
+    loss_reason:  t.lossReason || '',
+    followed_plan: t.followedPlan || 'Yes',
   };
 
   const [del, ins] = await Promise.all([
@@ -3012,6 +3020,16 @@ function openModal(prefill) {
   _checklistWarningAcked = false;
   const mcw = document.getElementById('modal-checklist-warn');
   if (mcw) mcw.style.display = 'none';
+  // Reset mental state and followed plan
+  _modalMentalState = 'Focused';
+  _modalFollowedPlan = 'Yes';
+  document.querySelectorAll('.ms-btn').forEach(b => b.classList.remove('active'));
+  const focusedBtn = document.querySelector('.ms-btn.ms-focused'); if (focusedBtn) focusedBtn.classList.add('active');
+  document.querySelectorAll('.fp-btn').forEach(b => b.classList.remove('active'));
+  const yesBtn = document.querySelector('.fp-btn.fp-yes'); if (yesBtn) yesBtn.classList.add('active');
+  // Hide loss reason field
+  const lrf = document.getElementById('loss-reason-field'); if (lrf) lrf.style.display = 'none';
+  const lrSel = document.getElementById('m-loss-reason'); if (lrSel) lrSel.value = '';
   const mcg = document.getElementById('modal-checklist-grid');
   if (mcg) mcg.innerHTML = CHECKLIST_ITEMS.map((item, i) =>
     `<div class="mcl-item" id="mcl-${i}" onclick="_toggleModalCheck(${i})">
@@ -3036,6 +3054,20 @@ function _toggleModalCheck(i) {
 function syncCustomPair(val) {
   const ci = document.getElementById('m-pair-custom');
   if (val === '__custom__') { ci.style.display = 'block'; ci.focus(); } else ci.style.display = 'none';
+}
+function toggleLossReason(outcome) {
+  const lrf = document.getElementById('loss-reason-field');
+  if (lrf) lrf.style.display = outcome === 'Loss' ? 'block' : 'none';
+}
+function setMentalState(val, btn) {
+  _modalMentalState = val;
+  document.querySelectorAll('.ms-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+function setFollowedPlan(val, btn) {
+  _modalFollowedPlan = val;
+  document.querySelectorAll('.fp-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
 }
 function syncCustomStrategy(val) {
   const ci = document.getElementById('m-strat-custom');
@@ -3093,6 +3125,17 @@ async function saveTrade() {
   if (rawPnl < 0 && rawOutcome === 'Win')  outcome = 'Loss';
   if (rawPnl === 0 && rawOutcome !== 'B.E') outcome = 'B.E';
 
+  // Validate loss reason when outcome is Loss
+  const lossReasonVal = document.getElementById('m-loss-reason')?.value || '';
+  if (outcome === 'Loss' && !lossReasonVal) {
+    showToast('Please select a Loss Reason before saving.', 'danger');
+    if (btn) { btn.disabled = false; btn.textContent = '💾 Save Trade'; }
+    document.getElementById('loss-reason-field').style.display = 'block';
+    document.getElementById('m-loss-reason').style.outline = '2px solid var(--red)';
+    setTimeout(() => { const el = document.getElementById('m-loss-reason'); if (el) el.style.outline = ''; }, 2000);
+    return;
+  }
+
   const newTrade = {
     user_id:      _currentUser.id,
     trade_date:   dateVal,
@@ -3115,7 +3158,9 @@ async function saveTrade() {
     notes:        document.getElementById('m-notes').value,
     pretrade:     document.getElementById('m-pretrade').value,
     planned_rr:   document.getElementById('m-planned-rr').value.trim() || '',
-    emotion:      'Calm',
+    emotion:      _modalMentalState || 'Focused',
+    loss_reason:  lossReasonVal,
+    followed_plan: _modalFollowedPlan || 'Yes',
     checklist:    [..._modalChecklist],
     charts:       [],
     chart_labels: [...CHART_LABELS],
@@ -5739,12 +5784,48 @@ function updateKPIs() {
         }
       }
 
+      // Mental state insight — compare win rates by state
+      const stateGroups = { Focused: [], Neutral: [], Distracted: [] };
+      trades.forEach(t => {
+        const st = t.emotion || 'Focused';
+        const grp = stateGroups[st] || stateGroups['Focused'];
+        grp.push(t);
+      });
+      const focusedWr = stateGroups.Focused.length >= 3 ? (stateGroups.Focused.filter(t => t.outcome === 'Win').length / stateGroups.Focused.length) * 100 : null;
+      const distractedWr = stateGroups.Distracted.length >= 2 ? (stateGroups.Distracted.filter(t => t.outcome === 'Win').length / stateGroups.Distracted.length) * 100 : null;
+      if (focusedWr !== null && distractedWr !== null && focusedWr - distractedWr > 15) {
+        parts.push(`You win <strong>${(focusedWr - distractedWr).toFixed(0)}%</strong> more when Focused vs Distracted — mental state is costing you real trades`);
+      }
+
+      // Followed plan insight
+      const planNo  = trades.filter(t => t.followedPlan === 'No');
+      const planYes = trades.filter(t => t.followedPlan === 'Yes' || !t.followedPlan);
+      if (planNo.length >= 2 && planYes.length >= 2) {
+        const planNoWr  = (planNo.filter(t => t.outcome === 'Win').length  / planNo.length)  * 100;
+        const planYesWr = (planYes.filter(t => t.outcome === 'Win').length / planYes.length) * 100;
+        if (planYesWr - planNoWr > 15) {
+          parts.push(`<strong>${planNo.length}</strong> trades where you broke your plan → ${planNoWr.toFixed(0)}% WR vs ${planYesWr.toFixed(0)}% when you followed it. Process discipline is your edge`);
+        }
+      }
+
+      // Top loss reason
+      const lossesWithReason = trades.filter(t => t.outcome === 'Loss' && t.lossReason);
+      if (lossesWithReason.length >= 3) {
+        const reasonCounts = {};
+        lossesWithReason.forEach(t => { reasonCounts[t.lossReason] = (reasonCounts[t.lossReason] || 0) + 1; });
+        const topReason = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1])[0];
+        const topPct = Math.round((topReason[1] / lossesWithReason.length) * 100);
+        if (topPct >= 30) {
+          parts.push(`🔴 Top loss cause: <strong>"${topReason[0]}"</strong> (${topPct}% of losses) — address this first`);
+        }
+      }
+
       if (parts.length === 0) {
         // Fallback: just show overall stats
         parts.push(`<strong>${total}</strong> trades logged · <strong>${wr}%</strong> win rate · Net <strong>${netPnl > 0 ? '+' : ''}${netPnl}%</strong> PnL — keep building your edge`);
       }
 
-      insightEl.innerHTML = parts.join('. ') + '.';
+      insightEl.innerHTML = parts.join(' &nbsp;·&nbsp; ');
     }
   }
 
@@ -6891,10 +6972,176 @@ async function handleLogout() {
 }
 
 // ── REFRESH ALL VIEWS ─────────────────────────────────
+// ══════════════════════════════════════════════════════
+// DAY × SESSION MATRIX
+// ══════════════════════════════════════════════════════
+function _buildDaySessionMatrix() {
+  const el = document.getElementById('day-session-matrix');
+  if (!el) return;
+  const trades = _getFilteredTrades();
+  if (trades.length < 5) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:12px;padding:16px">Log at least 5 trades to see day × session patterns.</div>';
+    return;
+  }
+  const DAYS = ['Mon','Tue','Wed','Thu','Fri'];
+  const SESSIONS = ['London','New York','Asian'];
+  const getDow = dateStr => { const d = new Date(dateStr + 'T12:00:00'); return d.getDay(); }; // 0=Sun
+  const dowToLabel = { 1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri' };
+
+  // Build matrix data
+  const matrix = {};
+  SESSIONS.forEach(s => { matrix[s] = {}; DAYS.forEach(d => { matrix[s][d] = { wins:0, total:0 }; }); });
+  trades.forEach(t => {
+    const dow = getDow(t.date);
+    const day = dowToLabel[dow];
+    if (!day) return;
+    const sess = t.kz;
+    if (!matrix[sess] || !matrix[sess][day]) return;
+    matrix[sess][day].total++;
+    if (t.outcome === 'Win') matrix[sess][day].wins++;
+  });
+
+  // Build HTML table
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html += '<thead><tr><th style="text-align:left;padding:6px 8px;color:var(--text3);font-weight:500"></th>';
+  DAYS.forEach(d => { html += `<th style="text-align:center;padding:6px 4px;color:var(--text3);font-weight:500">${d}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  SESSIONS.forEach(s => {
+    const icon = s === 'London' ? '🇬🇧' : s === 'New York' ? '🗽' : '🌏';
+    html += `<tr><td style="padding:5px 8px;font-weight:600;color:var(--text1);white-space:nowrap">${icon} ${s}</td>`;
+    DAYS.forEach(d => {
+      const cell = matrix[s][d];
+      if (cell.total === 0) {
+        html += '<td style="text-align:center;padding:5px 4px"><span style="color:var(--text3);font-size:11px">—</span></td>';
+      } else {
+        const wr = Math.round((cell.wins / cell.total) * 100);
+        const bg = wr >= 70 ? 'rgba(52,211,153,0.18)' : wr >= 50 ? 'rgba(251,191,36,0.15)' : 'rgba(248,113,113,0.15)';
+        const col = wr >= 70 ? 'var(--green)' : wr >= 50 ? 'var(--gold)' : 'var(--red)';
+        html += `<td style="text-align:center;padding:4px 3px"><div style="background:${bg};border-radius:6px;padding:4px 2px;cursor:default" title="${s} ${d}: ${cell.wins}W/${cell.total} trades">
+          <div style="font-weight:700;color:${col};font-size:13px">${wr}%</div>
+          <div style="color:var(--text3);font-size:10px">${cell.total}t</div>
+        </div></td>`;
+      }
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+
+  // Add a quick insight below matrix
+  let bestCell = null, worstCell = null;
+  SESSIONS.forEach(s => DAYS.forEach(d => {
+    const cell = matrix[s][d];
+    if (cell.total < 2) return;
+    const wr = cell.wins / cell.total;
+    if (!bestCell || wr > bestCell.wr) bestCell = { s, d, wr, ...cell };
+    if (!worstCell || wr < worstCell.wr) worstCell = { s, d, wr, ...cell };
+  }));
+  if (bestCell && worstCell && bestCell.s !== worstCell.s || bestCell?.d !== worstCell?.d) {
+    const bWrPct = Math.round(bestCell.wr * 100);
+    const wWrPct = Math.round(worstCell.wr * 100);
+    html += `<div style="margin-top:10px;padding:8px 10px;border-radius:6px;background:rgba(96,165,250,0.07);border:1px solid rgba(96,165,250,0.15);font-size:11px;color:var(--text2)">
+      💡 Best: <strong style="color:var(--green)">${bestCell.d} ${bestCell.s}</strong> (${bWrPct}% WR, ${bestCell.total} trades) &nbsp;·&nbsp; Worst: <strong style="color:var(--red)">${worstCell.d} ${worstCell.s}</strong> (${wWrPct}% WR, ${worstCell.total} trades)
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════
+// LOSS PATTERN CHART
+// ══════════════════════════════════════════════════════
+function _buildLossPatternChart() {
+  const el = document.getElementById('loss-pattern-chart');
+  if (!el) return;
+  const trades = _getFilteredTrades();
+  const losses = trades.filter(t => t.outcome === 'Loss' && t.lossReason);
+  if (losses.length < 2) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:12px;padding:16px">Tag loss reasons when logging trades to see patterns. Loss Reason is required when Outcome = Loss.</div>';
+    return;
+  }
+  const counts = {};
+  losses.forEach(t => { counts[t.lossReason] = (counts[t.lossReason] || 0) + 1; });
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const total = losses.length;
+  let html = '<div style="display:flex;flex-direction:column;gap:8px">';
+  sorted.forEach(([reason, count]) => {
+    const pct = Math.round((count / total) * 100);
+    const barW = Math.max(4, pct);
+    html += `<div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="font-size:12px;color:var(--text1)">${reason}</span>
+        <span style="font-size:11px;color:var(--text2)">${count} (${pct}%)</span>
+      </div>
+      <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${barW}%;background:var(--red);border-radius:3px;transition:width 0.4s ease"></div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  // Add top culprit callout
+  const topReason = sorted[0];
+  if (topReason[1] >= 2) {
+    html += `<div style="margin-top:12px;padding:8px 10px;border-radius:6px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);font-size:11px;color:var(--text2)">
+      🔴 <strong style="color:var(--red)">"${topReason[0]}"</strong> accounts for ${Math.round((topReason[1]/total)*100)}% of your losses — this is your #1 execution leak.
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════
+// CHECKLIST DISCIPLINE ANALYSIS
+// ══════════════════════════════════════════════════════
+function _buildChecklistDiscipline() {
+  const el = document.getElementById('checklist-skip-analysis');
+  if (!el) return;
+  const trades = _getFilteredTrades();
+  const withChecklist = trades.filter(t => Array.isArray(t.checklist));
+  if (withChecklist.length < 5) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:12px;padding:16px">Log at least 5 trades with checklist data to see discipline patterns.</div>';
+    return;
+  }
+  // For each checklist item: how often skipped on wins vs losses
+  const stats = CHECKLIST_ITEMS.map((item, i) => {
+    const losses = withChecklist.filter(t => t.outcome === 'Loss');
+    const wins   = withChecklist.filter(t => t.outcome === 'Win');
+    const skippedOnLoss = losses.filter(t => !t.checklist.includes(i)).length;
+    const skippedOnWin  = wins.filter(t => !t.checklist.includes(i)).length;
+    const skipRateLoss = losses.length ? skippedOnLoss / losses.length : 0;
+    const skipRateWin  = wins.length  ? skippedOnWin  / wins.length  : 0;
+    const correlation = skipRateLoss - skipRateWin; // higher = skipping this item correlates with losses
+    return { item, i, skipRateLoss, skipRateWin, correlation, skippedOnLoss, lossTotal: losses.length };
+  });
+  stats.sort((a, b) => b.correlation - a.correlation);
+
+  let html = '<div style="display:flex;flex-direction:column;gap:10px">';
+  stats.forEach(({ item, skipRateLoss, skipRateWin, correlation, skippedOnLoss, lossTotal }) => {
+    const skipLossPct = Math.round(skipRateLoss * 100);
+    const skipWinPct  = Math.round(skipRateWin  * 100);
+    const severity = correlation > 0.3 ? 'var(--red)' : correlation > 0.1 ? 'var(--gold)' : 'var(--green)';
+    const flag = correlation > 0.3 ? '🔴' : correlation > 0.1 ? '🟡' : '✅';
+    html += `<div style="padding:8px 10px;border-radius:6px;background:rgba(255,255,255,0.03);border:1px solid var(--glass-border)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:12px;font-weight:600;color:var(--text1)">${flag} ${item}</span>
+        <span style="font-size:10px;color:${severity};font-weight:600">${correlation > 0 ? '+' : ''}${Math.round(correlation*100)}pp gap</span>
+      </div>
+      <div style="display:flex;gap:12px;font-size:11px;color:var(--text2)">
+        <span>Skipped before losses: <strong style="color:var(--red)">${skipLossPct}%</strong> (${skippedOnLoss}/${lossTotal})</span>
+        <span>Skipped before wins: <strong style="color:var(--green)">${skipWinPct}%</strong></span>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  html += '<div style="margin-top:8px;font-size:10px;color:var(--text3)">pp gap = how many more percentage points this item is skipped before losses vs wins. Red = strong execution leak.</div>';
+  el.innerHTML = html;
+}
+
 function _refreshAll() {
   updateKPIs(); buildPairTable(); buildKillzoneTable(); buildStrategyTable(); buildMonthlyTable(); refreshPairFilter();
   buildSidebarYears(); renderCalendar(); renderTradeTable(trades); updateTrashBadge();
   buildAccounts();
+  _buildDaySessionMatrix(); _buildLossPatternChart(); _buildChecklistDiscipline();
   setTimeout(() => { _drawEquityCurve(); _renderHeatmap(_getFilteredTrades()); }, 60);
 }
 

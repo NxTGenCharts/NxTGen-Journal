@@ -9655,3 +9655,62 @@ body {
 /* ════════════════════════════════════════════════════════════════
    END LIQUID GLASS OVERRIDE
    ════════════════════════════════════════════════════════════════ */
+
+/* ════════════════════════════════════════════════════════════════
+   FEATURE: MENTAL STATE BUTTONS
+   ════════════════════════════════════════════════════════════════ */
+.mental-state-btns,
+.followed-plan-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ms-btn, .fp-btn {
+  flex: 1;
+  min-width: 80px;
+  padding: 7px 10px;
+  border-radius: var(--r-sm, 8px);
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.1));
+  background: var(--glass-0, rgba(255,255,255,0.04));
+  color: var(--text2);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  font-family: inherit;
+  line-height: 1.4;
+}
+.ms-btn:hover, .fp-btn:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text1);
+}
+.ms-btn.active.ms-focused  { background: rgba(52,211,153,0.15); border-color: rgba(52,211,153,0.4); color: var(--green); }
+.ms-btn.active.ms-neutral  { background: rgba(96,165,250,0.12); border-color: rgba(96,165,250,0.3); color: var(--blue); }
+.ms-btn.active.ms-distracted { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.3); color: var(--red); }
+.fp-btn.active.fp-yes     { background: rgba(52,211,153,0.15); border-color: rgba(52,211,153,0.4); color: var(--green); }
+.fp-btn.active.fp-partial { background: rgba(251,191,36,0.12); border-color: rgba(251,191,36,0.3); color: var(--gold); }
+.fp-btn.active.fp-no      { background: rgba(248,113,113,0.12); border-color: rgba(248,113,113,0.3); color: var(--red); }
+
+/* Light theme overrides */
+[data-theme="light"] .ms-btn,
+[data-theme="light"] .fp-btn {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.12);
+  color: var(--text2);
+}
+[data-theme="light"] .ms-btn:hover,
+[data-theme="light"] .fp-btn:hover {
+  background: rgba(0,0,0,0.08);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   FEATURE: LOSS REASON FIELD — slide in smoothly
+   ════════════════════════════════════════════════════════════════ */
+#loss-reason-field {
+  animation: slideDown 0.2s ease;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

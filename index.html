@@ -197,6 +197,24 @@
             </table>
           </div>
 
+          <!-- Day × Session Matrix -->
+          <div class="sec-head">Day × Session Win Rate <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-left:6px">Which days are actually worth trading?</span></div>
+          <div style="background:var(--glass-0);border:1px solid var(--glass-border);border-radius:var(--r-md);padding:16px;margin-bottom:20px;overflow-x:auto">
+            <div id="day-session-matrix"></div>
+          </div>
+
+          <!-- Loss Pattern Breakdown -->
+          <div class="sec-head">Loss Pattern Audit <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-left:6px">Why are you really losing?</span></div>
+          <div style="background:var(--glass-0);border:1px solid var(--glass-border);border-radius:var(--r-md);padding:16px;margin-bottom:20px">
+            <div id="loss-pattern-chart"></div>
+          </div>
+
+          <!-- Checklist Skip Analysis -->
+          <div class="sec-head">Checklist Discipline <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-left:6px">Items skipped before losses vs wins</span></div>
+          <div style="background:var(--glass-0);border:1px solid var(--glass-border);border-radius:var(--r-md);padding:16px;margin-bottom:20px">
+            <div id="checklist-skip-analysis"></div>
+          </div>
+
           <!-- Strategy -->
           <div class="sec-head">Strategy Performance</div>
           <div class="data-table-wrap">
@@ -1092,7 +1110,23 @@
       <div class="form-field"><label class="form-label">Planned R:R <span style="font-size:10px;color:var(--text3);font-weight:400">(before entry)</span></label><input type="text" class="form-input" id="m-planned-rr" placeholder="1:3"></div>
       <div class="form-field"><label class="form-label">PnL %</label><input type="number" class="form-input" id="m-pnl" step="0.1" placeholder="3.5"></div>
       <div class="form-field"><label class="form-label">Outcome</label>
-        <select class="form-select" id="m-outcome"><option>Win</option><option>Loss</option><option>B.E</option></select>
+        <select class="form-select" id="m-outcome" onchange="toggleLossReason(this.value)"><option>Win</option><option>Loss</option><option>B.E</option></select>
+      </div>
+      <!-- Loss Reason — shown only when outcome = Loss -->
+      <div class="form-field" id="loss-reason-field" style="display:none">
+        <label class="form-label" style="display:flex;align-items:center;gap:4px">Loss Reason <span style="color:var(--red);font-size:10px">required</span></label>
+        <select class="form-select" id="m-loss-reason">
+          <option value="">— Select reason —</option>
+          <option value="FOMO Entry">FOMO Entry</option>
+          <option value="Early Entry">Early Entry (no confirmation)</option>
+          <option value="Against HTF">Against HTF Bias</option>
+          <option value="Skipped Checklist">Skipped Checklist</option>
+          <option value="Wrong Session">Wrong Session / Outside KZ</option>
+          <option value="News Event">News Event / Spike</option>
+          <option value="Moved SL Early">Moved SL Too Early</option>
+          <option value="Revenge Trade">Revenge Trade</option>
+          <option value="Valid Loss">Valid Loss (followed plan)</option>
+        </select>
       </div>
       <div class="form-field"><label class="form-label">Killzone</label>
         <select class="form-select" id="m-kz"><option>London</option><option>New York</option><option>Asian</option></select>
@@ -1127,6 +1161,24 @@
       </div>
       <div class="form-field"><label class="form-label">Risk Used</label>
         <select class="form-select" id="m-risk"><option>0.5%</option><option>0.8%</option><option>1%</option><option>1.5%</option><option>2%</option></select>
+      </div>
+      <!-- Mental State -->
+      <div class="form-field">
+        <label class="form-label">Mental State</label>
+        <div class="mental-state-btns" id="mental-state-btns">
+          <button type="button" class="ms-btn ms-focused active" onclick="setMentalState('Focused',this)">🎯 Focused</button>
+          <button type="button" class="ms-btn ms-neutral" onclick="setMentalState('Neutral',this)">😐 Neutral</button>
+          <button type="button" class="ms-btn ms-distracted" onclick="setMentalState('Distracted',this)">😤 Distracted</button>
+        </div>
+      </div>
+      <!-- Followed Plan -->
+      <div class="form-field">
+        <label class="form-label">Followed Plan?</label>
+        <div class="followed-plan-btns" id="followed-plan-btns">
+          <button type="button" class="fp-btn fp-yes active" onclick="setFollowedPlan('Yes',this)">✅ Yes</button>
+          <button type="button" class="fp-btn fp-partial" onclick="setFollowedPlan('Partial',this)">⚠️ Partial</button>
+          <button type="button" class="fp-btn fp-no" onclick="setFollowedPlan('No',this)">❌ No</button>
+        </div>
       </div>
       <div class="form-field full"><label class="form-label">Pre-Trade Notes</label><textarea class="form-textarea" id="m-pretrade" placeholder="Brief bias, setup thesis…"></textarea></div>
       <div class="form-field full"><label class="form-label">Post-Trade Reflection</label><textarea class="form-textarea" id="m-notes" placeholder="What happened? What did you learn?"></textarea></div>
