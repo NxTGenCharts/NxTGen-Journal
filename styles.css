@@ -905,6 +905,9 @@ body{
 .wl-week-btn:hover{background:var(--glass-2);color:var(--text);border-color:var(--glass-border-h)}
 .wl-week-btn.danger:hover{background:rgba(248,113,113,0.12);color:var(--red);
   border-color:rgba(248,113,113,0.3)}
+.wl-week-btn.archive:hover{background:rgba(148,163,184,0.15);color:var(--text)}
+.wl-week-btn.restore{color:var(--green);border-color:rgba(52,211,153,0.3)}
+.wl-week-btn.restore:hover{background:rgba(52,211,153,0.12);border-color:rgba(52,211,153,0.5)}
 
 /* Pair grid */
 .wl-pairs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));
@@ -2830,6 +2833,8 @@ body{
   transition:var(--t-med);box-shadow:var(--shadow-sm);
 }
 .model-card:hover{background:var(--glass-2);border-color:var(--glass-border-h);transform:translateY(-1px)}
+.model-card-archived{opacity:.55;border-style:dashed}
+.model-card-archived:hover{opacity:.75}
 .model-title{font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:4px;letter-spacing:-0.2px}
 .model-sub{font-size:11.5px;color:var(--text2);margin-bottom:12px;line-height:1.5}
 .model-steps{display:flex;flex-direction:column;gap:6px;counter-reset:step}

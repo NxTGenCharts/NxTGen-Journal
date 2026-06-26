@@ -2591,7 +2591,7 @@ function _renderDetail(id) {
       <div class="form-field"><label class="form-label">Outcome</label><select class="form-select" id="e-outcome"><option${t.outcome === 'Win' ? ' selected' : ''}>Win</option><option${t.outcome === 'Loss' ? ' selected' : ''}>Loss</option><option${t.outcome === 'B.E' ? ' selected' : ''}>B.E</option></select></div>
       <div class="form-field"><label class="form-label">Killzone</label><select class="form-select" id="e-kz"><option${t.kz === 'London' ? ' selected' : ''}>London</option><option${t.kz === 'New York' ? ' selected' : ''}>New York</option><option${t.kz === 'Asian' ? ' selected' : ''}>Asian</option></select></div>
       <div class="form-field" style="grid-column:span 2"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Account <button type="button" onclick="_openManageAccounts()" style="font-size:10px;padding:2px 8px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);color:var(--blue);border-radius:4px;cursor:pointer;font-family:inherit">⚙ Manage</button></label><select class="form-select" id="e-acc">${_buildAccountOptions(t.account)}</select></div>
-      <div class="form-field"><label class="form-label">Strategy</label><select class="form-select" id="e-strat"><option${t.strategy === 'NxtGen - Mod' ? ' selected' : ''}>NxtGen - Mod</option><option${t.strategy === 'IRL > ERL' ? ' selected' : ''}>IRL > ERL</option><option${t.strategy === 'ERL > IRL' ? ' selected' : ''}>ERL > IRL</option><option value="__custom__">＋ Custom…</option></select></div>
+      <div class="form-field"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Strategy <button type="button" onclick="_openManageStrategies()" style="font-size:10px;padding:2px 8px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.25);color:var(--gold);border-radius:4px;cursor:pointer;font-family:inherit">⚙ Manage</button></label><select class="form-select" id="e-strat" onchange="_handleCustomSelect(this,'e-strat-custom')">${_buildStrategyOptions(t.strategy)}</select><input type="text" class="form-input" id="e-strat-custom" placeholder="Enter strategy name…" style="display:none;margin-top:6px" value="${_getActiveStrategies().find(m=>(m.strategyName||m.title)===t.strategy) ? '' : (t.strategy||'')}"></div>
       <div class="form-field"><label class="form-label">TF Alignment</label><select class="form-select" id="e-tf" onchange="_handleCustomSelect(this,'e-tf-custom')"><option${t.tf === '30m > 3m' ? ' selected' : ''}>30m > 3m</option><option${t.tf === '1h > 5m' ? ' selected' : ''}>1h > 5m</option><option${t.tf === '1h > 3m' ? ' selected' : ''}>1h > 3m</option><option${t.tf === '4h > 15m' ? ' selected' : ''}>4h > 15m</option><option${t.tf === 'D1 > 1h' ? ' selected' : ''}>D1 > 1h</option><option${t.tf === '15m > 1m' ? ' selected' : ''}>15m > 1m</option><option${t.tf === '15m > 3m' ? ' selected' : ''}>15m > 3m</option><option value="__custom__">＋ Custom…</option></select><input type="text" class="form-input" id="e-tf-custom" placeholder="e.g. 2h > 5m" style="display:none;margin-top:6px" value="${['30m > 3m','1h > 5m','1h > 3m','4h > 15m','D1 > 1h','15m > 1m','15m > 3m'].includes(t.tf) ? '' : t.tf}"></div>
     </div>
     <div class="form-field" style="margin-bottom:10px"><label class="form-label">Rating <span style="font-size:10px;color:var(--text3);font-weight:400;text-transform:none">(tap a star)</span></label>
@@ -3000,8 +3000,14 @@ function openModal(prefill) {
   document.getElementById('m-pnl').value = '';
   document.getElementById('m-outcome').value = 'Win';
   document.getElementById('m-kz').value = 'London';
-  // Strategy — reset to first preset, hide custom input
-  document.getElementById('m-strat').value = 'NxtGen - Mod';
+  // Strategy — populate from playbook models, reset to first active
+  const stratSel = document.getElementById('m-strat');
+  if (stratSel) {
+    const firstActive = _getActiveStrategies()[0];
+    const firstName = firstActive ? (firstActive.strategyName || firstActive.title) : 'NxtGen - Mod';
+    stratSel.innerHTML = _buildStrategyOptions(firstName);
+    stratSel.value = firstName;
+  }
   const stratCustom = document.getElementById('m-strat-custom');
   if (stratCustom) { stratCustom.style.display = 'none'; stratCustom.value = ''; }
   // TF Alignment — reset to first preset, hide custom input
@@ -5245,6 +5251,51 @@ async function _pbLoad() {
     if (!_pbData.models) _pbData.models = [...MODELS];
     if (!_pbData.rules)  _pbData.rules  = [...RULES];
   }
+  // Migrate: ensure every model has strategyName + status
+  _pbData.models = _pbData.models.map(m => ({
+    status: 'active',
+    strategyName: _inferStrategyName(m.title),
+    ...m,
+  }));
+}
+
+// Extract the short strategy name from a model title for backward compat
+// e.g. "Model 1 — IRL > ERL" → "IRL > ERL", "NxtGen Modified" → "NxtGen - Mod"
+function _inferStrategyName(title) {
+  if (!title) return title;
+  // Already short (no em-dash prefix)
+  if (!title.includes('—')) return title;
+  const after = title.split('—').slice(1).join('—').trim();
+  return after || title;
+}
+
+function _getActiveStrategies() {
+  return (_pbData.models || []).filter(m => m.status !== 'archived' && m.status !== 'deleted');
+}
+
+function _getArchivedStrategies() {
+  return (_pbData.models || []).filter(m => m.status === 'archived');
+}
+
+function _buildStrategyOptions(current) {
+  const active = _getActiveStrategies();
+  const opts = active.map(m => {
+    const name = m.strategyName || m.title;
+    return `<option value="${name}"${name === current ? ' selected' : ''}>${name}</option>`;
+  }).join('');
+  // If current strategy is not in active list (e.g. archived), still show it selected
+  const found = active.find(m => (m.strategyName || m.title) === current);
+  const extra = (current && !found)
+    ? `<option value="${current}" selected>${current} (archived)</option>` : '';
+  return extra + opts + `<option value="__custom__">＋ Custom…</option>`;
+}
+
+function _refreshStrategyDropdowns() {
+  ['m-strat', 'e-strat'].forEach(id => {
+    const sel = document.getElementById(id); if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = _buildStrategyOptions(cur);
+  });
 }
 
 async function _pbSave() {
@@ -5258,22 +5309,170 @@ async function _pbSave() {
   }
 }
 
+// ═══════════════════════════════════════════════════
+// MANAGE STRATEGIES MODAL
+// Mirrors _openManageAccounts — active / archived tabs
+// ═══════════════════════════════════════════════════
+function _openManageStrategies() {
+  const existing = document.getElementById('strat-manager-overlay');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'strat-manager-overlay';
+  overlay.className = 'acc-manager-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `
+  <div class="acc-manager-modal">
+    <div class="acc-manager-header">
+      <span>⚙ Manage Strategies</span>
+      <button onclick="document.getElementById('strat-manager-overlay').remove()" class="acc-mgr-close">✕</button>
+    </div>
+    <div class="acc-manager-body">
+      <div class="acc-mgr-tabs">
+        <button class="acc-mgr-tab active" onclick="_stratMgrTab('active',this)">Active</button>
+        <button class="acc-mgr-tab" onclick="_stratMgrTab('archived',this)">Archived</button>
+      </div>
+      <div id="strat-mgr-list-active" class="acc-mgr-list"></div>
+      <div id="strat-mgr-list-archived" class="acc-mgr-list" style="display:none"></div>
+      <div class="acc-mgr-add-row" id="strat-mgr-add-row">
+        <input type="text" id="strat-mgr-input" class="acc-mgr-input" placeholder="Strategy name (e.g. IRL > ERL)…" onkeydown="if(event.key==='Enter')_addStrategyFromModal()">
+        <button onclick="_addStrategyFromModal()" class="acc-mgr-add-btn">＋ Add</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  _rebuildStratMgrList();
+  requestAnimationFrame(() => overlay.classList.add('open'));
+}
+
+function _stratMgrTab(tab, btn) {
+  document.querySelectorAll('#strat-manager-overlay .acc-mgr-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('strat-mgr-list-active').style.display   = tab === 'active'   ? '' : 'none';
+  document.getElementById('strat-mgr-list-archived').style.display = tab === 'archived' ? '' : 'none';
+  const addRow = document.getElementById('strat-mgr-add-row');
+  if (addRow) addRow.style.display = tab === 'archived' ? 'none' : '';
+}
+
+function _rebuildStratMgrList() {
+  const elActive   = document.getElementById('strat-mgr-list-active');
+  const elArchived = document.getElementById('strat-mgr-list-archived');
+  if (!elActive || !elArchived) return;
+
+  const ICONS = {
+    edit: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+    archive: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>',
+    restore: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.28"/></svg>',
+    trash: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>',
+  };
+
+  const models = _pbData.models || [];
+
+  const renderActive = (m, mi) => `
+    <div class="acc-mgr-item" id="strat-mgr-item-${mi}">
+      <div class="acc-mgr-item-left" style="flex:1;min-width:0">
+        <span class="acc-mgr-name">${m.title}</span>
+        ${m.strategyName && m.strategyName !== m.title ? `<span class="acc-mgr-type-badge" style="background:rgba(251,191,36,.12);color:var(--gold);border-color:rgba(251,191,36,.25)">${m.strategyName}</span>` : ''}
+      </div>
+      <div class="acc-mgr-actions">
+        <button onclick="document.getElementById('strat-manager-overlay').remove();pbEditModelModal(${mi})" class="acc-mgr-btn edit" title="Edit model">${ICONS.edit}</button>
+        <button onclick="_toggleArchiveStrategy(${mi})" class="acc-mgr-btn archive" title="Archive">${ICONS.archive}</button>
+        <button onclick="_deleteStrategy(${mi})" class="acc-mgr-btn del" title="Delete">${ICONS.trash}</button>
+      </div>
+    </div>`;
+
+  const renderArchived = (m, mi) => `
+    <div class="acc-mgr-item acc-mgr-item-archived" id="strat-mgr-item-${mi}">
+      <div class="acc-mgr-item-left" style="flex:1;min-width:0">
+        <span class="acc-mgr-name">${m.title}</span>
+        ${m.strategyName && m.strategyName !== m.title ? `<span class="acc-mgr-type-badge">${m.strategyName}</span>` : ''}
+      </div>
+      <div class="acc-mgr-actions">
+        <button onclick="_toggleArchiveStrategy(${mi})" class="acc-mgr-btn restore" title="Restore">${ICONS.restore}</button>
+        <button onclick="_deleteStrategy(${mi})" class="acc-mgr-btn del" title="Delete">${ICONS.trash}</button>
+      </div>
+    </div>`;
+
+  const activeItems   = models.filter(m => m.status !== 'archived' && m.status !== 'deleted');
+  const archivedItems = models.filter(m => m.status === 'archived');
+
+  elActive.innerHTML = activeItems.length
+    ? models.map((m, mi) => (m.status !== 'archived' && m.status !== 'deleted') ? renderActive(m, mi) : '').join('')
+    : '<div class="acc-mgr-empty">No active strategies yet.</div>';
+
+  elArchived.innerHTML = archivedItems.length
+    ? models.map((m, mi) => m.status === 'archived' ? renderArchived(m, mi) : '').join('')
+    : '<div class="acc-mgr-empty">No archived strategies.</div>';
+}
+
+async function _addStrategyFromModal() {
+  const inp = document.getElementById('strat-mgr-input'); if (!inp) return;
+  const name = inp.value.trim(); if (!name) return;
+  const existing = (_pbData.models || []).find(m => (m.strategyName || m.title) === name);
+  if (existing) { showToast('Strategy already exists', 'danger'); return; }
+  _pbData.models.push({ title: name, strategyName: name, sub: '', steps: [], status: 'active' });
+  inp.value = '';
+  await _pbSave();
+  buildPlaybook();
+  _rebuildStratMgrList();
+  _refreshStrategyDropdowns();
+  showToast('Strategy added ✓', 'restore');
+}
+
+async function _toggleArchiveStrategy(mi) {
+  const m = _pbData.models[mi]; if (!m) return;
+  m.status = m.status === 'archived' ? 'active' : 'archived';
+  await _pbSave();
+  buildPlaybook();
+  _rebuildStratMgrList();
+  _refreshStrategyDropdowns();
+  showToast(m.status === 'archived' ? 'Strategy archived' : 'Strategy restored ✓', 'restore');
+}
+
+async function _deleteStrategy(mi) {
+  const m = _pbData.models[mi]; if (!m) return;
+  openGlassModal({
+    icon: '🗑️',
+    title: 'Delete Strategy?',
+    body: `<strong>${m.title}</strong> will be permanently removed.<br><small style="color:var(--text3)">Past trades using this strategy tag are not affected.</small>`,
+    confirmLabel: 'Delete',
+    confirmClass: 'glass-btn-danger',
+    onConfirm: async () => {
+      _pbData.models.splice(mi, 1);
+      await _pbSave();
+      buildPlaybook();
+      _rebuildStratMgrList();
+      _refreshStrategyDropdowns();
+      showToast('Strategy deleted', 'danger');
+    }
+  });
+}
+
 function buildPlaybook() {
   // Models
   const mc = document.getElementById('model-cards');
   if (mc) {
-    mc.innerHTML = (_pbData.models || []).map((m, mi) => `
-      <div class="model-card" style="position:relative">
+    mc.innerHTML = (_pbData.models || []).filter(m => m.status !== 'deleted').map((m, mi) => {
+      const isArchived = m.status === 'archived';
+      const sName = m.strategyName || m.title;
+      return `
+      <div class="model-card${isArchived ? ' model-card-archived' : ''}" style="position:relative">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-          <div>
-            <div class="model-title">${m.title}</div>
-            <div class="model-sub">${m.sub}</div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+              <div class="model-title">${m.title}</div>
+              ${isArchived ? '<span class="acc-mgr-type-badge" style="background:rgba(148,163,184,.12);color:var(--text3)">Archived</span>' : ''}
+            </div>
+            <div class="model-sub" style="margin-top:2px">${m.sub}</div>
+            ${sName !== m.title ? `<div style="margin-top:4px;font-size:10px;color:var(--gold);opacity:.7">Strategy tag: <strong>${sName}</strong></div>` : ''}
           </div>
-          <button class="wl-week-btn" style="font-size:10px;padding:3px 9px;flex-shrink:0" onclick="pbEditModel(${mi})">✎ Edit</button>
+          <div style="display:flex;gap:5px;flex-shrink:0">
+            <button class="wl-week-btn" style="font-size:10px;padding:3px 9px" onclick="pbEditModelModal(${mi})">✎ Edit</button>
+            <button class="wl-week-btn${isArchived ? ' restore' : ' archive'}" style="font-size:10px;padding:3px 9px" onclick="pbToggleArchiveModel(${mi})">${isArchived ? '↩ Restore' : '⬛ Archive'}</button>
+          </div>
         </div>
         <div class="model-steps">${(m.steps||[]).map(s => `<div class="model-step">${s}</div>`).join('')}</div>
-      </div>`).join('') +
-      `<div class="wl-add-pair-card" style="min-height:90px" onclick="pbAddModel()">
+      </div>`}).join('') +
+      `<div class="wl-add-pair-card" style="min-height:90px" onclick="pbAddModelModal()">
         <span>＋</span><p>Add Entry Model</p>
       </div>`;
   }
@@ -5291,30 +5490,104 @@ function buildPlaybook() {
   }
 }
 
-function pbAddModel() {
-  const title = prompt('Model name (e.g. NxtGen - Mod):');
-  if (!title) return;
-  const sub   = prompt('Sub-description:') || '';
-  const steps = [];
-  let step;
-  while ((step = prompt(`Step ${steps.length+1} (leave blank to finish):`)) !== null && step.trim()) {
-    steps.push(step.trim());
-  }
-  _pbData.models.push({ title, sub, steps });
-  buildPlaybook(); _pbSave();
+function pbAddModelModal() { _openModelEditModal(null); }
+function pbEditModelModal(mi) { _openModelEditModal(mi); }
+
+function _openModelEditModal(mi) {
+  const isNew = mi === null;
+  const m = isNew ? { title: '', strategyName: '', sub: '', steps: [], status: 'active' } : _pbData.models[mi];
+  const existing = document.getElementById('pb-model-edit-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'pb-model-edit-overlay';
+  overlay.className = 'acc-manager-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `
+  <div class="acc-manager-modal" style="max-width:520px">
+    <div class="acc-manager-header">
+      <span>${isNew ? '＋ Add Entry Model' : '✎ Edit Model'}</span>
+      <button onclick="document.getElementById('pb-model-edit-overlay').remove()" class="acc-mgr-close">✕</button>
+    </div>
+    <div class="acc-manager-body" style="display:flex;flex-direction:column;gap:12px;padding:16px">
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Model Title</label>
+        <input type="text" id="pb-edit-title" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="e.g. IRL > ERL" value="${m.title}">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Strategy Tag <span style="font-weight:400;text-transform:none;color:var(--gold)">(used in trade log)</span></label>
+        <input type="text" id="pb-edit-stratname" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="e.g. IRL > ERL" value="${m.strategyName || ''}">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Sub-Description</label>
+        <input type="text" id="pb-edit-sub" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="One-line description of the setup…" value="${m.sub}">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Steps <span style="font-weight:400;text-transform:none">(one per line)</span></label>
+        <textarea id="pb-edit-steps" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:140px;resize:vertical;font-size:12px;line-height:1.6" placeholder="Step 1&#10;Step 2&#10;Step 3…">${(m.steps||[]).join('\n')}</textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+        ${!isNew ? `<button onclick="pbDeleteModel(${mi})" class="acc-mgr-btn del" style="padding:6px 14px;margin-right:auto">🗑 Delete</button>` : ''}
+        <button onclick="document.getElementById('pb-model-edit-overlay').remove()" class="acc-mgr-btn" style="padding:6px 14px">Cancel</button>
+        <button onclick="_pbSaveModelModal(${isNew ? 'null' : mi})" class="acc-mgr-add-btn" style="padding:6px 18px">Save</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  document.getElementById('pb-edit-title')?.focus();
 }
 
-function pbEditModel(mi) {
-  const m = _pbData.models[mi];
-  const title = prompt('Model name:', m.title);
-  if (title === null) return;
-  const sub   = prompt('Sub-description:', m.sub);
-  if (sub === null) return;
-  const stepsStr = prompt('Steps (one per line):', (m.steps||[]).join('\n'));
-  if (stepsStr === null) return;
-  _pbData.models[mi] = { title: title||m.title, sub: sub||'', steps: stepsStr.split('\n').map(s=>s.trim()).filter(Boolean) };
-  buildPlaybook(); _pbSave();
+async function _pbSaveModelModal(mi) {
+  const isNew = mi === null;
+  const title    = document.getElementById('pb-edit-title')?.value.trim();
+  const stratN   = document.getElementById('pb-edit-stratname')?.value.trim();
+  const sub      = document.getElementById('pb-edit-sub')?.value.trim() || '';
+  const stepsRaw = document.getElementById('pb-edit-steps')?.value || '';
+  const steps    = stepsRaw.split('\n').map(s=>s.trim()).filter(Boolean);
+  if (!title) { showToast('Title is required', 'danger'); return; }
+  const strategyName = stratN || title;
+  if (isNew) {
+    _pbData.models.push({ title, strategyName, sub, steps, status: 'active' });
+  } else {
+    _pbData.models[mi] = { ..._pbData.models[mi], title, strategyName, sub, steps };
+  }
+  document.getElementById('pb-model-edit-overlay')?.remove();
+  buildPlaybook(); await _pbSave();
+  _refreshStrategyDropdowns();
+  showToast(isNew ? 'Model added ✓' : 'Model updated ✓', 'restore');
 }
+
+async function pbToggleArchiveModel(mi) {
+  const m = _pbData.models[mi]; if (!m) return;
+  const wasArchived = m.status === 'archived';
+  m.status = wasArchived ? 'active' : 'archived';
+  buildPlaybook(); await _pbSave();
+  _refreshStrategyDropdowns();
+  showToast(wasArchived ? 'Model restored ✓' : 'Model archived', 'restore');
+}
+
+async function pbDeleteModel(mi) {
+  const m = _pbData.models[mi]; if (!m) return;
+  openGlassModal({
+    icon: '🗑️',
+    title: 'Delete Model?',
+    body: `<strong>${m.title}</strong> will be permanently removed from your playbook.<br><small style="color:var(--text3)">Past trades using this strategy tag are not affected.</small>`,
+    confirmLabel: 'Delete Model',
+    confirmClass: 'glass-btn-danger',
+    onConfirm: async () => {
+      document.getElementById('pb-model-edit-overlay')?.remove();
+      _pbData.models.splice(mi, 1);
+      buildPlaybook(); await _pbSave();
+      _refreshStrategyDropdowns();
+      showToast('Model deleted', 'danger');
+    }
+  });
+}
+
+// Legacy prompt-based functions (kept for safety, now delegate to modal)
+function pbAddModel() { pbAddModelModal(); }
+function pbEditModel(mi) { pbEditModelModal(mi); }
 
 function pbAddRule() {
   const rule = prompt('New rule:');
@@ -6404,7 +6677,8 @@ async function _saveEdit(id) {
   }
   if (kzVal) t.kz = kzVal;
   if (accVal && accVal !== '__custom__') t.account = accVal;
-  if (stratVal) t.strategy = stratVal;
+  if (stratVal && stratVal !== '__custom__') t.strategy = stratVal;
+  else if (stratVal === '__custom__') { const sc = get('e-strat-custom'); if (sc && sc.trim()) t.strategy = sc.trim(); }
   if (tfVal && tfVal !== '__custom__') t.tf = tfVal;
   t.rating = ratingVal;
   const plannedRrEdit = document.getElementById('e-planned-rr');
