@@ -117,9 +117,9 @@ const EMOTIONS=["Calm","Relaxed","Confident","Focused","Neutral","Anxious","Impa
 const CHART_LABELS=["Daily HTF","4h Structure","1h Confirm","30m Trigger","3m/5m Entry","Result"];
 const RULES=["Never trade without HTF bias confirmed","Never enter without an active killzone","Never risk more than 1% on funded accounts","Never chase price — missed entry = no entry","Never move SL before 30% of target is hit","Never trade 15 min before/after red news","Never skip the entry checklist","Never take more than 2 trades per day","Never take a 3★ or below setup","Never trade while angry, fearful or revenge-seeking"];
 const MODELS=[
-  {title:"Model 1 — IRL > ERL",dir:"Bearish",sub:"Price at Internal Range Liquidity → delivers to External Range Liquidity",steps:["Daily/Weekly confirms bearish bias","4h shows sell-side delivery","1am London manipulation sweeps buy-side (IRL)","30m market structure shifts bearish (BOS/CHoCH)","Enter on 3m OB or FVG · SL above manipulation high","Target: ERL — previous lows, daily BISI, weekly discount"]},
-  {title:"Model 2 — ERL > IRL",dir:"Bullish",sub:"Price at External Range Liquidity → returns to Internal Range Liquidity",steps:["Daily/Weekly confirms bullish bias","4h shows buy-side delivery","1am London manipulation sweeps sell-side (ERL)","30m market structure shifts bullish","Enter on 3m OB or FVG · SL below manipulation low","Target: IRL — previous highs, daily SIBI, weekly premium"]},
-  {title:"Model 3 — NxtGen Modified",dir:"SMT + CISD",sub:"SMT divergence confirms manipulation · CISD gives entry",steps:["Identify SMT between GBPUSD/EURUSD or Gold/DXY","One pair makes new high/low while other fails → SMT confirmed","Wait for CISD on 1h or 30m","Enter on 3m/5m · tight SL","Target: opposing liquidity pool"]},
+  {title:"IRL > ERL",strategyName:"IRL > ERL",status:"active",dir:"Bearish",sub:"Price at Internal Range Liquidity → delivers to External Range Liquidity",steps:["Daily/Weekly confirms bearish bias","4h shows sell-side delivery","1am London manipulation sweeps buy-side (IRL)","30m market structure shifts bearish (BOS/CHoCH)","Enter on 3m OB or FVG · SL above manipulation high","Target: ERL — previous lows, daily BISI, weekly discount"]},
+  {title:"ERL > IRL",strategyName:"ERL > IRL",status:"active",dir:"Bullish",sub:"Price at External Range Liquidity → returns to Internal Range Liquidity",steps:["Daily/Weekly confirms bullish bias","4h shows buy-side delivery","1am London manipulation sweeps sell-side (ERL)","30m market structure shifts bullish","Enter on 3m OB or FVG · SL below manipulation low","Target: IRL — previous highs, daily SIBI, weekly premium"]},
+  {title:"NxtGen - Mod",strategyName:"NxtGen - Mod",status:"active",dir:"SMT + CISD",sub:"SMT divergence confirms manipulation · CISD gives entry",steps:["Identify SMT between GBPUSD/EURUSD or Gold/DXY","One pair makes new high/low while other fails → SMT confirmed","Wait for CISD on 1h or 30m","Enter on 3m/5m · tight SL","Target: opposing liquidity pool"]},
 ];
 const WL_PAIRS=[
   {name:"GBPUSD",priority:"🔴 HIGH",bias:"Bear",tfs:[{tf:"Weekly",bias:"bear"},{tf:"Daily",bias:"bear"},{tf:"4H",bias:"bear"},{tf:"1H",bias:"neu"}],note:"Setup: NxtGen IRL>ERL · Key: 1.2650 OB · R:R 1:3 · London kill zone · Watch 1am manipulation"},
@@ -2591,7 +2591,7 @@ function _renderDetail(id) {
       <div class="form-field"><label class="form-label">Outcome</label><select class="form-select" id="e-outcome"><option${t.outcome === 'Win' ? ' selected' : ''}>Win</option><option${t.outcome === 'Loss' ? ' selected' : ''}>Loss</option><option${t.outcome === 'B.E' ? ' selected' : ''}>B.E</option></select></div>
       <div class="form-field"><label class="form-label">Killzone</label><select class="form-select" id="e-kz"><option${t.kz === 'London' ? ' selected' : ''}>London</option><option${t.kz === 'New York' ? ' selected' : ''}>New York</option><option${t.kz === 'Asian' ? ' selected' : ''}>Asian</option></select></div>
       <div class="form-field" style="grid-column:span 2"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Account <button type="button" onclick="_openManageAccounts()" style="font-size:10px;padding:2px 8px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);color:var(--blue);border-radius:4px;cursor:pointer;font-family:inherit">⚙ Manage</button></label><select class="form-select" id="e-acc">${_buildAccountOptions(t.account)}</select></div>
-      <div class="form-field"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Strategy <button type="button" onclick="_openManageStrategies()" style="font-size:10px;padding:2px 8px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.25);color:var(--gold);border-radius:4px;cursor:pointer;font-family:inherit">⚙ Manage</button></label><select class="form-select" id="e-strat" onchange="_handleCustomSelect(this,'e-strat-custom')">${_buildStrategyOptions(t.strategy)}</select><input type="text" class="form-input" id="e-strat-custom" placeholder="Enter strategy name…" style="display:none;margin-top:6px" value="${_getActiveStrategies().find(m=>(m.strategyName||m.title)===t.strategy) ? '' : (t.strategy||'')}"></div>
+      <div class="form-field"><label class="form-label">Strategy</label><select class="form-select" id="e-strat" onchange="_handleCustomSelect(this,'e-strat-custom')">${_buildStrategyOptions(t.strategy)}</select><input type="text" class="form-input" id="e-strat-custom" placeholder="Enter strategy name…" style="display:none;margin-top:6px" value="${_getActiveStrategies().find(m=>(m.strategyName||m.title)===t.strategy) ? '' : (t.strategy||'')}"></div>
       <div class="form-field"><label class="form-label">TF Alignment</label><select class="form-select" id="e-tf" onchange="_handleCustomSelect(this,'e-tf-custom')"><option${t.tf === '30m > 3m' ? ' selected' : ''}>30m > 3m</option><option${t.tf === '1h > 5m' ? ' selected' : ''}>1h > 5m</option><option${t.tf === '1h > 3m' ? ' selected' : ''}>1h > 3m</option><option${t.tf === '4h > 15m' ? ' selected' : ''}>4h > 15m</option><option${t.tf === 'D1 > 1h' ? ' selected' : ''}>D1 > 1h</option><option${t.tf === '15m > 1m' ? ' selected' : ''}>15m > 1m</option><option${t.tf === '15m > 3m' ? ' selected' : ''}>15m > 3m</option><option value="__custom__">＋ Custom…</option></select><input type="text" class="form-input" id="e-tf-custom" placeholder="e.g. 2h > 5m" style="display:none;margin-top:6px" value="${['30m > 3m','1h > 5m','1h > 3m','4h > 15m','D1 > 1h','15m > 1m','15m > 3m'].includes(t.tf) ? '' : t.tf}"></div>
     </div>
     <div class="form-field" style="margin-bottom:10px"><label class="form-label">Rating <span style="font-size:10px;color:var(--text3);font-weight:400;text-transform:none">(tap a star)</span></label>
@@ -5232,10 +5232,19 @@ async function accDeleteMilestone(i) {
 // ═══════════════════════════════════════════════════
 // PLAYBOOK — Supabase-backed, per user
 // Table: journal_playbook { id, user_id, data jsonb }
-// data = { models:[{title,sub,steps:[]}], rules:[str] }
+// data = { models:[{title,strategyName,sub,steps,status}], rules:[str] }
 // ═══════════════════════════════════════════════════
 let _pbData  = { models: MODELS.map(m=>({...m,steps:(m.steps||[]).slice()})), rules: [...RULES] };
 let _pbRowId = null;
+
+// Known legacy title → correct strategyName mapping for backward compat
+const _LEGACY_TITLE_MAP = {
+  'Model 1 — IRL > ERL':    'IRL > ERL',
+  'Model 2 — ERL > IRL':    'ERL > IRL',
+  'Model 3 — NxtGen Modified': 'NxtGen - Mod',
+  'NxtGen Modified':         'NxtGen - Mod',
+  'NxtGen – Mod':            'NxtGen - Mod',
+};
 
 async function _pbLoad() {
   if (!_currentUser) return;
@@ -5252,20 +5261,36 @@ async function _pbLoad() {
     if (!_pbData.rules)  _pbData.rules  = [...RULES];
   }
   // Migrate: ensure every model has strategyName + status
-  _pbData.models = _pbData.models.map(m => ({
-    status: 'active',
-    strategyName: _inferStrategyName(m.title),
-    ...m,
-  }));
+  // Priority: (1) existing strategyName already on model, (2) legacy title map, (3) infer from title
+  _pbData.models = _pbData.models.map(m => {
+    const resolvedName = m.strategyName
+      || _LEGACY_TITLE_MAP[m.title]
+      || _inferStrategyName(m.title);
+    return {
+      status: 'active',
+      ...m,
+      strategyName: resolvedName,
+      // Also update the title to be clean (strip legacy "Model N — " prefix)
+      title: _LEGACY_TITLE_MAP[m.title] ? resolvedName : m.title,
+    };
+  });
+  // De-duplicate: if migration produced duplicate strategyNames, keep the first
+  const seen = new Set();
+  _pbData.models = _pbData.models.filter(m => {
+    const key = m.strategyName || m.title;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  // Save the migrated data back so we don't re-migrate every load
+  await _pbSave();
 }
 
-// Extract the short strategy name from a model title for backward compat
-// e.g. "Model 1 — IRL > ERL" → "IRL > ERL", "NxtGen Modified" → "NxtGen - Mod"
+// Extract short strategy name from legacy title (fallback only)
 function _inferStrategyName(title) {
   if (!title) return title;
-  // Already short (no em-dash prefix)
-  if (!title.includes('—')) return title;
-  const after = title.split('—').slice(1).join('—').trim();
+  if (!title.includes('—') && !title.includes('–')) return title;
+  const after = title.split(/[—–]/).slice(1).join('—').trim();
   return after || title;
 }
 
@@ -5278,15 +5303,21 @@ function _getArchivedStrategies() {
 }
 
 function _buildStrategyOptions(current) {
-  const active = _getActiveStrategies();
+  const allModels  = _pbData.models || [];
+  const active     = allModels.filter(m => m.status !== 'archived' && m.status !== 'deleted');
+  const activeNames = new Set(active.map(m => m.strategyName || m.title));
+
+  // Build active options
   const opts = active.map(m => {
     const name = m.strategyName || m.title;
     return `<option value="${name}"${name === current ? ' selected' : ''}>${name}</option>`;
   }).join('');
-  // If current strategy is not in active list (e.g. archived), still show it selected
-  const found = active.find(m => (m.strategyName || m.title) === current);
-  const extra = (current && !found)
-    ? `<option value="${current}" selected>${current} (archived)</option>` : '';
+
+  // If current value isn't in active list (old/custom trade), prepend it so it stays selected
+  // but DON'T label it "(archived)" — just show the raw name
+  const extra = (current && !activeNames.has(current))
+    ? `<option value="${current}" selected>${current}</option>` : '';
+
   return extra + opts + `<option value="__custom__">＋ Custom…</option>`;
 }
 

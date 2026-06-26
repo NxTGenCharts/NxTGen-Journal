@@ -479,7 +479,10 @@
           <div class="cover-title">Trading Playbook</div>
           <div class="cover-sub">Read this every morning before trading</div>
         </div>
-        <div class="sec-head">Entry Models</div>
+        <div class="sec-head" style="display:flex;align-items:center;justify-content:space-between">
+          <span>Entry Models</span>
+          <button onclick="_openManageStrategies()" style="font-size:11px;padding:4px 12px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);color:var(--gold);border-radius:20px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .15s" onmouseover="this.style.background='rgba(251,191,36,.22)'" onmouseout="this.style.background='rgba(251,191,36,.12)'">⚙ Manage</button>
+        </div>
         <div id="model-cards"></div>
         <div class="sec-head">10 Rules Never Broken</div>
         <div id="rules-list"></div>
@@ -1131,7 +1134,7 @@
       <div class="form-field"><label class="form-label">Killzone</label>
         <select class="form-select" id="m-kz"><option>London</option><option>New York</option><option>Asian</option></select>
       </div>
-      <div class="form-field"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Strategy <button type="button" onclick="_openManageStrategies()" style="font-size:10px;padding:2px 8px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.25);color:var(--gold);border-radius:4px;cursor:pointer;font-family:inherit;line-height:1.6">⚙ Manage</button></label>
+      <div class="form-field"><label class="form-label">Strategy</label>
         <select class="form-select" id="m-strat" onchange="syncCustomStrategy(this.value)">
           <option>NxtGen - Mod</option>
           <option>IRL &gt; ERL</option>
