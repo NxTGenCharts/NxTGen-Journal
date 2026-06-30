@@ -9250,7 +9250,7 @@ select[id="filter-kz"] option[value="London"] {
                         0 8px 20px rgba(0,0,0,0.3),
                         0 0 0 0.5px rgba(255,255,255,0.12);
   --lg-active-pill:     rgba(96, 165, 250, 0.18);
-  --lg-nav-radius:      26px; /* Telegram-style generous pill corners */
+  --lg-nav-radius:      30px; /* Telegram-style generous pill corners */
 }
 
 [data-theme="light"] {
@@ -9371,7 +9371,7 @@ select[id="filter-kz"] option[value="London"] {
   justify-content: center;
   gap: 4px;
   padding: 6px 4px;
-  border-radius: calc(var(--lg-nav-radius) - 6px);
+  border-radius: var(--r-full);
   transition: color 0.2s ease, background 0.2s ease, transform 0.2s var(--ease-spring);
   -webkit-tap-highlight-color: transparent;
 }
@@ -9383,6 +9383,7 @@ select[id="filter-kz"] option[value="London"] {
     inset 0 1px 0 rgba(96,165,250,0.25),
     0 0 16px rgba(96,165,250,0.12);
   color: var(--blue) !important;
+  border-radius: var(--r-full) !important;
 }
 
 /* Remove old top-notch indicator, replace with pill glow */
@@ -9390,7 +9391,7 @@ select[id="filter-kz"] option[value="London"] {
   content: '' !important;
   position: absolute !important;
   inset: 0 !important;
-  border-radius: calc(var(--lg-nav-radius) - 6px) !important;
+  border-radius: var(--r-full) !important;
   background: radial-gradient(ellipse at 50% 0%, rgba(96,165,250,0.22) 0%, transparent 65%) !important;
   width: auto !important;
   height: auto !important;
@@ -9427,7 +9428,7 @@ select[id="filter-kz"] option[value="London"] {
 .mob-nav-add-btn .mob-nav-icon {
   width: 46px !important;
   height: 46px !important;
-  border-radius: 14px !important;
+  border-radius: 18px !important;
   background: linear-gradient(145deg,
     rgba(96, 165, 250, 0.85) 0%,
     rgba(37, 99, 235, 0.9) 100%
