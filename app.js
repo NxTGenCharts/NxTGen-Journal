@@ -5814,6 +5814,31 @@ function mrNav(dir) {
   buildMonthlyReview();
 }
 
+// Expand/collapse the per-trade list under a Pair Breakdown row.
+function _mrTogglePairRow(rowId, headerEl) {
+  const rows = document.querySelectorAll(`tr.mr-pair-sub-row[data-group="${rowId}"]`);
+  const isOpen = rows.length && rows[0].style.display !== 'none';
+  rows.forEach(r => { r.style.display = isOpen ? 'none' : 'table-row'; });
+  const arrow = headerEl?.querySelector('.mr-pair-arrow');
+  if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(90deg)';
+}
+
+// Normalize a trade's PnL to a percentage, the same way updateKPIs() does:
+// MT5/$-unit trades store their pnl in dollars, so it must be converted via
+// the trade's own account size before it can be treated as a percentage.
+// Without this, dollar values (e.g. -$1018 on a BTCUSD.X MT5 import) were
+// being printed directly as "-101.8%", which also corrupted every aggregate
+// (Net PnL, Avg Loss, Profit Factor, Pair Breakdown) that summed raw t.pnl.
+function _mrTradePct(t) {
+  const accSize = getAccSizeForAccount(t.account);
+  const dollars = toPnlDollars(t, accSize);
+  if (accSize > 0) return (dollars / accSize) * 100;
+  // No known account size — if it's already a plain % trade, use it as-is;
+  // otherwise we can't meaningfully convert, so fall back to 0 rather than
+  // displaying a dollar figure dressed up as a percentage.
+  return (!_isMt5Trade(t) && t.pnlUnit !== '$') ? (parseFloat(t.pnl) || 0) : 0;
+}
+
 async function buildMonthlyReview() {
   const key = `${_mrYear}-${String(_mrMonth+1).padStart(2,'0')}`;
   const monthName = _MR_MONTHS[_mrMonth];
@@ -5827,11 +5852,12 @@ async function buildMonthlyReview() {
   const wins   = mt.filter(t => t.outcome === 'Win');
   const losses = mt.filter(t => t.outcome === 'Loss');
   const wr     = mt.length ? ((wins.length / mt.length) * 100).toFixed(1) : 0;
-  const netPnl = mt.reduce((a, t) => a + t.pnl, 0).toFixed(1);
-  const avgW   = wins.length   ? (wins.reduce((a,t)=>a+t.pnl,0)/wins.length).toFixed(1) : 0;
-  const avgL   = losses.length ? (losses.reduce((a,t)=>a+t.pnl,0)/losses.length).toFixed(1) : 0;
-  const lossPnls = losses.map(t=>t.pnl);
-  const winPnls  = wins.map(t=>t.pnl);
+  const pctOf  = (t) => _mrTradePct(t);
+  const netPnl = mt.reduce((a, t) => a + pctOf(t), 0).toFixed(1);
+  const avgW   = wins.length   ? (wins.reduce((a,t)=>a+pctOf(t),0)/wins.length).toFixed(1) : 0;
+  const avgL   = losses.length ? (losses.reduce((a,t)=>a+pctOf(t),0)/losses.length).toFixed(1) : 0;
+  const lossPnls = losses.map(pctOf);
+  const winPnls  = wins.map(pctOf);
   const pf = lossPnls.length
     ? Math.abs(winPnls.reduce((a,b)=>a+b,0) / lossPnls.reduce((a,b)=>a+b,0)).toFixed(2)
     : '∞';
@@ -5870,42 +5896,53 @@ async function buildMonthlyReview() {
     }
   }
 
-  // Loss audit
+  // Loss audit — rows are clickable to open the underlying trade
   const lossTbody = document.getElementById('mr-loss-tbody');
   if (lossTbody) {
     lossTbody.innerHTML = losses.length
       ? losses.map(t => `
-          <tr>
+          <tr class="mr-clickable-row" onclick="openDetail(${t.id})" title="Click to view trade">
             <td>${t.date}</td>
             <td class="bold">${t.pair}</td>
             <td>${t.strategy || '—'}</td>
-            <td class="outcome-loss mono">${t.pnl.toFixed(1)}%</td>
+            <td class="outcome-loss mono">${pctOf(t).toFixed(1)}%</td>
             <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.notes || '—'}</td>
           </tr>`).join('')
       : '<tr><td colspan="5" style="color:var(--text3);text-align:center;font-style:italic">No losses this month 🎉</td></tr>';
   }
 
-  // Pair breakdown
+  // Pair breakdown — each pair row expands to list its trades for the
+  // month; clicking a trade in that list opens it in the detail panel.
   const pairTbody = document.getElementById('mr-pair-tbody');
   if (pairTbody) {
     const pairMap = {};
     mt.forEach(t => {
-      if (!pairMap[t.pair]) pairMap[t.pair] = { trades: 0, wins: 0, pnl: 0 };
+      if (!pairMap[t.pair]) pairMap[t.pair] = { trades: 0, wins: 0, pnl: 0, list: [] };
       pairMap[t.pair].trades++;
       if (t.outcome === 'Win') pairMap[t.pair].wins++;
-      pairMap[t.pair].pnl += t.pnl;
+      pairMap[t.pair].pnl += pctOf(t);
+      pairMap[t.pair].list.push(t);
     });
     const pairs = Object.entries(pairMap).sort((a,b) => b[1].pnl - a[1].pnl);
     pairTbody.innerHTML = pairs.length
-      ? pairs.map(([pair, d]) => {
+      ? pairs.map(([pair, d], idx) => {
           const pwr = ((d.wins/d.trades)*100).toFixed(0);
           const pc  = d.pnl >= 0 ? 'outcome-win' : 'outcome-loss';
-          return `<tr>
-            <td class="bold">${pair}</td>
+          const rowId = `mr-pair-sub-${idx}`;
+          const subRows = d.list
+            .sort((a,b) => a.date.localeCompare(b.date))
+            .map(t => `
+              <tr class="mr-clickable-row mr-pair-sub-row" data-group="${rowId}" style="display:none" onclick="event.stopPropagation();openDetail(${t.id})" title="Click to view trade">
+                <td style="padding-left:26px;color:var(--text3)">↳ ${t.date}</td>
+                <td colspan="2" style="color:var(--text2)">${t.strategy || '—'}</td>
+                <td class="${t.outcome==='Win'?'outcome-win':'outcome-loss'} mono">${pctOf(t)>=0?'+':''}${pctOf(t).toFixed(1)}%</td>
+              </tr>`).join('');
+          return `<tr class="mr-clickable-row mr-pair-row" data-group="${rowId}" onclick="_mrTogglePairRow('${rowId}',this)" title="Click to view trades for ${pair}">
+            <td class="bold"><span class="mr-pair-arrow" style="display:inline-block;width:12px;transition:transform .15s">▸</span> ${pair}</td>
             <td>${d.trades}</td>
             <td class="${pwr>=65?'outcome-win':'outcome-loss'} mono">${pwr}%</td>
             <td class="${pc} mono">${d.pnl>=0?'+':''}${d.pnl.toFixed(1)}%</td>
-          </tr>`;
+          </tr>${subRows}`;
         }).join('')
       : '<tr><td colspan="4" style="color:var(--text3);text-align:center;font-style:italic">No trades this month</td></tr>';
   }

@@ -9805,3 +9805,9 @@ body {
   .wl-week-chip { padding: 4px 9px; font-size: 10px; }
   .wl-add-week-btn { width: 100%; text-align: center; padding: 6px 12px; }
 }
+
+/* ── Monthly Review: clickable Loss Audit / Pair Breakdown rows ── */
+.mr-clickable-row { cursor: pointer; transition: background 0.12s; }
+.mr-clickable-row:hover { background: var(--glass-2); }
+.mr-pair-sub-row td { background: rgba(255,255,255,0.015); }
+[data-theme="light"] .mr-pair-sub-row td { background: rgba(0,0,0,0.015); }
