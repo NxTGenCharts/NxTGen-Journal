@@ -9777,6 +9777,7 @@ body {
   gap: 8px;
   margin-bottom: 18px;
   padding-bottom: 12px;
+  align-items: center;
 }
 .wl-week-scroll {
   gap: 6px;
@@ -9811,3 +9812,48 @@ body {
 .mr-clickable-row:hover { background: var(--glass-2); }
 .mr-pair-sub-row td { background: rgba(255,255,255,0.015); }
 [data-theme="light"] .mr-pair-sub-row td { background: rgba(0,0,0,0.015); }
+
+/* ── Watchlist: organized "Past Weeks" history dropdown ── */
+.wl-week-chip-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--green); margin-right: 6px; vertical-align: middle;
+  box-shadow: 0 0 6px rgba(52,211,153,0.6);
+}
+.wl-week-history { position: relative; flex-shrink: 0; }
+.wl-week-history-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: var(--r-full);
+  border: 1px solid var(--glass-border); background: var(--glass-1);
+  color: var(--text2); font-size: 10.5px; font-weight: 600; cursor: pointer;
+  transition: var(--t-fast); font-family: var(--font-mono); white-space: nowrap;
+}
+.wl-week-history-btn:hover { background: var(--glass-2); color: var(--text); border-color: var(--glass-border-h); }
+.wl-week-history-ico { font-size: 11px; line-height: 1; }
+.wl-week-history-count { color: var(--blue); font-weight: 700; }
+.wl-week-history-arrow { font-size: 9px; transition: transform 0.15s ease; opacity: 0.7; }
+
+.wl-week-history-panel {
+  position: absolute; top: calc(100% + 8px); left: 0;
+  min-width: 260px; max-width: 320px; max-height: 320px; overflow-y: auto;
+  background: var(--glass-1); backdrop-filter: var(--blur-md);
+  -webkit-backdrop-filter: var(--blur-md);
+  border: 1px solid var(--glass-border); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 var(--glass-shine);
+  padding: 6px; z-index: 40;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.wl-week-history-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; text-align: left; padding: 8px 10px; border-radius: var(--r-md);
+  border: none; background: transparent; color: var(--text2); cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.wl-week-history-item:hover { background: var(--glass-2); color: var(--text); }
+.wl-week-history-item-label { font-size: 12px; font-weight: 700; font-family: var(--font-mono); color: var(--text); }
+.wl-week-history-item-range { font-size: 10px; color: var(--text3); font-family: var(--font-mono); white-space: nowrap; }
+.wl-week-history-empty { padding: 14px 10px; text-align: center; font-size: 11.5px; color: var(--text3); font-style: italic; }
+
+@media (max-width: 640px) {
+  .wl-week-history-panel { left: auto; right: 0; min-width: 220px; }
+  .wl-week-history-btn { padding: 4px 10px; font-size: 10px; }
+}

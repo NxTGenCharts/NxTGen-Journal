@@ -359,6 +359,15 @@
         <!-- Week selector bar -->
         <div class="wl-week-bar" id="wl-week-bar">
           <div class="wl-week-scroll" id="wl-week-scroll"></div>
+          <div class="wl-week-history" id="wl-week-history">
+            <button class="wl-week-history-btn" id="wl-week-history-btn" onclick="_wlToggleHistory(event)">
+              <span class="wl-week-history-ico">🕘</span>
+              <span>Past Weeks</span>
+              <span class="wl-week-history-count" id="wl-week-history-count"></span>
+              <span class="wl-week-history-arrow" id="wl-week-history-arrow">▾</span>
+            </button>
+            <div class="wl-week-history-panel" id="wl-week-history-panel" style="display:none"></div>
+          </div>
           <button class="wl-add-week-btn" onclick="wlAddWeek()" title="Add new week">＋ New Week</button>
         </div>
 

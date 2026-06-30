@@ -3336,7 +3336,7 @@ function _wlRenderWeeks() {
   const weeks = _wlData.filter(w => w.quarter === _wlActiveQ)
     .sort((a,b) => b.weekDate.localeCompare(a.weekDate));
 
-  // Week chips
+  // Current/active week chip — always visible
   const scroll = document.getElementById('wl-week-scroll');
   if (scroll) {
     if (weeks.length === 0) {
@@ -3345,11 +3345,30 @@ function _wlRenderWeeks() {
       if (!_wlActiveWeekId || !weeks.find(w => w.id === _wlActiveWeekId)) {
         _wlActiveWeekId = weeks[0].id;
       }
-      scroll.innerHTML = weeks.map(w =>
-        `<button class="wl-week-chip${w.id === _wlActiveWeekId ? ' active' : ''}"
-           onclick="_wlSetWeek('${w.id}')">${w.weekLabel}</button>`
-      ).join('');
+      const active = weeks.find(w => w.id === _wlActiveWeekId) || weeks[0];
+      const isLatest = active.id === weeks[0].id;
+      scroll.innerHTML = `
+        <button class="wl-week-chip active" onclick="_wlToggleHistory(event)" title="${active.weekDate}${active.weekDateEnd ? ' → ' + active.weekDateEnd : ''}">
+          ${isLatest ? '<span class="wl-week-chip-dot"></span>' : ''}${active.weekLabel}
+        </button>`;
     }
+  }
+
+  // Past-weeks dropdown — every other week for this quarter, organized newest → oldest
+  const histBtn   = document.getElementById('wl-week-history');
+  const histCount = document.getElementById('wl-week-history-count');
+  const histPanel = document.getElementById('wl-week-history-panel');
+  const others = weeks.filter(w => w.id !== _wlActiveWeekId);
+  if (histBtn) histBtn.style.display = weeks.length > 1 ? '' : 'none';
+  if (histCount) histCount.textContent = others.length ? `(${others.length})` : '';
+  if (histPanel) {
+    histPanel.innerHTML = others.length
+      ? others.map(w => `
+          <button class="wl-week-history-item" onclick="_wlSetWeek('${w.id}');_wlCloseHistory()">
+            <span class="wl-week-history-item-label">${w.weekLabel}</span>
+            <span class="wl-week-history-item-range">${w.weekDate}${w.weekDateEnd ? ' → ' + w.weekDateEnd : ''}</span>
+          </button>`).join('')
+      : '<div class="wl-week-history-empty">No other weeks in this quarter</div>';
   }
 
   // Week content
@@ -3368,6 +3387,28 @@ function _wlRenderWeeks() {
   const week = weeks.find(w => w.id === _wlActiveWeekId) || weeks[0];
   _wlRenderWeekContent(week, content);
 }
+
+function _wlToggleHistory(e) {
+  if (e) e.stopPropagation();
+  const panel = document.getElementById('wl-week-history-panel');
+  const arrow = document.getElementById('wl-week-history-arrow');
+  if (!panel) return;
+  const open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : '';
+  if (arrow) arrow.style.transform = open ? '' : 'rotate(180deg)';
+}
+
+function _wlCloseHistory() {
+  const panel = document.getElementById('wl-week-history-panel');
+  const arrow = document.getElementById('wl-week-history-arrow');
+  if (panel) panel.style.display = 'none';
+  if (arrow) arrow.style.transform = '';
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('wl-week-history');
+  if (wrap && !wrap.contains(e.target)) _wlCloseHistory();
+});
 
 function _wlSetWeek(id) {
   _wlActiveWeekId = id;
