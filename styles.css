@@ -9719,3 +9719,89 @@ body {
   from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   COMPACT REFRESH — Dashboard calendar KPI strip + Watchlist header
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Dashboard calendar: tighter KPI strip (Trades / P&L / Best / Worst / Day win rate) ── */
+.dash-cal-panel .cal-kpi-row {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  padding: 0 0 8px;
+}
+.dash-cal-panel .cal-kpi {
+  padding: 6px 7px;
+  border-radius: var(--r-sm, 8px);
+}
+.dash-cal-panel .cal-kpi-label { font-size: 7px; margin-bottom: 1px; letter-spacing: 0.06em; }
+.dash-cal-panel .cal-kpi-val { font-size: 12.5px; }
+.dash-cal-panel .cal-kpi-val .cal-kpi-sub,
+.dash-cal-panel .cal-kpi small { font-size: 7px; }
+
+/* Slightly tighter panel chrome to match */
+.dash-cal-panel { padding: 16px 14px 20px; }
+.dash-cal-top { margin-bottom: 10px; }
+.dash-cal-panel .cal-header { padding: 4px 0 6px !important; }
+.dash-cal-panel .cal-month-label { font-size: 13px; }
+.dash-cal-panel .cal-nav { width: 24px; height: 24px; font-size: 13px; }
+
+@media (max-width: 1080px) {
+  .dash-cal-panel .cal-kpi-row { grid-template-columns: repeat(5, 1fr); gap: 4px; }
+  .dash-cal-panel .cal-kpi { padding: 5px 4px; }
+  .dash-cal-panel .cal-kpi-label { font-size: 6.5px; }
+  .dash-cal-panel .cal-kpi-val { font-size: 11px; }
+}
+
+@media (max-width: 640px) {
+  .dash-cal-panel .cal-kpi-row { grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .dash-cal-panel .cal-kpi { padding: 5px 4px; }
+}
+
+@media (max-width: 420px) {
+  .dash-cal-panel .cal-kpi-row { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+}
+
+/* ── Watchlist: compact hero header ── */
+#page-watchlist .cover { padding: 14px 18px; margin-bottom: 14px; }
+#page-watchlist .cover-label { font-size: 9px; margin-bottom: 3px; }
+#page-watchlist .cover-title { font-size: 18px; }
+#page-watchlist .cover-sub { font-size: 11px; margin-top: 3px; }
+
+/* ── Watchlist: quarter + week pill bar — compact, responsive, properly organized ── */
+.wl-quarter-nav { gap: 6px; margin-bottom: 10px; }
+.wl-q-tab { padding: 5px 12px; font-size: 10.5px; }
+
+.wl-week-bar {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+}
+.wl-week-scroll {
+  gap: 6px;
+  row-gap: 6px;
+}
+.wl-week-chip {
+  padding: 4px 11px;
+  font-size: 10.5px;
+}
+.wl-add-week-btn {
+  padding: 4px 12px;
+  font-size: 10.5px;
+}
+
+@media (max-width: 640px) {
+  #page-watchlist .cover { padding: 12px 14px; }
+  #page-watchlist .cover-title { font-size: 16px; }
+  .wl-quarter-nav { gap: 5px; margin-bottom: 8px; }
+  .wl-q-tab { padding: 4px 10px; font-size: 10px; }
+  .wl-week-bar {
+    border-bottom: 1px solid var(--glass-border);
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+  }
+  .wl-week-scroll { gap: 5px; }
+  .wl-week-chip { padding: 4px 9px; font-size: 10px; }
+  .wl-add-week-btn { width: 100%; text-align: center; padding: 6px 12px; }
+}
