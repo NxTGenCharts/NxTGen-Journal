@@ -2418,7 +2418,14 @@ function renderTradeTable(list) {
     </tr>`;
   }).join('') : _emptyRow(12, '📋 No trades match your filter — try adjusting the search or filters above');
   const countEl = document.getElementById('trade-count');
-  if (countEl) countEl.textContent = `Showing ${list.length} of ${trades.length} trades · Sum PnL: ${list.reduce((a, t) => a + t.pnl, 0).toFixed(1)}%`;
+  if (countEl) {
+    const sumPct = list.reduce((a, t) => {
+      const accSize = getAccSizeForAccount(t.account);
+      if (accSize > 0) return a + (toPnlDollars(t, accSize) / accSize) * 100;
+      return a + (!_isMt5Trade(t) && t.pnlUnit !== '$' ? (parseFloat(t.pnl) || 0) : 0);
+    }, 0);
+    countEl.textContent = `Showing ${list.length} of ${trades.length} trades · Sum PnL: ${sumPct.toFixed(1)}%`;
+  }
   _updateBulkBar();
   document.querySelectorAll('#trade-table-body tr').forEach((row, i) => {
     row.style.opacity = '0'; row.style.transform = 'translateY(6px)';
