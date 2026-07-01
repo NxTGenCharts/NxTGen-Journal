@@ -9033,18 +9033,15 @@ function _restoreDraftIfAny() {
   return true;
 }
 
-// ── Show Affirmation on Load ─────────────────────────────────────────────
+// ── Show Affirmations on Load ────────────────────────────────────────────
 function _currentAffirmationMeta() {
   const full = (_goalsData && _goalsData.affirmations) ? _goalsData.affirmations : [];
   if (!full.length) return null; // user hasn't added any of their own yet
-  // Rotate serially (in the order shown on the Goals page) through at most
-  // the first 5 affirmations, one per day, wrapping back to #1.
+  // Show the first 5 affirmations, in the order set on the Goals page.
   const list = full.slice(0, 5);
-  const dayIdx = Math.floor(Date.now() / 86400000); // increases by 1 each day
-  const idx = dayIdx % list.length;
-  return { text: list[idx], index: idx + 1, total: list.length };
+  return { list, total: full.length };
 }
-function _currentAffirmation() { const m = _currentAffirmationMeta(); return m ? m.text : ''; }
+function _currentAffirmation() { const m = _currentAffirmationMeta(); return m ? m.list[0] : ''; }
 function _ensureAffirmationUI() {
   if (document.getElementById('affirmation-overlay')) return;
   const wrap = document.createElement('div');
@@ -9055,7 +9052,7 @@ function _ensureAffirmationUI() {
         <div class="affirmation-head">
           <div class="affirmation-icon">✨</div>
           <div>
-            <div class="affirmation-label">Today's Affirmation</div>
+            <div class="affirmation-label">Today's Affirmations</div>
             <div class="affirmation-count" id="affirmation-count"></div>
           </div>
         </div>
@@ -9063,7 +9060,7 @@ function _ensureAffirmationUI() {
         <button class="affirmation-close-btn" onclick="closeAffirmationModal()">I'm ready — let's trade</button>
       </div>
     </div>
-    <button class="affirmation-fab" id="affirmation-fab" title="Drag to move · tap to review today's affirmation" onclick="_fabClick(this)">✨</button>`;
+    <button class="affirmation-fab" id="affirmation-fab" title="Drag to move · tap to review your affirmations" onclick="_fabClick(this)">✨</button>`;
   document.body.appendChild(wrap);
   document.getElementById('affirmation-overlay').addEventListener('click', e => {
     if (e.target.id === 'affirmation-overlay') closeAffirmationModal();
@@ -9154,13 +9151,16 @@ function _makeFabDraggable(el) {
 function openAffirmationModal() {
   _ensureAffirmationUI();
   const meta = _currentAffirmationMeta();
+  const textEl = document.getElementById('affirmation-text');
   const countEl = document.getElementById('affirmation-count');
   if (!meta) {
-    document.getElementById('affirmation-text').textContent = "You haven't added any affirmations yet — add some in Goals & Milestones → Morning Affirmations.";
+    textEl.innerHTML = "You haven't added any affirmations yet — add some in Goals & Milestones → Morning Affirmations.";
     if (countEl) countEl.textContent = '';
   } else {
-    document.getElementById('affirmation-text').textContent = '"' + meta.text + '"';
-    if (countEl) countEl.textContent = meta.index + ' of ' + meta.total;
+    textEl.innerHTML = meta.list.map((a, i) =>
+      `<div class="affirmation-item"><span class="affirmation-item-num">${i + 1}</span>"${a}"</div>`
+    ).join('');
+    if (countEl) countEl.textContent = 'showing ' + meta.list.length + ' of ' + meta.total;
   }
   document.getElementById('affirmation-overlay').classList.add('open');
 }
