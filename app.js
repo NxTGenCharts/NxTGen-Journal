@@ -134,7 +134,6 @@ const GOALS=[
   {q:"Q2 2026 🔵 Active",items:[{t:"Maintain 70%+ win rate",done:true},{t:"Pass GFT $10k Phase 1",done:false},{t:"Receive first funded payout",done:false},{t:"Trade 3 consecutive winning weeks",done:false},{t:"Build Sunday watchlist habit",done:false}]},
   {q:"Q3 2026",items:[{t:"Scale to 2% risk on top setups",done:false},{t:"Add NASDAQ to watchlist",done:false},{t:"Achieve $3,000 total payouts",done:false}]},
 ];
-const AFFIRMATIONS=["I only take A+ setups. I am patient.","I follow my plan. I do not chase price.","My edge works over time. One trade does not define me.","I protect my capital above all else.","I am calm, disciplined, and consistent.","Losses are the cost of doing business. I learn and move on.","I trade the model, not my emotions."];
 
 // ── STATE ─────────────────────────────────────────────
 let trades = [];
@@ -5804,10 +5803,15 @@ function pbDeleteRule(i) {
 // Table: journal_goals  { id, user_id, data jsonb, created_at }
 // data = { groups: [{q, items:[{t,done}]}], affirmations: [str] }
 // ═══════════════════════════════════════════════════
-let _goalsData = { groups: [], affirmations: [...AFFIRMATIONS] };
+let _goalsData = { groups: [], affirmations: [] };
 let _goalsRowId = null;
 
 async function _goalsLoad() {
+  // Always reset to a clean, empty state first so no stale/previous-session
+  // data (or the old shared default affirmations) can ever bleed into a
+  // different account's view.
+  _goalsRowId = null;
+  _goalsData  = { groups: [], affirmations: [] };
   if (!_currentUser) return;
   const { data, error } = await sb
     .from('journal_goals')
@@ -5817,8 +5821,8 @@ async function _goalsLoad() {
   if (error) { console.error('goalsLoad:', error.message); return; }
   if (data) {
     _goalsRowId = data.id;
-    _goalsData  = data.data || { groups: [], affirmations: [...AFFIRMATIONS] };
-    if (!_goalsData.affirmations) _goalsData.affirmations = [...AFFIRMATIONS];
+    _goalsData  = data.data || { groups: [], affirmations: [] };
+    if (!_goalsData.affirmations) _goalsData.affirmations = [];
     if (!_goalsData.groups) _goalsData.groups = [];
   }
 }
@@ -5935,6 +5939,10 @@ function buildGoals() {
   // Affirmations
   const affEl = document.getElementById('affirmations');
   if (affEl) {
+    if (!_goalsData.affirmations || _goalsData.affirmations.length === 0) {
+      affEl.innerHTML = '<div class="wl-empty-state" style="padding:30px 0"><div class="wl-empty-icon">✨</div><div class="wl-empty-title">No affirmations yet</div><div class="wl-empty-sub">Click + Add above to create your first one.</div></div>';
+      return;
+    }
     affEl.innerHTML = _goalsData.affirmations.map((a, i) => {
       if (_affEditIdx === i) {
         return `
@@ -9027,12 +9035,16 @@ function _restoreDraftIfAny() {
 
 // ── Show Affirmation on Load ─────────────────────────────────────────────
 function _currentAffirmationMeta() {
-  const list = (_goalsData && _goalsData.affirmations && _goalsData.affirmations.length) ? _goalsData.affirmations : AFFIRMATIONS;
-  const dayIdx = Math.floor(Date.now() / 86400000); // rotates once per day, same for whole day
+  const full = (_goalsData && _goalsData.affirmations) ? _goalsData.affirmations : [];
+  if (!full.length) return null; // user hasn't added any of their own yet
+  // Rotate serially (in the order shown on the Goals page) through at most
+  // the first 5 affirmations, one per day, wrapping back to #1.
+  const list = full.slice(0, 5);
+  const dayIdx = Math.floor(Date.now() / 86400000); // increases by 1 each day
   const idx = dayIdx % list.length;
   return { text: list[idx], index: idx + 1, total: list.length };
 }
-function _currentAffirmation() { return _currentAffirmationMeta().text; }
+function _currentAffirmation() { const m = _currentAffirmationMeta(); return m ? m.text : ''; }
 function _ensureAffirmationUI() {
   if (document.getElementById('affirmation-overlay')) return;
   const wrap = document.createElement('div');
@@ -9142,9 +9154,14 @@ function _makeFabDraggable(el) {
 function openAffirmationModal() {
   _ensureAffirmationUI();
   const meta = _currentAffirmationMeta();
-  document.getElementById('affirmation-text').textContent = '"' + meta.text + '"';
   const countEl = document.getElementById('affirmation-count');
-  if (countEl) countEl.textContent = meta.index + ' of ' + meta.total;
+  if (!meta) {
+    document.getElementById('affirmation-text').textContent = "You haven't added any affirmations yet — add some in Goals & Milestones → Morning Affirmations.";
+    if (countEl) countEl.textContent = '';
+  } else {
+    document.getElementById('affirmation-text').textContent = '"' + meta.text + '"';
+    if (countEl) countEl.textContent = meta.index + ' of ' + meta.total;
+  }
   document.getElementById('affirmation-overlay').classList.add('open');
 }
 function closeAffirmationModal() {
