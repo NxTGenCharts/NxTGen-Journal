@@ -5236,11 +5236,26 @@ function accClosePayoutModal() {
 /* ── Milestones ── */
 let _msDragSrc   = null;   // index currently being dragged
 let _msClickSrc  = null;   // index selected via click-to-reorder
+let _msEditIdx   = null;   // index currently being inline-edited
 
 function _renderMilestones() {
   const ml = document.getElementById('milestones-list');
   if (!ml) return;
-  ml.innerHTML = _accData.milestones.map((m, i) => `
+  ml.innerHTML = _accData.milestones.map((m, i) => {
+    if (_msEditIdx === i) {
+      return `
+    <div class="cl-item editing" style="position:relative" draggable="false">
+      <span class="cl-drag-handle" style="opacity:.25;cursor:default">⠿</span>
+      <div class="cl-box">${m.done ? '✓' : ''}</div>
+      <input type="text" class="cl-edit-input" id="ms-edit-input-${i}" value="${m.t.replace(/"/g,'&quot;')}"
+             onkeydown="if(event.key==='Enter'){msSaveEdit(${i})} else if(event.key==='Escape'){msCancelEdit()}">
+      <div class="acc-ms-actions" style="opacity:1">
+        <button class="wl-week-btn primary" style="font-size:10px;padding:2px 7px" onclick="msSaveEdit(${i})">✓ Done</button>
+        <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="msCancelEdit()">✕</button>
+      </div>
+    </div>`;
+    }
+    return `
     <div class="cl-item${m.done ? ' checked' : ''}" style="position:relative"
          draggable="true"
          ondragstart="msDragStart(event,${i})"
@@ -5253,11 +5268,16 @@ function _renderMilestones() {
       <div class="cl-box" onclick="accToggleMilestone(${i})">${m.done ? '✓' : ''}</div>
       <span class="cl-text" onclick="accToggleMilestone(${i})">${m.t}</span>
       <div class="acc-ms-actions">
-        <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="accEditMilestone(${i});event.stopPropagation()">✎</button>
+        <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="msStartEdit(${i});event.stopPropagation()">✎</button>
         <button class="wl-week-btn danger" style="font-size:10px;padding:2px 7px" onclick="accDeleteMilestone(${i});event.stopPropagation()">✕</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   _renderMilestoneProgress();
+  if (_msEditIdx !== null) {
+    const input = document.getElementById(`ms-edit-input-${_msEditIdx}`);
+    if (input) { input.focus(); input.select(); }
+  }
 }
 
 function msDragStart(e, i) {
@@ -5316,6 +5336,26 @@ async function msHandleClick(e, i) {
   }
 }
 
+function msStartEdit(i) {
+  _msClickSrc = null;
+  _msEditIdx = i;
+  _renderMilestones();
+}
+
+async function msSaveEdit(i) {
+  const input = document.getElementById(`ms-edit-input-${i}`);
+  const text = input ? input.value.trim() : '';
+  if (text) _accData.milestones[i].t = text;
+  _msEditIdx = null;
+  _renderMilestones();
+  await _accSave();
+}
+
+function msCancelEdit() {
+  _msEditIdx = null;
+  _renderMilestones();
+}
+
 function _renderMilestoneProgress() {
   const fill = document.getElementById('acc-progress-fill');
   const text = document.getElementById('acc-progress-text');
@@ -5340,14 +5380,6 @@ function accAddMilestone() {
   const text = prompt('Milestone goal:');
   if (!text) return;
   _accData.milestones.push({ t: text.trim(), done: false });
-  _renderMilestones();
-  _accSave();
-}
-
-function accEditMilestone(i) {
-  const text = prompt('Edit milestone:', _accData.milestones[i].t);
-  if (!text) return;
-  _accData.milestones[i].t = text.trim();
   _renderMilestones();
   _accSave();
 }
@@ -5852,7 +5884,21 @@ function buildGoals() {
               <div class="acc-progress-fill" style="width:${gPct}%"></div>
             </div>
           </div>
-          <div class="checklist-grid">${g.items.map((item, ii) => `
+          <div class="checklist-grid">${g.items.map((item, ii) => {
+            if (_goalEditIdx && _goalEditIdx.gi === gi && _goalEditIdx.ii === ii) {
+              return `
+            <div class="cl-item editing" draggable="false">
+              <span class="cl-drag-handle" style="opacity:.25;cursor:default">⠿</span>
+              <div class="cl-box">${item.done ? '✓' : ''}</div>
+              <input type="text" class="cl-edit-input" id="goal-edit-input-${gi}-${ii}" value="${item.t.replace(/"/g,'&quot;')}"
+                     onkeydown="if(event.key==='Enter'){goalSaveEdit(${gi},${ii})} else if(event.key==='Escape'){goalCancelEdit()}">
+              <div class="acc-ms-actions" style="opacity:1">
+                <button class="wl-week-btn primary" style="font-size:10px;padding:2px 7px" onclick="goalSaveEdit(${gi},${ii})">✓ Done</button>
+                <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="goalCancelEdit()">✕</button>
+              </div>
+            </div>`;
+            }
+            return `
             <div class="cl-item${item.done?' checked':''}"
                  draggable="true"
                  ondragstart="goalDragStart(event,${gi},${ii})"
@@ -5865,12 +5911,21 @@ function buildGoals() {
               <span class="cl-drag-handle${_goalClickSrc && _goalClickSrc.gi===gi && _goalClickSrc.ii===ii ? ' selected' : ''}" onclick="goalHandleClick(event,${gi},${ii})" title="Drag, or click and click another to swap">⠿</span>
               <div class="cl-box">${item.done?'✓':''}</div>
               <span class="cl-text">${item.t}</span>
-            </div>`).join('')}
+              <div class="acc-ms-actions">
+                <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="goalStartEdit(${gi},${ii});event.stopPropagation()">✎</button>
+                <button class="wl-week-btn danger" style="font-size:10px;padding:2px 7px" onclick="goalDeleteItem(${gi},${ii});event.stopPropagation()">✕</button>
+              </div>
+            </div>`;
+          }).join('')}
           </div>
         </div>`;
       }).join('');
     }
     _renderGoalsProgress();
+    if (_goalEditIdx) {
+      const input = document.getElementById(`goal-edit-input-${_goalEditIdx.gi}-${_goalEditIdx.ii}`);
+      if (input) { input.focus(); input.select(); }
+    }
   }
 
   // Affirmations
@@ -5884,9 +5939,37 @@ function buildGoals() {
 
 let _goalDragSrc  = null;   // {gi, ii} currently being dragged
 let _goalClickSrc = null;   // {gi, ii} selected via click-to-reorder
+let _goalEditIdx  = null;   // {gi, ii} currently being inline-edited
 
 async function goalsToggle(gi, ii) {
   _goalsData.groups[gi].items[ii].done = !_goalsData.groups[gi].items[ii].done;
+  buildGoals();
+  await _goalsSave();
+}
+
+function goalStartEdit(gi, ii) {
+  _goalClickSrc = null;
+  _goalEditIdx = { gi, ii };
+  buildGoals();
+}
+
+async function goalSaveEdit(gi, ii) {
+  const input = document.getElementById(`goal-edit-input-${gi}-${ii}`);
+  const text = input ? input.value.trim() : '';
+  if (text) _goalsData.groups[gi].items[ii].t = text;
+  _goalEditIdx = null;
+  buildGoals();
+  await _goalsSave();
+}
+
+function goalCancelEdit() {
+  _goalEditIdx = null;
+  buildGoals();
+}
+
+async function goalDeleteItem(gi, ii) {
+  if (!confirm(`Delete goal: "${_goalsData.groups[gi].items[ii].t}"?`)) return;
+  _goalsData.groups[gi].items.splice(ii, 1);
   buildGoals();
   await _goalsSave();
 }

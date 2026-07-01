@@ -908,6 +908,17 @@ body{
 .wl-week-btn.archive:hover{background:rgba(148,163,184,0.15);color:var(--text)}
 .wl-week-btn.restore{color:var(--green);border-color:rgba(52,211,153,0.3)}
 .wl-week-btn.restore:hover{background:rgba(52,211,153,0.12);border-color:rgba(52,211,153,0.5)}
+.wl-week-btn.primary{color:var(--green);border-color:rgba(52,211,153,0.35);background:rgba(52,211,153,0.08)}
+.wl-week-btn.primary:hover{background:rgba(52,211,153,0.18);border-color:rgba(52,211,153,0.55);color:var(--green)}
+
+/* Inline edit input for milestones + goal items */
+.cl-item.editing{cursor:default;box-shadow:0 0 0 2px var(--blue),inset 0 0 0 1px rgba(96,165,250,0.15)}
+.cl-edit-input{
+  flex:1;font-size:12px;color:var(--text);background:var(--glass-1);
+  border:1px solid var(--glass-border-h);border-radius:6px;padding:5px 8px;
+  font-family:inherit;outline:none;min-width:0;
+}
+.cl-edit-input:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(96,165,250,0.2)}
 
 /* Pair grid */
 .wl-pairs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));
@@ -2818,6 +2829,7 @@ body{
 /* Drag-to-reorder for checklist items (milestones + goals) */
 #milestones-list .cl-item,.goals-group .cl-item{cursor:grab}
 #milestones-list .cl-item:active,.goals-group .cl-item:active{cursor:grabbing}
+#milestones-list .cl-item.editing,.goals-group .cl-item.editing{cursor:default}
 .cl-item.dragging{opacity:.35;transform:scale(0.97)}
 .cl-item.drag-over{box-shadow:0 0 0 2px var(--blue),inset 0 0 0 1px rgba(96,165,250,0.15);transform:scale(1.02)}
 .cl-drag-handle{
