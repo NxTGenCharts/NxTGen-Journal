@@ -3359,35 +3359,69 @@ body{
 /* ════════════ AFFIRMATION ON LOAD ════════════════ */
 .affirmation-overlay{
   position:fixed;inset:0;
-  background:rgba(0,0,0,0.75);
+  background:rgba(0,0,0,0.72);
   backdrop-filter:var(--blur-md);
   -webkit-backdrop-filter:var(--blur-md);
   z-index:9100;display:none;
   align-items:center;justify-content:center;
+  padding:20px;
 }
 .affirmation-overlay.open{display:flex;animation:fadeInBG 0.25s var(--ease-out)}
 .affirmation-card{
-  background:linear-gradient(135deg,var(--blue) 0%,#7c3aed 100%);
+  position:relative;overflow:hidden;
+  background:var(--glass-2);
+  backdrop-filter:var(--blur-xl);
+  -webkit-backdrop-filter:var(--blur-xl);
   border:1px solid var(--glass-border);
   border-radius:var(--r-xl);
-  padding:36px 30px 28px;max-width:420px;width:90%;
-  box-shadow:var(--shadow-xl),inset 0 1px 0 rgba(255,255,255,.2);
+  padding:22px 24px 20px;max-width:360px;width:100%;
+  box-shadow:var(--shadow-xl),inset 0 1px 0 var(--glass-shine);
   animation:slideUp 0.25s var(--ease-spring);
-  text-align:center;color:#fff;
+  text-align:left;color:var(--text);
 }
-.affirmation-icon{font-size:34px;margin-bottom:10px}
-.affirmation-label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;opacity:.8;margin-bottom:14px}
-.affirmation-text{font-family:var(--font-head);font-size:19px;font-weight:600;line-height:1.5;margin-bottom:26px}
+[data-theme="light"] .affirmation-card{background:rgba(255,255,255,0.92)}
+.affirmation-card::before{
+  content:'';position:absolute;inset:0 0 auto 0;height:3px;
+  background:linear-gradient(90deg,var(--blue) 0%,var(--purple) 100%);
+}
+.affirmation-card::after{
+  content:'❝';position:absolute;top:-18px;right:6px;
+  font-family:Georgia,serif;font-size:110px;line-height:1;
+  color:var(--blue);opacity:.07;pointer-events:none;
+}
+.affirmation-close-x{
+  position:absolute;top:10px;right:10px;width:24px;height:24px;
+  border-radius:50%;border:none;background:var(--glass-1);
+  color:var(--text3);font-size:13px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:var(--t-fast);
+}
+.affirmation-close-x:hover{background:var(--glass-3);color:var(--text)}
+.affirmation-head{display:flex;align-items:center;gap:9px;margin-bottom:14px}
+.affirmation-icon{
+  width:30px;height:30px;flex:none;border-radius:50%;
+  background:linear-gradient(135deg,var(--blue) 0%,var(--purple) 100%);
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;box-shadow:0 0 0 1px rgba(255,255,255,.08) inset;
+}
+.affirmation-label{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text3)}
+.affirmation-count{font-size:10px;color:var(--text3);font-family:var(--font-mono);margin-top:1px}
+.affirmation-text{
+  font-family:var(--font-head);font-style:italic;font-weight:600;color:var(--text);
+  font-size:clamp(14.5px,4vw,17px);line-height:1.48;margin-bottom:18px;
+}
 .affirmation-close-btn{
-  background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);
-  color:#fff;border-radius:var(--r-md);padding:11px 22px;font-size:13px;font-weight:600;
+  display:block;width:100%;
+  background:linear-gradient(135deg,var(--blue) 0%,var(--purple) 100%);
+  border:none;color:#fff;border-radius:var(--r-md);padding:10px 18px;
+  font-size:12.5px;font-weight:700;letter-spacing:.01em;
   cursor:pointer;transition:var(--t-fast);
 }
-.affirmation-close-btn:hover{background:rgba(255,255,255,.26)}
+.affirmation-close-btn:hover{filter:brightness(1.1)}
 .affirmation-fab{
   position:fixed;right:20px;bottom:88px;
   width:44px;height:44px;border-radius:50%;
-  background:linear-gradient(135deg,var(--blue) 0%,#7c3aed 100%);
+  background:linear-gradient(135deg,var(--blue) 0%,var(--purple) 100%);
   border:1px solid var(--glass-border);
   box-shadow:0 3px 10px rgba(0,0,0,0.3);
   font-size:19px;cursor:grab;
@@ -3399,6 +3433,7 @@ body{
 .affirmation-fab.dragging{cursor:grabbing;transition:none;box-shadow:0 6px 18px rgba(0,0,0,0.4)}
 @media(max-width:768px){
   .affirmation-fab{ width:40px;height:40px;font-size:17px }
+
 }
 
 /* ════════════ APP TOAST ════════════════════════ */

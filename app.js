@@ -9026,19 +9026,27 @@ function _restoreDraftIfAny() {
 }
 
 // ── Show Affirmation on Load ─────────────────────────────────────────────
-function _currentAffirmation() {
+function _currentAffirmationMeta() {
   const list = (_goalsData && _goalsData.affirmations && _goalsData.affirmations.length) ? _goalsData.affirmations : AFFIRMATIONS;
   const dayIdx = Math.floor(Date.now() / 86400000); // rotates once per day, same for whole day
-  return list[dayIdx % list.length];
+  const idx = dayIdx % list.length;
+  return { text: list[idx], index: idx + 1, total: list.length };
 }
+function _currentAffirmation() { return _currentAffirmationMeta().text; }
 function _ensureAffirmationUI() {
   if (document.getElementById('affirmation-overlay')) return;
   const wrap = document.createElement('div');
   wrap.innerHTML = `
     <div class="affirmation-overlay" id="affirmation-overlay">
       <div class="affirmation-card">
-        <div class="affirmation-icon">✨</div>
-        <div class="affirmation-label">Today's Affirmation</div>
+        <button class="affirmation-close-x" onclick="closeAffirmationModal()" aria-label="Close">✕</button>
+        <div class="affirmation-head">
+          <div class="affirmation-icon">✨</div>
+          <div>
+            <div class="affirmation-label">Today's Affirmation</div>
+            <div class="affirmation-count" id="affirmation-count"></div>
+          </div>
+        </div>
         <div class="affirmation-text" id="affirmation-text"></div>
         <button class="affirmation-close-btn" onclick="closeAffirmationModal()">I'm ready — let's trade</button>
       </div>
@@ -9133,7 +9141,10 @@ function _makeFabDraggable(el) {
 }
 function openAffirmationModal() {
   _ensureAffirmationUI();
-  document.getElementById('affirmation-text').textContent = _currentAffirmation();
+  const meta = _currentAffirmationMeta();
+  document.getElementById('affirmation-text').textContent = '"' + meta.text + '"';
+  const countEl = document.getElementById('affirmation-count');
+  if (countEl) countEl.textContent = meta.index + ' of ' + meta.total;
   document.getElementById('affirmation-overlay').classList.add('open');
 }
 function closeAffirmationModal() {
