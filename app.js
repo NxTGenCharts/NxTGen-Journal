@@ -9048,11 +9048,10 @@ function _ensureAffirmationUI() {
   wrap.innerHTML = `
     <div class="affirmation-overlay" id="affirmation-overlay">
       <div class="affirmation-card">
-        <button class="affirmation-close-x" onclick="closeAffirmationModal()" aria-label="Close">✕</button>
         <div class="affirmation-head">
           <div class="affirmation-icon">✨</div>
           <div>
-            <div class="affirmation-label">Daily Affirmation</div>
+            <div class="affirmation-label">Daily Affirmations</div>
             <div class="affirmation-count" id="affirmation-count"></div>
           </div>
         </div>
