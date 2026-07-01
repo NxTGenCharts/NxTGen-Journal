@@ -604,6 +604,11 @@ body{
 .data-table td.bold{font-weight:600;color:var(--text)}
 .data-table td.mono{font-family:var(--font-mono);font-size:12px;letter-spacing:-0.2px}
 
+/* ── Compact Table View (Settings > Compact Table View) ── */
+.data-table.compact-table th{ padding:5px 10px; font-size:9.5px }
+.data-table.compact-table td{ padding:4px 10px; font-size:11.5px }
+.data-table.compact-table tbody tr{ line-height:1.2 }
+
 /* ════════════ PILLS ══════════════════════════════ */
 .pill{
   display:inline-flex;align-items:center;
@@ -3350,6 +3355,49 @@ body{
   border-radius:var(--r-md);padding:7px 14px;margin:8px auto;font-size:13px;
 }
 .glass-modal-actions{display:flex;gap:8px;justify-content:center}
+
+/* ════════════ AFFIRMATION ON LOAD ════════════════ */
+.affirmation-overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,0.75);
+  backdrop-filter:var(--blur-md);
+  -webkit-backdrop-filter:var(--blur-md);
+  z-index:9100;display:none;
+  align-items:center;justify-content:center;
+}
+.affirmation-overlay.open{display:flex;animation:fadeInBG 0.25s var(--ease-out)}
+.affirmation-card{
+  background:linear-gradient(135deg,var(--blue) 0%,#7c3aed 100%);
+  border:1px solid var(--glass-border);
+  border-radius:var(--r-xl);
+  padding:36px 30px 28px;max-width:420px;width:90%;
+  box-shadow:var(--shadow-xl),inset 0 1px 0 rgba(255,255,255,.2);
+  animation:slideUp 0.25s var(--ease-spring);
+  text-align:center;color:#fff;
+}
+.affirmation-icon{font-size:34px;margin-bottom:10px}
+.affirmation-label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;opacity:.8;margin-bottom:14px}
+.affirmation-text{font-family:var(--font-head);font-size:19px;font-weight:600;line-height:1.5;margin-bottom:26px}
+.affirmation-close-btn{
+  background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);
+  color:#fff;border-radius:var(--r-md);padding:11px 22px;font-size:13px;font-weight:600;
+  cursor:pointer;transition:var(--t-fast);
+}
+.affirmation-close-btn:hover{background:rgba(255,255,255,.26)}
+.affirmation-fab{
+  position:fixed;right:20px;bottom:88px;
+  width:44px;height:44px;border-radius:50%;
+  background:linear-gradient(135deg,var(--blue) 0%,#7c3aed 100%);
+  border:1px solid var(--glass-border);
+  box-shadow:var(--shadow-lg);
+  font-size:19px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  z-index:600;transition:var(--t-fast);
+}
+.affirmation-fab:hover{transform:scale(1.08)}
+@media(max-width:768px){
+  .affirmation-fab{ right:14px; bottom:76px; width:40px;height:40px;font-size:17px }
+}
 
 /* ════════════ APP TOAST ════════════════════════ */
 .app-toast{

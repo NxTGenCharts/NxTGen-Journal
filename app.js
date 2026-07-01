@@ -2468,6 +2468,7 @@ async function bulkDeleteSelected() {
   }
   _bulkSelected.clear();
   _updateBulkBar();
+  _playChime('delete');
   showToast(`${n} trade${n!==1?'s':''} moved to trash`, 'danger');
 }
 function showRowActions(id, row) { const el = document.getElementById('ra-' + id); if (el) el.style.opacity = '1'; }
@@ -3050,6 +3051,7 @@ function openModal(prefill) {
     </div>`).join('');
   if (prefill && prefill.date) document.getElementById('m-date').value = prefill.date;
   document.getElementById('modal').classList.add('open');
+  if (!prefill) _restoreDraftIfAny();
 }
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
 function _toggleModalCheck(i) {
@@ -3200,6 +3202,8 @@ async function saveTrade() {
   closeModal();
   document.getElementById('m-pair').value = 'GBPUSD';
   document.getElementById('m-pair-custom').style.display = 'none';
+  _clearDraft();
+  _playChime('save');
   _refreshAll();
   nav('tradelog', null, 'Trade Log');
   renderTradeTable(trades);
@@ -6444,7 +6448,8 @@ function updateKPIs() {
   //     (MT5/$ trades: dollars → % = (val/accSize)*100; manual % trades: use val directly).
   const _totalDollars = trades.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
   const _totalPct = trades.reduce((a, t) => a + _pctOfTrade(t), 0);
-  const _netDollarFmt = (_totalDollars >= 0 ? '+$' : '-$') + Math.abs(_totalDollars).toFixed(2);
+  const _sym = _currencySymbol();
+  const _netDollarFmt = (_totalDollars >= 0 ? '+' : '-') + _sym + Math.abs(_totalDollars).toFixed(2);
   const _netPctFmt    = (_totalPct >= 0 ? '+' : '') + _totalPct.toFixed(1) + '%';
   // _pnlToggleMode: '%' (default) | '$' — cycled by toggleNetPnl()
   const _showDollar   = (_pnlToggleMode === '$');
@@ -6618,25 +6623,44 @@ function updateKPIs() {
     }
   }
 
-  // ── Dashboard cover: current quarter summary ──
+  // ── Dashboard cover: period summary — respects "Dashboard Default View" setting ──
+  const _dvMode = (_profileData.defaultview || 'Quarterly');
   const _cqYear = new Date().getFullYear();
-  const _cqQ    = getQuarter(localToday());
-  const _cqT    = trades.filter(t => getYear(t.date) === _cqYear && getQuarter(t.date) === _cqQ);
+  const _todayStr = localToday();
+  let _cvFrom, _cvTo, _cvLabel, _cvTitle;
+  if (_dvMode === 'Monthly') {
+    const _cqM = new Date().getMonth();
+    _cvFrom  = _cqYear + '-' + String(_cqM + 1).padStart(2, '0') + '-01';
+    _cvTo    = _todayStr;
+    _cvLabel = 'MONTHLY PERFORMANCE · ' + _cqYear;
+    _cvTitle = MONTH_NAMES_LONG[_cqM] + ' ' + _cqYear;
+  } else if (_dvMode === 'Weekly') {
+    const _wd = _weekStartDate(new Date());
+    _cvFrom  = _wd.getFullYear() + '-' + String(_wd.getMonth() + 1).padStart(2, '0') + '-' + String(_wd.getDate()).padStart(2, '0');
+    _cvTo    = _todayStr;
+    _cvLabel = 'WEEKLY PERFORMANCE · ' + _cqYear;
+    _cvTitle = 'Week of ' + new Date(_cvFrom + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } else {
+    const _cqQ   = getQuarter(_todayStr);
+    const qStart = [null, '01', '04', '07', '10'][_cqQ];
+    _cvFrom  = _cqYear + '-' + qStart + '-01';
+    _cvTo    = _todayStr;
+    _cvLabel = 'QUARTERLY PERFORMANCE · ' + _cqYear;
+    _cvTitle = 'Q' + _cqQ + ' ' + _cqYear + ' — ' + (Q_MONTHS[_cqQ] || '');
+  }
+  const _cqT   = trades.filter(t => t.date >= _cvFrom && t.date <= _cvTo);
   const _cqWins = _cqT.filter(t => t.outcome === 'Win').length;
   const _cqWr   = _cqT.length ? ((_cqWins / _cqT.length) * 100).toFixed(1) : '0.0';
-  const _cqNetD  = _cqT.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
-  const _cqAbs   = Math.abs(_cqNetD);
-  const _cqFmt   = _cqAbs >= 1000
-    ? (_cqNetD >= 0 ? '+$' : '-$') + (_cqAbs/1000).toFixed(1) + 'k'
-    : (_cqNetD >= 0 ? '+$' : '-$') + _cqAbs.toFixed(2);
+  const _cqNetD = _cqT.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
+  const _cqFmt  = fmtUSD(_cqNetD);
   const periodEl = document.getElementById('dash-cover-period');
   const titleEl  = document.getElementById('dash-cover-title');
   const subTextEl = document.getElementById('dash-cover-sub-text');
-  if (periodEl) periodEl.textContent = 'QUARTERLY PERFORMANCE · ' + _cqYear;
-  if (titleEl)  titleEl.textContent  = 'Q' + _cqQ + ' ' + _cqYear + ' — ' + (Q_MONTHS[_cqQ] || '');
+  if (periodEl) periodEl.textContent = _cvLabel;
+  if (titleEl)  titleEl.textContent  = _cvTitle;
   if (subTextEl) subTextEl.textContent = _cqT.length
     ? _cqT.length + ' trades · Win rate ' + _cqWr + '% · Net PnL ' + _cqFmt
-    : 'No trades yet this quarter — tap + New Trade to begin';
+    : 'No trades yet this period — tap + New Trade to begin';
 }
 
 // ── Dashboard date range filter ──────────────────────
@@ -6647,12 +6671,13 @@ function setDashPreset(preset, btn) {
   const d = new Date();
   if (preset === 'all')   { _dashFilter = { from: null, to: null, preset }; }
   else if (preset === 'week') {
-    // Current calendar week: Sunday → today (week starts on Sunday)
-    const dow = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-    d.setDate(d.getDate() - dow); // days back to reach this week's Sunday
-    _dashFilter = { from: d.toISOString().slice(0,10), to: today, preset };
+    // Current calendar week, respecting the user's Week Starts On setting
+    const wd = _weekStartDate(d);
+    _dashFilter = { from: wd.getFullYear()+'-'+String(wd.getMonth()+1).padStart(2,'0')+'-'+String(wd.getDate()).padStart(2,'0'), to: today, preset };
   } else if (preset === 'month') {
     _dashFilter = { from: today.slice(0,7)+'-01', to: today, preset };
+  } else if (preset === 'year') {
+    _dashFilter = { from: today.slice(0,4)+'-01-01', to: today, preset };
   } else if (preset === 'quarter') {
     const q = getQuarter(today);
     const qStart = [null,'01','04','07','10'][q];
@@ -7214,6 +7239,7 @@ async function _saveEdit(id) {
   }
 
   showToast(t.pair + ' updated ✓', 'restore');
+  _playChime('save');
 
   // Background cloud save
   _cloudSaveTrade(t).then(ok => {
@@ -7269,6 +7295,7 @@ async function _executeSoftDelete(id) {
   if (row) { row.style.transition = 'opacity 0.15s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 150); }
   _refreshAll();
   renderTradeTable(trades);
+  _playChime('delete');
   showToast(t.pair + ' moved to Trash', 'danger', { label: 'View Trash', fn: "nav('trash',null,'Trash')" });
 }
 
@@ -7333,7 +7360,15 @@ function pnlToUSD(pnl, accSize, trade) {
   // Legacy call-sites that don't pass a trade object: treat as % (old behaviour for manual/seed trades only)
   return (pnl / 100) * accSize;
 }
-function fmtUSD(val) { const abs = Math.abs(val); const s = abs >= 1000 ? '$' + (abs / 1000).toFixed(1) + 'k' : '$' + abs.toFixed(2); return (val < 0 ? '-' : val > 0 ? '+' : '') + s; }
+function _currencySymbol() {
+  const c = (_profileData && _profileData.currency) || '% (Percentage)';
+  if (c.startsWith('USD')) return '$';
+  if (c.startsWith('GBP')) return '£';
+  if (c.startsWith('NGN')) return '₦';
+  if (c.startsWith('EUR')) return '€';
+  return '$';
+}
+function fmtUSD(val) { const abs = Math.abs(val); const sym = _currencySymbol(); const s = abs >= 1000 ? sym + (abs / 1000).toFixed(1) + 'k' : sym + abs.toFixed(2); return (val < 0 ? '-' : val > 0 ? '+' : '') + s; }
 // groupTradesByDay: totalPnlUSD stores the sum in dollars using toPnlDollars per trade.
 // accSize is needed to convert %-based trades; it is provided by renderCalendar.
 function groupTradesByDay(tradeList, accSize) {
@@ -7385,7 +7420,8 @@ function renderCalendar() {
   const daysEl2 = document.getElementById('cal-days-2');
   if (!daysEl && !daysEl2) return;
   const firstDay = new Date(calYear, calMonth, 1);
-  let startDow = firstDay.getDay(); // 0=Sun: no offset needed for Sun-start calendar
+  let startDow = firstDay.getDay(); // 0=Sun-start baseline
+  if (_weekStartsMonday) startDow = (startDow + 6) % 7; // shift so Monday=0 when that setting is chosen
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
   const daysInPrev = new Date(calYear, calMonth, 0).getDate();
   const today = localToday(); // use local timezone, not UTC (avoids off-by-one near midnight in WAT)
@@ -8080,6 +8116,10 @@ document.addEventListener('DOMContentLoaded', async function () {
   ]);
   await runAutoCleanup();
 
+  // 5b. Apply settings that affect initial rendering (week start, $/% default mode)
+  _applyWeekStartSetting();
+  _pnlToggleMode = (_profileData.currency && _profileData.currency !== '% (Percentage)') ? '$' : '%';
+
   // 6. Render all UI
   updateKPIs();
   buildPairTable();
@@ -8101,10 +8141,22 @@ document.addEventListener('DOMContentLoaded', async function () {
   buildGoals();
   buildMonthlyReview();
   renderTradeTable(trades);
+  _applyCompactTableSetting();
   _refreshCalendarAccountFilter();
   _restoreCalendarAccountSelection();
   renderCalendar();
   _injectTopbarAvatar();
+  _applyDefaultDateRangeSetting();
+
+  // 6b. Draft autosave — listen for input on the New Trade modal
+  const _modalEl = document.getElementById('modal');
+  if (_modalEl) {
+    _modalEl.addEventListener('input', _scheduleDraftSave);
+    _modalEl.addEventListener('change', _scheduleDraftSave);
+  }
+
+  // 6c. Affirmation on load (per Settings toggle) + always-available review icon
+  _maybeShowAffirmationOnLoad();
 
   // 7. Live clock
   updateClock();
@@ -8841,7 +8893,177 @@ async function _profileSave() {
   return true;
 }
 
-// ── Topbar avatar — uses cloud profile data ──
+// ── SETTINGS — LIVE APPLICATION ENGINE ──────────────────────────────────
+// Every "App Preferences" control applies immediately on change (not just
+// after hitting Save). Save() persists the same _profileData to Supabase.
+
+let _weekStartsMonday = false; // set by _applyWeekStartSetting()
+
+function _weekStartDate(baseDate) {
+  const d = new Date(baseDate);
+  const dow = d.getDay(); // 0=Sun..6=Sat
+  const offset = _weekStartsMonday ? ((dow + 6) % 7) : dow;
+  d.setDate(d.getDate() - offset);
+  return d;
+}
+
+function _applyWeekStartSetting() {
+  _weekStartsMonday = (_profileData.weekstart === 'Monday');
+  const order = _weekStartsMonday
+    ? ['MON','TUE','WED','THU','FRI','SAT','SUN']
+    : ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  ['cal-dow-row','cal-dow-row-2'].forEach(id => {
+    const row = document.getElementById(id);
+    if (row) row.innerHTML = order.map(d => `<div class="cal-dow">${d}</div>`).join('');
+  });
+}
+
+function _applyCompactTableSetting() {
+  const table = document.getElementById('trade-table');
+  if (table) table.classList.toggle('compact-table', !!_profileData.compact);
+}
+
+function _applyDefaultDateRangeSetting() {
+  const map = { 'This Month':'month', 'This Quarter':'quarter', 'This Year':'year', 'All Time':'all' };
+  const preset = map[_profileData.daterange] || 'all';
+  const btn = Array.from(document.querySelectorAll('.dash-filter-btn'))
+    .find(b => (b.getAttribute('onclick')||'').includes(`setDashPreset('${preset}'`));
+  setDashPreset(preset, btn || null);
+}
+
+// Called from onchange="" handlers on every App Preferences field so the
+// effect is visible immediately, in addition to being saved on Save click.
+function _pfLiveUpdate(key, value) {
+  _profileData[key] = value;
+  if (key === 'compact')     _applyCompactTableSetting();
+  if (key === 'weekstart')   { _applyWeekStartSetting(); renderCalendar(); }
+  if (key === 'currency')    { _pnlToggleMode = (value === '% (Percentage)') ? '%' : '$'; updateKPIs(); renderCalendar(); }
+  if (key === 'defaultview') updateKPIs();
+  if (key === 'daterange')   _applyDefaultDateRangeSetting();
+}
+
+// ── Sound notifications — short synthesized chime, no external audio file ──
+function _playChime(kind) {
+  if (!_profileData || _profileData.sounds !== true) return;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = 'sine';
+    const now = ctx.currentTime;
+    if (kind === 'delete') {
+      o.frequency.setValueAtTime(520, now);
+      o.frequency.exponentialRampToValueAtTime(260, now + 0.18);
+    } else {
+      o.frequency.setValueAtTime(660, now);
+      o.frequency.exponentialRampToValueAtTime(880, now + 0.12);
+    }
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.13, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
+    o.start(now); o.stop(now + 0.26);
+    o.onended = () => ctx.close();
+  } catch (e) { /* ignore audio errors */ }
+}
+
+// ── Auto-save drafts — unfinished New Trade form persisted to localStorage ──
+const _DRAFT_KEY = 'nxtgen_trade_draft_v1';
+const _DRAFT_FIELDS = ['m-date','m-pair','m-pair-custom','m-pos','m-rr','m-planned-rr','m-pnl',
+  'm-outcome','m-kz','m-strat','m-strat-custom','m-tf','m-tf-custom','m-acc','m-rating','m-risk',
+  'm-pretrade','m-notes','m-loss-reason'];
+let _draftSaveTimer = null;
+
+function _collectDraft() {
+  const obj = {};
+  _DRAFT_FIELDS.forEach(id => { const el = document.getElementById(id); if (el && el.value) obj[id] = el.value; });
+  obj._modalMentalState  = _modalMentalState;
+  obj._modalFollowedPlan = _modalFollowedPlan;
+  return obj;
+}
+function _scheduleDraftSave() {
+  if (_profileData.autosave === false) return;
+  const modal = document.getElementById('modal');
+  if (!modal || !modal.classList.contains('open')) return;
+  clearTimeout(_draftSaveTimer);
+  _draftSaveTimer = setTimeout(() => {
+    try { localStorage.setItem(_DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), data: _collectDraft() })); }
+    catch (e) { /* storage full or unavailable — ignore */ }
+  }, 500);
+}
+function _clearDraft() { try { localStorage.removeItem(_DRAFT_KEY); } catch (e) {} }
+
+function _restoreDraftIfAny() {
+  if (_profileData.autosave === false) return false;
+  let raw; try { raw = localStorage.getItem(_DRAFT_KEY); } catch (e) { return false; }
+  if (!raw) return false;
+  let parsed; try { parsed = JSON.parse(raw); } catch (e) { return false; }
+  if (!parsed || !parsed.data) return false;
+  if (Date.now() - (parsed.savedAt || 0) > 7 * 24 * 60 * 60 * 1000) { _clearDraft(); return false; } // expire after 7 days
+  const d = parsed.data;
+  const hasContent = Object.keys(d).some(k => !k.startsWith('_') && d[k]);
+  if (!hasContent) return false;
+  Object.keys(d).forEach(id => {
+    if (id.startsWith('_')) return;
+    const el = document.getElementById(id);
+    if (el) el.value = d[id];
+  });
+  if (d['m-pair-custom'])  document.getElementById('m-pair-custom').style.display  = 'block';
+  if (d['m-strat-custom']) document.getElementById('m-strat-custom').style.display = 'block';
+  if (d['m-tf-custom'])    document.getElementById('m-tf-custom').style.display    = 'block';
+  if (d._modalMentalState) {
+    const btn = document.querySelector('.ms-btn.ms-' + d._modalMentalState.toLowerCase());
+    if (btn) setMentalState(d._modalMentalState, btn);
+  }
+  if (d._modalFollowedPlan) {
+    const btn = document.querySelector('.fp-btn.fp-' + d._modalFollowedPlan.toLowerCase());
+    if (btn) setFollowedPlan(d._modalFollowedPlan, btn);
+  }
+  showToast('Unsaved draft restored ✓', 'restore');
+  return true;
+}
+
+// ── Show Affirmation on Load ─────────────────────────────────────────────
+function _currentAffirmation() {
+  const list = (_goalsData && _goalsData.affirmations && _goalsData.affirmations.length) ? _goalsData.affirmations : AFFIRMATIONS;
+  const dayIdx = Math.floor(Date.now() / 86400000); // rotates once per day, same for whole day
+  return list[dayIdx % list.length];
+}
+function _ensureAffirmationUI() {
+  if (document.getElementById('affirmation-overlay')) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div class="affirmation-overlay" id="affirmation-overlay">
+      <div class="affirmation-card">
+        <div class="affirmation-icon">✨</div>
+        <div class="affirmation-label">Today's Affirmation</div>
+        <div class="affirmation-text" id="affirmation-text"></div>
+        <button class="affirmation-close-btn" onclick="closeAffirmationModal()">I'm ready — let's trade</button>
+      </div>
+    </div>
+    <button class="affirmation-fab" id="affirmation-fab" title="Review today's affirmation" onclick="openAffirmationModal()">✨</button>`;
+  document.body.appendChild(wrap);
+  document.getElementById('affirmation-overlay').addEventListener('click', e => {
+    if (e.target.id === 'affirmation-overlay') closeAffirmationModal();
+  });
+}
+function openAffirmationModal() {
+  _ensureAffirmationUI();
+  document.getElementById('affirmation-text').textContent = _currentAffirmation();
+  document.getElementById('affirmation-overlay').classList.add('open');
+}
+function closeAffirmationModal() {
+  const el = document.getElementById('affirmation-overlay');
+  if (el) el.classList.remove('open');
+}
+function _maybeShowAffirmationOnLoad() {
+  _ensureAffirmationUI();
+  if (_profileData.affirmation !== false) openAffirmationModal();
+}
+
+
 function _injectTopbarAvatar() {
   const oldBar = document.querySelector('.topbar-right > div[style*="display:flex"]');
   if (oldBar) oldBar.remove();

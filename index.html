@@ -281,7 +281,7 @@
 
               <!-- Calendar grid -->
               <div class="cal-grid-wrap">
-                <div class="cal-dow-row">
+                <div class="cal-dow-row" id="cal-dow-row">
                   <div class="cal-dow">SUN</div><div class="cal-dow">MON</div><div class="cal-dow">TUE</div>
                   <div class="cal-dow">WED</div><div class="cal-dow">THU</div><div class="cal-dow">FRI</div><div class="cal-dow">SAT</div>
                 </div>
@@ -653,7 +653,7 @@
           </div>
           <div class="cal-kpi-row" id="cal-kpi-row-2"></div>
           <div class="cal-grid-wrap">
-            <div class="cal-dow-row">
+            <div class="cal-dow-row" id="cal-dow-row-2">
               <div class="cal-dow">SUN</div><div class="cal-dow">MON</div><div class="cal-dow">TUE</div>
               <div class="cal-dow">WED</div><div class="cal-dow">THU</div><div class="cal-dow">FRI</div><div class="cal-dow">SAT</div>
             </div>
@@ -1011,30 +1011,30 @@
             </div>
             <div class="profile-form-grid">
               <div class="profile-field"><label class="profile-label">Default Date Range</label>
-                <select class="profile-select" id="pf-daterange"><option>This Month</option><option>This Quarter</option><option>This Year</option><option>All Time</option></select></div>
+                <select class="profile-select" id="pf-daterange" onchange="_pfLiveUpdate('daterange', this.value)"><option>This Month</option><option>This Quarter</option><option>This Year</option><option>All Time</option></select></div>
               <div class="profile-field"><label class="profile-label">Currency Display</label>
-                <select class="profile-select" id="pf-currency"><option>% (Percentage)</option><option>USD ($)</option><option>GBP (£)</option><option>NGN (₦)</option><option>EUR (€)</option></select></div>
+                <select class="profile-select" id="pf-currency" onchange="_pfLiveUpdate('currency', this.value)"><option>% (Percentage)</option><option>USD ($)</option><option>GBP (£)</option><option>NGN (₦)</option><option>EUR (€)</option></select></div>
               <div class="profile-field"><label class="profile-label">Week Starts On</label>
-                <select class="profile-select" id="pf-weekstart"><option>Monday</option><option>Sunday</option></select></div>
+                <select class="profile-select" id="pf-weekstart" onchange="_pfLiveUpdate('weekstart', this.value)"><option>Monday</option><option>Sunday</option></select></div>
               <div class="profile-field"><label class="profile-label">Dashboard Default View</label>
-                <select class="profile-select" id="pf-defaultview"><option>Quarterly</option><option>Monthly</option><option>Weekly</option></select></div>
+                <select class="profile-select" id="pf-defaultview" onchange="_pfLiveUpdate('defaultview', this.value)"><option>Quarterly</option><option>Monthly</option><option>Weekly</option></select></div>
             </div>
             <div style="margin-top:20px">
               <div class="profile-toggle-row">
                 <div><div class="profile-toggle-label">Show Affirmation on Load</div><div class="profile-toggle-sub">Display a daily trading affirmation when the app opens</div></div>
-                <label class="profile-toggle-switch"><input type="checkbox" id="pf-affirmation" checked><span class="profile-toggle-track"></span></label>
+                <label class="profile-toggle-switch"><input type="checkbox" id="pf-affirmation" checked onchange="_pfLiveUpdate('affirmation', this.checked)"><span class="profile-toggle-track"></span></label>
               </div>
               <div class="profile-toggle-row">
                 <div><div class="profile-toggle-label">Sound Notifications</div><div class="profile-toggle-sub">Play a chime when a trade is saved or deleted</div></div>
-                <label class="profile-toggle-switch"><input type="checkbox" id="pf-sounds"><span class="profile-toggle-track"></span></label>
+                <label class="profile-toggle-switch"><input type="checkbox" id="pf-sounds" onchange="_pfLiveUpdate('sounds', this.checked)"><span class="profile-toggle-track"></span></label>
               </div>
               <div class="profile-toggle-row">
                 <div><div class="profile-toggle-label">Compact Table View</div><div class="profile-toggle-sub">Reduce row height in Trade Log for denser viewing</div></div>
-                <label class="profile-toggle-switch"><input type="checkbox" id="pf-compact"><span class="profile-toggle-track"></span></label>
+                <label class="profile-toggle-switch"><input type="checkbox" id="pf-compact" onchange="_pfLiveUpdate('compact', this.checked)"><span class="profile-toggle-track"></span></label>
               </div>
               <div class="profile-toggle-row">
                 <div><div class="profile-toggle-label">Auto-Save Drafts</div><div class="profile-toggle-sub">Automatically save unfinished trade forms</div></div>
-                <label class="profile-toggle-switch"><input type="checkbox" id="pf-autosave" checked><span class="profile-toggle-track"></span></label>
+                <label class="profile-toggle-switch"><input type="checkbox" id="pf-autosave" checked onchange="_pfLiveUpdate('autosave', this.checked)"><span class="profile-toggle-track"></span></label>
               </div>
             </div>
           </div>
