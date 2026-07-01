@@ -3466,10 +3466,13 @@ body{
 }
 
 /* ── Only one logo visible at a time ──
-   When the sidebar is expanded (desktop), its own logo header is showing,
-   so hide the topbar logo to avoid showing the brand twice.
-   The topbar logo reappears once the sidebar is collapsed. */
+   When the sidebar is expanded (desktop) or open (mobile overlay), its own
+   logo header is showing, so hide the topbar logo to avoid showing the
+   brand twice. The topbar logo reappears once the sidebar is closed/collapsed. */
 @media (min-width: 769px) {
+  body.sb-expanded .topbar-left .brand { display: none; }
+}
+@media (max-width: 768px) {
   body.sb-expanded .topbar-left .brand { display: none; }
 }
 
