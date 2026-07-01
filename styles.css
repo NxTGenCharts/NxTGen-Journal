@@ -2542,6 +2542,7 @@ body{
 /* Milestone edit/delete buttons */
 .acc-ms-actions{margin-left:auto;display:flex;gap:4px;opacity:0;transition:opacity .15s}
 .cl-item:hover .acc-ms-actions{opacity:1}
+.aff-card:hover .acc-ms-actions{opacity:1}
 
 /* Progress bar (kept for future use) */
 .acc-progress-wrap{margin-top:12px}
@@ -2832,6 +2833,8 @@ body{
 #milestones-list .cl-item.editing,.goals-group .cl-item.editing{cursor:default}
 .cl-item.dragging{opacity:.35;transform:scale(0.97)}
 .cl-item.drag-over{box-shadow:0 0 0 2px var(--blue),inset 0 0 0 1px rgba(96,165,250,0.15);transform:scale(1.02)}
+.aff-card.dragging{opacity:.35;transform:scale(0.97)}
+.aff-card.drag-over{box-shadow:0 0 0 2px var(--blue),inset 0 0 0 1px rgba(96,165,250,0.15);transform:scale(1.02)}
 .cl-drag-handle{
   font-size:13px;opacity:.45;cursor:grab;flex-shrink:0;
   line-height:1;transition:var(--t-fast);border-radius:4px;
@@ -2853,6 +2856,14 @@ body{
 .rule-card:hover{background:var(--glass-1);border-color:var(--glass-border-h)}
 .rule-num{font-family:var(--font-mono);font-size:10px;color:var(--accent);margin-bottom:4px;font-weight:700;letter-spacing:.08em}
 .rule-text{font-size:13px;color:var(--text2);line-height:1.55}
+
+/* Morning Affirmations — draggable/editable cards */
+.aff-card{display:flex;align-items:flex-start;gap:10px;cursor:grab}
+.aff-card:active{cursor:grabbing}
+.aff-card.editing{cursor:default}
+.aff-card .cl-drag-handle{margin-top:2px}
+.aff-card .acc-ms-actions{margin-top:2px}
+.aff-card .cl-edit-input{margin-top:2px;font-style:italic}
 .model-card{
   background:var(--glass-1);border:1px solid var(--glass-border);
   border-radius:var(--r-lg);padding:18px;margin-bottom:10px;

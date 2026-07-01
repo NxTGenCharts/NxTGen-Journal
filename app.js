@@ -5931,10 +5931,142 @@ function buildGoals() {
   // Affirmations
   const affEl = document.getElementById('affirmations');
   if (affEl) {
-    affEl.innerHTML = _goalsData.affirmations.map((a, i) =>
-      `<div class="rule-card"><div class="rule-num">${String(i+1).padStart(2,'0')}</div><div class="rule-text" style="font-style:italic">"${a}"</div></div>`
-    ).join('');
+    affEl.innerHTML = _goalsData.affirmations.map((a, i) => {
+      if (_affEditIdx === i) {
+        return `
+      <div class="rule-card aff-card editing" draggable="false">
+        <span class="cl-drag-handle" style="opacity:.25;cursor:default">⠿</span>
+        <div style="flex:1;min-width:0">
+          <div class="rule-num">${String(i+1).padStart(2,'0')}</div>
+          <input type="text" class="cl-edit-input" id="aff-edit-input-${i}" value="${a.replace(/"/g,'&quot;')}"
+                 onkeydown="if(event.key==='Enter'){affSaveEdit(${i})} else if(event.key==='Escape'){affCancelEdit()}">
+        </div>
+        <div class="acc-ms-actions" style="opacity:1">
+          <button class="wl-week-btn primary" style="font-size:10px;padding:2px 7px" onclick="affSaveEdit(${i})">✓ Done</button>
+          <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="affCancelEdit()">✕</button>
+        </div>
+      </div>`;
+      }
+      return `
+      <div class="rule-card aff-card"
+           draggable="true"
+           ondragstart="affDragStart(event,${i})"
+           ondragover="affDragOver(event)"
+           ondragenter="affDragEnter(event,${i})"
+           ondragleave="affDragLeave(event)"
+           ondrop="affDrop(event,${i})"
+           ondragend="affDragEnd(event)">
+        <span class="cl-drag-handle${_affClickSrc===i ? ' selected' : ''}" onclick="affHandleClick(event,${i})" title="Drag, or click and click another to swap">⠿</span>
+        <div style="flex:1;min-width:0">
+          <div class="rule-num">${String(i+1).padStart(2,'0')}</div>
+          <div class="rule-text" style="font-style:italic">"${a}"</div>
+        </div>
+        <div class="acc-ms-actions">
+          <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="affStartEdit(${i});event.stopPropagation()">✎</button>
+          <button class="wl-week-btn danger" style="font-size:10px;padding:2px 7px" onclick="affDeleteItem(${i});event.stopPropagation()">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+    if (_affEditIdx !== null) {
+      const input = document.getElementById(`aff-edit-input-${_affEditIdx}`);
+      if (input) { input.focus(); input.select(); }
+    }
   }
+}
+
+let _affDragSrc  = null;   // index currently being dragged
+let _affClickSrc = null;   // index selected via click-to-reorder
+let _affEditIdx  = null;   // index currently being inline-edited
+
+function affDragStart(e, i) {
+  _affDragSrc = i;
+  _affClickSrc = null;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(i));
+}
+
+function affDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function affDragEnter(e, i) {
+  if (_affDragSrc !== null && i !== _affDragSrc) e.currentTarget.classList.add('drag-over');
+}
+
+function affDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+async function affDrop(e, i) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (_affDragSrc === null || _affDragSrc === i) { _affDragSrc = null; return; }
+  const arr = _goalsData.affirmations;
+  const [moved] = arr.splice(_affDragSrc, 1);
+  arr.splice(i, 0, moved);
+  _affDragSrc = null;
+  buildGoals();
+  await _goalsSave();
+}
+
+function affDragEnd() {
+  document.querySelectorAll('#affirmations .aff-card').forEach(el => el.classList.remove('dragging', 'drag-over'));
+  _affDragSrc = null;
+}
+
+async function affHandleClick(e, i) {
+  e.stopPropagation();
+  if (_affClickSrc === null) {
+    _affClickSrc = i;
+    buildGoals();
+  } else if (_affClickSrc === i) {
+    _affClickSrc = null;
+    buildGoals();
+  } else {
+    const arr = _goalsData.affirmations;
+    const [moved] = arr.splice(_affClickSrc, 1);
+    arr.splice(i, 0, moved);
+    _affClickSrc = null;
+    buildGoals();
+    await _goalsSave();
+  }
+}
+
+function affStartEdit(i) {
+  _affClickSrc = null;
+  _affEditIdx = i;
+  buildGoals();
+}
+
+async function affSaveEdit(i) {
+  const input = document.getElementById(`aff-edit-input-${i}`);
+  const text = input ? input.value.trim() : '';
+  if (text) _goalsData.affirmations[i] = text;
+  _affEditIdx = null;
+  buildGoals();
+  await _goalsSave();
+}
+
+function affCancelEdit() {
+  _affEditIdx = null;
+  buildGoals();
+}
+
+function affAddItem() {
+  const text = prompt('Affirmation:');
+  if (!text) return;
+  _goalsData.affirmations.push(text.trim());
+  buildGoals();
+  _goalsSave();
+}
+
+async function affDeleteItem(i) {
+  if (!confirm(`Delete this affirmation?`)) return;
+  _goalsData.affirmations.splice(i, 1);
+  buildGoals();
+  await _goalsSave();
 }
 
 let _goalDragSrc  = null;   // {gi, ii} currently being dragged
