@@ -3389,14 +3389,16 @@ body{
   width:44px;height:44px;border-radius:50%;
   background:linear-gradient(135deg,var(--blue) 0%,#7c3aed 100%);
   border:1px solid var(--glass-border);
-  box-shadow:var(--shadow-lg);
-  font-size:19px;cursor:pointer;
+  box-shadow:0 3px 10px rgba(0,0,0,0.3);
+  font-size:19px;cursor:grab;
   display:flex;align-items:center;justify-content:center;
-  z-index:600;transition:var(--t-fast);
+  z-index:600;transition:box-shadow .15s ease,transform .15s ease;
+  touch-action:none;user-select:none;-webkit-user-select:none;
 }
-.affirmation-fab:hover{transform:scale(1.08)}
+.affirmation-fab:hover{box-shadow:0 4px 14px rgba(0,0,0,0.36)}
+.affirmation-fab.dragging{cursor:grabbing;transition:none;box-shadow:0 6px 18px rgba(0,0,0,0.4)}
 @media(max-width:768px){
-  .affirmation-fab{ right:14px; bottom:76px; width:40px;height:40px;font-size:17px }
+  .affirmation-fab{ width:40px;height:40px;font-size:17px }
 }
 
 /* ════════════ APP TOAST ════════════════════════ */

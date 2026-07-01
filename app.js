@@ -9043,11 +9043,93 @@ function _ensureAffirmationUI() {
         <button class="affirmation-close-btn" onclick="closeAffirmationModal()">I'm ready — let's trade</button>
       </div>
     </div>
-    <button class="affirmation-fab" id="affirmation-fab" title="Review today's affirmation" onclick="openAffirmationModal()">✨</button>`;
+    <button class="affirmation-fab" id="affirmation-fab" title="Drag to move · tap to review today's affirmation" onclick="_fabClick(this)">✨</button>`;
   document.body.appendChild(wrap);
   document.getElementById('affirmation-overlay').addEventListener('click', e => {
     if (e.target.id === 'affirmation-overlay') closeAffirmationModal();
   });
+  _initFabPosition(document.getElementById('affirmation-fab'));
+}
+
+// ── Affirmation FAB — freely draggable anywhere on screen (desktop + mobile) ──
+const _FAB_POS_KEY = 'affirmation_fab_pos';
+function _clampFabXY(el, x, y) {
+  const w = el.offsetWidth || 44, h = el.offsetHeight || 44;
+  const maxX = Math.max(6, window.innerWidth - w - 6);
+  const maxY = Math.max(6, window.innerHeight - h - 6);
+  return { x: Math.min(Math.max(6, x), maxX), y: Math.min(Math.max(6, y), maxY) };
+}
+function _setFabXY(el, x, y) {
+  const p = _clampFabXY(el, x, y);
+  el.style.left = p.x + 'px';
+  el.style.top  = p.y + 'px';
+  el.style.right = 'auto';
+  el.style.bottom = 'auto';
+  return p;
+}
+function _initFabPosition(el) {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(_FAB_POS_KEY) || 'null'); } catch (e) {}
+  if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
+    _setFabXY(el, saved.x, saved.y);
+  } else {
+    // Default: bottom-right, clear of the mobile bottom nav if present
+    const bottomNav = document.querySelector('.mob-bottom-nav');
+    const navH = (bottomNav && window.innerWidth <= 768) ? bottomNav.offsetHeight : 0;
+    const w = el.offsetWidth || 44, h = el.offsetHeight || 44;
+    _setFabXY(el, window.innerWidth - w - 20, window.innerHeight - h - 24 - navH);
+  }
+  _makeFabDraggable(el);
+  window.addEventListener('resize', () => {
+    const rect = el.getBoundingClientRect();
+    _setFabXY(el, rect.left, rect.top);
+  });
+}
+function _fabClick(el) {
+  if (el.dataset.justDragged) return;
+  openAffirmationModal();
+}
+function _makeFabDraggable(el) {
+  let dragging = false, moved = false, startX = 0, startY = 0, origX = 0, origY = 0;
+  const THRESHOLD = 6;
+  function onDown(e) {
+    dragging = true; moved = false;
+    const p = e.touches ? e.touches[0] : e;
+    startX = p.clientX; startY = p.clientY;
+    const rect = el.getBoundingClientRect();
+    origX = rect.left; origY = rect.top;
+    el.classList.add('dragging');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onUp);
+  }
+  function onMove(e) {
+    if (!dragging) return;
+    const p = e.touches ? e.touches[0] : e;
+    const dx = p.clientX - startX, dy = p.clientY - startY;
+    if (Math.abs(dx) > THRESHOLD || Math.abs(dy) > THRESHOLD) moved = true;
+    if (moved) {
+      if (e.cancelable) e.preventDefault();
+      _setFabXY(el, origX + dx, origY + dy);
+    }
+  }
+  function onUp() {
+    dragging = false;
+    el.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onUp);
+    if (moved) {
+      const rect = el.getBoundingClientRect();
+      try { localStorage.setItem(_FAB_POS_KEY, JSON.stringify({ x: rect.left, y: rect.top })); } catch (e) {}
+      el.dataset.justDragged = '1';
+      setTimeout(() => { delete el.dataset.justDragged; }, 60);
+    }
+  }
+  el.addEventListener('mousedown', onDown);
+  el.addEventListener('touchstart', onDown, { passive: true });
 }
 function openAffirmationModal() {
   _ensureAffirmationUI();
