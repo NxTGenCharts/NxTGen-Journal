@@ -450,6 +450,15 @@
           <div class="sec-head" style="margin-bottom:0">Milestones</div>
           <button class="wl-add-week-btn" onclick="accAddMilestone()">＋ Add Milestone</button>
         </div>
+        <div class="acc-progress-wrap">
+          <div class="acc-progress-label">
+            <span id="acc-progress-text">0 of 0 complete</span>
+            <span id="acc-progress-pct">0%</span>
+          </div>
+          <div class="acc-progress-bg">
+            <div class="acc-progress-fill" id="acc-progress-fill" style="width:0%"></div>
+          </div>
+        </div>
         <div class="checklist-grid" id="milestones-list"></div>
 
         <!-- Payout modal -->
@@ -524,6 +533,15 @@
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
           <div class="sec-head" style="margin-bottom:0" id="goals-section-head">Goals</div>
           <button class="wl-add-week-btn" onclick="goalsAddGroup()">＋ Add Group</button>
+        </div>
+        <div class="acc-progress-wrap">
+          <div class="acc-progress-label">
+            <span id="goals-progress-text">0 of 0 complete</span>
+            <span id="goals-progress-pct">0%</span>
+          </div>
+          <div class="acc-progress-bg">
+            <div class="acc-progress-fill" id="goals-progress-fill" style="width:0%"></div>
+          </div>
         </div>
         <div id="goals-list"></div>
         <div class="sec-head">Personal Bests <span style="font-size:10px;color:var(--text3);font-weight:400;font-family:var(--font-mono)">· computed from your trades</span></div>

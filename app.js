@@ -5246,6 +5246,21 @@ function _renderMilestones() {
         <button class="wl-week-btn danger" style="font-size:10px;padding:2px 7px" onclick="accDeleteMilestone(${i});event.stopPropagation()">✕</button>
       </div>
     </div>`).join('');
+  _renderMilestoneProgress();
+}
+
+function _renderMilestoneProgress() {
+  const fill = document.getElementById('acc-progress-fill');
+  const text = document.getElementById('acc-progress-text');
+  const pct  = document.getElementById('acc-progress-pct');
+  if (!fill || !text || !pct) return;
+  const total = _accData.milestones.length;
+  const done  = _accData.milestones.filter(m => m.done).length;
+  const percent = total ? Math.round((done / total) * 100) : 0;
+  text.textContent = `${done} of ${total} complete`;
+  pct.textContent  = `${percent}%`;
+  fill.style.setProperty('--target-width', percent + '%');
+  fill.style.width = percent + '%';
 }
 
 async function accToggleMilestone(i) {
@@ -5748,7 +5763,11 @@ function buildGoals() {
     if (_goalsData.groups.length === 0) {
       goalsEl.innerHTML = '<div class="wl-empty-state" style="padding:30px 0"><div class="wl-empty-icon">🎯</div><div class="wl-empty-title">No goals yet</div><div class="wl-empty-sub">Click + Add Group to create your first goal group.</div></div>';
     } else {
-      goalsEl.innerHTML = _goalsData.groups.map((g, gi) => `
+      goalsEl.innerHTML = _goalsData.groups.map((g, gi) => {
+        const gTotal = g.items.length;
+        const gDone  = g.items.filter(item => item.done).length;
+        const gPct   = gTotal ? Math.round((gDone / gTotal) * 100) : 0;
+        return `
         <div class="goals-group" style="margin-bottom:18px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <div style="font-size:12px;font-weight:700;color:var(--text2);letter-spacing:.3px">${g.q}</div>
@@ -5757,14 +5776,25 @@ function buildGoals() {
               <button class="wl-week-btn danger" style="font-size:10px;padding:3px 9px" onclick="goalsDeleteGroup(${gi})">✕</button>
             </div>
           </div>
+          <div class="acc-progress-wrap" style="margin-top:0;margin-bottom:10px">
+            <div class="acc-progress-label">
+              <span>${gDone} of ${gTotal} complete</span>
+              <span>${gPct}%</span>
+            </div>
+            <div class="acc-progress-bg">
+              <div class="acc-progress-fill" style="width:${gPct}%"></div>
+            </div>
+          </div>
           <div class="checklist-grid">${g.items.map((item, ii) => `
             <div class="cl-item${item.done?' checked':''}" onclick="goalsToggle(${gi},${ii})">
               <div class="cl-box">${item.done?'✓':''}</div>
               <span class="cl-text">${item.t}</span>
             </div>`).join('')}
           </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
     }
+    _renderGoalsProgress();
   }
 
   // Affirmations
@@ -5780,6 +5810,21 @@ async function goalsToggle(gi, ii) {
   _goalsData.groups[gi].items[ii].done = !_goalsData.groups[gi].items[ii].done;
   buildGoals();
   await _goalsSave();
+}
+
+function _renderGoalsProgress() {
+  const fill = document.getElementById('goals-progress-fill');
+  const text = document.getElementById('goals-progress-text');
+  const pct  = document.getElementById('goals-progress-pct');
+  if (!fill || !text || !pct) return;
+  const allItems = _goalsData.groups.flatMap(g => g.items);
+  const total = allItems.length;
+  const done  = allItems.filter(item => item.done).length;
+  const percent = total ? Math.round((done / total) * 100) : 0;
+  text.textContent = `${done} of ${total} complete`;
+  pct.textContent  = `${percent}%`;
+  fill.style.setProperty('--target-width', percent + '%');
+  fill.style.width = percent + '%';
 }
 
 function goalsAddGroup() {
