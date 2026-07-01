@@ -1274,6 +1274,7 @@
     } else {
       const isCollapsed = sb.classList.toggle('sb-collapsed');
       document.getElementById('main-layout').classList.toggle('sidebar-hidden', isCollapsed);
+      document.body.classList.toggle('sb-expanded', !isCollapsed);
       if (btn) btn.classList.toggle('active', !isCollapsed);
       localStorage.setItem('sb_collapsed', isCollapsed ? '1' : '0');
     }
@@ -1297,6 +1298,7 @@
       // Start with sidebar open on desktop by default
       const btn = document.getElementById('sb-toggle-btn');
       if (btn) btn.classList.add('active');
+      document.body.classList.add('sb-expanded');
     }
   })();
 

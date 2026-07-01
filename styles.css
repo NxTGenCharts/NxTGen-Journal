@@ -3465,6 +3465,14 @@ body{
   /* handled by sidebar width going to 0 — flex does the rest */
 }
 
+/* ── Only one logo visible at a time ──
+   When the sidebar is expanded (desktop), its own logo header is showing,
+   so hide the topbar logo to avoid showing the brand twice.
+   The topbar logo reappears once the sidebar is collapsed. */
+@media (min-width: 769px) {
+  body.sb-expanded .topbar-left .brand { display: none; }
+}
+
 /* ── Table scroll wrapper ── */
 .data-table-wrap{
   overflow-x:auto;
