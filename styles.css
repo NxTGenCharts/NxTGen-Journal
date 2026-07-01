@@ -2815,6 +2815,20 @@ body{
 .cl-text{font-size:12px;color:var(--text2)}
 .cl-item.checked .cl-text{color:var(--text)}
 
+/* Drag-to-reorder for checklist items (milestones + goals) */
+#milestones-list .cl-item,.goals-group .cl-item{cursor:grab}
+#milestones-list .cl-item:active,.goals-group .cl-item:active{cursor:grabbing}
+.cl-item.dragging{opacity:.35;transform:scale(0.97)}
+.cl-item.drag-over{box-shadow:0 0 0 2px var(--blue),inset 0 0 0 1px rgba(96,165,250,0.15);transform:scale(1.02)}
+.cl-drag-handle{
+  font-size:13px;opacity:.45;cursor:grab;flex-shrink:0;
+  line-height:1;transition:var(--t-fast);border-radius:4px;
+  width:16px;height:16px;display:flex;align-items:center;justify-content:center;
+}
+.cl-drag-handle:hover{opacity:.9}
+.cl-drag-handle:active{cursor:grabbing}
+.cl-drag-handle.selected{opacity:1;color:var(--blue);background:rgba(96,165,250,0.15);box-shadow:0 0 0 1px rgba(96,165,250,0.4)}
+
 /* ════════════ ACCOUNTS ═════════════════════════ */
 
 

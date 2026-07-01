@@ -5234,11 +5234,22 @@ function accClosePayoutModal() {
 }
 
 /* ── Milestones ── */
+let _msDragSrc   = null;   // index currently being dragged
+let _msClickSrc  = null;   // index selected via click-to-reorder
+
 function _renderMilestones() {
   const ml = document.getElementById('milestones-list');
   if (!ml) return;
   ml.innerHTML = _accData.milestones.map((m, i) => `
-    <div class="cl-item${m.done ? ' checked' : ''}" style="position:relative">
+    <div class="cl-item${m.done ? ' checked' : ''}" style="position:relative"
+         draggable="true"
+         ondragstart="msDragStart(event,${i})"
+         ondragover="msDragOver(event)"
+         ondragenter="msDragEnter(event,${i})"
+         ondragleave="msDragLeave(event)"
+         ondrop="msDrop(event,${i})"
+         ondragend="msDragEnd(event)">
+      <span class="cl-drag-handle${_msClickSrc===i ? ' selected' : ''}" onclick="msHandleClick(event,${i})" title="Drag, or click and click another to swap">⠿</span>
       <div class="cl-box" onclick="accToggleMilestone(${i})">${m.done ? '✓' : ''}</div>
       <span class="cl-text" onclick="accToggleMilestone(${i})">${m.t}</span>
       <div class="acc-ms-actions">
@@ -5247,6 +5258,62 @@ function _renderMilestones() {
       </div>
     </div>`).join('');
   _renderMilestoneProgress();
+}
+
+function msDragStart(e, i) {
+  _msDragSrc = i;
+  _msClickSrc = null;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(i));
+}
+
+function msDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function msDragEnter(e, i) {
+  if (_msDragSrc !== null && i !== _msDragSrc) e.currentTarget.classList.add('drag-over');
+}
+
+function msDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+async function msDrop(e, i) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (_msDragSrc === null || _msDragSrc === i) { _msDragSrc = null; return; }
+  const arr = _accData.milestones;
+  const [moved] = arr.splice(_msDragSrc, 1);
+  arr.splice(i, 0, moved);
+  _msDragSrc = null;
+  _renderMilestones();
+  await _accSave();
+}
+
+function msDragEnd() {
+  document.querySelectorAll('#milestones-list .cl-item').forEach(el => el.classList.remove('dragging', 'drag-over'));
+  _msDragSrc = null;
+}
+
+async function msHandleClick(e, i) {
+  e.stopPropagation();
+  if (_msClickSrc === null) {
+    _msClickSrc = i;
+    _renderMilestones();
+  } else if (_msClickSrc === i) {
+    _msClickSrc = null;
+    _renderMilestones();
+  } else {
+    const arr = _accData.milestones;
+    const [moved] = arr.splice(_msClickSrc, 1);
+    arr.splice(i, 0, moved);
+    _msClickSrc = null;
+    _renderMilestones();
+    await _accSave();
+  }
 }
 
 function _renderMilestoneProgress() {
@@ -5786,7 +5853,16 @@ function buildGoals() {
             </div>
           </div>
           <div class="checklist-grid">${g.items.map((item, ii) => `
-            <div class="cl-item${item.done?' checked':''}" onclick="goalsToggle(${gi},${ii})">
+            <div class="cl-item${item.done?' checked':''}"
+                 draggable="true"
+                 ondragstart="goalDragStart(event,${gi},${ii})"
+                 ondragover="goalDragOver(event)"
+                 ondragenter="goalDragEnter(event,${gi},${ii})"
+                 ondragleave="goalDragLeave(event)"
+                 ondrop="goalDrop(event,${gi},${ii})"
+                 ondragend="goalDragEnd(event)"
+                 onclick="goalsToggle(${gi},${ii})">
+              <span class="cl-drag-handle${_goalClickSrc && _goalClickSrc.gi===gi && _goalClickSrc.ii===ii ? ' selected' : ''}" onclick="goalHandleClick(event,${gi},${ii})" title="Drag, or click and click another to swap">⠿</span>
               <div class="cl-box">${item.done?'✓':''}</div>
               <span class="cl-text">${item.t}</span>
             </div>`).join('')}
@@ -5806,10 +5882,74 @@ function buildGoals() {
   }
 }
 
+let _goalDragSrc  = null;   // {gi, ii} currently being dragged
+let _goalClickSrc = null;   // {gi, ii} selected via click-to-reorder
+
 async function goalsToggle(gi, ii) {
   _goalsData.groups[gi].items[ii].done = !_goalsData.groups[gi].items[ii].done;
   buildGoals();
   await _goalsSave();
+}
+
+function goalDragStart(e, gi, ii) {
+  _goalDragSrc = { gi, ii };
+  _goalClickSrc = null;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(ii));
+}
+
+function goalDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function goalDragEnter(e, gi, ii) {
+  if (_goalDragSrc && _goalDragSrc.gi === gi && _goalDragSrc.ii !== ii) e.currentTarget.classList.add('drag-over');
+}
+
+function goalDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+async function goalDrop(e, gi, ii) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.classList.remove('drag-over');
+  if (!_goalDragSrc || _goalDragSrc.gi !== gi || _goalDragSrc.ii === ii) { _goalDragSrc = null; return; }
+  const arr = _goalsData.groups[gi].items;
+  const [moved] = arr.splice(_goalDragSrc.ii, 1);
+  arr.splice(ii, 0, moved);
+  _goalDragSrc = null;
+  buildGoals();
+  await _goalsSave();
+}
+
+function goalDragEnd() {
+  document.querySelectorAll('.goals-group .cl-item').forEach(el => el.classList.remove('dragging', 'drag-over'));
+  _goalDragSrc = null;
+}
+
+async function goalHandleClick(e, gi, ii) {
+  e.stopPropagation();
+  if (!_goalClickSrc) {
+    _goalClickSrc = { gi, ii };
+    buildGoals();
+  } else if (_goalClickSrc.gi === gi && _goalClickSrc.ii === ii) {
+    _goalClickSrc = null;
+    buildGoals();
+  } else if (_goalClickSrc.gi !== gi) {
+    // Reordering is confined to within a single group
+    _goalClickSrc = { gi, ii };
+    buildGoals();
+  } else {
+    const arr = _goalsData.groups[gi].items;
+    const [moved] = arr.splice(_goalClickSrc.ii, 1);
+    arr.splice(ii, 0, moved);
+    _goalClickSrc = null;
+    buildGoals();
+    await _goalsSave();
+  }
 }
 
 function _renderGoalsProgress() {
