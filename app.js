@@ -9052,7 +9052,7 @@ function _ensureAffirmationUI() {
         <div class="affirmation-head">
           <div class="affirmation-icon">✨</div>
           <div>
-            <div class="affirmation-label">Today's Affirmations</div>
+            <div class="affirmation-label">Daily Affirmation</div>
             <div class="affirmation-count" id="affirmation-count"></div>
           </div>
         </div>
