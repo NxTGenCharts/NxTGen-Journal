@@ -3360,8 +3360,8 @@ body{
 .affirmation-overlay{
   position:fixed;inset:0;
   background:rgba(0,0,0,0.28);
-  backdrop-filter:var(--blur-xs);
-  -webkit-backdrop-filter:var(--blur-xs);
+  backdrop-filter:blur(11px);
+  -webkit-backdrop-filter:blur(11px);
   z-index:9100;display:none;
   align-items:center;justify-content:center;
   padding:20px;
@@ -3370,8 +3370,8 @@ body{
 .affirmation-card{
   position:relative;overflow:hidden;
   background:rgba(255,255,255,0.04);
-  backdrop-filter:var(--blur-xs);
-  -webkit-backdrop-filter:var(--blur-xs);
+  backdrop-filter:blur(11px);
+  -webkit-backdrop-filter:blur(11px);
   border:1px solid var(--glass-border);
   border-radius:var(--r-xl);
   padding:22px 24px 20px;max-width:360px;width:100%;
@@ -3383,11 +3383,6 @@ body{
 .affirmation-card::before{
   content:'';position:absolute;inset:0 0 auto 0;height:3px;
   background:linear-gradient(90deg,var(--blue) 0%,var(--purple) 100%);
-}
-.affirmation-card::after{
-  content:'❝';position:absolute;top:-18px;right:6px;
-  font-family:Georgia,serif;font-size:110px;line-height:1;
-  color:var(--blue);opacity:.07;pointer-events:none;
 }
 .affirmation-head{
   display:flex;align-items:center;gap:9px;margin:-22px -24px 16px;
