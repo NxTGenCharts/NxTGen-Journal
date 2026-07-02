@@ -1024,6 +1024,8 @@ function aiClear() {
 
 /* ── Init AI page on nav ── */
 function buildAI() {
+  // If the chat widget is floating, pull it back into the page and close the float
+  if (typeof closeFloatingChat === 'function') closeFloatingChat();
   _aiRenderContextPanel('daily');
   aiSetMode('daily');
   // Init chat on first load
@@ -1036,6 +1038,8 @@ function aiPageTab(tab) {
   const tabCoach   = document.getElementById('ai-tab-coach');
   const tabChat    = document.getElementById('ai-tab-chat');
   if (!coachPanel || !chatPanel) return;
+  // Reclaim the chat UI in case it's currently living in the floating chat widget
+  if (typeof closeFloatingChat === 'function') closeFloatingChat();
   if (tab === 'chat') {
     coachPanel.style.display = 'none';
     chatPanel.style.display  = '';
@@ -9186,12 +9190,56 @@ function _ensureAffirmationUI() {
         <button class="affirmation-close-btn" onclick="closeAffirmationModal()">I'm ready — let's trade</button>
       </div>
     </div>
-    <button class="affirmation-fab" id="affirmation-fab" title="Drag to move · tap to review your affirmations" onclick="_fabClick(this)">✨</button>`;
+    <div class="ai-float-chat-overlay" id="ai-float-chat-overlay">
+      <div class="ai-float-chat-card" id="ai-float-chat-card">
+        <div class="ai-float-chat-topbar">
+          <div class="ai-float-chat-title"><span>✦</span> NxTGen AI</div>
+          <div class="ai-float-chat-topbar-actions">
+            <button class="chat-action-btn" title="Open full AI Coach page" onclick="_openAIFullFromFloat()">⤢</button>
+            <button class="chat-action-btn" title="Close" onclick="closeFloatingChat()">✕</button>
+          </div>
+        </div>
+        <div class="ai-float-chat-body" id="ai-float-chat-body"></div>
+      </div>
+    </div>
+    <button class="affirmation-fab" id="affirmation-fab" onclick="_fabClick(this)"></button>`;
   document.body.appendChild(wrap);
   document.getElementById('affirmation-overlay').addEventListener('click', e => {
     if (e.target.id === 'affirmation-overlay') closeAffirmationModal();
   });
+  document.getElementById('ai-float-chat-overlay').addEventListener('click', e => {
+    if (e.target.id === 'ai-float-chat-overlay') closeFloatingChat();
+  });
   _initFabPosition(document.getElementById('affirmation-fab'));
+  _renderFabIcon(document.getElementById('affirmation-fab'));
+}
+
+// ── FAB mode (two-in-one: Daily Affirmations ⇄ AI Chat) ──────────────────
+const _FAB_MODE_KEY = 'affirmation_fab_mode';
+function _getFabMode() {
+  try { return localStorage.getItem(_FAB_MODE_KEY) || 'affirmation'; } catch (e) { return 'affirmation'; }
+}
+function _setFabMode(mode) {
+  try { localStorage.setItem(_FAB_MODE_KEY, mode); } catch (e) {}
+}
+const _FAB_CHAT_SVG = `<svg class="fab-chat-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <path d="M4 5.5C4 4.67 4.67 4 5.5 4h13c.83 0 1.5.67 1.5 1.5v9c0 .83-.67 1.5-1.5 1.5H9l-4 3.5v-3.5H5.5C4.67 15.5 4 14.83 4 14v-8.5z" fill="#fff"/>
+  <circle cx="8.4" cy="9.7" r="1.15" fill="#7c3aed"/>
+  <circle cx="12.4" cy="9.7" r="1.15" fill="#7c3aed"/>
+  <circle cx="16.4" cy="9.7" r="1.15" fill="#7c3aed"/>
+</svg>`;
+function _renderFabIcon(el) {
+  if (!el) return;
+  const mode = _getFabMode();
+  if (mode === 'chat') {
+    el.innerHTML = _FAB_CHAT_SVG;
+    el.classList.add('mode-chat');
+    el.title = 'Tap for AI Chat · tap again for Daily Affirmations';
+  } else {
+    el.innerHTML = '✨';
+    el.classList.remove('mode-chat');
+    el.title = 'Tap for Daily Affirmations · tap again for AI Chat';
+  }
 }
 
 // ── Affirmation FAB — freely draggable anywhere on screen (desktop + mobile) ──
@@ -9230,7 +9278,42 @@ function _initFabPosition(el) {
 }
 function _fabClick(el) {
   if (el.dataset.justDragged) return;
-  openAffirmationModal();
+  const mode = _getFabMode();
+  if (mode === 'chat') {
+    openFloatingChat();
+  } else {
+    openAffirmationModal();
+  }
+  // Toggle so the next tap triggers the other function
+  _setFabMode(mode === 'chat' ? 'affirmation' : 'chat');
+  _renderFabIcon(el);
+}
+
+// ── Floating AI Chat (the FAB's second function) ──────────────────────────
+// Reuses the same chat engine/DOM as the AI Coach page's "Chat" tab by
+// relocating the live .chat-container node — no duplicate IDs, no lost state.
+function openFloatingChat() {
+  _ensureAffirmationUI();
+  const overlay   = document.getElementById('ai-float-chat-overlay');
+  const body      = document.getElementById('ai-float-chat-body');
+  const container = document.querySelector('.chat-container');
+  if (container && body && container.parentElement !== body) body.appendChild(container);
+  if (overlay) overlay.classList.add('open');
+  if (!_chatInitialised) { chatInit(); _chatInitialised = true; }
+  setTimeout(() => document.getElementById('chat-input')?.focus(), 150);
+}
+function closeFloatingChat() {
+  const overlay = document.getElementById('ai-float-chat-overlay');
+  if (overlay) overlay.classList.remove('open');
+  const home      = document.getElementById('ai-chat-panel');
+  const container = document.getElementById('ai-float-chat-body')?.querySelector('.chat-container');
+  if (container && home && container.parentElement !== home) home.appendChild(container);
+}
+function _openAIFullFromFloat() {
+  closeFloatingChat();
+  const sbEl = document.querySelector('.sb-item.ai-glow');
+  if (typeof nav === 'function') nav('ai', sbEl, 'AI Coach');
+  setTimeout(() => { if (typeof aiPageTab === 'function') aiPageTab('chat'); }, 60);
 }
 function _makeFabDraggable(el) {
   let dragging = false, moved = false, startX = 0, startY = 0, origX = 0, origY = 0;
