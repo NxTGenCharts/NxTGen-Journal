@@ -231,11 +231,21 @@ function _showSkeletons() {
 }
 function _hideSkeletons() { /* replaced by actual data rendering */ }
 
+// Columns pulled on initial load. `charts` is deliberately excluded —
+// it can hold base64 image data (or long URL arrays) and is only ever
+// needed when a single trade's detail panel is opened. Pulling it for
+// every row on every page load is the #1 cause of slow boot times on
+// accounts with lots of chart images. See _ensureChartsLoaded().
+const _TRADE_LIST_COLUMNS =
+  'id, trade_date, pair, pos, rr, pnl, pnl_unit, outcome, kz, strategy, tf, ' +
+  'account, rating, risk, notes, pretrade, emotion, checklist, chart_labels, ' +
+  'mistakes, source, planned_rr, would_retake, loss_reason, followed_plan';
+
 async function loadTrades() {
   _showSkeletons();
   const { data, error } = await sb
     .from('journal_trades')
-    .select('*')
+    .select(_TRADE_LIST_COLUMNS)
     .eq('user_id', _currentUser.id)
     .order('trade_date', { ascending: false });
 
@@ -259,19 +269,44 @@ async function loadTrades() {
         mistakes:    row.mistakes || '',
         emotion:     row.emotion || 'Calm',
         checklist:   row.checklist || [],
-        charts:      row.charts || [],
+        charts:      [],              // lazy-loaded on demand — see _ensureChartsLoaded
         chartLabels: row.chart_labels || [...CHART_LABELS],
+        _chartsLoaded: false,
       };
     });
   }
   return true;
 }
 
+/* Fetch just the `charts` column for one trade, the first time it's actually
+   needed (i.e. when its detail panel is opened). Cached after first load so
+   re-opening the same trade doesn't re-fetch. This is what lets loadTrades()
+   skip charts entirely for the bulk list/table/calendar views. */
+async function _ensureChartsLoaded(id) {
+  const s = getTS(id);
+  if (s._chartsLoaded) return;
+  if (!_currentUser) return;
+  const { data, error } = await sb
+    .from('journal_trades')
+    .select('charts')
+    .eq('id', id)
+    .eq('user_id', _currentUser.id)
+    .maybeSingle();
+  if (error) { console.error('_ensureChartsLoaded error:', error.message); return; }
+  s.charts = data?.charts || [];
+  s._chartsLoaded = true;
+  const t = trades.find(x => x.id === id);
+  if (t) t.charts = s.charts;
+}
+
 /* Load deleted trades for this user */
 async function loadDeletedTrades() {
+  // Same reasoning as loadTrades(): the trash list never renders chart
+  // images, so don't pay to download them here either. Charts are pulled
+  // on the fly by _ensureChartsLoaded() the moment a deleted trade needs them.
   const { data, error } = await sb
     .from('journal_deleted_trades')
-    .select('*')
+    .select(_TRADE_LIST_COLUMNS + ', deleted_at, original_id')
     .eq('user_id', _currentUser.id)
     .order('deleted_at', { ascending: false });
 
@@ -2517,6 +2552,12 @@ function openDetail(id, editMode) {
   if (!_detActiveTab) _detActiveTab = 'overview';
   _renderDetail(id);
   document.getElementById('detail-panel').classList.add('open');
+
+  // Charts are fetched lazily (not part of the bulk trade load) — pull them
+  // in now and re-render once they land, without blocking the rest of the panel.
+  _ensureChartsLoaded(id).then(() => {
+    if (currentDetail === id) _renderDetail(id);
+  });
 }
 
 function _renderDetail(id) {
@@ -2833,71 +2874,87 @@ function triggerImg(id, slot) {
   document.getElementById('img-input').value = '';
   document.getElementById('img-input').click();
 }
-function handleImg(e) {
+/* Downscale + re-encode an image before it ever leaves the browser.
+   Trading screenshots are usually full-res PNGs (2-6MB); resizing to a
+   1600px-wide JPEG keeps them perfectly readable for chart review while
+   cutting file size ~70-90%. Falls back to the original file if anything
+   goes wrong (e.g. an odd file type createImageBitmap can't decode). */
+async function _compressChartImage(file, maxWidth = 1600, quality = 0.82) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale  = Math.min(1, maxWidth / bitmap.width);
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', quality));
+    return blob || file;
+  } catch (err) {
+    console.warn('Chart compression skipped, using original file:', err.message);
+    return file;
+  }
+}
+
+async function handleImg(e) {
   const f = e.target.files[0];
   if (!f || !currentUploadSlot) return;
   const { id, slot } = currentUploadSlot;
 
   // Show upload progress in the slot immediately
   const grid = document.getElementById(`chart-sort-grid-${id}`);
-  if (grid) {
-    const items = grid.querySelectorAll('.chart-sort-item');
-    const slotEl = items[slot];
-    if (slotEl) {
-      const thumb = slotEl.querySelector('.chart-sort-thumb');
-      if (thumb) {
-        thumb.innerHTML = `
-          <div class="chart-upload-progress">
-            <div class="cup-spinner"></div>
-            <div class="cup-label">Uploading…</div>
-            <div class="cup-bar-wrap"><div class="cup-bar" id="cup-bar-${id}-${slot}"></div></div>
-          </div>`;
-        // Animate progress bar
-        let pct = 0;
-        const barEl = document.getElementById(`cup-bar-${id}-${slot}`);
-        const prog = setInterval(() => {
-          pct = Math.min(pct + Math.random() * 18, 85);
-          if (barEl) barEl.style.width = pct + '%';
-        }, 120);
+  const items = grid ? grid.querySelectorAll('.chart-sort-item') : null;
+  const slotEl = items ? items[slot] : null;
+  const thumb  = slotEl ? slotEl.querySelector('.chart-sort-thumb') : null;
 
-        const r = new FileReader();
-        r.onload = async ev => {
-          clearInterval(prog);
-          if (barEl) barEl.style.width = '100%';
-          const s = getTS(id);
-          if (!s.charts) s.charts = [];
-          s.charts[slot] = ev.target.result;
-          const t = trades.find(x => x.id === id);
-          if (t) t.charts = s.charts;
-          // Re-render instantly — user sees image right away
-          _renderDetail(id);
-          showToast('Chart saved ✓', 'restore');
-          // Background cloud save
-          _cloudSaveTrade(t).then(ok => {
-            if (!ok) showToast('Chart cloud sync failed', 'danger');
-          });
-        };
-        r.readAsDataURL(f);
-        return;
-      }
-    }
+  let prog, barEl;
+  if (thumb) {
+    thumb.innerHTML = `
+      <div class="chart-upload-progress">
+        <div class="cup-spinner"></div>
+        <div class="cup-label">Uploading…</div>
+        <div class="cup-bar-wrap"><div class="cup-bar" id="cup-bar-${id}-${slot}"></div></div>
+      </div>`;
+    let pct = 0;
+    barEl = document.getElementById(`cup-bar-${id}-${slot}`);
+    prog = setInterval(() => {
+      pct = Math.min(pct + Math.random() * 18, 85);
+      if (barEl) barEl.style.width = pct + '%';
+    }, 120);
   }
 
-  // Fallback (no slot element found) — original behaviour
-  const r = new FileReader();
-  r.onload = async ev => {
+  try {
+    // Compress client-side, then upload to Supabase Storage — only a short
+    // URL ever gets written to the journal_trades row (see _cloudSaveTrade),
+    // instead of embedding megabytes of base64 image data in the database.
+    const compressed = await _compressChartImage(f);
+    const path = `${_currentUser.id}/${id}/${slot}-${Date.now()}.jpg`;
+    const { error: upErr } = await sb.storage.from('trade-charts')
+      .upload(path, compressed, { upsert: true, contentType: 'image/jpeg' });
+    if (upErr) throw upErr;
+    const { data: urlData } = sb.storage.from('trade-charts').getPublicUrl(path);
+
+    if (prog) clearInterval(prog);
+    if (barEl) barEl.style.width = '100%';
+
     const s = getTS(id);
     if (!s.charts) s.charts = [];
-    s.charts[slot] = ev.target.result;
+    s.charts[slot] = urlData.publicUrl;
+    s._chartsLoaded = true;
     const t = trades.find(x => x.id === id);
     if (t) t.charts = s.charts;
+
     _renderDetail(id);
     showToast('Chart saved ✓', 'restore');
     _cloudSaveTrade(t).then(ok => {
       if (!ok) showToast('Chart cloud sync failed', 'danger');
     });
-  };
-  r.readAsDataURL(f);
+  } catch (err) {
+    if (prog) clearInterval(prog);
+    console.error('Chart upload failed:', err.message || err);
+    showToast('Chart upload failed', 'danger');
+    _renderDetail(id);
+  }
 }
 
 async function detSave(id) {
@@ -7657,6 +7714,19 @@ async function restoreTrade(originalId) {
   if (originalId === undefined || originalId === null || originalId === '') return;
   const t = deletedTrades.find(x => (x.originalId || x.id) == originalId);
   if (!t) { showToast('Trade not found in trash', 'danger'); return; }
+
+  // charts weren't part of the bulk trash load — fetch them now so restoring
+  // doesn't wipe out the trade's images.
+  const { data: chartData } = await sb
+    .from('journal_deleted_trades')
+    .select('charts')
+    .eq('user_id', _currentUser.id)
+    .eq('original_id', t.originalId || t.id)
+    .order('deleted_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  t.charts = chartData?.charts || [];
+
   const restored = await _cloudRestoreTrade(t);
   if (!restored) { showToast('Restore failed', 'danger'); return; }
   deletedTrades = deletedTrades.filter(x => (x.originalId || x.id) != originalId);
