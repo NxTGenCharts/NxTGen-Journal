@@ -1582,8 +1582,24 @@ body{
 
 /* Responsive */
 @media(max-width:640px){
-  .ai-mode-bar { gap: 4px; padding: 5px; }
-  .ai-mode-btn { font-size: 11px; padding: 7px 9px; min-width: 80px; }
+  .ai-mode-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 6px; padding: 5px;
+    margin-left: -14px; margin-right: -14px;
+    padding-left: 14px; padding-right: 14px;
+    border-radius: 0;
+    border-left: none; border-right: none;
+    mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+  }
+  .ai-mode-bar::-webkit-scrollbar { display: none; }
+  .ai-mode-btn {
+    flex: none; min-width: max-content;
+    font-size: 11.5px; padding: 8px 13px;
+  }
   .ai-response-body { padding: 14px 15px; font-size: 13px; }
   .ai-prompt-actions { flex-direction: column; align-items: stretch; }
   .ai-analyse-btn { width: 100%; justify-content: center; }
@@ -3425,11 +3441,11 @@ body{
 .affirmation-close-btn:hover{filter:brightness(1.1)}
 .affirmation-fab{
   position:fixed;right:20px;bottom:88px;
-  width:44px;height:44px;border-radius:50%;
+  width:52px;height:52px;border-radius:50%;
   background:linear-gradient(135deg,var(--blue) 0%,var(--purple) 100%);
   border:1px solid var(--glass-border);
   box-shadow:0 3px 10px rgba(0,0,0,0.3);
-  font-size:19px;cursor:grab;
+  font-size:23px;cursor:grab;
   display:flex;align-items:center;justify-content:center;
   z-index:600;transition:box-shadow .15s ease,transform .15s ease;
   touch-action:none;user-select:none;-webkit-user-select:none;
@@ -3437,16 +3453,16 @@ body{
 .affirmation-fab:hover{box-shadow:0 4px 14px rgba(0,0,0,0.36)}
 .affirmation-fab.dragging{cursor:grabbing;transition:none;box-shadow:0 6px 18px rgba(0,0,0,0.4)}
 @media(max-width:768px){
-  .affirmation-fab{ width:40px;height:40px;font-size:17px }
+  .affirmation-fab{ width:48px;height:48px;font-size:21px }
 
 }
 
 /* Chat-mode variant of the FAB icon — distinct glyph from the ✨ affirmation icon */
-.affirmation-fab .fab-chat-svg{width:20px;height:20px;display:block}
+.affirmation-fab .fab-chat-svg{width:23px;height:23px;display:block}
 .affirmation-fab.mode-chat{box-shadow:0 3px 10px rgba(124,58,237,0.4)}
 .affirmation-fab.mode-chat:hover{box-shadow:0 4px 16px rgba(124,58,237,0.5)}
 @media(max-width:768px){
-  .affirmation-fab .fab-chat-svg{width:18px;height:18px}
+  .affirmation-fab .fab-chat-svg{width:21px;height:21px}
 }
 
 /* ════════════ FLOATING AI CHAT (FAB's second function) ════════════════ */
