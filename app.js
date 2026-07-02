@@ -1461,6 +1461,7 @@ async function chatSend() {
 
   _chatStreaming = false;
   _chatUpdateSendBtn(false);
+  _chatAddQuickChips();
   _chatScrollBottom();
   inp.focus();
 }
