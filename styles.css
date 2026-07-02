@@ -3422,7 +3422,7 @@ body{
 .affirmation-count{font-size:10.5px;color:rgba(255,255,255,0.65);font-family:var(--font-mono);margin-top:1px}
 .affirmation-text{
   font-family:var(--font-head);font-style:italic;font-weight:600;color:var(--text);
-  font-size:clamp(14.5px,4vw,17px);line-height:1.48;margin-bottom:18px;
+  font-size:clamp(13px,3.6vw,15.5px);line-height:1.48;margin-bottom:18px;
   max-height:50vh;overflow-y:auto;
 }
 .affirmation-item{display:flex;gap:9px;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--glass-2)}
