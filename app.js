@@ -2695,6 +2695,7 @@ function _renderDetail(id) {
       <div class="form-field"><label class="form-label">PnL <select id="e-pnlunit" class="form-select" style="display:inline-block;width:auto;padding:1px 6px;font-size:11px;margin-left:4px;height:22px;vertical-align:middle"><option value="%"${(!t.pnlUnit||t.pnlUnit==='%')?'selected':''}>%</option><option value="$"${t.pnlUnit==='$'?'selected':''}>$</option></select></label><input type="number" class="form-input" id="e-pnl" step="0.01" value="${t.pnl}"></div>
       <div class="form-field"><label class="form-label">Outcome</label><select class="form-select" id="e-outcome"><option${t.outcome === 'Win' ? ' selected' : ''}>Win</option><option${t.outcome === 'Loss' ? ' selected' : ''}>Loss</option><option${t.outcome === 'B.E' ? ' selected' : ''}>B.E</option></select></div>
       <div class="form-field"><label class="form-label">Killzone</label><select class="form-select" id="e-kz"><option${t.kz === 'London' ? ' selected' : ''}>London</option><option${t.kz === 'New York' ? ' selected' : ''}>New York</option><option${t.kz === 'Asian' ? ' selected' : ''}>Asian</option></select></div>
+      <div class="form-field"><label class="form-label">Risk per Trade</label><input type="text" class="form-input" id="e-risk" value="${t.risk || ''}" placeholder="e.g. 0.5%"></div>
       <div class="form-field" style="grid-column:span 2"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Account <button type="button" onclick="_openManageAccounts()" style="font-size:10px;padding:2px 8px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);color:var(--blue);border-radius:4px;cursor:pointer;font-family:inherit">⚙ Manage</button></label><select class="form-select" id="e-acc">${_buildAccountOptions(t.account)}</select></div>
       <div class="form-field"><label class="form-label">Strategy</label><select class="form-select" id="e-strat" onchange="_handleCustomSelect(this,'e-strat-custom')">${_buildStrategyOptions(t.strategy)}</select><input type="text" class="form-input" id="e-strat-custom" placeholder="Enter strategy name…" style="display:none;margin-top:6px" value="${_getActiveStrategies().find(m=>(m.strategyName||m.title)===t.strategy) ? '' : (t.strategy||'')}"></div>
       <div class="form-field"><label class="form-label">TF Alignment</label><select class="form-select" id="e-tf" onchange="_handleCustomSelect(this,'e-tf-custom')"><option${t.tf === '30m > 3m' ? ' selected' : ''}>30m > 3m</option><option${t.tf === '1h > 5m' ? ' selected' : ''}>1h > 5m</option><option${t.tf === '1h > 3m' ? ' selected' : ''}>1h > 3m</option><option${t.tf === '4h > 15m' ? ' selected' : ''}>4h > 15m</option><option${t.tf === 'D1 > 1h' ? ' selected' : ''}>D1 > 1h</option><option${t.tf === '15m > 1m' ? ' selected' : ''}>15m > 1m</option><option${t.tf === '15m > 3m' ? ' selected' : ''}>15m > 3m</option><option value="__custom__">＋ Custom…</option></select><input type="text" class="form-input" id="e-tf-custom" placeholder="e.g. 2h > 5m" style="display:none;margin-top:6px" value="${['30m > 3m','1h > 5m','1h > 3m','4h > 15m','D1 > 1h','15m > 1m','15m > 3m'].includes(t.tf) ? '' : t.tf}"></div>
@@ -3285,7 +3286,7 @@ async function saveTrade() {
     risk:         document.getElementById('m-risk').value,
     notes:        document.getElementById('m-notes').value,
     pretrade:     document.getElementById('m-pretrade').value,
-    planned_rr:   document.getElementById('m-planned-rr').value.trim() || '',
+    planned_rr:   document.getElementById('m-planned-rr')?.value.trim() || '',
     emotion:      _modalMentalState || 'Focused',
     loss_reason:  lossReasonVal,
     followed_plan: _modalFollowedPlan || 'Yes',
@@ -7339,6 +7340,8 @@ async function _saveEdit(id) {
     t.outcome = correctedOutcome;
   }
   if (kzVal) t.kz = kzVal;
+  const riskVal = get('e-risk');
+  if (riskVal !== null && riskVal.trim()) t.risk = riskVal.trim();
   if (accVal && accVal !== '__custom__') t.account = accVal;
   if (stratVal && stratVal !== '__custom__') t.strategy = stratVal;
   else if (stratVal === '__custom__') { const sc = get('e-strat-custom'); if (sc && sc.trim()) t.strategy = sc.trim(); }
@@ -8331,9 +8334,14 @@ async function _saveCustomAccounts(list) {
 }
 
 function _buildAccountOptions(current) {
-  return _getCustomAccounts().map(a =>
-    `<option value="${a.name}"${a.name === current ? ' selected' : ''}>${a.name}${a.status === 'archived' ? ' (archived)' : ''}</option>`
-  ).join('');
+  const active   = _getActiveAccounts();
+  const archived = _getArchivedAccounts();
+  const opt = a => `<option value="${a.name}"${a.name === current ? ' selected' : ''}>${a.name}</option>`;
+  let html = active.map(opt).join('');
+  if (archived.length) {
+    html += `<optgroup label="Archived">${archived.map(opt).join('')}</optgroup>`;
+  }
+  return html;
 }
 
 function _buildActiveAccountOptions(current) {
