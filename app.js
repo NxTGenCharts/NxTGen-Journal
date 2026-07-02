@@ -3368,6 +3368,10 @@ async function _wlLoad() {
     checklist:   r.checklist || [],
     dailyPlans:  r.daily_plans || {},
   }));
+
+  // Fire-and-forget: clean up any legacy base64 charts in the background
+  // so they don't keep bloating this query on every future load.
+  _wlMigrateBase64Charts();
 }
 
 async function _wlSaveWeek(week) {
@@ -3402,14 +3406,84 @@ async function _wlDeleteWeek(id) {
   return true;
 }
 
-/* ── Upload chart image to Supabase Storage ── */
+/* ── Upload chart image to Supabase Storage ──
+   Compresses client-side first (same as trade charts) so watchlist rows
+   never end up carrying multi-MB payloads — only a short URL is stored. */
 async function _wlUploadChart(file) {
-  const ext  = file.name.split('.').pop();
-  const path = `${_currentUser.id}/wl_${Date.now()}.${ext}`;
-  const { error } = await sb.storage.from('trade-charts').upload(path, file, { upsert: false });
+  const compressed = await _compressChartImage(file);
+  const path = `${_currentUser.id}/wl_${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
+  const { error } = await sb.storage.from('trade-charts')
+    .upload(path, compressed, { upsert: false, contentType: 'image/jpeg' });
   if (error) { console.error('chart upload error:', error.message); return null; }
   const { data } = sb.storage.from('trade-charts').getPublicUrl(path);
   return data.publicUrl;
+}
+
+/* ── Backfill: migrate any base64 chart images already sitting in
+   journal_watchlist rows out to Storage, replacing them with URLs.
+   Runs once after _wlLoad(); safe to call repeatedly (no-op if nothing
+   to migrate). This is what fixes historical slow loads — uploading new
+   charts correctly doesn't help rows that were saved before that. */
+async function _wlMigrateBase64Charts() {
+  if (!_currentUser) return;
+  let migratedAny = false;
+
+  for (const week of _wlData) {
+    let weekChanged = false;
+
+    // Pair charts
+    if (Array.isArray(week.pairs)) {
+      for (const pair of week.pairs) {
+        if (!Array.isArray(pair.charts)) continue;
+        for (const chart of pair.charts) {
+          if (chart && typeof chart.url === 'string' && chart.url.startsWith('data:image')) {
+            const migratedUrl = await _wlMigrateOneBase64Image(chart.url);
+            if (migratedUrl) { chart.url = migratedUrl; weekChanged = true; }
+          }
+        }
+      }
+    }
+
+    // Daily plan charts
+    if (week.dailyPlans) {
+      for (const day of Object.keys(week.dailyPlans)) {
+        const plan = week.dailyPlans[day];
+        if (!plan || !Array.isArray(plan.charts)) continue;
+        for (const chart of plan.charts) {
+          if (chart && typeof chart.url === 'string' && chart.url.startsWith('data:image')) {
+            const migratedUrl = await _wlMigrateOneBase64Image(chart.url);
+            if (migratedUrl) { chart.url = migratedUrl; weekChanged = true; }
+          }
+        }
+      }
+    }
+
+    if (weekChanged) {
+      migratedAny = true;
+      await _wlSaveWeek(week);
+    }
+  }
+
+  if (migratedAny) console.info('Watchlist: migrated legacy base64 chart images to Storage.');
+}
+
+/* Convert a data: URL back to a Blob and upload it, reusing the same
+   compression path as fresh uploads so old bloated base64 gets shrunk too. */
+async function _wlMigrateOneBase64Image(dataUrl) {
+  try {
+    const res  = await fetch(dataUrl);
+    const blob = await res.blob();
+    const compressed = await _compressChartImage(blob);
+    const path = `${_currentUser.id}/wl_migrated_${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
+    const { error } = await sb.storage.from('trade-charts')
+      .upload(path, compressed, { upsert: false, contentType: 'image/jpeg' });
+    if (error) { console.error('chart migration upload error:', error.message); return null; }
+    const { data } = sb.storage.from('trade-charts').getPublicUrl(path);
+    return data.publicUrl;
+  } catch (err) {
+    console.error('chart migration failed:', err.message || err);
+    return null;
+  }
 }
 
 /* ── Quarter key from date ── */
@@ -3972,19 +4046,24 @@ async function _wlHandleDayChartUpload(input, weekId, day) {
   if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '', charts: [] };
   if (!week.dailyPlans[day].charts) week.dailyPlans[day].charts = [];
 
+  let fellBackToBase64 = false;
   for (const file of files) {
-    // Base64 fallback
-    const b64 = await new Promise(resolve => {
-      const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(file);
-    });
-    let finalUrl = b64;
+    let finalUrl = null;
     if (_currentUser) {
-      const remote = await _wlUploadChart(file);
-      if (remote) finalUrl = remote;
+      finalUrl = await _wlUploadChart(file);
+    }
+    if (!finalUrl) {
+      // Storage upload failed (or no user) — base64 is a last resort only,
+      // never the default path, since it bloats the DB row and slows loads.
+      fellBackToBase64 = true;
+      finalUrl = await new Promise(resolve => {
+        const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(file);
+      });
     }
     const label = file.name.replace(/\.[^.]+$/, '');
     week.dailyPlans[day].charts.push({ url: finalUrl, label });
   }
+  if (fellBackToBase64) showToast('Chart upload to cloud storage failed — saved locally instead', 'danger');
   input.value = '';
   await _wlSaveWeek(week);
 
@@ -4840,21 +4919,22 @@ async function _wlHandleChartUpload(input) {
   const btn = document.getElementById('wl-p-save-btn');
   if (btn) { btn.textContent = 'Uploading…'; btn.disabled = true; }
 
+  let fellBackToBase64 = false;
   for (const file of files) {
-    // Convert to base64 data URL as fallback if storage isn't configured
-    const url = await new Promise(resolve => {
-      const r = new FileReader();
-      r.onload = () => resolve(r.result);
-      r.readAsDataURL(file);
-    });
-    // Try Supabase storage first
-    let finalUrl = url;
-    if (_currentUser) {
-      const remoteUrl = await _wlUploadChart(file);
-      if (remoteUrl) finalUrl = remoteUrl;
+    // Try Supabase storage first — base64 is only a last-resort fallback,
+    // since it bloats journal_watchlist rows and slows down every load.
+    let finalUrl = _currentUser ? await _wlUploadChart(file) : null;
+    if (!finalUrl) {
+      fellBackToBase64 = true;
+      finalUrl = await new Promise(resolve => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.readAsDataURL(file);
+      });
     }
     _wlPendingCharts.push({ url: finalUrl, label: file.name.replace(/\.[^.]+$/, '') });
   }
+  if (fellBackToBase64) showToast('Chart upload to cloud storage failed — saved locally instead', 'danger');
   input.value = '';
   if (btn) { btn.textContent = _wlEditingPairIdx !== null ? 'Save Changes' : 'Add to Watchlist'; btn.disabled = false; }
 
@@ -8989,6 +9069,7 @@ async function _profileLoad() {
   if (data) {
     _profileRowId = data.id;
     _profileData  = data;
+    _profileMigrateBase64Avatar(); // fire-and-forget backfill, see below
   } else {
     // First login — seed from auth metadata
     const meta = _currentUser.user_metadata || {};
@@ -9018,6 +9099,29 @@ async function _profileLoad() {
     };
     // Persist the seed immediately
     await _profileSave();
+  }
+}
+
+/* ── Backfill: migrate a legacy base64 avatar_url (from before the
+   compress+Storage path existed) out to Storage. Safe to call repeatedly. */
+async function _profileMigrateBase64Avatar() {
+  if (!_currentUser || !_profileData.avatar_url) return;
+  if (!_profileData.avatar_url.startsWith('data:image')) return;
+  try {
+    const res  = await fetch(_profileData.avatar_url);
+    const blob = await res.blob();
+    const compressed = await _compressChartImage(blob, 400, 0.85);
+    const path = `avatars/${_currentUser.id}/avatar_${Date.now()}.jpg`;
+    const { error } = await sb.storage.from('trade-charts')
+      .upload(path, compressed, { upsert: true, contentType: 'image/jpeg' });
+    if (error) { console.error('avatar migration upload error:', error.message); return; }
+    const { data: urlData } = sb.storage.from('trade-charts').getPublicUrl(path);
+    _profileData.avatar_url = urlData.publicUrl;
+    await _profileSave();
+    _profileApplyAvatar(_profileData.avatar_url);
+    console.info('Profile: migrated legacy base64 avatar to Storage.');
+  } catch (err) {
+    console.error('avatar migration failed:', err.message || err);
   }
 }
 
@@ -9516,28 +9620,31 @@ function _profileRefreshInitials(fname, lname, display) {
   document.querySelectorAll('#topbar-avatar-initials').forEach(el => el.textContent = initials);
 }
 
-function profileHandleAvatar(e) {
+async function profileHandleAvatar(e) {
   const file = e.target.files[0]; if (!file) return;
-  // Upload to Supabase storage
-  const reader = new FileReader();
-  reader.onload = async ev => {
-    const dataUrl = ev.target.result;
-    // Try Supabase storage upload first
-    const ext  = file.name.split('.').pop();
-    const path = `avatars/${_currentUser.id}/avatar.${ext}`;
-    const { error } = await sb.storage.from('trade-charts').upload(path, file, { upsert: true });
-    if (!error) {
-      const { data: urlData } = sb.storage.from('trade-charts').getPublicUrl(path);
-      _profileData.avatar_url = urlData.publicUrl;
-    } else {
-      // Fall back to base64 stored in profile data
-      _profileData.avatar_url = dataUrl;
-    }
-    await _profileSave();
-    _profileApplyAvatar(_profileData.avatar_url);
-    showToast('Avatar updated ✓', 'success');
-  };
-  reader.readAsDataURL(file);
+
+  // Compress (avatars only need to be small — 400px is plenty) and try
+  // Supabase storage upload first. Base64 is a last-resort fallback only,
+  // since it bloats journal_profiles rows and slows down every load.
+  const compressed = await _compressChartImage(file, 400, 0.85);
+  const path = `avatars/${_currentUser.id}/avatar_${Date.now()}.jpg`;
+  const { error } = await sb.storage.from('trade-charts')
+    .upload(path, compressed, { upsert: true, contentType: 'image/jpeg' });
+
+  if (!error) {
+    const { data: urlData } = sb.storage.from('trade-charts').getPublicUrl(path);
+    _profileData.avatar_url = urlData.publicUrl;
+  } else {
+    console.error('avatar upload error:', error.message);
+    _profileData.avatar_url = await new Promise(resolve => {
+      const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(file);
+    });
+    showToast('Avatar upload to cloud storage failed — saved locally instead', 'danger');
+  }
+
+  await _profileSave();
+  _profileApplyAvatar(_profileData.avatar_url);
+  showToast('Avatar updated ✓', 'success');
 }
 
 function _profileRefreshAvatar() {
