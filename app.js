@@ -65,6 +65,36 @@ function toPnlDollars(trade, accSize) {
   return val; // fallback — no conversion possible
 }
 
+// ── Unit-safe display + aggregation helpers ────────────────────────────────
+// BUG FIX (2026-07-02): dozens of places across this file used to display
+// raw `t.pnl` with a hardcoded '%' suffix, and summed raw `t.pnl` across
+// trades to produce "totals". That's wrong whenever a trade's pnlUnit is
+// '$' (real dollar P/L, e.g. MT5 imports or a manually-logged dollar trade)
+// — a dollar figure like -101.76 would get shown as "-101.76%" and summed
+// straight into percentage totals, wrecking every aggregate (AI Coach
+// "All-time PnL", dashboard KPIs, weekly/monthly stats, etc). These two
+// helpers are now the single source of truth for "does this look like %
+// or $, and what should it say / count as". Every display and sum in the
+// file should route through one of these instead of touching t.pnl raw.
+function _pnlLabel(t) {
+  const val = parseFloat(t.pnl) || 0;
+  if (_isMt5Trade(t)) {
+    return (val >= 0 ? '+$' : '-$') + Math.abs(val).toFixed(2);
+  }
+  return (val > 0 ? '+' : '') + val + '%';
+}
+function _pnlPctValue(t) {
+  // Returns the trade's contribution in PERCENT terms for aggregation.
+  // %-denominated trades: their raw value, unchanged.
+  // $-denominated trades (MT5 or pnlUnit:'$'): converted using the
+  // trade's own account size if known, otherwise excluded (0) rather than
+  // silently corrupting the sum the way raw addition used to.
+  if (!_isMt5Trade(t) && t.pnlUnit !== '$') return parseFloat(t.pnl) || 0;
+  const sz = getAccSizeForAccount(t.account);
+  if (sz > 0) return (toPnlDollars(t, sz) / sz) * 100;
+  return 0;
+}
+
 function getAccSizeForAccount(accountName) {
   const acc = _getCustomAccounts ? _getCustomAccounts().find(a => a.name === accountName) : null;
   return parseFloat(acc?.size) || 0;
@@ -583,7 +613,7 @@ function _aiSystemPrompt() {
   const wins  = trades.filter(t => t.outcome === 'Win').length;
   const losses = trades.filter(t => t.outcome === 'Loss').length;
   const wr    = totalTrades ? ((wins / totalTrades) * 100).toFixed(1) : 0;
-  const netPnl = trades.reduce((a, t) => a + t.pnl, 0).toFixed(1);
+  const netPnl = trades.reduce((a, t) => a + _pnlPctValue(t), 0).toFixed(1);
 
   // Emotion breakdown
   const emotionMap = {};
@@ -601,7 +631,7 @@ function _aiSystemPrompt() {
 
   // Recent 10 trades summary
   const recent = [...trades].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).map(t =>
-    `${t.date} ${t.pair} ${t.pos} ${t.outcome} PnL:${t.pnl>0?'+':''}${t.pnl}% Emotion:${t.emotion||'?'} Strategy:${t.strategy||'?'} Notes:"${(t.notes||'').slice(0,80)}"`
+    `${t.date} ${t.pair} ${t.pos} ${t.outcome} PnL:${_pnlLabel(t)} Emotion:${t.emotion||'?'} Strategy:${t.strategy||'?'} Notes:"${(t.notes||'').slice(0,80)}"`
   ).join('\n');
 
   // Today's and this week's trades
@@ -617,7 +647,7 @@ function _aiSystemPrompt() {
   trades.forEach(t => {
     if (!t.emotion) return;
     if (!emotionPnl[t.emotion]) emotionPnl[t.emotion] = { pnl: 0, n: 0, wins: 0 };
-    emotionPnl[t.emotion].pnl  += t.pnl;
+    emotionPnl[t.emotion].pnl  += _pnlPctValue(t);
     emotionPnl[t.emotion].n    += 1;
     if (t.outcome === 'Win') emotionPnl[t.emotion].wins += 1;
   });
@@ -653,7 +683,7 @@ FULL TRADING DATA (${totalTrades} total trades):
 - Emotion frequency: ${emotionSummary}
 - Emotion vs PnL: ${emotionPnlSummary}
 - Rating vs WR: ${ratingSummary}
-- Today's trades (${todayTrades.length}): ${todayTrades.map(t=>`${t.pair} ${t.outcome} ${t.pnl>0?'+':''}${t.pnl}%`).join(', ')||'none'}
+- Today's trades (${todayTrades.length}): ${todayTrades.map(t=>`${t.pair} ${t.outcome} ${_pnlLabel(t)}`).join(', ')||'none'}
 - This week (${weekTrades.length} trades): WR=${weekTrades.length?((weekTrades.filter(t=>t.outcome==='Win').length/weekTrades.length)*100).toFixed(0):0}%
 - This month (${monthTrades.length} trades): WR=${monthTrades.length?((monthTrades.filter(t=>t.outcome==='Win').length/monthTrades.length)*100).toFixed(0):0}%
 
@@ -691,23 +721,23 @@ function _aiUserPrompt(mode, customQuestion) {
   switch (mode) {
     case 'daily':
       return `Give me a complete daily trading brief for today, ${dayName} ${today}.
-I have traded ${todayTrades.length} times today${todayTrades.length ? ': ' + todayTrades.map(t=>`${t.pair} ${t.outcome} ${t.pnl>0?'+':''}${t.pnl}%`).join(', ') : ''}.
+I have traded ${todayTrades.length} times today${todayTrades.length ? ': ' + todayTrades.map(t=>`${t.pair} ${t.outcome} ${_pnlLabel(t)}`).join(', ') : ''}.
 Cover: (1) Assessment of today's session so far, (2) Psychological readiness check based on my emotion history, (3) Key reminders from my rules most relevant right now, (4) What I should focus on for the rest of today or tomorrow's session.`;
 
     case 'weekly':
       const weekWins = weekTrades.filter(t=>t.outcome==='Win').length;
-      const weekPnl  = weekTrades.reduce((a,t)=>a+t.pnl,0).toFixed(1);
+      const weekPnl  = weekTrades.reduce((a,t)=>a+_pnlPctValue(t),0).toFixed(1);
       return `Give me a comprehensive weekly review.
 This week so far: ${weekTrades.length} trades, ${weekWins} wins, WR=${weekTrades.length?((weekWins/weekTrades.length)*100).toFixed(0):0}%, Net PnL=${weekPnl>0?'+':''}${weekPnl}%
-Trades this week: ${weekTrades.map(t=>`${t.date} ${t.pair} ${t.outcome} ${t.pnl>0?'+':''}${t.pnl}% emotion:${t.emotion}`).join(' | ')||'none'}
+Trades this week: ${weekTrades.map(t=>`${t.date} ${t.pair} ${t.outcome} ${_pnlLabel(t)} emotion:${t.emotion}`).join(' | ')||'none'}
 Cover: (1) Week performance grade and summary, (2) Best trade and why, (3) Worst trade and root cause, (4) Psychological patterns this week, (5) Rule violations if any, (6) What to focus on next week.`;
 
     case 'monthly':
       const mWins = monthTrades.filter(t=>t.outcome==='Win').length;
-      const mPnl  = monthTrades.reduce((a,t)=>a+t.pnl,0).toFixed(1);
+      const mPnl  = monthTrades.reduce((a,t)=>a+_pnlPctValue(t),0).toFixed(1);
       return `Give me a deep monthly review for ${monthKey}.
 Month stats: ${monthTrades.length} trades, WR=${monthTrades.length?((mWins/monthTrades.length)*100).toFixed(0):0}%, Net PnL=${mPnl>0?'+':''}${mPnl}%
-Full trade list: ${monthTrades.map(t=>`${t.date} ${t.pair} ${t.pos} ${t.outcome} PnL:${t.pnl>0?'+':''}${t.pnl}% strategy:${t.strategy} emotion:${t.emotion} notes:"${(t.notes||'').slice(0,60)}"`).join('\n')}
+Full trade list: ${monthTrades.map(t=>`${t.date} ${t.pair} ${t.pos} ${t.outcome} PnL:${_pnlLabel(t)} strategy:${t.strategy} emotion:${t.emotion} notes:"${(t.notes||'').slice(0,60)}"`).join('\n')}
 Cover: (1) Month grade and verdict, (2) Strategy performance breakdown, (3) Session breakdown, (4) Psychology and emotional analysis, (5) Loss audit — root causes, (6) Plan adjustments for next month, (7) Progress toward quarterly goals.`;
 
     case 'pattern':
@@ -1018,7 +1048,7 @@ function _aiRenderContextPanel(mode) {
   const total      = trades.length;
   const wins       = trades.filter(t => t.outcome === 'Win').length;
   const wr         = total ? ((wins / total) * 100).toFixed(1) : 0;
-  const netPnl     = trades.reduce((a, t) => a + t.pnl, 0).toFixed(1);
+  const netPnl     = trades.reduce((a, t) => a + _pnlPctValue(t), 0).toFixed(1);
   const todayTrades = trades.filter(t => t.date === today);
   const weekTrades  = trades.filter(t => t.date >= weekStart);
   const monthTrades = trades.filter(t => t.date.startsWith(monthKey));
@@ -1030,7 +1060,9 @@ function _aiRenderContextPanel(mode) {
   const weekWins  = weekTrades.filter(t => t.outcome === 'Win').length;
   const monthWins = monthTrades.filter(t => t.outcome === 'Win').length;
   const qWins     = qTrades.filter(t => t.outcome === 'Win').length;
-  const qPnl      = qTrades.reduce((a, t) => a + t.pnl, 0).toFixed(1);
+  const weekPnl   = weekTrades.reduce((a, t) => a + _pnlPctValue(t), 0);
+  const monthPnl  = monthTrades.reduce((a, t) => a + _pnlPctValue(t), 0);
+  const qPnl      = qTrades.reduce((a, t) => a + _pnlPctValue(t), 0).toFixed(1);
 
   // Last emotion
   const lastEmotion = [...trades].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,1)[0]?.emotion || '—';
@@ -1056,7 +1088,7 @@ function _aiRenderContextPanel(mode) {
       <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">
         ${stat('Trades', weekTrades.length, 'blue')}
         ${stat('WR', weekTrades.length ? ((weekWins/weekTrades.length)*100).toFixed(0)+'%' : '—', weekTrades.length && weekWins/weekTrades.length >= 0.6 ? 'green' : 'red')}
-        ${stat('Net PnL', weekTrades.length ? (weekTrades.reduce((a,t)=>a+t.pnl,0)>=0?'+':'')+weekTrades.reduce((a,t)=>a+t.pnl,0).toFixed(1)+'%' : '—', weekTrades.reduce((a,t)=>a+t.pnl,0) >= 0 ? 'green' : 'red')}
+        ${stat('Net PnL', weekTrades.length ? (weekPnl>=0?'+':'')+weekPnl.toFixed(1)+'%' : '—', weekPnl >= 0 ? 'green' : 'red')}
         ${stat('Losses', weekTrades.filter(t=>t.outcome==='Loss').length)}
       </div>`,
 
@@ -1065,7 +1097,7 @@ function _aiRenderContextPanel(mode) {
       <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">
         ${stat('Trades', monthTrades.length, 'blue')}
         ${stat('WR', monthTrades.length ? ((monthWins/monthTrades.length)*100).toFixed(0)+'%' : '—', monthTrades.length && monthWins/monthTrades.length >= 0.6 ? 'green' : 'red')}
-        ${stat('PnL', monthTrades.length ? (monthTrades.reduce((a,t)=>a+t.pnl,0)>=0?'+':'')+monthTrades.reduce((a,t)=>a+t.pnl,0).toFixed(1)+'%' : '—', monthTrades.reduce((a,t)=>a+t.pnl,0) >= 0 ? 'green' : 'red')}
+        ${stat('PnL', monthTrades.length ? (monthPnl>=0?'+':'')+monthPnl.toFixed(1)+'%' : '—', monthPnl >= 0 ? 'green' : 'red')}
         ${stat('Q' + curQ + ' trades', qTrades.length, 'purple')}
         ${stat('Q' + curQ + ' PnL', (parseFloat(qPnl)>=0?'+':'')+qPnl+'%', parseFloat(qPnl)>=0?'green':'red')}
       </div>`,
@@ -1085,7 +1117,7 @@ function _aiRenderContextPanel(mode) {
       trades.forEach(t => { if(t.emotion) emotionMap[t.emotion] = (emotionMap[t.emotion]||0)+1; });
       const topEmotion = Object.entries(emotionMap).sort((a,b)=>b[1]-a[1])[0];
       const negCount = trades.filter(t => ['Anxious','Fearful','Greedy','Revenge','Impatient'].includes(t.emotion)).length;
-      const negPnl = trades.filter(t => ['Anxious','Fearful','Greedy','Revenge','Impatient'].includes(t.emotion)).reduce((a,t)=>a+t.pnl,0).toFixed(1);
+      const negPnl = trades.filter(t => ['Anxious','Fearful','Greedy','Revenge','Impatient'].includes(t.emotion)).reduce((a,t)=>a+_pnlPctValue(t),0).toFixed(1);
       return `
         <strong style="color:var(--text);font-size:12px">Psychology Snapshot</strong><br>
         <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">
@@ -1600,7 +1632,7 @@ function _chatHandleStats() {
   const total = trades.length;
   const wins  = trades.filter(t => t.outcome === 'Win').length;
   const wr    = total ? ((wins / total) * 100).toFixed(1) : 0;
-  const pnl   = trades.reduce((a, t) => a + t.pnl, 0).toFixed(1);
+  const pnl   = trades.reduce((a, t) => a + _pnlPctValue(t), 0).toFixed(1);
   const today = localToday();
   const todayT = trades.filter(t => t.date === today);
   return `**Quick Stats — ${today}**\n\n` +
@@ -2439,7 +2471,7 @@ function renderTradeTable(list) {
       <td class="bold">${t.pair}</td>
       <td><span class="${posC}">${t.pos}</span></td>
       <td class="mono">${t.rr}</td>
-      <td class="${pnlC} mono">${t.pnl > 0 ? '+' : ''}${t.pnl}%</td>
+      <td class="${pnlC} mono">${_pnlLabel(t)}</td>
       <td class="${outC}">${t.outcome}</td>
       <td>${kzPill(t.kz)}</td>
       <td style="color:var(--text2);font-size:12px">${t.strategy || '—'}</td>
@@ -2453,11 +2485,7 @@ function renderTradeTable(list) {
   }).join('') : _emptyRow(12, '📋 No trades match your filter — try adjusting the search or filters above');
   const countEl = document.getElementById('trade-count');
   if (countEl) {
-    const sumPct = list.reduce((a, t) => {
-      const accSize = getAccSizeForAccount(t.account);
-      if (accSize > 0) return a + (toPnlDollars(t, accSize) / accSize) * 100;
-      return a + (!_isMt5Trade(t) && t.pnlUnit !== '$' ? (parseFloat(t.pnl) || 0) : 0);
-    }, 0);
+    const sumPct = list.reduce((a, t) => a + _pnlPctValue(t), 0);
     countEl.textContent = `Showing ${list.length} of ${trades.length} trades · Sum PnL: ${sumPct.toFixed(1)}%`;
   }
   _updateBulkBar();
@@ -2526,10 +2554,10 @@ function filterTable() {
 function exportTradesToCSV() {
   const list = _lastFilteredList.length ? _lastFilteredList : trades;
   if (!list.length) { showToast('No trades to export', 'danger'); return; }
-  const headers = ['Date','Pair','Position','R:R','PnL%','Outcome','Killzone','Strategy','Account','Rating','Notes','Emotion'];
+  const headers = ['Date','Pair','Position','R:R','PnL','Outcome','Killzone','Strategy','Account','Rating','Notes','Emotion'];
   const rows = list.map(t => [
     t.date, t.pair, t.pos, t.rr,
-    (t.pnl > 0 ? '+' : '') + t.pnl + '%',
+    _pnlLabel(t),
     t.outcome, t.kz, t.strategy || '',
     t.account, t.rating,
     '"' + (t.notes || '').replace(/"/g, '""') + '"',
@@ -5900,10 +5928,10 @@ function buildGoals() {
   const pbTbody = document.getElementById('goals-pb-tbody');
   if (pbTbody) {
     const wins = trades.filter(t => t.pnl > 0);
-    const bigWin = wins.length ? wins.reduce((a, b) => b.pnl > a.pnl ? b : a, wins[0]) : null;
+    const bigWin = wins.length ? wins.reduce((a, b) => _pnlPctValue(b) > _pnlPctValue(a) ? b : a, wins[0]) : null;
     // Best month
     const monthMap = {};
-    trades.forEach(t => { const k = t.date.slice(0,7); monthMap[k] = (monthMap[k]||0)+t.pnl; });
+    trades.forEach(t => { const k = t.date.slice(0,7); monthMap[k] = (monthMap[k]||0)+_pnlPctValue(t); });
     const bestMonthKey = Object.keys(monthMap).sort((a,b) => monthMap[b]-monthMap[a])[0];
     // Streak
     const sorted = [...trades].sort((a,b) => a.date.localeCompare(b.date));
@@ -5914,7 +5942,7 @@ function buildGoals() {
     const bestRR = rrAll.length ? rrAll.reduce((a,b)=>b.v>a.v?b:a,rrAll[0]) : null;
 
     pbTbody.innerHTML = [
-      bigWin  ? `<tr><td>Biggest Win %</td><td class="outcome-win mono">+${bigWin.pnl.toFixed(1)}%</td><td>${bigWin.date}</td><td class="bold">${bigWin.pair}</td></tr>` : '',
+      bigWin  ? `<tr><td>Biggest Win %</td><td class="outcome-win mono">${_pnlLabel(bigWin)}</td><td>${bigWin.date}</td><td class="bold">${bigWin.pair}</td></tr>` : '',
       bestMonthKey ? `<tr><td>Best Month PnL</td><td class="outcome-win mono">+${monthMap[bestMonthKey].toFixed(1)}%</td><td>${bestMonthKey}</td><td>—</td></tr>` : '',
       maxStreak ? `<tr><td>Longest Win Streak</td><td class="outcome-win mono">${maxStreak} trades</td><td>—</td><td>—</td></tr>` : '',
       bestRR  ? `<tr><td>Best R:R Achieved</td><td class="outcome-win mono">1:${bestRR.v}</td><td>${bestRR.t.date}</td><td class="bold">${bestRR.t.pair}</td></tr>` : '',
@@ -6613,7 +6641,7 @@ function updateKPIs() {
       const ratingStats = [3, 4, 5].map(r => {
         const rt = trades.filter(t => t.rating === r);
         const rw = rt.filter(t => t.outcome === 'Win').length;
-        const rpnl = rt.reduce((a, t) => a + t.pnl, 0);
+        const rpnl = rt.reduce((a, t) => a + _pnlPctValue(t), 0);
         return { r, n: rt.length, wr: rt.length ? (rw / rt.length) * 100 : null, avgPnl: rt.length ? rpnl / rt.length : null };
       }).filter(r => r.n >= 2);
 
@@ -7119,7 +7147,7 @@ function renderQuarterPage(year, q) {
   const losses = qt.filter(t => t.outcome === 'Loss').length;
   const bes = qt.filter(t => t.outcome === 'B.E').length;
   const wr = qt.length ? ((wins / qt.length) * 100).toFixed(1) : 0;
-  const netPnl = qt.reduce((a, t) => a + t.pnl, 0).toFixed(1);
+  const netPnl = qt.reduce((a, t) => a + _pnlPctValue(t), 0).toFixed(1);
   // Compute dollar PnL per trade using its account size for correct avg
   const qtDollars  = qt.map(t => toPnlDollars(t, getAccSizeForAccount(t.account)));
   const netDollarsQ = qtDollars.reduce((a, b) => a + b, 0);
@@ -7319,7 +7347,7 @@ function _confirmDelete(id) {
   if (!area) return;
   area.innerHTML = `
     <div class="del-confirm" style="margin-top:14px">
-      <div class="del-confirm-text">Move <strong>${t.pair}</strong> (${t.date}, ${t.pnl > 0 ? '+' : ''}${t.pnl}%) to Trash?<br><span style="font-size:11px;color:var(--text3)">You can restore it from Trash anytime.</span></div>
+      <div class="del-confirm-text">Move <strong>${t.pair}</strong> (${t.date}, ${_pnlLabel(t)}) to Trash?<br><span style="font-size:11px;color:var(--text3)">You can restore it from Trash anytime.</span></div>
       <div class="del-confirm-btns">
         <button class="del-no" onclick="document.getElementById('del-confirm-area').innerHTML=''">Cancel</button>
         <button class="del-yes" onclick="_executeSoftDelete(${id})">🗑 Move to Trash</button>
@@ -7674,7 +7702,7 @@ function renderTrash() {
         <div class="trash-card-meta">${t.date} · ${t.kz || '—'} · ${t.strategy || 'No strategy'} · ${t.account}</div>
         <div class="trash-card-meta" style="color:var(--text3)">Deleted: ${delDate}</div>
       </div>
-      <div class="trash-card-pnl ${pnlC}" style="min-width:52px;text-align:right">${t.pnl > 0 ? '+' : ''}${t.pnl}%</div>
+      <div class="trash-card-pnl ${pnlC}" style="min-width:52px;text-align:right">${_pnlLabel(t)}</div>
       <div class="trash-card-actions">
         <button class="glass-btn glass-btn-restore" style="font-size:11px;padding:5px 12px" onclick="event.stopPropagation();restoreTrade('${origId}')">↩ Restore</button>
         <button class="glass-btn glass-btn-danger" style="font-size:11px;padding:5px 10px" onclick="event.stopPropagation();permanentDelete('${origId}')">✕</button>
@@ -7692,7 +7720,7 @@ async function quickDelete(id) {
   if (!t) return;
   openGlassModal({
     icon: '🗑', title: 'Move to Trash?',
-    body: `<div class="glass-modal-trade-pill"><span class="${t.pos === 'Buy' ? 'pos-buy' : 'pos-sell'}">${t.pos}</span><strong>${t.pair}</strong><span style="color:var(--text3)">${t.date}</span><span class="${t.pnl >= 0 ? 'outcome-win' : 'outcome-loss'}">${t.pnl > 0 ? '+' : ''}${t.pnl}%</span></div><div style="font-size:12px;color:var(--text3);margin-top:6px">Trade will be kept in Trash for ${trashSettings.autoDays} days. Restore anytime.</div>`,
+    body: `<div class="glass-modal-trade-pill"><span class="${t.pos === 'Buy' ? 'pos-buy' : 'pos-sell'}">${t.pos}</span><strong>${t.pair}</strong><span style="color:var(--text3)">${t.date}</span><span class="${t.pnl >= 0 ? 'outcome-win' : 'outcome-loss'}">${_pnlLabel(t)}</span></div><div style="font-size:12px;color:var(--text3);margin-top:6px">Trade will be kept in Trash for ${trashSettings.autoDays} days. Restore anytime.</div>`,
     confirmLabel: 'Move to Trash', confirmClass: 'glass-btn-danger',
     onConfirm: async () => {
       const ok = await _cloudSoftDelete(t);
@@ -7765,7 +7793,7 @@ function permanentDelete(originalId) {
   if (!t) { showToast('Trade not found', 'danger'); return; }
   openGlassModal({
     icon: '⚠️', title: 'Permanently Delete?',
-    body: `<div class="glass-modal-trade-pill"><strong>${t.pair}</strong><span style="color:var(--text3)">${t.date}</span><span class="${t.pnl >= 0 ? 'outcome-win' : 'outcome-loss'}">${t.pnl > 0 ? '+' : ''}${t.pnl}%</span></div><div style="font-size:12px;color:var(--red);margin-top:8px;font-weight:500">This cannot be undone.</div>`,
+    body: `<div class="glass-modal-trade-pill"><strong>${t.pair}</strong><span style="color:var(--text3)">${t.date}</span><span class="${t.pnl >= 0 ? 'outcome-win' : 'outcome-loss'}">${_pnlLabel(t)}</span></div><div style="font-size:12px;color:var(--red);margin-top:8px;font-weight:500">This cannot be undone.</div>`,
     confirmLabel: 'Delete Forever', confirmClass: 'glass-btn-danger',
     onConfirm: async () => {
       await _cloudPermDelete(t.originalId || t.id);
@@ -8778,9 +8806,13 @@ function smPopulateCard(id) {
 function smRefreshPnl() {
   const t=trades.find(x=>x.id===_shareTradeId); if(!t) return;
   const pnlBlock=document.getElementById('sm-pnl-block'); if(!pnlBlock) return;
-  const sign=t.pnl>=0?'+':'', pctStr=sign+t.pnl+'%';
   const acctSize=parseFloat(document.getElementById('sm-acct-size')?.value||5000);
-  const usdVal=(t.pnl/100)*acctSize, usdSign=usdVal>=0?'+':'';
+  // Unit-safe: $-denominated trades (MT5 etc) use the real dollar value directly;
+  // %-denominated trades convert against the user-adjustable share-card account size.
+  const usdVal = _isMt5Trade(t) ? (parseFloat(t.pnl)||0) : (acctSize > 0 ? (parseFloat(t.pnl)||0)/100*acctSize : 0);
+  const pct = acctSize > 0 ? (usdVal / acctSize) * 100 : (parseFloat(t.pnl)||0);
+  const pctStr = (pct>=0?'+':'') + pct.toFixed(2) + '%';
+  const usdSign=usdVal>=0?'+':'';
   const usdStr=usdSign+'$'+Math.abs(usdVal).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   const cls=t.pnl>0?'pnl-win':t.pnl<0?'pnl-loss':'pnl-be';
   if(_sharePnlMode==='pct') pnlBlock.innerHTML=`<span class="sm-pnl-main ${cls}">${pctStr}</span>`;
@@ -9487,9 +9519,9 @@ function profileExportJSON() {
 
 function profileExportCSV() {
   if (!trades.length) { showToast('No trades to export', 'danger'); return; }
-  const hdr  = ['Date','Pair','Position','R:R','PnL%','Outcome','Killzone','Strategy','TF','Account','Rating','Risk','Notes'];
+  const hdr  = ['Date','Pair','Position','R:R','PnL','Outcome','Killzone','Strategy','TF','Account','Rating','Risk','Notes'];
   const rows = trades.map(t => [
-    t.date,t.pair,t.pos,t.rr,t.pnl,t.outcome,t.kz,
+    t.date,t.pair,t.pos,t.rr,_pnlLabel(t),t.outcome,t.kz,
     t.strategy||'',t.tf||'',t.account||'',t.rating||'',t.risk||'',
     (t.notes||'').replace(/"/g,'""')
   ].map(v=>`"${v}"`).join(','));
