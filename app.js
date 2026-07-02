@@ -804,7 +804,12 @@ function aiChipClick(btn) {
 
 /* ── Chart upload handling ── */
 async function aiHandleChartUpload(input) {
-  const files = Array.from(input.files);
+  await _aiIngestChartFiles(input.files);
+  input.value = '';
+}
+
+async function _aiIngestChartFiles(fileList) {
+  const files = Array.from(fileList || []).filter(f => f.type.startsWith('image/'));
   for (const file of files) {
     const dataUrl = await new Promise(resolve => {
       const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(file);
@@ -812,8 +817,23 @@ async function aiHandleChartUpload(input) {
     const mimeType = file.type || 'image/jpeg';
     _aiChartImages.push({ dataUrl, mimeType, name: file.name });
   }
-  input.value = '';
   _aiRenderChartThumbs();
+}
+
+// Drag-and-drop support for the Chart Read upload zone (was previously
+// click-to-upload only — the zone had no ondragover/ondrop wired up).
+function aiChartDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+function aiChartDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+function aiChartDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const files = e.dataTransfer?.files;
+  if (files && files.length) _aiIngestChartFiles(files);
 }
 
 function _aiRenderChartThumbs() {
@@ -1249,7 +1269,7 @@ function _chatAddQuickChips() {
   div.innerHTML = [
     'Give me a daily brief', 'Analyse my psychology', 'What\'s my strongest edge?',
     'Review this week', 'How is my risk management?'
-  ].map(q => `<button class="chat-quick-chip" onclick="chatQuickSend(this,'${q.replace(/'/g,"\\'")}'">${q}</button>`).join('');
+  ].map(q => `<button class="chat-quick-chip" onclick="chatQuickSend(this,'${q.replace(/'/g,"\\'")}')">${q}</button>`).join('');
   msgs.appendChild(div);
 }
 
@@ -1257,8 +1277,12 @@ function chatQuickSend(btn, text) {
   const existing = document.getElementById('chat-quick-chips');
   if (existing) existing.remove();
   const inp = document.getElementById('chat-input');
-  if (inp) inp.value = text;
-  chatSend();
+  if (inp) {
+    inp.value = text;
+    inp.focus();
+    // Trigger auto-resize since we're setting the value programmatically
+    if (typeof chatInputChange === 'function') chatInputChange(inp);
+  }
 }
 
 /* ── Input auto-resize & slash command palette ── */

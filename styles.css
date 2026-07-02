@@ -1253,6 +1253,12 @@ body{
   border-color: rgba(167,139,250,0.55);
   background: rgba(167,139,250,0.08);
 }
+.ai-chart-upload-zone.drag-over {
+  border-color: var(--purple, #a78bfa);
+  border-style: solid;
+  background: rgba(167,139,250,0.14);
+  box-shadow: 0 0 0 2px rgba(167,139,250,0.25);
+}
 .ai-upload-icon { font-size: 32px; margin-bottom: 10px; }
 .ai-upload-text { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
 .ai-upload-hint { font-size: 11px; color: var(--text3); font-family: var(--font-mono); }

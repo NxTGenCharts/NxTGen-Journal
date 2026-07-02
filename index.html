@@ -710,7 +710,10 @@
         <!-- Chart upload (only visible in chart mode) -->
         <div class="ai-chart-upload-wrap" id="ai-chart-upload-wrap" style="display:none">
           <div class="ai-chart-upload-zone" id="ai-chart-upload-zone"
-               onclick="document.getElementById('ai-chart-file').click()">
+               onclick="document.getElementById('ai-chart-file').click()"
+               ondragover="aiChartDragOver(event)"
+               ondragleave="aiChartDragLeave(event)"
+               ondrop="aiChartDrop(event)">
             <div class="ai-upload-icon">📸</div>
             <div class="ai-upload-text">Drop chart screenshots here or click to upload</div>
             <div class="ai-upload-hint">Supports PNG, JPG, WebP · Multiple files OK</div>
