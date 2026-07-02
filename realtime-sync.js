@@ -20,6 +20,10 @@
 
   // ─── Toast ────────────────────────────────────────────────────────────────
   function _showSyncToast(msg) {
+    // Don't toast while the tab is backgrounded/hidden — sync still happens,
+    // it just shouldn't interrupt with a visible notification.
+    if (document.visibilityState !== 'visible') return;
+
     let toast = document.getElementById('rt-sync-toast');
     if (!toast) {
       toast = document.createElement('div');
@@ -92,6 +96,19 @@
     };
   }
 
+  // ─── Is this row's account archived? Archived accounts should sync data
+  //     silently (so imports still land) but never surface a toast. ─────────
+  function _isArchivedAccount(accountName) {
+    if (!accountName) return false;
+    if (typeof _getCustomAccounts !== 'function') return false;
+    try {
+      const acc = _getCustomAccounts().find(function (a) { return a.name === accountName; });
+      return !!(acc && acc.status === 'archived');
+    } catch (e) {
+      return false;
+    }
+  }
+
   function _mapDeletedRow(row) {
     return Object.assign(_mapRow(row), {
       deletedAt:  row.deleted_at,
@@ -140,7 +157,7 @@
       trades.push(_mapRow(row));
       _syncTradeState(row);
       _scheduleRender('trades', _renderTradePanels);
-      _showSyncToast('⚡ New trade synced');
+      if (!_isArchivedAccount(row.account)) _showSyncToast('⚡ New trade synced');
 
     } else if (payload.eventType === 'UPDATE') {
       const row = payload.new;
@@ -153,7 +170,7 @@
       }
       _syncTradeState(row);
       _scheduleRender('trades', _renderTradePanels);
-      _showSyncToast('⚡ Trade updated');
+      if (!_isArchivedAccount(row.account)) _showSyncToast('⚡ Trade updated');
 
     } else if (payload.eventType === 'DELETE') {
       const id = payload.old.id;
@@ -186,7 +203,7 @@
         _renderTradePanels();
         if (typeof renderTrash === 'function') renderTrash();
       });
-      _showSyncToast('⚡ Trade moved to trash');
+      if (!_isArchivedAccount(row.account)) _showSyncToast('⚡ Trade moved to trash');
 
     } else if (payload.eventType === 'DELETE') {
       // Permanently deleted or restored — remove from deletedTrades
