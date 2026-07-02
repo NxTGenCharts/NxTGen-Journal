@@ -8353,10 +8353,10 @@ div[style*="data-table"] .data-table-wrap,
    54. COVER BANNER — Animated shimmer effect (overlay)
    ──────────────────────────────────────────────────────────────── */
 @keyframes coverShimmer {
-  0%   { background-position: -200% center; opacity: 0; }
+  0%   { background-position: 200% 0; opacity: 0; }
   10%  { opacity: 1; }
   90%  { opacity: 1; }
-  100% { background-position: 200% center; opacity: 0; }
+  100% { background-position: -200% 0; opacity: 0; }
 }
 
 .cover::after {
@@ -8369,7 +8369,7 @@ div[style*="data-table"] .data-table-wrap,
     rgba(255,255,255,0.08) 50%,
     rgba(255,255,255,0.04) 55%,
     transparent 100%);
-  background-size: 300% 100%;
+  background-size: 200% 100%;
   border-radius: inherit;
   pointer-events: none;
   animation: coverShimmer 6s ease-in-out infinite;
@@ -8382,7 +8382,7 @@ div[style*="data-table"] .data-table-wrap,
     transparent 0%,
     rgba(255,255,255,0.12) 50%,
     transparent 100%);
-  background-size: 300% 100%;
+  background-size: 200% 100%;
   animation: coverShimmer 7s ease-in-out infinite;
   animation-delay: 1.5s;
 }
