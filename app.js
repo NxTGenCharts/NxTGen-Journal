@@ -8895,6 +8895,11 @@ function openShareModal(id) {
     </div>
   </div>`;
   document.body.appendChild(overlay);
+  // Lock background scroll so the page can't move/rubber-band behind the
+  // fixed overlay on mobile — this was the main cause of the modal
+  // jumping/glitching in compact (address-bar-hidden) view.
+  document.body.style.overflow = 'hidden';
+  document.body.style.touchAction = 'none';
   requestAnimationFrame(() => { overlay.style.display = 'flex'; requestAnimationFrame(() => overlay.classList.add('open')); });
   _smEnsureLibs(() => smPopulateCard(id));
 }
@@ -8940,7 +8945,7 @@ function smRefreshPnl() {
 function smSetPnlMode(mode,btn){_sharePnlMode=mode;document.querySelectorAll('#sm-pnl-seg .sm-seg-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const r=document.getElementById('sm-usd-row');if(r)r.style.display=mode==='pct'?'none':'';smRefreshPnl();}
 function smSetFmt(fmt,btn){_shareFmt=fmt;document.querySelectorAll('.sm-fmt-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
 function smToggleTheme(){_shareCardTheme=_shareCardTheme==='dark'?'light':'dark';const c=document.getElementById('sm-card');if(c)c.className='sm-card '+_shareCardTheme;const b=document.getElementById('sm-theme-btn');if(b)b.textContent=_shareCardTheme==='dark'?'☀️':'🌙';}
-function closeShareModal(){const o=document.getElementById('share-modal-overlay');if(!o)return;o.classList.remove('open');setTimeout(()=>o.remove(),260);}
+function closeShareModal(){const o=document.getElementById('share-modal-overlay');if(!o)return;o.classList.remove('open');document.body.style.overflow='';document.body.style.touchAction='';setTimeout(()=>o.remove(),260);}
 function _smSetLoading(btnId,spinId,lblId,on,lbl){const btn=document.getElementById(btnId),sp=document.getElementById(spinId),lb=document.getElementById(lblId);if(!btn)return;btn.disabled=on;if(sp)sp.classList.toggle('active',on);if(lb){lb.style.opacity=on?'0':'1';if(lbl&&!on)lb.textContent=lbl;}}
 
 // ── Pre-baked logo PNGs: generated from logo.svg at build time ──

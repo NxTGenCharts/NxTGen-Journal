@@ -5322,6 +5322,8 @@ body{
 #share-modal-overlay {
   position: fixed;
   inset: 0;
+  height: 100vh;
+  height: 100dvh;
   background: rgba(4,8,18,0.80);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -5332,7 +5334,12 @@ body{
   padding: 16px;
   opacity: 0;
   transition: opacity 0.22s ease;
-  overflow-y: auto;
+  /* The overlay itself no longer scrolls — only .sm-modal does. Letting both
+     the overlay AND the modal scroll on mobile is what caused the layout to
+     jump/glitch (rubber-banding, the header appearing detached from the
+     card) whenever the browser's address bar showed/hid in compact view. */
+  overflow: hidden;
+  overscroll-behavior: contain;
 }
 #share-modal-overlay.open { opacity: 1; }
 [data-theme="light"] #share-modal-overlay { background: rgba(15,23,42,0.65); }
@@ -5340,6 +5347,9 @@ body{
 .sm-modal {
   width: 100%;
   max-width: 560px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
   background: var(--bg2);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-lg, 14px);
@@ -5363,6 +5373,7 @@ body{
   padding: 15px 20px;
   border-bottom: 1px solid var(--glass-border);
   background: var(--glass-1);
+  flex-shrink: 0;
 }
 [data-theme="light"] .sm-header { border-color: rgba(0,0,0,0.07); background: rgba(0,0,0,0.02); }
 .sm-title { display: flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
@@ -5383,7 +5394,15 @@ body{
 .sm-close-btn:hover { background: rgba(248,113,113,0.15); color: var(--red); border-color: rgba(248,113,113,0.35); }
 [data-theme="light"] .sm-icon-btn { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.09); color: var(--text); }
 
-.sm-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; }
+.sm-body {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
 .sm-card-wrap { display: flex; justify-content: center; }
 
 /* ── Card ── */
@@ -5591,6 +5610,18 @@ body{
 @keyframes sm-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 520px) {
+  /* On mobile, dock the modal to a bottom-sheet-style layout with a fixed
+     viewport-relative cap instead of relying on centered auto-height —
+     this is what stopped it from jumping/glitching when the browser's
+     address bar collapses (compact view) and the visible viewport height
+     changes mid-interaction. */
+  #share-modal-overlay { padding: 0; align-items: flex-end; }
+  .sm-modal {
+    max-height: 92vh;
+    max-height: 92dvh;
+    border-radius: 14px 14px 0 0;
+    margin: 0;
+  }
   .sm-body { padding: 12px; gap: 12px; }
   .sm-pair { font-size: 30px; }
   .sm-pnl-main { font-size: 28px; letter-spacing: 0.4px; }
@@ -5605,6 +5636,12 @@ body{
   .sm-actions { grid-template-columns: 1fr; }
   .sm-fmt-row  { grid-template-columns: 1fr; }
   .view-stats-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  /* Heavy backdrop-filter blur combined with a fixed overlay is a common
+     source of repaint glitches/flicker on Android Chrome & mobile Safari.
+     Lighten it on small screens where it's most noticeable. */
+  #share-modal-overlay { backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 }
 
 /* ══════════════════════════════════════════════════════
