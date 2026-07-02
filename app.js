@@ -9236,6 +9236,10 @@ const _FAB_CHAT_SVG = `<svg class="fab-chat-svg" viewBox="0 0 24 24" xmlns="http
   <circle cx="12.4" cy="9.7" r="1.15" fill="#7c3aed"/>
   <circle cx="16.4" cy="9.7" r="1.15" fill="#7c3aed"/>
 </svg>`;
+const _FAB_AFF_SVG = `<svg class="fab-aff-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <path d="M12.3 2.6c.15-.5.86-.5 1.01 0l1.44 4.83c.5 1.68 1.82 3 3.5 3.5l4.83 1.44c.5.15.5.86 0 1.01l-4.83 1.44c-1.68.5-3 1.82-3.5 3.5l-1.44 4.83c-.15.5-.86.5-1.01 0l-1.44-4.83c-.5-1.68-1.82-3-3.5-3.5L2.53 13.4c-.5-.15-.5-.86 0-1.01l4.83-1.44c1.68-.5 3-1.82 3.5-3.5l1.44-4.83z" fill="#fff"/>
+  <path d="M19 2.2c.09-.3.5-.3.58 0l.5 1.7c.15.5.54.9 1.05 1.05l1.7.5c.3.09.3.5 0 .58l-1.7.5c-.5.15-.9.54-1.05 1.05l-.5 1.7c-.09.3-.5.3-.58 0l-.5-1.7c-.15-.5-.54-.9-1.05-1.05l-1.7-.5c-.3-.09-.3-.5 0-.58l1.7-.5c.5-.15.9-.54 1.05-1.05l.5-1.7z" fill="#fff" opacity=".82"/>
+</svg>`;
 function _renderFabIcon(el) {
   if (!el) return;
   const mode = _getFabMode();
@@ -9244,7 +9248,7 @@ function _renderFabIcon(el) {
     el.classList.add('mode-chat');
     el.title = 'Tap for AI Chat · tap again for Daily Affirmations';
   } else {
-    el.innerHTML = '✨';
+    el.innerHTML = _FAB_AFF_SVG;
     el.classList.remove('mode-chat');
     el.title = 'Tap for Daily Affirmations · tap again for AI Chat';
   }

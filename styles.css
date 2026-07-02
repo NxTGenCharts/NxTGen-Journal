@@ -3441,11 +3441,11 @@ body{
 .affirmation-close-btn:hover{filter:brightness(1.1)}
 .affirmation-fab{
   position:fixed;right:20px;bottom:88px;
-  width:52px;height:52px;border-radius:50%;
+  width:54px;height:54px;border-radius:50%;
   background:linear-gradient(135deg,var(--blue) 0%,var(--purple) 100%);
   border:1px solid var(--glass-border);
   box-shadow:0 3px 10px rgba(0,0,0,0.3);
-  font-size:23px;cursor:grab;
+  font-size:25px;cursor:grab;
   display:flex;align-items:center;justify-content:center;
   z-index:600;transition:box-shadow .15s ease,transform .15s ease;
   touch-action:none;user-select:none;-webkit-user-select:none;
@@ -3453,16 +3453,19 @@ body{
 .affirmation-fab:hover{box-shadow:0 4px 14px rgba(0,0,0,0.36)}
 .affirmation-fab.dragging{cursor:grabbing;transition:none;box-shadow:0 6px 18px rgba(0,0,0,0.4)}
 @media(max-width:768px){
-  .affirmation-fab{ width:48px;height:48px;font-size:21px }
+  .affirmation-fab{ width:50px;height:50px;font-size:23px }
 
 }
 
-/* Chat-mode variant of the FAB icon — distinct glyph from the ✨ affirmation icon */
-.affirmation-fab .fab-chat-svg{width:23px;height:23px;display:block}
+/* Sparkle-mode icon (Daily Affirmations) — crisp SVG, consistent across themes */
+.affirmation-fab .fab-aff-svg{width:25px;height:25px;display:block}
+/* Chat-mode variant of the FAB icon — distinct glyph from the affirmation sparkle icon */
+.affirmation-fab .fab-chat-svg{width:25px;height:25px;display:block}
 .affirmation-fab.mode-chat{box-shadow:0 3px 10px rgba(124,58,237,0.4)}
 .affirmation-fab.mode-chat:hover{box-shadow:0 4px 16px rgba(124,58,237,0.5)}
 @media(max-width:768px){
-  .affirmation-fab .fab-chat-svg{width:21px;height:21px}
+  .affirmation-fab .fab-chat-svg{width:23px;height:23px}
+  .affirmation-fab .fab-aff-svg{width:23px;height:23px}
 }
 
 /* ════════════ FLOATING AI CHAT (FAB's second function) ════════════════ */
