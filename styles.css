@@ -7345,17 +7345,40 @@ body {
 [data-theme="light"] #page-tradelog .data-table-wrap::-webkit-scrollbar-thumb{
   background:rgba(30,41,59,0.22);
 }
-#page-tradelog .data-table{ min-width:900px; width:100% }
-/* The trailing row-actions column (delete icon, hidden until hover)
-   has no header label — on wide screens the auto table layout was
-   dumping ALL the leftover width into this one empty column instead
-   of spreading it across the real columns, which read as a dead gap
-   on the right. Capping it keeps the extra width distributed among
-   the columns that actually have content. */
+#page-tradelog .data-table{ min-width:900px; width:100%; table-layout:auto }
+/* Every column gets an explicit share of the width (summing to 100%,
+   plus the two fixed-px utility columns). Previously most columns were
+   left unspecified ("auto"), and the browser's table layout algorithm
+   dumped ALL the leftover width from stretching to 100% into whichever
+   column it treated as flexible (the ★ column) instead of spreading it
+   out — which read as a dead gap. Giving every column an explicit
+   width removes that ambiguity entirely. */
+#page-tradelog .data-table th:nth-child(1),
+#page-tradelog .data-table td:nth-child(1){ width:40px !important; max-width:40px !important }
+#page-tradelog .data-table th:nth-child(2),
+#page-tradelog .data-table td:nth-child(2){ width:calc((100% - 96px) * 0.10) }
+#page-tradelog .data-table th:nth-child(3),
+#page-tradelog .data-table td:nth-child(3){ width:calc((100% - 96px) * 0.09) }
+#page-tradelog .data-table th:nth-child(4),
+#page-tradelog .data-table td:nth-child(4){ width:calc((100% - 96px) * 0.06) }
+#page-tradelog .data-table th:nth-child(5),
+#page-tradelog .data-table td:nth-child(5){ width:calc((100% - 96px) * 0.06) }
+#page-tradelog .data-table th:nth-child(6),
+#page-tradelog .data-table td:nth-child(6){ width:calc((100% - 96px) * 0.09) }
+#page-tradelog .data-table th:nth-child(7),
+#page-tradelog .data-table td:nth-child(7){ width:calc((100% - 96px) * 0.08) }
+#page-tradelog .data-table th:nth-child(8),
+#page-tradelog .data-table td:nth-child(8){ width:calc((100% - 96px) * 0.12) }
+#page-tradelog .data-table th:nth-child(9),
+#page-tradelog .data-table td:nth-child(9){ width:calc((100% - 96px) * 0.12) }
+#page-tradelog .data-table th:nth-child(10),
+#page-tradelog .data-table td:nth-child(10){ width:calc((100% - 96px) * 0.20) }
+#page-tradelog .data-table th:nth-child(11),
+#page-tradelog .data-table td:nth-child(11){ width:calc((100% - 96px) * 0.08) }
 #page-tradelog .data-table th:last-child,
 #page-tradelog .data-table td:last-child{
-  width:56px;
-  max-width:56px;
+  width:56px !important;
+  max-width:56px !important;
 }
 
 /* Sticky header — stuck to the page's own scroll (the wrap no longer
