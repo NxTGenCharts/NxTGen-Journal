@@ -2565,6 +2565,15 @@ function renderTradeTable(list) {
     row.style.transition = `opacity 0.18s ${i * 0.02}s ease,transform 0.18s ${i * 0.02}s ease`;
     setTimeout(() => { row.style.opacity = ''; row.style.transform = ''; }, 10);
   });
+  // Rows just landed via innerHTML, which can trigger the browser's
+  // scroll-anchoring to nudge the wrap's horizontal scroll away from 0,
+  // clipping the first data column under the sticky checkbox column.
+  // Snap it back explicitly.
+  const wrap = tbody.closest('.data-table-wrap');
+  if (wrap) {
+    wrap.scrollLeft = 0;
+    requestAnimationFrame(() => { wrap.scrollLeft = 0; });
+  }
 }
 
 function bulkToggle(id, checked) {

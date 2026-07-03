@@ -7326,6 +7326,12 @@ body {
   -webkit-overflow-scrolling:touch;
   scrollbar-width:thin;
   scrollbar-color:rgba(255,255,255,0.22) transparent;
+  /* The table body is populated by JS after first paint. Without this,
+     the browser's scroll-anchoring "helpfully" shifts scrollLeft when
+     that content lands, leaving the table scrolled a few pixels right
+     on load and clipping the first column's header/text under the
+     sticky checkbox column. */
+  overflow-anchor:none;
 }
 [data-theme="light"] #page-tradelog .data-table-wrap{
   background:rgba(255,255,255,0.80);
