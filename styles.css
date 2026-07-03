@@ -10407,7 +10407,7 @@ body {
 .cal-an-gauge-col{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0}
 /* Lock intrinsic shape so a CSS width override can never squash/stretch the arc —
    this is what was distorting the win/BE/loss ring into a torn/uneven shape. */
-.cal-an-gauge-col svg{display:block;width:100%;height:auto;aspect-ratio:2/1;overflow:visible}
+.cal-an-gauge-col svg{display:block;width:100%;height:auto;aspect-ratio:108/68;overflow:visible}
 .cal-an-gauge-legend{display:flex;gap:5px}
 .cal-an-legend-chip{
   padding:2px 7px;border-radius:var(--r-full);font-size:10px;font-weight:800;
@@ -10501,7 +10501,7 @@ body {
 
   /* Shrink SVG gauges to fit the compact cards (viewBox keeps them proportional) */
   .cal-an-gauge-col{width:100%;align-items:flex-start;gap:3px}
-  .cal-an-gauge-col svg{width:58px !important;max-width:58px;height:auto !important;aspect-ratio:2/1}
+  .cal-an-gauge-col svg{width:58px !important;max-width:58px;height:auto !important;aspect-ratio:108/68}
   .cal-an-gauge-legend{gap:3px}
   .cal-an-legend-chip{padding:1px 5px;font-size:8px}
   .cal-an-ring-col svg{width:38px !important;max-width:38px;height:auto !important;aspect-ratio:1/1}
@@ -10574,7 +10574,7 @@ body {
   .cal-an-grid{gap:5px}
   .cal-an-value{font-size:13px}
   .cal-an-label{font-size:8.5px}
-  .cal-an-gauge-col svg{width:46px !important;max-width:46px;aspect-ratio:2/1}
+  .cal-an-gauge-col svg{width:46px !important;max-width:46px;aspect-ratio:108/68}
   .cal-an-ring-col svg{width:32px !important;max-width:32px;aspect-ratio:1/1}
 }
 @media(max-width:360px){
