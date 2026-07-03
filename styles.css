@@ -7339,7 +7339,7 @@ body {
 [data-theme="light"] #page-tradelog .data-table-wrap::-webkit-scrollbar-thumb{
   background:rgba(30,41,59,0.22);
 }
-#page-tradelog .data-table{ min-width:900px; width:max-content }
+#page-tradelog .data-table{ min-width:900px; width:100% }
 
 /* Sticky header — stuck to the page's own scroll (the wrap no longer
    scrolls vertically), painted to match the card so it never reads as
