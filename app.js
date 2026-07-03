@@ -9,7 +9,7 @@
 // ══════════════════════════════════════════════════════
 const SUPABASE_URL  = 'https://jlqgdwfbwdiieafhwisy.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpscWdkd2Zid2RpaWVhZmh3aXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5OTIwNTIsImV4cCI6MjA5NDU2ODA1Mn0.5Z8wZ2X7zTvz8CeGy5cBF8b4vs21YVoj-ZGr-jvSXaw';
-const BASE_URL      = 'https://dabossmira.github.io/NxTGen-Journal';
+const BASE_URL      = 'https://nxtgencharts.github.io/NxTGen-Journal';
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
@@ -8854,9 +8854,8 @@ function openShareModal(id) {
           </div>
           <div class="sm-rule"></div>
           <div class="sm-stats">
-            <div class="sm-stat"><div class="sm-stat-lbl">PLANNED R:R</div><div class="sm-stat-val" id="sm-planned-rr">${t.plannedRr || '—'}</div></div>
-            <div class="sm-stat sm-stat-center"><div class="sm-stat-lbl">ACTUAL R:R</div><div class="sm-stat-val" id="sm-rr">${t.rr}</div></div>
-            <div class="sm-stat"><div class="sm-stat-lbl">STRATEGY</div><div class="sm-stat-val sm-stat-val-sm" id="sm-strategy">${t.strategy || '—'}</div></div>
+            <div class="sm-stat"><div class="sm-stat-lbl">RISK : REWARD</div><div class="sm-stat-val" id="sm-rr">${t.rr}</div></div>
+            <div class="sm-stat sm-stat-center"><div class="sm-stat-lbl">STRATEGY</div><div class="sm-stat-val sm-stat-val-sm" id="sm-strategy">${t.strategy || '—'}</div></div>
           </div>
           <div class="sm-rule"></div>
           <div class="sm-tags">
@@ -8866,7 +8865,7 @@ function openShareModal(id) {
           </div>
           <div class="sm-notes-row" id="sm-notes-row"><div class="sm-notes" id="sm-notes"></div></div>
           <div class="sm-bottom-row"><div class="sm-stars" id="sm-stars"></div><div class="sm-risk-tag">${t.risk || '—'} risk</div></div>
-          <div class="sm-footer"><span class="sm-footer-url">dabossmira.github.io/NxTGen-Journal</span><img class="sm-footer-logo" src="logo.svg" alt="NxTGen"></div>
+          <div class="sm-footer"><span class="sm-footer-url">nxtgencharts.github.io/NxTGen-Journal</span><img class="sm-footer-logo" src="logo.svg" alt="NxTGen"></div>
         </div>
       </div>
       <div class="sm-section">
@@ -8944,7 +8943,6 @@ function smPopulateCard(id) {
   if (badge){badge.textContent=bl;badge.className='sm-badge '+bc;}
   const arr=document.getElementById('sm-dir-arrow');
   if(arr){arr.textContent=t.pos==='Buy'?'▲':'▼';arr.className='sm-dir-arrow '+(t.pos==='Buy'?'arr-buy':'arr-sell');}
-  const prrEl = document.getElementById('sm-planned-rr'); if (prrEl) prrEl.textContent = t.plannedRr || '—';
   const glow=document.getElementById('sm-glow');
   if(glow)glow.className='sm-glow-blob '+(t.outcome==='Win'?'glow-win':t.outcome==='Loss'?'glow-loss':'glow-be');
   const chartColor=t.outcome==='Win'?'#34d399':t.outcome==='Loss'?'#f87171':'#fbbf24';

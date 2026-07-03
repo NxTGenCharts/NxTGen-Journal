@@ -5534,7 +5534,7 @@ body{
 .sm-card.dark  .sm-rule { background: rgba(255,255,255,0.07); }
 .sm-card.light .sm-rule { background: rgba(0,0,0,0.08); }
 
-.sm-stats { display: grid; grid-template-columns: repeat(3,1fr); padding: 0 22px; }
+.sm-stats { display: grid; grid-template-columns: repeat(2,1fr); padding: 0 22px; }
 .sm-stat { display: flex; flex-direction: column; gap: 5px; padding: 14px 0; }
 .sm-stat-center { border-left: 1px solid; border-right: 1px solid; padding-left: 14px; padding-right: 14px; margin-left: 4px; margin-right: 4px; }
 .sm-card.dark  .sm-stat-center { border-color: rgba(255,255,255,0.07); }
