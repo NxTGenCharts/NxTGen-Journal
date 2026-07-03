@@ -10479,25 +10479,46 @@ body {
   .cal-week-col-wrap{width:118px}
 }
 @media(max-width:760px){
-  .cal-an-grid{grid-template-columns:1fr}
+  /* ── Analytics cards: compact 3-up / 2-up rows, matching desktop layout ── */
+  .cal-an-grid{grid-template-columns:repeat(3,1fr);gap:7px}
   .cal-an-grid > .cal-an-card:first-child{grid-column:auto}
-  .cal-grid-with-weeks{flex-direction:column;gap:12px}
+  .cal-an-grid.row2{grid-template-columns:repeat(2,1fr)}
+
+  .cal-an-card{
+    flex-direction:column;align-items:flex-start;justify-content:flex-start;
+    gap:6px;padding:10px 10px;min-height:0;border-radius:var(--r-lg);
+  }
+  .cal-an-grid.row2 .cal-an-card{flex-direction:row;align-items:center;justify-content:space-between;gap:8px}
+  .cal-an-left{gap:3px;width:100%}
+  .cal-an-label{font-size:9px;gap:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cal-an-label .info-dot{width:10px;height:10px;font-size:7px}
+  .cal-an-value{font-size:15px;letter-spacing:-.3px}
+  .cal-an-badge{position:static;padding:1px 7px;font-size:9.5px;align-self:flex-start;margin-top:-2px}
+  .cal-an-mini-icon{width:26px;height:26px}
+
+  /* Shrink SVG gauges to fit the compact cards (viewBox keeps them proportional) */
+  .cal-an-gauge-col{width:100%;align-items:flex-start;gap:3px}
+  .cal-an-gauge-col svg{width:58px !important;height:auto !important}
+  .cal-an-gauge-legend{gap:3px}
+  .cal-an-legend-chip{padding:1px 5px;font-size:8px}
+  .cal-an-ring-col svg{width:38px !important;height:auto !important}
+  .cal-an-bar-wrap{gap:5px}
+  .cal-an-bar-track{height:7px}
+  .cal-an-bar-labels{font-size:10px}
+
+  /* ── Weekly summary: stays to the right of the calendar, compact, like desktop ── */
+  .cal-grid-with-weeks{flex-direction:row;gap:6px;align-items:stretch}
   #page-calendar .cal-grid-with-weeks{min-height:0}
-  .cal-week-col-wrap{width:100%;gap:6px}
-  .cal-week-col-heading{
-    display:block;font-size:10.5px;font-weight:800;color:var(--text3);
-    text-transform:uppercase;letter-spacing:.08em;padding:0 2px;
-  }
-  .cal-week-col{
-    flex-direction:row;overflow-x:auto;overflow-y:hidden;
-    -webkit-overflow-scrolling:touch;scrollbar-width:thin;
-    padding-bottom:4px;
-  }
-  .cal-week-card{min-width:104px;flex-shrink:0}
-  .cal-an-value{font-size:22px}
+  .cal-week-col-wrap{width:64px;flex-shrink:0;gap:6px}
+  .cal-week-col-heading{display:none}
+  .cal-week-col{flex-direction:column;overflow:visible}
+  .cal-week-card{min-width:0;padding:6px 5px;gap:2px;align-items:flex-start}
+  .cal-week-label{font-size:8px}
+  .cal-week-pnl{font-size:10.5px;letter-spacing:-.3px;white-space:nowrap}
+  .cal-week-days{font-size:7.5px;padding:1px 5px}
 
   /* ── Tidier, more organized day grid on mobile ── */
-  #page-calendar{padding:14px 12px 16px}
+  #page-calendar{padding:14px 12px calc(72px + env(safe-area-inset-bottom, 0px))}
   .cal-page-header{gap:8px}
   .cal-month-label{font-size:15px;min-width:0}
   .cal-today-btn{font-size:11px;padding:6px 12px}
@@ -10505,21 +10526,29 @@ body {
   .cal-icon-btn{width:28px;height:28px;font-size:12px}
   .cal-stats-pill-row{font-size:11px;gap:7px}
   .cal-dow{font-size:8px;padding:6px 0;letter-spacing:.05em}
-  .cal-day{min-height:56px;padding:5px 5px}
+  .cal-day{min-height:52px;padding:5px 4px}
   .cal-day-num{font-size:10px}
   .cal-today-badge{width:18px;height:18px;font-size:9px}
   .cal-day-dot{width:4px;height:4px;top:5px;right:5px}
-  .cal-day-pnl{font-size:9px;margin-top:3px}
+  .cal-day-pnl{font-size:8.5px;margin-top:3px}
   .cal-day-count{font-size:7.5px;margin-top:1px}
   .cal-day-pairs{display:none}
 }
 @media(max-width:420px){
-  .cal-day{min-height:46px;padding:4px 3px}
+  .cal-day{min-height:44px;padding:4px 3px}
   .cal-day-num{font-size:9px}
-  .cal-day-pnl{font-size:8px}
+  .cal-day-pnl{font-size:7.5px}
   .cal-day-count{display:none}
-  .cal-week-card{min-width:90px;padding:9px 10px}
-  .cal-week-pnl{font-size:14px}
+  .cal-week-col-wrap{width:52px}
+  .cal-week-card{padding:5px 4px}
+  .cal-week-label{font-size:7px}
+  .cal-week-pnl{font-size:9px}
+  .cal-week-days{display:none}
+  .cal-an-grid{gap:5px}
+  .cal-an-value{font-size:13px}
+  .cal-an-label{font-size:8.5px}
+  .cal-an-gauge-col svg{width:46px !important}
+  .cal-an-ring-col svg{width:32px !important}
 }
 
 /* ── Calendar Settings modal ─────────────────────── */
