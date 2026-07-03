@@ -4048,7 +4048,6 @@ body{
   .kpi-value{ font-size:18px }
   .cover-title{ font-size:18px }
   .data-table{ min-width:320px }
-  #page-tradelog .data-table{ min-width:460px }
   .modal-form-grid{ grid-template-columns:1fr }
   .form-grid{ grid-template-columns:1fr }
   .det-tab{ padding:5px 10px;font-size:11px }
@@ -7345,40 +7344,64 @@ body {
 [data-theme="light"] #page-tradelog .data-table-wrap::-webkit-scrollbar-thumb{
   background:rgba(30,41,59,0.22);
 }
-#page-tradelog .data-table{ min-width:900px; width:100%; table-layout:auto }
-/* Every column gets an explicit share of the width (summing to 100%,
-   plus the two fixed-px utility columns). Previously most columns were
-   left unspecified ("auto"), and the browser's table layout algorithm
-   dumped ALL the leftover width from stretching to 100% into whichever
-   column it treated as flexible (the ★ column) instead of spreading it
-   out — which read as a dead gap. Giving every column an explicit
-   width removes that ambiguity entirely. */
+#page-tradelog .data-table{
+  min-width:1000px;
+  width:100%;
+  /* table-layout:fixed makes column widths strictly obey what's
+     specified below — no browser guesswork, no ambiguous leftover
+     space to dump anywhere. */
+  table-layout:fixed;
+}
+/* box-sizing defaults to content-box, meaning a declared `width` on a
+   cell EXCLUDES its own padding — so a 40px-wide checkbox column with
+   16px of padding was actually rendering ~56px wide, throwing every
+   percentage below off by a different, inconsistent amount per column.
+   border-box makes the declared width the true, final rendered width,
+   padding included — which is what makes exact percentages possible. */
+#page-tradelog .data-table th,
+#page-tradelog .data-table td{
+  box-sizing:border-box;
+}
+/* Every column gets a flat percentage width (no px, no calc — those
+   don't combine reliably with a min-width-overridden table, which is
+   what broke this on mobile). They sum to exactly 100%, so the table
+   fills its container edge-to-edge with nothing left over, at any
+   viewport width. */
 #page-tradelog .data-table th:nth-child(1),
-#page-tradelog .data-table td:nth-child(1){ width:40px !important; max-width:40px !important }
+#page-tradelog .data-table td:nth-child(1){ width:3% !important; overflow:hidden }
 #page-tradelog .data-table th:nth-child(2),
-#page-tradelog .data-table td:nth-child(2){ width:calc((100% - 96px) * 0.10) }
+#page-tradelog .data-table td:nth-child(2){ width:10%; overflow:hidden }
 #page-tradelog .data-table th:nth-child(3),
-#page-tradelog .data-table td:nth-child(3){ width:calc((100% - 96px) * 0.09) }
+#page-tradelog .data-table td:nth-child(3){ width:9%; overflow:hidden }
 #page-tradelog .data-table th:nth-child(4),
-#page-tradelog .data-table td:nth-child(4){ width:calc((100% - 96px) * 0.06) }
+#page-tradelog .data-table td:nth-child(4){ width:6%; overflow:hidden }
 #page-tradelog .data-table th:nth-child(5),
-#page-tradelog .data-table td:nth-child(5){ width:calc((100% - 96px) * 0.06) }
+#page-tradelog .data-table td:nth-child(5){ width:6%; overflow:hidden }
 #page-tradelog .data-table th:nth-child(6),
-#page-tradelog .data-table td:nth-child(6){ width:calc((100% - 96px) * 0.09) }
+#page-tradelog .data-table td:nth-child(6){ width:9%; overflow:hidden }
 #page-tradelog .data-table th:nth-child(7),
-#page-tradelog .data-table td:nth-child(7){ width:calc((100% - 96px) * 0.08) }
+#page-tradelog .data-table td:nth-child(7){ width:8%; overflow:hidden }
 #page-tradelog .data-table th:nth-child(8),
-#page-tradelog .data-table td:nth-child(8){ width:calc((100% - 96px) * 0.12) }
+#page-tradelog .data-table td:nth-child(8){ width:11%; overflow:hidden }
 #page-tradelog .data-table th:nth-child(9),
-#page-tradelog .data-table td:nth-child(9){ width:calc((100% - 96px) * 0.12) }
+#page-tradelog .data-table td:nth-child(9){ width:11%; overflow:hidden }
 #page-tradelog .data-table th:nth-child(10),
-#page-tradelog .data-table td:nth-child(10){ width:calc((100% - 96px) * 0.20) }
+#page-tradelog .data-table td:nth-child(10){ width:13%; overflow:hidden }
 #page-tradelog .data-table th:nth-child(11),
-#page-tradelog .data-table td:nth-child(11){ width:calc((100% - 96px) * 0.08) }
+#page-tradelog .data-table td:nth-child(11){ width:8%; overflow:hidden }
 #page-tradelog .data-table th:last-child,
-#page-tradelog .data-table td:last-child{
-  width:56px !important;
-  max-width:56px !important;
+#page-tradelog .data-table td:last-child{ width:6% !important; overflow:hidden }
+/* Fixed layout clips overflow instead of wrapping/growing — keep long
+   cell text (account names, strategy tags) truncating cleanly rather
+   than spilling or breaking the grid. */
+#page-tradelog .data-table td{
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+#page-tradelog .data-table td.stars,
+#page-tradelog .data-table td:first-child,
+#page-tradelog .data-table td.row-actions{
+  white-space:nowrap;
 }
 
 /* Sticky header — stuck to the page's own scroll (the wrap no longer
