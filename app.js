@@ -8228,17 +8228,14 @@ function mobNavMore() {
   const overlay = document.getElementById('mob-more-overlay');
   if (!sheet) return;
   const isOpen = sheet.classList.contains('open');
-  const activePage = Array.from(document.querySelectorAll('.page')).find(p => getComputedStyle(p).display !== 'none');
   if (isOpen) {
     sheet.classList.remove('open');
     overlay?.classList.remove('show');
     document.body.style.overflow = '';
-    if (activePage) activePage.style.overflow = '';
   } else {
     sheet.classList.add('open');
     overlay?.classList.add('show');
     document.body.style.overflow = 'hidden';
-    if (activePage) activePage.style.overflow = 'hidden';
   }
 }
 
@@ -8246,8 +8243,6 @@ function mobMoreClose() {
   document.getElementById('mob-more-sheet')?.classList.remove('open');
   document.getElementById('mob-more-overlay')?.classList.remove('show');
   document.body.style.overflow = '';
-  const activePage = Array.from(document.querySelectorAll('.page')).find(p => getComputedStyle(p).display !== 'none');
-  if (activePage) activePage.style.overflow = '';
 }
 
 function mobMoreNav(pageId, label) {
