@@ -115,6 +115,47 @@ function localToday() {
     String(d.getDate()).padStart(2, '0');
 }
 
+// ── User timezone helpers ───────────────────────────────────────────────
+// Respects the "Timezone" setting on the Account tab (_profileData.timezone),
+// falling back to Africa/Lagos (WAT) if unset or invalid. All time-of-day
+// displays across the app (chat bubbles, journal exports, watchlist times,
+// "last updated" labels, the topbar clock, etc.) should go through these
+// helpers so that changing the preferred timezone applies everywhere.
+function getUserTz() {
+  return (typeof _profileData !== 'undefined' && _profileData && _profileData.timezone) || 'Africa/Lagos';
+}
+// Returns the short timezone label (e.g. "WAT", "GMT", "EST") for a given
+// IANA zone, falling back to "WAT" if the zone can't be resolved.
+function getUserTzLabel(tz) {
+  tz = tz || getUserTz();
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' }).formatToParts(new Date());
+    return (parts.find(p => p.type === 'timeZoneName') || {}).value || 'WAT';
+  } catch (e) {
+    return 'WAT';
+  }
+}
+// Formats a time (defaults to now) as "HH:MM" in the user's preferred timezone.
+function formatUserTime(date) {
+  date = date || new Date();
+  const tz = getUserTz();
+  try {
+    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz });
+  } catch (e) {
+    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' });
+  }
+}
+// Formats a date+time (defaults to now) using the user's preferred timezone.
+function formatUserDateTime(date, opts) {
+  date = date || new Date();
+  const tz = getUserTz();
+  try {
+    return date.toLocaleString('en-GB', Object.assign({ timeZone: tz }, opts || {}));
+  } catch (e) {
+    return date.toLocaleString('en-GB', Object.assign({ timeZone: 'Africa/Lagos' }, opts || {}));
+  }
+}
+
 // Current authenticated user — set on boot
 let _currentUser = null;
 
@@ -874,7 +915,7 @@ async function aiRun() {
   const metaEl       = document.getElementById('ai-response-meta');
   if (responseWrap) responseWrap.style.display = '';
   if (modeLabel)    modeLabel.textContent = _AI_MODE_LABELS[_aiMode];
-  if (metaEl)       metaEl.textContent = new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Lagos' }) + ' WAT';
+  if (metaEl)       metaEl.textContent = formatUserTime() + ' ' + getUserTzLabel();
   if (responseBody) { responseBody.innerHTML = '<div class="ai-thinking"><span></span><span></span><span></span></div>'; }
 
   const userPrompt = _aiUserPrompt(_aiMode, customQ);
@@ -1518,7 +1559,8 @@ function _chatAddBubble(role, content, ts, animate, images) {
   const id     = `chat-msg-${++_chatMsgCount}`;
   const isUser = role === 'user';
   const isErr  = role === 'error';
-  const time   = new Date(ts).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Lagos' });
+  const time   = formatUserTime(new Date(ts));
+  const tzLabel = getUserTzLabel();
 
   const imgHtml = images ? images.map(img =>
     `<div class="chat-bubble-img-wrap">
@@ -1541,7 +1583,7 @@ function _chatAddBubble(role, content, ts, animate, images) {
       ${imgHtml}
       <div class="chat-bubble-content">${contentHtml}</div>
       <div class="chat-bubble-meta">
-        <span class="chat-bubble-time">${time} WAT</span>
+        <span class="chat-bubble-time">${time} ${tzLabel}</span>
         ${!isUser && !isErr ? `<button class="chat-bubble-copy" onclick="_chatCopyBubble('${id}')" title="Copy">⎘</button>` : ''}
       </div>
     </div>
@@ -1636,8 +1678,8 @@ function chatExport() {
   if (!_chatHistory.length) { showToast('No chat to export', 'danger'); return; }
   const lines = _chatHistory.map(m => {
     const role = m.role === 'user' ? 'You' : 'AI Coach';
-    const time = new Date(m.ts).toLocaleString('en-GB', { timeZone: 'Africa/Lagos' });
-    return `[${time} WAT] ${role}:\n${m.content}\n`;
+    const time = formatUserDateTime(new Date(m.ts));
+    return `[${time} ${getUserTzLabel()}] ${role}:\n${m.content}\n`;
   });
   const blob = new Blob([lines.join('\n---\n\n')], { type: 'text/plain' });
   const a = document.createElement('a');
@@ -4562,7 +4604,7 @@ function _wlCalRender(weekId, events, startDate, endDate) {
         : (e.impact === 'medium' || e.impact === 'med') ? 'med' : 'low';
       const isMyPair = pairCurs.has(e.country);
       const timeStr  = e.date && e.date.includes('T')
-        ? new Date(e.date).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Lagos' }) + ' WAT'
+        ? formatUserTime(new Date(e.date)) + ' ' + getUserTzLabel()
         : 'All day';
 
       return `
@@ -6727,7 +6769,7 @@ function updateKPIs() {
   _checkDailyLossLimit(trades);
   setTimeout(() => { _drawEquityCurve(); _renderHeatmap(trades); }, 50);
   const subEl = document.getElementById('dash-last-updated');
-  if (subEl) { const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' }); subEl.textContent = 'Last updated ' + now + ' WAT'; }
+  if (subEl) { const now = formatUserTime(); subEl.textContent = 'Last updated ' + now + ' ' + getUserTzLabel(); }
 
   // ── Dashboard insight bar — computed from this user's actual data ──
   const insightEl = document.getElementById('dash-insight-text');
@@ -7358,19 +7400,17 @@ function updateClock() {
   const el = document.getElementById('topbar-clock');
   if (!el) return;
   const now = new Date();
-  const tz  = (_profileData && _profileData.timezone) || 'Africa/Lagos';
-  let t, d, tzLabel;
+  const tz  = getUserTz();
+  let t, d;
   try {
     t = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: tz });
     d = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz });
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' }).formatToParts(now);
-    tzLabel = (parts.find(p => p.type === 'timeZoneName') || {}).value || '';
   } catch (e) {
     // Unknown/invalid IANA zone — fall back safely
     t = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Africa/Lagos' });
     d = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Africa/Lagos' });
-    tzLabel = 'WAT';
   }
+  const tzLabel = getUserTzLabel(tz);
   el.textContent = d + ' · ' + t + (tzLabel ? ' ' + tzLabel : '');
 }
 
@@ -9750,6 +9790,7 @@ async function profileSaveAccount() {
   if (ok !== false) {
     _profileRefreshHero();
     _injectTopbarAvatar();
+    if (typeof updateClock === 'function') updateClock();
     showToast('Account info saved ✓', 'success');
   }
 }
