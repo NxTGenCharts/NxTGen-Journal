@@ -7340,6 +7340,17 @@ body {
   background:rgba(30,41,59,0.22);
 }
 #page-tradelog .data-table{ min-width:900px; width:100% }
+/* The trailing row-actions column (delete icon, hidden until hover)
+   has no header label — on wide screens the auto table layout was
+   dumping ALL the leftover width into this one empty column instead
+   of spreading it across the real columns, which read as a dead gap
+   on the right. Capping it keeps the extra width distributed among
+   the columns that actually have content. */
+#page-tradelog .data-table th:last-child,
+#page-tradelog .data-table td:last-child{
+  width:56px;
+  max-width:56px;
+}
 
 /* Sticky header — stuck to the page's own scroll (the wrap no longer
    scrolls vertically), painted to match the card so it never reads as
