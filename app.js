@@ -7674,6 +7674,10 @@ function renderCalendar() {
     if (kpiEl) kpiEl.innerHTML = _kpiHtml;
     if (kpiEl2) kpiEl2.innerHTML = _kpiHtml;
   }
+
+  // ── Standalone Calendar page: analytics cards + monthly stats pill ──
+  renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDays, beDays, wr, tradingDays.length, accSize);
+
   const daysEl = document.getElementById('cal-days');
   const daysEl2 = document.getElementById('cal-days-2');
   if (!daysEl && !daysEl2) return;
@@ -7703,7 +7707,180 @@ function renderCalendar() {
     return `<div class="${cls}" ${clickAttr} ${hoverAttr}>${dotHTML}${dayNumHTML}${pnlHTML}${countHTML}${pairsHTML}</div>`;
   }).join(''); };
   _calDaysHTML_fn(daysEl); _calDaysHTML_fn(daysEl2);
+  renderCalWeekSidebar(cells, dayMap);
   window._dayMap = dayMap;
+}
+
+// ── Weekly summary sidebar (standalone Calendar page only) ──
+function renderCalWeekSidebar(cells, dayMap) {
+  const col = document.getElementById('cal-week-col-2');
+  if (!col) return;
+  let html = '';
+  for (let row = 0; row < cells.length; row += 7) {
+    const weekCells = cells.slice(row, row + 7);
+    let total = 0, activeDays = 0;
+    weekCells.forEach(c => {
+      const dateStr = c.year + '-' + String(c.month).padStart(2, '0') + '-' + String(c.day).padStart(2, '0');
+      const d = dayMap[dateStr];
+      if (d) { total += d.totalPnlUSD; activeDays++; }
+    });
+    const cls = total > 0 ? 'green' : total < 0 ? 'red' : 'zero';
+    html += `<div class="cal-week-card"><div class="cal-week-label">Week ${(row / 7) + 1}</div><div class="cal-week-pnl ${cls}">${activeDays ? fmtUSD(total) : 'CA$0'}</div><div class="cal-week-days">${activeDays} day${activeDays === 1 ? '' : 's'}</div></div>`;
+  }
+  col.innerHTML = html;
+}
+
+// ── SVG gauge helpers ──────────────────────────────
+function _calPolar(cx, cy, r, angle) { const rad = (angle - 180) * Math.PI / 180; return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }; }
+function _calArcPath(cx, cy, r, startAngle, endAngle) {
+  if (endAngle <= startAngle) return '';
+  const start = _calPolar(cx, cy, r, startAngle);
+  const end = _calPolar(cx, cy, r, endAngle);
+  const largeArc = (endAngle - startAngle) > 180 ? 1 : 0;
+  return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+}
+// Semicircle gauge with up to 3 weighted segments (green/blue/red)
+function _calSemiGauge(segments, size) {
+  size = size || 108;
+  const cx = size / 2, cy = size / 2 + 2, r = size / 2 - 12, sw = 12;
+  const total = segments.reduce((a, s) => a + s.value, 0) || 1;
+  let angle = 0, paths = '';
+  segments.forEach(s => {
+    if (s.value <= 0) return;
+    const span = (s.value / total) * 180;
+    paths += `<path d="${_calArcPath(cx, cy, r, angle, angle + span)}" stroke="${s.color}" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`;
+    angle += span;
+  });
+  const track = `<path d="${_calArcPath(cx, cy, r, 0, 180)}" stroke="var(--glass-2)" stroke-width="${sw}" fill="none"/>`;
+  return `<svg width="${size}" height="${size / 2 + 14}" viewBox="0 0 ${size} ${size / 2 + 14}">${track}${paths}</svg>`;
+}
+// Full ring gauge for a single fraction (0..1)
+function _calRingGauge(fraction, colorMain, colorRest, size) {
+  size = size || 76; const cx = size / 2, cy = size / 2, r = size / 2 - 9, sw = 9;
+  fraction = Math.max(0, Math.min(1, fraction));
+  const circ = 2 * Math.PI * r;
+  const mainLen = circ * fraction;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${cx}" cy="${cy}" r="${r}" stroke="${colorRest}" stroke-width="${sw}" fill="none"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" stroke="${colorMain}" stroke-width="${sw}" fill="none"
+      stroke-dasharray="${mainLen.toFixed(1)} ${circ.toFixed(1)}" stroke-linecap="round"
+      transform="rotate(-90 ${cx} ${cy})"/>
+  </svg>`;
+}
+
+// ── Analytics cards (standalone Calendar page) ──────
+function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDays, beDays, dayWR, tradingDaysCount, accSize) {
+  const row1 = document.getElementById('cal-an-row1');
+  const row2 = document.getElementById('cal-an-row2');
+  const pillRow = document.getElementById('cal-stats-pill-2');
+  if (!row1 && !row2 && !pillRow) return;
+
+  const wins = monthTrades.filter(t => t.outcome === 'Win').length;
+  const losses = monthTrades.filter(t => t.outcome === 'Loss').length;
+  const bes = monthTrades.filter(t => t.outcome !== 'Win' && t.outcome !== 'Loss').length;
+  const denom = wins + losses;
+  const tradeWR = denom > 0 ? (wins / denom) * 100 : 0;
+
+  let grossProfit = 0, grossLoss = 0, winSum = 0, lossSum = 0;
+  monthTrades.forEach(t => {
+    const usd = toPnlDollars(t, accSize);
+    if (usd > 0) { grossProfit += usd; winSum += usd; }
+    else if (usd < 0) { grossLoss += Math.abs(usd); lossSum += Math.abs(usd); }
+  });
+  const profitFactor = grossLoss > 0 ? (grossProfit / grossLoss) : (grossProfit > 0 ? grossProfit : 0);
+  const pfFraction = (grossProfit + grossLoss) > 0 ? grossProfit / (grossProfit + grossLoss) : 0;
+  const avgWin = wins > 0 ? winSum / wins : 0;
+  const avgLoss = losses > 0 ? lossSum / losses : 0;
+  const avgRatio = avgLoss > 0 ? (avgWin / avgLoss) : (avgWin > 0 ? avgWin : 0);
+  const barTotal = avgWin + avgLoss || 1;
+  const winPct = (avgWin / barTotal) * 100;
+
+  if (row1) {
+    row1.innerHTML = `
+      <div class="cal-an-card">
+        <div class="cal-an-left">
+          <div class="cal-an-label">Net P&amp;L <span class="info-dot">i</span></div>
+          <div class="cal-an-value ${totalUSD >= 0 ? 'green' : 'red'}">${fmtUSD(totalUSD)}</div>
+        </div>
+        <div class="cal-an-badge">${monthTrades.length}</div>
+      </div>
+      <div class="cal-an-card">
+        <div class="cal-an-left">
+          <div class="cal-an-label">Trade win % <span class="info-dot">i</span></div>
+          <div class="cal-an-value">${tradeWR.toFixed(2)}%</div>
+        </div>
+        <div class="cal-an-gauge-col">
+          ${_calSemiGauge([{ value: wins, color: 'var(--green)' }, { value: bes, color: 'var(--blue)' }, { value: losses, color: 'var(--red)' }])}
+          <div class="cal-an-gauge-legend">
+            <span class="cal-an-legend-chip green">${wins}</span>
+            <span class="cal-an-legend-chip blue">${bes}</span>
+            <span class="cal-an-legend-chip red">${losses}</span>
+          </div>
+        </div>
+      </div>
+      <div class="cal-an-card">
+        <div class="cal-an-left">
+          <div class="cal-an-label">Profit factor <span class="info-dot">i</span></div>
+          <div class="cal-an-value">${profitFactor.toFixed(2)}</div>
+        </div>
+        <div class="cal-an-ring-col">${_calRingGauge(pfFraction, 'var(--green)', 'var(--red)')}</div>
+      </div>`;
+  }
+
+  if (row2) {
+    row2.innerHTML = `
+      <div class="cal-an-card">
+        <div class="cal-an-left">
+          <div class="cal-an-label">Day win % <span class="info-dot">i</span></div>
+          <div class="cal-an-value">${dayWR.toFixed(2)}%</div>
+        </div>
+        <div class="cal-an-gauge-col">
+          ${_calSemiGauge([{ value: winDays, color: 'var(--green)' }, { value: beDays, color: 'var(--blue)' }, { value: lossDays, color: 'var(--red)' }])}
+          <div class="cal-an-gauge-legend">
+            <span class="cal-an-legend-chip green">${winDays}</span>
+            <span class="cal-an-legend-chip blue">${beDays}</span>
+            <span class="cal-an-legend-chip red">${lossDays}</span>
+          </div>
+        </div>
+      </div>
+      <div class="cal-an-card">
+        <div class="cal-an-left" style="flex:0 0 auto">
+          <div class="cal-an-label">Avg win/loss trade <span class="info-dot">i</span></div>
+          <div class="cal-an-value">${avgRatio.toFixed(2)}</div>
+        </div>
+        <div class="cal-an-bar-wrap">
+          <div class="cal-an-bar-track">
+            <div class="cal-an-bar-seg green" style="width:${winPct.toFixed(1)}%"></div>
+            <div class="cal-an-bar-seg red" style="width:${(100 - winPct).toFixed(1)}%"></div>
+          </div>
+          <div class="cal-an-bar-labels">
+            <span class="green">${fmtUSD(avgWin)}</span>
+            <span class="red">${fmtUSD(-avgLoss)}</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  if (pillRow) {
+    pillRow.innerHTML = `<span class="lbl">Monthly stats:</span> <span class="cal-pill ${totalUSD >= 0 ? 'green' : ''}">${fmtUSD(totalUSD)}</span> <span class="cal-pill">${tradingDaysCount} day${tradingDaysCount === 1 ? '' : 's'}</span>`;
+  }
+}
+
+function calGoToday() { calYear = new Date().getFullYear(); calMonth = new Date().getMonth(); renderCalendar(); }
+
+function calExportImage() {
+  const el = document.querySelector('#page-calendar .cal-page-scroll');
+  if (!el) return;
+  _smEnsureLibs(() => {
+    showToast('Generating image…', 'info');
+    html2canvas(el, { backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg') || '#080b12', scale: 2 }).then(canvas => {
+      const link = document.createElement('a');
+      link.download = 'NxTGen_Calendar_' + MONTH_NAMES_LONG[calMonth] + '_' + calYear + '.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      showToast('Calendar image saved! 🖼', 'success');
+    }).catch(() => showToast('Export failed', 'danger'));
+  });
 }
 
 function openCalPopup(e, dateStr) {

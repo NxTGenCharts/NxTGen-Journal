@@ -633,9 +633,9 @@
          CALENDAR PAGE
     ═══════════════════════════════════════════════ -->
     <div class="page" id="page-calendar">
-      <div style="display:flex;flex-direction:column;height:100%;padding:16px 20px;overflow:hidden">
+      <div class="cal-page-scroll">
         <!-- Account filter bar — mirrors the desktop dashboard calendar controls -->
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
             <span style="font-size:11px;color:var(--text3);white-space:nowrap">📅 Trading Calendar</span>
           </div>
@@ -644,19 +644,35 @@
           </select>
           <input type="number" class="acc-size-input" id="cal-acc-size-2" value="5000" oninput="_onCalAccSize2Change()" title="Account size for USD calc" style="width:80px;font-size:11px;padding:4px 6px;height:30px">
         </div>
+
+        <!-- Analytics cards — Net P&L / Trade win% / Profit factor -->
+        <div class="cal-an-grid" id="cal-an-row1"></div>
+        <!-- Analytics cards — Day win% / Avg win-loss trade -->
+        <div class="cal-an-grid row2" id="cal-an-row2"></div>
+
         <div class="cal-wrap">
-          <div class="cal-header">
+          <div class="cal-page-header">
             <div class="cal-nav" onclick="calNav(-1)">‹</div>
             <div class="cal-month-label" id="cal-month-label-2">May 2026</div>
             <div class="cal-nav" onclick="calNav(1)">›</div>
-          </div>
-          <div class="cal-kpi-row" id="cal-kpi-row-2"></div>
-          <div class="cal-grid-wrap">
-            <div class="cal-dow-row" id="cal-dow-row-2">
-              <div class="cal-dow">SUN</div><div class="cal-dow">MON</div><div class="cal-dow">TUE</div>
-              <div class="cal-dow">WED</div><div class="cal-dow">THU</div><div class="cal-dow">FRI</div><div class="cal-dow">SAT</div>
+            <button class="cal-today-btn" onclick="calGoToday()">This month</button>
+            <div class="cal-header-spacer"></div>
+            <div class="cal-header-icons">
+              <button class="cal-icon-btn" title="Calendar settings" onclick="showToast('Calendar settings coming soon','info')">⚙</button>
+              <button class="cal-icon-btn" title="Export as image" onclick="calExportImage()">📷</button>
+              <button class="cal-icon-btn" title="About this calendar" onclick="showToast('Colored cells show daily P&amp;L outcome — green win, red loss, blue breakeven.','info')">ⓘ</button>
             </div>
-            <div class="cal-days" id="cal-days-2"></div>
+          </div>
+          <div class="cal-stats-pill-row" id="cal-stats-pill-2"></div>
+          <div class="cal-grid-with-weeks">
+            <div class="cal-grid-wrap">
+              <div class="cal-dow-row" id="cal-dow-row-2">
+                <div class="cal-dow">SUN</div><div class="cal-dow">MON</div><div class="cal-dow">TUE</div>
+                <div class="cal-dow">WED</div><div class="cal-dow">THU</div><div class="cal-dow">FRI</div><div class="cal-dow">SAT</div>
+              </div>
+              <div class="cal-days" id="cal-days-2"></div>
+            </div>
+            <div class="cal-week-col" id="cal-week-col-2"></div>
           </div>
         </div>
       </div>

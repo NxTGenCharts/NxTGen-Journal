@@ -10175,3 +10175,130 @@ body {
   .wl-week-history-item-label { font-size: 10.5px; }
   .wl-week-history-item-range { font-size: 8.5px; }
 }
+
+/* ════════════════════════════════════════════════════════
+   CALENDAR PAGE — Analytics Overhaul (standalone Calendar page only)
+   ════════════════════════════════════════════════════════ */
+#page-calendar{padding:16px 20px;overflow-y:auto;overflow-x:hidden}
+#page-calendar .cal-page-scroll{display:flex;flex-direction:column;gap:14px;min-height:100%;padding-bottom:8px}
+#page-calendar .cal-wrap{height:auto;flex:none}
+#page-calendar .cal-grid-with-weeks{min-height:560px}
+
+/* ── Analytics card grid ─────────────────────────── */
+.cal-an-grid{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:12px}
+.cal-an-grid.row2{grid-template-columns:1fr 1.35fr}
+
+.cal-an-card{
+  background:var(--glass-1);
+  border:1px solid var(--glass-border);
+  border-radius:var(--r-xl);
+  padding:16px 18px;
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  position:relative;overflow:hidden;
+  box-shadow:var(--shadow-sm);
+  min-height:112px;
+}
+[data-theme="light"] .cal-an-card{background:var(--glass-2);box-shadow:var(--shadow-xs)}
+.cal-an-card:hover{border-color:var(--glass-border-h);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+
+.cal-an-left{display:flex;flex-direction:column;gap:8px;min-width:0}
+.cal-an-label{font-size:11.5px;color:var(--text3);display:flex;align-items:center;gap:5px;font-weight:700;letter-spacing:.01em}
+.cal-an-label .info-dot{width:13px;height:13px;border-radius:50%;border:1.4px solid var(--text3);display:inline-flex;align-items:center;justify-content:center;font-size:8.5px;opacity:.55;flex-shrink:0}
+.cal-an-value{font-family:var(--font-mono);font-size:27px;font-weight:800;letter-spacing:-.6px;line-height:1;white-space:nowrap}
+.cal-an-value.green{color:var(--green);text-shadow:0 0 22px var(--green-glow)}
+.cal-an-value.red{color:var(--red);text-shadow:0 0 22px var(--red-glow)}
+
+.cal-an-badge{
+  position:absolute;top:14px;right:16px;
+  background:var(--glass-3);border:1px solid var(--glass-border);
+  border-radius:var(--r-full);font-size:11px;font-weight:800;color:var(--text2);
+  padding:3px 10px;font-family:var(--font-mono);
+}
+.cal-an-mini-icon{
+  width:36px;height:36px;border-radius:var(--r-md);
+  background:var(--green-dim);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--green);flex-shrink:0;
+}
+
+/* ── Gauge column (semicircle) ───────────────────── */
+.cal-an-gauge-col{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0}
+.cal-an-gauge-col svg{display:block}
+.cal-an-gauge-legend{display:flex;gap:5px}
+.cal-an-legend-chip{
+  padding:2px 7px;border-radius:var(--r-full);font-size:10px;font-weight:800;
+  font-family:var(--font-mono);background:var(--glass-2);color:var(--text2);
+}
+.cal-an-legend-chip.green{color:var(--green);background:var(--green-dim)}
+.cal-an-legend-chip.blue{color:var(--blue);background:var(--blue-dim)}
+.cal-an-legend-chip.red{color:var(--red);background:var(--red-dim)}
+
+/* ── Ring gauge (profit factor) ──────────────────── */
+.cal-an-ring-col{flex-shrink:0}
+
+/* ── Avg win/loss bar card ───────────────────────── */
+.cal-an-bar-wrap{flex:1;display:flex;flex-direction:column;justify-content:center;gap:9px;min-width:0}
+.cal-an-bar-track{height:10px;border-radius:var(--r-full);overflow:hidden;display:flex;background:var(--glass-2);box-shadow:inset 0 1px 2px rgba(0,0,0,.25)}
+.cal-an-bar-seg{height:100%;transition:width .3s var(--ease-out)}
+.cal-an-bar-seg.green{background:linear-gradient(90deg,var(--green),color-mix(in srgb, var(--green) 70%, white))}
+.cal-an-bar-seg.red{background:linear-gradient(270deg,var(--red),color-mix(in srgb, var(--red) 70%, white))}
+.cal-an-bar-labels{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:13px;font-weight:800}
+.cal-an-bar-labels .green{color:var(--green)}
+.cal-an-bar-labels .red{color:var(--red)}
+
+/* ── Calendar header row (month nav + today + icons) ─ */
+.cal-page-header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cal-today-btn{
+  font-size:12px;font-weight:700;padding:7px 15px;border-radius:var(--r-md);
+  background:var(--glass-2);border:1px solid var(--glass-border);color:var(--text2);
+  cursor:pointer;transition:var(--t-fast);
+}
+.cal-today-btn:hover{background:var(--glass-3);color:var(--text);border-color:var(--glass-border-h)}
+.cal-header-spacer{flex:1}
+.cal-header-icons{display:flex;gap:6px}
+.cal-icon-btn{
+  width:32px;height:32px;border-radius:var(--r-md);
+  background:var(--glass-1);border:1px solid var(--glass-border);
+  display:flex;align-items:center;justify-content:center;font-size:13.5px;
+  color:var(--text2);cursor:pointer;transition:var(--t-fast);
+}
+.cal-icon-btn:hover{background:var(--glass-3);color:var(--text);border-color:var(--glass-border-h);transform:translateY(-1px)}
+
+/* ── Monthly stats pill row ──────────────────────── */
+.cal-stats-pill-row{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--text2);font-weight:700;flex-wrap:wrap;padding:2px 2px 0}
+.cal-stats-pill-row .lbl{color:var(--text3);font-weight:600}
+.cal-pill{padding:4px 12px;border-radius:var(--r-full);background:var(--glass-2);border:1px solid var(--glass-border);font-family:var(--font-mono);font-weight:800;color:var(--text)}
+.cal-pill.green{color:var(--green)}
+
+/* ── Grid + week sidebar ──────────────────────────── */
+.cal-grid-with-weeks{flex:1;display:flex;gap:10px;min-height:0;align-items:stretch}
+.cal-grid-with-weeks .cal-grid-wrap{flex:1;min-width:0}
+#cal-days-2{grid-auto-rows:1fr}
+.cal-week-col{display:flex;flex-direction:column;gap:8px;width:148px;flex-shrink:0}
+.cal-week-card{
+  flex:1;background:var(--glass-1);border:1px solid var(--glass-border);
+  border-radius:var(--r-lg);padding:12px 14px;display:flex;flex-direction:column;justify-content:center;gap:4px;
+  min-height:0;transition:var(--t-fast);
+}
+.cal-week-card:hover{background:var(--glass-2);border-color:var(--glass-border-h)}
+.cal-week-label{font-size:11px;color:var(--text3);font-weight:700}
+.cal-week-pnl{font-family:var(--font-mono);font-size:17px;font-weight:800;letter-spacing:-.4px}
+.cal-week-pnl.green{color:var(--green)}
+.cal-week-pnl.red{color:var(--red)}
+.cal-week-pnl.zero{color:var(--text3)}
+.cal-week-days{font-size:10px;color:var(--text3);background:var(--glass-2);border-radius:var(--r-full);padding:3px 9px;width:fit-content}
+
+@media(max-width:1180px){
+  .cal-an-grid{grid-template-columns:1fr 1fr}
+  .cal-an-grid > .cal-an-card:first-child{grid-column:1/3}
+  .cal-an-grid.row2{grid-template-columns:1fr}
+  .cal-week-col{width:118px}
+}
+@media(max-width:760px){
+  .cal-an-grid{grid-template-columns:1fr}
+  .cal-an-grid > .cal-an-card:first-child{grid-column:auto}
+  .cal-grid-with-weeks{flex-direction:column}
+  .cal-week-col{width:100%;flex-direction:row;overflow-x:auto}
+  .cal-week-card{min-width:104px}
+  .cal-an-value{font-size:22px}
+}
