@@ -7691,7 +7691,10 @@ function renderCalendar() {
   for (let i = startDow - 1; i >= 0; i--) { const prevMonth = calMonth === 0 ? 12 : calMonth; const prevYear = calMonth === 0 ? calYear - 1 : calYear; cells.push({ day: daysInPrev - i, month: prevMonth, year: prevYear, current: false }); }
   for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, month: calMonth + 1, year: calYear, current: true });
   let nextD = 1;
-  while (cells.length < 42) { const nextMonth = calMonth === 11 ? 1 : calMonth + 2; const nextYear = calMonth === 11 ? calYear + 1 : calYear; cells.push({ day: nextD++, month: nextMonth, year: nextYear, current: false }); }
+  // Pad only to the number of rows this month actually needs (4, 5, or 6) — never a trailing blank row
+  const rowsNeeded = Math.ceil((startDow + daysInMonth) / 7);
+  const targetCells = rowsNeeded * 7;
+  while (cells.length < targetCells) { const nextMonth = calMonth === 11 ? 1 : calMonth + 2; const nextYear = calMonth === 11 ? calYear + 1 : calYear; cells.push({ day: nextD++, month: nextMonth, year: nextYear, current: false }); }
   const _calDaysHTML_fn = (daysEl_target) => { if (!daysEl_target) return;
   daysEl_target.innerHTML = cells.map(c => {
     const dateStr = c.year + '-' + String(c.month).padStart(2, '0') + '-' + String(c.day).padStart(2, '0');
@@ -7725,12 +7728,18 @@ function renderCalWeekSidebar(cells, dayMap) {
       if (d) { total += d.totalPnlUSD; activeDays++; }
     });
     const cls = total > 0 ? 'green' : total < 0 ? 'red' : 'zero';
-    html += `<div class="cal-week-card"><div class="cal-week-label">Week ${(row / 7) + 1}</div><div class="cal-week-pnl ${cls}">${activeDays ? fmtUSD(total) : 'CA$0'}</div><div class="cal-week-days">${activeDays} day${activeDays === 1 ? '' : 's'}</div></div>`;
+    html += `<div class="cal-week-card"><div class="cal-week-label">Week ${(row / 7) + 1}</div><div class="cal-week-pnl ${cls}">${fmtUSD(total)}</div><div class="cal-week-days">${activeDays} day${activeDays === 1 ? '' : 's'}</div></div>`;
   }
   col.innerHTML = html;
 }
 
 // ── SVG gauge helpers ──────────────────────────────
+function _calCssVar(name, fallback) {
+  try {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback || '#888';
+  } catch (e) { return fallback || '#888'; }
+}
 function _calPolar(cx, cy, r, angle) { const rad = (angle - 180) * Math.PI / 180; return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }; }
 function _calArcPath(cx, cy, r, startAngle, endAngle) {
   if (endAngle <= startAngle) return '';
@@ -7739,9 +7748,10 @@ function _calArcPath(cx, cy, r, startAngle, endAngle) {
   const largeArc = (endAngle - startAngle) > 180 ? 1 : 0;
   return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
 }
-// Semicircle gauge with up to 3 weighted segments (green/blue/red)
-function _calSemiGauge(segments, size) {
+// Semicircle gauge with up to 3 weighted segments (green/blue/red) — colors must be resolved (hex/rgb), not var()
+function _calSemiGauge(segments, size, trackColor) {
   size = size || 108;
+  trackColor = trackColor || _calCssVar('--glass-3', 'rgba(255,255,255,0.12)');
   const cx = size / 2, cy = size / 2 + 2, r = size / 2 - 12, sw = 12;
   const total = segments.reduce((a, s) => a + s.value, 0) || 1;
   let angle = 0, paths = '';
@@ -7751,10 +7761,10 @@ function _calSemiGauge(segments, size) {
     paths += `<path d="${_calArcPath(cx, cy, r, angle, angle + span)}" stroke="${s.color}" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`;
     angle += span;
   });
-  const track = `<path d="${_calArcPath(cx, cy, r, 0, 180)}" stroke="var(--glass-2)" stroke-width="${sw}" fill="none"/>`;
+  const track = `<path d="${_calArcPath(cx, cy, r, 0, 180)}" stroke="${trackColor}" stroke-width="${sw}" fill="none"/>`;
   return `<svg width="${size}" height="${size / 2 + 14}" viewBox="0 0 ${size} ${size / 2 + 14}">${track}${paths}</svg>`;
 }
-// Full ring gauge for a single fraction (0..1)
+// Full ring gauge for a single fraction (0..1) — colors must be resolved (hex/rgb), not var()
 function _calRingGauge(fraction, colorMain, colorRest, size) {
   size = size || 76; const cx = size / 2, cy = size / 2, r = size / 2 - 9, sw = 9;
   fraction = Math.max(0, Math.min(1, fraction));
@@ -7795,6 +7805,11 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
   const barTotal = avgWin + avgLoss || 1;
   const winPct = (avgWin / barTotal) * 100;
 
+  // Resolve actual color values (not var(...) strings) so gauges rasterize correctly on export
+  const cGreen = _calCssVar('--green', '#34d399');
+  const cRed   = _calCssVar('--red', '#f87171');
+  const cBlue  = _calCssVar('--blue', '#60a5fa');
+
   if (row1) {
     row1.innerHTML = `
       <div class="cal-an-card">
@@ -7810,7 +7825,7 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
           <div class="cal-an-value">${tradeWR.toFixed(2)}%</div>
         </div>
         <div class="cal-an-gauge-col">
-          ${_calSemiGauge([{ value: wins, color: 'var(--green)' }, { value: bes, color: 'var(--blue)' }, { value: losses, color: 'var(--red)' }])}
+          ${_calSemiGauge([{ value: wins, color: cGreen }, { value: bes, color: cBlue }, { value: losses, color: cRed }])}
           <div class="cal-an-gauge-legend">
             <span class="cal-an-legend-chip green">${wins}</span>
             <span class="cal-an-legend-chip blue">${bes}</span>
@@ -7823,7 +7838,7 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
           <div class="cal-an-label">Profit factor <span class="info-dot">i</span></div>
           <div class="cal-an-value">${profitFactor.toFixed(2)}</div>
         </div>
-        <div class="cal-an-ring-col">${_calRingGauge(pfFraction, 'var(--green)', 'var(--red)')}</div>
+        <div class="cal-an-ring-col">${_calRingGauge(pfFraction, cGreen, cRed)}</div>
       </div>`;
   }
 
@@ -7835,7 +7850,7 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
           <div class="cal-an-value">${dayWR.toFixed(2)}%</div>
         </div>
         <div class="cal-an-gauge-col">
-          ${_calSemiGauge([{ value: winDays, color: 'var(--green)' }, { value: beDays, color: 'var(--blue)' }, { value: lossDays, color: 'var(--red)' }])}
+          ${_calSemiGauge([{ value: winDays, color: cGreen }, { value: beDays, color: cBlue }, { value: lossDays, color: cRed }])}
           <div class="cal-an-gauge-legend">
             <span class="cal-an-legend-chip green">${winDays}</span>
             <span class="cal-an-legend-chip blue">${beDays}</span>
@@ -7868,18 +7883,62 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
 
 function calGoToday() { calYear = new Date().getFullYear(); calMonth = new Date().getMonth(); renderCalendar(); }
 
+// ── Calendar Settings modal ─────────────────────────
+function openCalSettings() {
+  const overlay = document.getElementById('cal-settings-overlay');
+  if (!overlay) return;
+  const curSel = document.getElementById('cs-currency');
+  const wsSel  = document.getElementById('cs-weekstart');
+  const accInp = document.getElementById('cs-accsize');
+  if (curSel) curSel.value = (_profileData && _profileData.currency) || '% (Percentage)';
+  if (wsSel)  wsSel.value  = (_profileData && _profileData.weekstart) || 'Sunday';
+  if (accInp) accInp.value = getAccSize();
+  overlay.style.display = 'flex';
+}
+function closeCalSettings() {
+  const overlay = document.getElementById('cal-settings-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+async function saveCalSettings() {
+  const curSel = document.getElementById('cs-currency');
+  const wsSel  = document.getElementById('cs-weekstart');
+  const accInp = document.getElementById('cs-accsize');
+  if (curSel && typeof _pfLiveUpdate === 'function') _pfLiveUpdate('currency', curSel.value);
+  if (wsSel  && typeof _pfLiveUpdate === 'function') _pfLiveUpdate('weekstart', wsSel.value);
+  if (accInp) {
+    const v = parseFloat(accInp.value) || 5000;
+    ['cal-acc-size', 'cal-acc-size-2'].forEach(id => { const el = document.getElementById(id); if (el) el.value = v; });
+  }
+  renderCalendar();
+  if (typeof _profileSave === 'function') { try { await _profileSave(); } catch (e) { console.error('Calendar settings save failed:', e); } }
+  showToast('Calendar settings saved ✓', 'success');
+  closeCalSettings();
+}
+
 function calExportImage() {
   const el = document.querySelector('#page-calendar .cal-page-scroll');
-  if (!el) return;
+  if (!el) { showToast('Nothing to export', 'danger'); return; }
+  showToast('Generating image…', 'info');
   _smEnsureLibs(() => {
-    showToast('Generating image…', 'info');
-    html2canvas(el, { backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg') || '#080b12', scale: 2 }).then(canvas => {
+    const bg = _calCssVar('--bg', '#080b12');
+    html2canvas(el, {
+      backgroundColor: bg,
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+    }).then(canvas => {
       const link = document.createElement('a');
       link.download = 'NxTGen_Calendar_' + MONTH_NAMES_LONG[calMonth] + '_' + calYear + '.png';
       link.href = canvas.toDataURL('image/png');
+      document.body.appendChild(link);
       link.click();
+      link.remove();
       showToast('Calendar image saved! 🖼', 'success');
-    }).catch(() => showToast('Export failed', 'danger'));
+    }).catch(err => {
+      console.error('Calendar export failed:', err);
+      showToast('Export failed — ' + (err && err.message ? err.message : 'please try again'), 'danger');
+    });
   });
 }
 

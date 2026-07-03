@@ -658,7 +658,7 @@
             <button class="cal-today-btn" onclick="calGoToday()">This month</button>
             <div class="cal-header-spacer"></div>
             <div class="cal-header-icons">
-              <button class="cal-icon-btn" title="Calendar settings" onclick="showToast('Calendar settings coming soon','info')">⚙</button>
+              <button class="cal-icon-btn" title="Calendar settings" onclick="openCalSettings()">⚙</button>
               <button class="cal-icon-btn" title="Export as image" onclick="calExportImage()">📷</button>
               <button class="cal-icon-btn" title="About this calendar" onclick="showToast('Colored cells show daily P&amp;L outcome — green win, red loss, blue breakeven.','info')">ⓘ</button>
             </div>
@@ -1262,6 +1262,42 @@
 
 <!-- ══ CALENDAR POPUP & TOOLTIP ══ -->
 <div class="cal-popup" id="cal-popup" style="display:none"></div>
+
+<div class="cal-settings-overlay" id="cal-settings-overlay" style="display:none" onclick="if(event.target===this) closeCalSettings()">
+  <div class="cal-settings-modal">
+    <div class="cal-settings-head">
+      <div class="cal-settings-title">⚙ Calendar Settings</div>
+      <button class="cal-popup-close" onclick="closeCalSettings()">✕</button>
+    </div>
+    <div class="cal-settings-body">
+      <div class="cal-settings-field">
+        <label>Default currency</label>
+        <select class="form-select" id="cs-currency">
+          <option value="% (Percentage)">% (Percentage)</option>
+          <option value="USD ($)">USD ($)</option>
+          <option value="GBP (£)">GBP (£)</option>
+          <option value="NGN (₦)">NGN (₦)</option>
+          <option value="EUR (€)">EUR (€)</option>
+        </select>
+      </div>
+      <div class="cal-settings-field">
+        <label>Week starts on</label>
+        <select class="form-select" id="cs-weekstart">
+          <option value="Sunday">Sunday</option>
+          <option value="Monday">Monday</option>
+        </select>
+      </div>
+      <div class="cal-settings-field">
+        <label>Default account size (for % trades)</label>
+        <input type="number" class="form-select" id="cs-accsize" value="5000">
+      </div>
+    </div>
+    <div class="cal-settings-foot">
+      <button class="cal-today-btn" onclick="closeCalSettings()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCalSettings()">Save changes</button>
+    </div>
+  </div>
+</div>
 <div class="cal-tooltip" id="cal-tooltip" style="display:none"></div>
 
 <!-- ══ GLASS CONFIRM MODAL ══ -->
