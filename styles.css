@@ -3818,8 +3818,9 @@ body{
   .data-table th:last-child,.data-table td:last-child{ display:none }
   .col-winbar{ display:none }
 
-  /* Trade Log: keep every column and let the table scroll both ways
-     instead of hiding data — the wrap below handles the axes.
+  /* Trade Log: keep every column and let the table scroll sideways
+     to reveal them — vertical scroll stays with the page itself
+     (single scroll region, not a second one nested inside it).
      (html-prefixed for specificity so it wins over the desktop
      defaults declared later in the stylesheet.) */
   #page-tradelog .data-table{ min-width:900px }
@@ -3828,9 +3829,11 @@ body{
   html body #page-tradelog.page{ padding-left:0; padding-right:0 }
   html body #page-tradelog .page-inner{ padding:0 14px }
   html body #page-tradelog .data-table-wrap{
-    margin:0 -14px 14px;
-    padding:0 14px;
-    max-height:calc(100dvh - var(--topbar) - var(--mob-nav-h) - var(--mob-safe) - 200px);
+    margin:0 0 14px;
+    padding:0;
+    overflow-x:auto;
+    overflow-y:visible;
+    max-height:none;
   }
 
   /* ── Filter bar ── */
@@ -7305,48 +7308,78 @@ body {
   margin-right:0;
 }
 #page-tradelog .data-table-wrap{
-  border-radius:0;
-  border:none;
-  background:transparent;
-  backdrop-filter:none;
-  box-shadow:none;
-  margin:0 -24px 16px;
-  padding:0 24px;
+  border-radius:16px;
+  border:0.5px solid var(--glass-border);
+  background:var(--glass-1);
+  backdrop-filter:var(--vibrancy-xs);
+  -webkit-backdrop-filter:var(--vibrancy-xs);
+  box-shadow:var(--elev-1), var(--glass-spec-top);
+  margin:0 0 16px;
+  padding:0;
   width:auto;
   max-width:none;
+  /* Horizontal scroll only — vertical scroll belongs to the page,
+     not a second nested scroll region (that's what made scrolling
+     feel disjointed). */
   overflow-x:auto;
-  overflow-y:auto;
-  max-height:calc(100dvh - 320px);
+  overflow-y:visible;
   -webkit-overflow-scrolling:touch;
   scrollbar-width:thin;
   scrollbar-color:rgba(255,255,255,0.22) transparent;
 }
 [data-theme="light"] #page-tradelog .data-table-wrap{
-  background:transparent;
-  box-shadow:none;
+  background:rgba(255,255,255,0.80);
+  border-color:rgba(30,41,59,0.10);
+  box-shadow:0 0.5px 0 rgba(255,255,255,0.95) inset, var(--elev-2);
 }
 #page-tradelog .data-table-wrap::-webkit-scrollbar{ height:6px; width:6px }
 #page-tradelog .data-table-wrap::-webkit-scrollbar-thumb{
   background:rgba(255,255,255,0.22); border-radius:4px;
 }
+[data-theme="light"] #page-tradelog .data-table-wrap::-webkit-scrollbar-thumb{
+  background:rgba(30,41,59,0.22);
+}
 #page-tradelog .data-table{ min-width:900px; width:max-content }
+
+/* Sticky header — stuck to the page's own scroll (the wrap no longer
+   scrolls vertically), painted to match the card so it never reads as
+   a mismatched slab against the banded rows behind it. */
 #page-tradelog .data-table thead th{
   position:sticky; top:0; z-index:2;
-  background:rgba(10,13,22,0.96);
+  background:rgba(15,19,31,0.94);
   backdrop-filter:var(--vibrancy-xs);
+  -webkit-backdrop-filter:var(--vibrancy-xs);
 }
 [data-theme="light"] #page-tradelog .data-table thead th{
-  background:rgba(250,250,252,0.96);
+  background:rgba(248,249,252,0.94);
 }
-/* first column (checkbox) stays reachable while scrolling horizontally */
+
+/* First column (checkbox) stays reachable while scrolling horizontally.
+   Uses the same frosted family as the card + row banding instead of a
+   flat opaque fill, so it blends in rather than showing up as a stray
+   rectangle while scrolling. */
 #page-tradelog .data-table th:first-child,
 #page-tradelog .data-table td:first-child{
   position:sticky; left:0; z-index:1;
-  background:var(--bg-base);
+  background:rgba(15,19,31,0.90);
+  backdrop-filter:var(--vibrancy-xs);
+  -webkit-backdrop-filter:var(--vibrancy-xs);
+}
+#page-tradelog .data-table tbody tr:nth-child(even) td:first-child{
+  background:rgba(19,24,37,0.90);
+}
+#page-tradelog .data-table tbody tr:hover td:first-child{
+  background:rgba(30,35,50,0.90);
 }
 [data-theme="light"] #page-tradelog .data-table th:first-child,
 [data-theme="light"] #page-tradelog .data-table td:first-child{
-  background:#fafafc;
+  background:rgba(250,250,252,0.92);
+}
+[data-theme="light"] #page-tradelog .data-table tbody tr:nth-child(even) td:first-child{
+  background:rgba(242,244,249,0.92);
+}
+[data-theme="light"] #page-tradelog .data-table tbody tr:hover td:first-child{
+  background:rgba(232,232,250,0.55);
 }
 #page-tradelog .data-table thead th:first-child{ z-index:3 }
 
