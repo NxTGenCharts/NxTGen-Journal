@@ -3675,6 +3675,10 @@ body{
   .data-table td:nth-child(8),
   .data-table th:nth-child(9),
   .data-table td:nth-child(9){ display:none }
+  #page-tradelog .data-table th:nth-child(8),
+  #page-tradelog .data-table td:nth-child(8),
+  #page-tradelog .data-table th:nth-child(9),
+  #page-tradelog .data-table td:nth-child(9){ display:table-cell }
   .detail-panel{ width:360px }
 }
 
@@ -3808,12 +3812,26 @@ body{
   }
   /* Dashboard 4-5 col tables don't need 540px */
   .data-table{ min-width:360px;font-size:12px }
-  #page-tradelog .data-table{ min-width:520px }
   .data-table th,.data-table td{ padding:8px 10px }
   .data-table th:nth-child(8),.data-table td:nth-child(8){ display:none }
   .data-table th:nth-child(9),.data-table td:nth-child(9){ display:none }
   .data-table th:last-child,.data-table td:last-child{ display:none }
   .col-winbar{ display:none }
+
+  /* Trade Log: keep every column and let the table scroll both ways
+     instead of hiding data — the wrap below handles the axes.
+     (html-prefixed for specificity so it wins over the desktop
+     defaults declared later in the stylesheet.) */
+  #page-tradelog .data-table{ min-width:900px }
+  #page-tradelog .data-table th,
+  #page-tradelog .data-table td{ display:table-cell }
+  html body #page-tradelog.page{ padding-left:0; padding-right:0 }
+  html body #page-tradelog .page-inner{ padding:0 14px }
+  html body #page-tradelog .data-table-wrap{
+    margin:0 -14px 14px;
+    padding:0 14px;
+    max-height:calc(100dvh - var(--topbar) - var(--mob-nav-h) - var(--mob-safe) - 200px);
+  }
 
   /* ── Filter bar ── */
   .filter-bar{ flex-wrap:wrap;gap:6px;padding:0 0 10px }
@@ -7263,6 +7281,74 @@ body {
   border-color: rgba(0,0,0,0.06);
   box-shadow: 0 0.5px 0 rgba(255,255,255,0.95) inset, var(--elev-2);
 }
+
+/* ────────────────────────────────────────────────────────────────
+   11b. TRADE LOG — full-width, unconfined, dual-axis scroll
+   Overrides the "card" treatment above: no rounded box, no max-width
+   column, table gets its own scroll region so it can scroll both
+   horizontally (wide columns) and vertically (long trade lists)
+   independent of the outer page, on every viewport size.
+   ──────────────────────────────────────────────────────────────── */
+#page-tradelog.page{ padding-left:0; padding-right:0 }
+#page-tradelog .page-inner{
+  max-width:none;
+  width:100%;
+  margin:0;
+  padding:0 24px;
+  box-sizing:border-box;
+}
+#page-tradelog .cover,
+#page-tradelog .filter-bar,
+#page-tradelog #bulk-action-bar,
+#page-tradelog #trade-count{
+  margin-left:0;
+  margin-right:0;
+}
+#page-tradelog .data-table-wrap{
+  border-radius:0;
+  border:none;
+  background:transparent;
+  backdrop-filter:none;
+  box-shadow:none;
+  margin:0 -24px 16px;
+  padding:0 24px;
+  width:auto;
+  max-width:none;
+  overflow-x:auto;
+  overflow-y:auto;
+  max-height:calc(100dvh - 320px);
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(255,255,255,0.22) transparent;
+}
+[data-theme="light"] #page-tradelog .data-table-wrap{
+  background:transparent;
+  box-shadow:none;
+}
+#page-tradelog .data-table-wrap::-webkit-scrollbar{ height:6px; width:6px }
+#page-tradelog .data-table-wrap::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,0.22); border-radius:4px;
+}
+#page-tradelog .data-table{ min-width:900px; width:max-content }
+#page-tradelog .data-table thead th{
+  position:sticky; top:0; z-index:2;
+  background:rgba(10,13,22,0.96);
+  backdrop-filter:var(--vibrancy-xs);
+}
+[data-theme="light"] #page-tradelog .data-table thead th{
+  background:rgba(250,250,252,0.96);
+}
+/* first column (checkbox) stays reachable while scrolling horizontally */
+#page-tradelog .data-table th:first-child,
+#page-tradelog .data-table td:first-child{
+  position:sticky; left:0; z-index:1;
+  background:var(--bg-base);
+}
+[data-theme="light"] #page-tradelog .data-table th:first-child,
+[data-theme="light"] #page-tradelog .data-table td:first-child{
+  background:#fafafc;
+}
+#page-tradelog .data-table thead th:first-child{ z-index:3 }
 
 .data-table th {
   font-size: 10px;
