@@ -1273,6 +1273,11 @@
       document.body.style.overflow = isOpen ? 'hidden' : '';
       document.body.classList.toggle('sb-expanded', isOpen);
       if (btn) btn.classList.toggle('active', isOpen);
+      // This app scrolls inside an inner `.page` container, not the window,
+      // so body.style.overflow alone doesn't stop the page from moving
+      // (and re-triggering the browser's toolbar resize) behind the menu.
+      const activePage = Array.from(document.querySelectorAll('.page')).find(p => getComputedStyle(p).display !== 'none');
+      if (activePage) activePage.style.overflow = isOpen ? 'hidden' : '';
     } else {
       const isCollapsed = sb.classList.toggle('sb-collapsed');
       document.getElementById('main-layout').classList.toggle('sidebar-hidden', isCollapsed);
@@ -1288,6 +1293,8 @@
     sb.classList.remove('mob-open');
     ov.classList.remove('show');
     document.body.style.overflow = '';
+    const activePage = Array.from(document.querySelectorAll('.page')).find(p => getComputedStyle(p).display !== 'none');
+    if (activePage) activePage.style.overflow = '';
     if (window.innerWidth <= 768) document.body.classList.remove('sb-expanded');
     if (btn) btn.classList.remove('active');
   }

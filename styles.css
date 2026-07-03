@@ -3750,9 +3750,11 @@ body{
     transform:translateX(-105%);
     transition:transform 0.3s cubic-bezier(0.22,1,0.36,1),box-shadow 0.3s;
     border-right:1px solid var(--glass-border);
+    /* No backdrop-filter: this panel's background is already 97% opaque,
+       so blur added no visible effect but carried the same fixed-layer
+       repaint/tearing risk (address-bar resize, keyboard open) that caused
+       the Share Trade Card glitch. */
     background:rgba(9,12,20,0.97);
-    backdrop-filter:blur(40px) saturate(1.8);
-    -webkit-backdrop-filter:blur(40px) saturate(1.8);
     border-radius:0 var(--r-xl) var(--r-xl) 0;
     box-shadow:none;
     overflow-y:auto;
@@ -3764,10 +3766,12 @@ body{
   }
   .mob-overlay{
     display:none;position:fixed;inset:0;top:var(--topbar);z-index:399;
-    background:rgba(0,0,0,0.62);
-    backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+    /* Same reasoning — dropped backdrop-filter, bumped opacity slightly to
+       keep the same visual dimming without the fixed+blur tearing risk. */
+    background:rgba(0,0,0,0.66);
   }
   .mob-overlay.show{ display:block }
+
   .sb-close-btn{
     display:flex;align-items:center;justify-content:flex-end;
     padding:8px 12px 6px;
@@ -4123,8 +4127,9 @@ body{
   top:0;left:0;right:0;
   bottom:calc(62px + env(safe-area-inset-bottom,0px));
   z-index:499;
-  background:rgba(0,0,0,0.55);
-  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  /* No backdrop-filter — same fixed+blur tearing risk as the Share Trade
+     Card overlay had. Bumped opacity slightly to keep the same dimming. */
+  background:rgba(0,0,0,0.60);
 }
 .mob-more-overlay.show{ display:block }
 
@@ -4137,9 +4142,9 @@ body{
   max-height:calc(100dvh - var(--topbar) - 62px - env(safe-area-inset-bottom,0px) - 8px);
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
+  /* Background is already 97% opaque — blur behind it was invisible, so
+     dropping it removes the tearing risk with no visual change. */
   background:rgba(9,12,21,0.97);
-  backdrop-filter:blur(44px) saturate(1.8);
-  -webkit-backdrop-filter:blur(44px) saturate(1.8);
   box-shadow:0 -4px 48px rgba(0,0,0,0.55);
   transform:translateY(110%);
   opacity:0;
@@ -7755,8 +7760,6 @@ body {
    ──────────────────────────────────────────────────────────────── */
 .mob-more-sheet {
   background: rgba(10,13,22,0.97);
-  backdrop-filter: var(--vibrancy-2xl);
-  -webkit-backdrop-filter: var(--vibrancy-2xl);
   border-radius: 26px 26px 0 0;
   border-top: 0.5px solid rgba(255,255,255,0.10);
   box-shadow: var(--glass-spec-top), var(--elev-5);
@@ -8259,9 +8262,11 @@ body {
    44. MOBILE OVERLAY — Refined blur
    ──────────────────────────────────────────────────────────────── */
 .mob-overlay {
-  background: rgba(0,0,0,0.5);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* No backdrop-filter — this is a pure dimming layer (fixed, full-screen)
+     so it doesn't need frosted texture, and dropping it removes the same
+     fixed+blur repaint/tearing risk that caused the Share Trade Card
+     glitch. Slightly higher opacity keeps the same visual dimming. */
+  background: rgba(0,0,0,0.58);
 }
 
 /* ────────────────────────────────────────────────────────────────
@@ -9572,6 +9577,12 @@ select[id="filter-kz"] option[value="London"] {
 
   z-index: 1000 !important;
   overflow: hidden !important;
+  /* Keeps this blurred layer on its own stable GPU compositor layer so
+     Chrome's dynamic-toolbar/keyboard resize doesn't force a full repaint
+     mid-frame — the same class of bug behind the Share Trade Card glitch,
+     just less visible here since this element persists rather than being
+     freshly mounted. */
+  transform: translateZ(0);
 }
 
 /* Glass refraction layer — pseudo shimmer across the pill */
@@ -9728,6 +9739,7 @@ select[id="filter-kz"] option[value="London"] {
   box-shadow:
     inset -1px 0 0 rgba(255,255,255,0.04),
     4px 0 32px rgba(0,0,0,0.25) !important;
+  transform: translateZ(0);
 }
 
 /* Subtle inner shimmer on sidebar */
@@ -9781,6 +9793,7 @@ select[id="filter-kz"] option[value="London"] {
     inset 0 1px 0 rgba(255,255,255,0.10),
     inset 0 -0.5px 0 rgba(255,255,255,0.04),
     0 2px 24px rgba(0,0,0,0.2) !important;
+  transform: translateZ(0);
 }
 
 [data-theme="light"] .topbar {
