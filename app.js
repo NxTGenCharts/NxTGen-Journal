@@ -7352,13 +7352,26 @@ function loadTheme() {
 }
 
 // ── LIVE CLOCK ────────────────────────────────────────
+// Respects the "Timezone" setting on the Account tab (_profileData.timezone),
+// falling back to Africa/Lagos (WAT) if unset or invalid.
 function updateClock() {
   const el = document.getElementById('topbar-clock');
   if (!el) return;
   const now = new Date();
-  const t = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Africa/Lagos' });
-  const d = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Africa/Lagos' });
-  el.textContent = d + ' · ' + t + ' WAT';
+  const tz  = (_profileData && _profileData.timezone) || 'Africa/Lagos';
+  let t, d, tzLabel;
+  try {
+    t = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: tz });
+    d = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz });
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' }).formatToParts(now);
+    tzLabel = (parts.find(p => p.type === 'timeZoneName') || {}).value || '';
+  } catch (e) {
+    // Unknown/invalid IANA zone — fall back safely
+    t = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Africa/Lagos' });
+    d = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Africa/Lagos' });
+    tzLabel = 'WAT';
+  }
+  el.textContent = d + ' · ' + t + (tzLabel ? ' ' + tzLabel : '');
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────
@@ -9243,6 +9256,7 @@ function _pfLiveUpdate(key, value) {
   if (key === 'currency')    { _pnlToggleMode = (value === '% (Percentage)') ? '%' : '$'; updateKPIs(); renderCalendar(); }
   if (key === 'defaultview') updateKPIs();
   if (key === 'daterange')   _applyDefaultDateRangeSetting();
+  if (key === 'timezone')    updateClock();
 }
 
 // ── Sound notifications — short synthesized chime, no external audio file ──

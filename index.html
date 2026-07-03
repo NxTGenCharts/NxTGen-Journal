@@ -897,14 +897,18 @@
               <div class="profile-field"><label class="profile-label">Phone (optional)</label><input class="profile-input" type="tel" id="pf-phone" placeholder="+1 234 567 8900"></div>
               <div class="profile-field">
                 <label class="profile-label">Timezone</label>
-                <select class="profile-select" id="pf-timezone">
+                <select class="profile-select" id="pf-timezone" onchange="_pfLiveUpdate('timezone', this.value)">
                   <option value="Africa/Lagos">Nigeria (WAT, UTC+1)</option>
                   <option value="Europe/London">United Kingdom (GMT/BST)</option>
                   <option value="America/New_York">United States — EST/EDT</option>
                   <option value="America/Chicago">United States — CST/CDT</option>
+                  <option value="America/Los_Angeles">United States — PST/PDT</option>
                   <option value="Europe/Berlin">Germany (CET/CEST)</option>
                   <option value="Asia/Dubai">UAE (GST, UTC+4)</option>
                   <option value="Asia/Singapore">Singapore (SGT, UTC+8)</option>
+                  <option value="Asia/Tokyo">Japan (JST, UTC+9)</option>
+                  <option value="Australia/Sydney">Australia — AEST/AEDT</option>
+                  <option value="UTC">UTC</option>
                 </select>
               </div>
               <div class="profile-field full"><label class="profile-label">Address</label><input class="profile-input" type="text" id="pf-address" placeholder="e.g. 12 Baker St, London, UK"></div>

@@ -6871,16 +6871,18 @@ body {
   font-size: 11px;
   letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
-  color: var(--text3);
+  color: var(--text2);
+  font-weight: 600;
   padding: 5px 11px;
-  background: rgba(255,255,255,0.05);
-  border: 0.5px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.07);
+  border: 0.5px solid rgba(255,255,255,0.12);
   border-radius: 8px;
   box-shadow: var(--glass-spec-top);
 }
 [data-theme="light"] .topbar-clock {
-  background: rgba(0,0,0,0.04);
-  border-color: rgba(0,0,0,0.07);
+  color: var(--text);
+  background: rgba(0,0,0,0.05);
+  border-color: rgba(0,0,0,0.10);
 }
 
 /* Avatar button — Apple style */
