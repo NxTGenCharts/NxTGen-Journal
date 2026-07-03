@@ -7916,17 +7916,44 @@ async function saveCalSettings() {
 }
 
 function calExportImage() {
-  const el = document.querySelector('#page-calendar .cal-page-scroll');
-  if (!el) { showToast('Nothing to export', 'danger'); return; }
+  const pageEl   = document.getElementById('page-calendar');
+  const scrollEl = document.querySelector('#page-calendar .cal-page-scroll');
+  if (!pageEl || !scrollEl) { showToast('Nothing to export', 'danger'); return; }
   showToast('Generating image…', 'info');
   _smEnsureLibs(() => {
-    const bg = _calCssVar('--bg', '#080b12');
-    html2canvas(el, {
+    // Temporarily disable the internal scroll clipping so the FULL calendar
+    // (every analytics card + every week row) is captured, not just what's on screen.
+    const prevPageOverflow   = pageEl.style.overflow;
+    const prevPageHeight     = pageEl.style.height;
+    const prevScrollMinHeight = scrollEl.style.minHeight;
+    const prevScrollHeight    = scrollEl.style.height;
+    pageEl.style.overflow    = 'visible';
+    pageEl.style.height      = 'auto';
+    scrollEl.style.minHeight = 'auto';
+    scrollEl.style.height    = 'auto';
+
+    const bg   = _calCssVar('--bg', '#080b12');
+    const text = _calCssVar('--text', '#f8fafc');
+
+    html2canvas(scrollEl, {
       backgroundColor: bg,
       scale: 2,
       useCORS: true,
       allowTaint: true,
       logging: false,
+      windowWidth: scrollEl.scrollWidth,
+      windowHeight: scrollEl.scrollHeight,
+      onclone: (clonedDoc) => {
+        // html2canvas can't render "background-clip:text" gradient labels — it paints the
+        // gradient as a solid box instead. Flatten the month label to plain text for export.
+        clonedDoc.querySelectorAll('.cal-month-label').forEach(el => {
+          el.style.background = 'none';
+          el.style.webkitBackgroundClip = 'initial';
+          el.style.backgroundClip = 'initial';
+          el.style.webkitTextFillColor = 'initial';
+          el.style.color = text;
+        });
+      },
     }).then(canvas => {
       const link = document.createElement('a');
       link.download = 'NxTGen_Calendar_' + MONTH_NAMES_LONG[calMonth] + '_' + calYear + '.png';
@@ -7938,6 +7965,11 @@ function calExportImage() {
     }).catch(err => {
       console.error('Calendar export failed:', err);
       showToast('Export failed — ' + (err && err.message ? err.message : 'please try again'), 'danger');
+    }).finally(() => {
+      pageEl.style.overflow    = prevPageOverflow;
+      pageEl.style.height      = prevPageHeight;
+      scrollEl.style.minHeight = prevScrollMinHeight;
+      scrollEl.style.height    = prevScrollHeight;
     });
   });
 }
