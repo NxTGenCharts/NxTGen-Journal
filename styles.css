@@ -5324,9 +5324,14 @@ body{
   inset: 0;
   height: 100vh;
   height: 100dvh;
-  background: rgba(4,8,18,0.80);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* No backdrop-filter here on purpose. Blurring a position:fixed layer
+     that also gets resized/re-transformed by Chrome's dynamic address bar
+     (which happens on ANY touch/scroll while the modal is open) is what
+     produced the torn frames, blank gaps, and "half visible" content —
+     Android Chrome fails to recomposite the blurred layer correctly during
+     that resize. A solid darkened background gives the same dimmed-page
+     effect without triggering the bug. */
+  background: rgba(4,8,18,0.90);
   z-index: 3000;
   display: none;
   align-items: center;
@@ -5340,9 +5345,12 @@ body{
      card) whenever the browser's address bar showed/hid in compact view. */
   overflow: hidden;
   overscroll-behavior: contain;
+  isolation: isolate;
+  contain: layout paint;
+  transform-origin: top left;
 }
 #share-modal-overlay.open { opacity: 1; }
-[data-theme="light"] #share-modal-overlay { background: rgba(15,23,42,0.65); }
+[data-theme="light"] #share-modal-overlay { background: rgba(15,23,42,0.80); }
 
 .sm-modal {
   width: 100%;
@@ -5358,6 +5366,11 @@ body{
   transform: translateY(20px);
   transition: transform 0.26s cubic-bezier(0.22,1,0.36,1);
   margin: auto;
+  /* Own compositor layer + hard clip so nothing behind it can ever show
+     through mid-repaint, regardless of what the overlay above is doing. */
+  isolation: isolate;
+  contain: layout paint;
+  background-color: var(--bg2);
 }
 #share-modal-overlay.open .sm-modal { transform: translateY(0); }
 [data-theme="light"] .sm-modal {
@@ -5636,12 +5649,6 @@ body{
   .sm-actions { grid-template-columns: 1fr; }
   .sm-fmt-row  { grid-template-columns: 1fr; }
   .view-stats-grid { grid-template-columns: 1fr; }
-}
-@media (max-width: 768px) {
-  /* Heavy backdrop-filter blur combined with a fixed overlay is a common
-     source of repaint glitches/flicker on Android Chrome & mobile Safari.
-     Lighten it on small screens where it's most noticeable. */
-  #share-modal-overlay { backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 }
 
 /* ══════════════════════════════════════════════════════

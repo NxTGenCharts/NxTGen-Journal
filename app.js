@@ -8808,7 +8808,7 @@ function _onCalAccSize2Change() {
 }
 
 // ── SHARE MODAL ────────────────────────────────────────────────────────────
-let _shareFmt = 'jpg', _sharePnlMode = 'pct', _shareCardTheme = 'dark', _shareTradeId = null;
+let _shareFmt = 'jpg', _sharePnlMode = 'pct', _shareCardTheme = 'dark', _shareTradeId = null, _smScrollY = 0, _smActivePage = null, _smActivePageScroll = 0;
 
 function openShareModal(id) {
   const t = trades.find(x => x.id === id); if (!t) return;
@@ -8895,11 +8895,43 @@ function openShareModal(id) {
     </div>
   </div>`;
   document.body.appendChild(overlay);
-  // Lock background scroll so the page can't move/rubber-band behind the
-  // fixed overlay on mobile — this was the main cause of the modal
-  // jumping/glitching in compact (address-bar-hidden) view.
+  // --- Robust mobile scroll-lock -------------------------------------
+  // overflow:hidden alone still lets Chrome's dynamic address bar show/hide
+  // as you touch/scroll, which resizes the visual viewport mid-interaction.
+  // Combined with backdrop-filter on a position:fixed layer, that resize is
+  // exactly what was causing the torn/ghosted frames and blank gaps you saw
+  // (content from behind the modal "bleeding through", parts going blurry
+  // or half-rendered). Freezing the body at its current scroll position
+  // stops the toolbar from moving at all while the modal is open.
+  _smScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${_smScrollY}px`;
+  document.body.style.left = '0';
+  document.body.style.right = '0';
+  document.body.style.width = '100%';
   document.body.style.overflow = 'hidden';
-  document.body.style.touchAction = 'none';
+  // This app scrolls inside an internal `.page` container rather than the
+  // window itself, so it also needs to be frozen or it can keep moving
+  // (and re-triggering the toolbar resize) under the modal.
+  _smActivePage = Array.from(document.querySelectorAll('.page')).find(p => getComputedStyle(p).display !== 'none') || null;
+  if (_smActivePage) { _smActivePageScroll = _smActivePage.scrollTop; _smActivePage.style.overflow = 'hidden'; }
+
+  // Keep the overlay pinned exactly to the visible viewport (not the
+  // layout viewport) so it can't be caught mid-resize by the toolbar or an
+  // on-screen keyboard opening for the account-size input.
+  const _smSyncViewport = () => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    overlay.style.height = vv.height + 'px';
+    overlay.style.transform = `translateY(${vv.offsetTop}px)`;
+  };
+  _smSyncViewport();
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', _smSyncViewport);
+    window.visualViewport.addEventListener('scroll', _smSyncViewport);
+  }
+  overlay._smSyncViewport = _smSyncViewport;
+
   requestAnimationFrame(() => { overlay.style.display = 'flex'; requestAnimationFrame(() => overlay.classList.add('open')); });
   _smEnsureLibs(() => smPopulateCard(id));
 }
@@ -8945,7 +8977,24 @@ function smRefreshPnl() {
 function smSetPnlMode(mode,btn){_sharePnlMode=mode;document.querySelectorAll('#sm-pnl-seg .sm-seg-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const r=document.getElementById('sm-usd-row');if(r)r.style.display=mode==='pct'?'none':'';smRefreshPnl();}
 function smSetFmt(fmt,btn){_shareFmt=fmt;document.querySelectorAll('.sm-fmt-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
 function smToggleTheme(){_shareCardTheme=_shareCardTheme==='dark'?'light':'dark';const c=document.getElementById('sm-card');if(c)c.className='sm-card '+_shareCardTheme;const b=document.getElementById('sm-theme-btn');if(b)b.textContent=_shareCardTheme==='dark'?'☀️':'🌙';}
-function closeShareModal(){const o=document.getElementById('share-modal-overlay');if(!o)return;o.classList.remove('open');document.body.style.overflow='';document.body.style.touchAction='';setTimeout(()=>o.remove(),260);}
+function closeShareModal(){
+  const o=document.getElementById('share-modal-overlay');
+  if(!o)return;
+  o.classList.remove('open');
+  if (window.visualViewport && o._smSyncViewport) {
+    window.visualViewport.removeEventListener('resize', o._smSyncViewport);
+    window.visualViewport.removeEventListener('scroll', o._smSyncViewport);
+  }
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.left = '';
+  document.body.style.right = '';
+  document.body.style.width = '';
+  document.body.style.overflow = '';
+  window.scrollTo(0, _smScrollY || 0);
+  if (_smActivePage) { _smActivePage.style.overflow = ''; _smActivePage.scrollTop = _smActivePageScroll; _smActivePage = null; }
+  setTimeout(()=>o.remove(),260);
+}
 function _smSetLoading(btnId,spinId,lblId,on,lbl){const btn=document.getElementById(btnId),sp=document.getElementById(spinId),lb=document.getElementById(lblId);if(!btn)return;btn.disabled=on;if(sp)sp.classList.toggle('active',on);if(lb){lb.style.opacity=on?'0':'1';if(lbl&&!on)lb.textContent=lbl;}}
 
 // ── Pre-baked logo PNGs: generated from logo.svg at build time ──
