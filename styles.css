@@ -3995,7 +3995,7 @@ body{
   .cal-day-num{ font-size:10px }
   .cal-day-pnl{ font-size:9px }
   .cal-day-count{ font-size:9px }
-  .cal-day-pairs{ display:none }
+  .cal-day-pairs{ font-size:7.5px }
   #cal-popup{
     position:fixed !important;left:50% !important;top:50% !important;
     transform:translate(-50%,-50%) !important;
@@ -4921,7 +4921,7 @@ body{
   .cal-kpi-row{grid-template-columns:repeat(2,1fr)}
   .cal-kpi-val{font-size:14px}
   .cal-day{min-height:50px;padding:4px 5px}
-  .cal-day-pairs{display:none}
+  .cal-day-pairs{font-size:7.5px}
 }
 
 /* ════ TRASH card left bar gradient on hover ════════ */
@@ -10571,13 +10571,14 @@ body {
   .cal-day-dot{width:4px;height:4px;top:5px;right:5px}
   .cal-day-pnl{font-size:9.5px;margin-top:3px}
   .cal-day-count{font-size:8px;margin-top:1px}
-  .cal-day-pairs{display:none}
+  .cal-day-pairs{font-size:7px}
 }
 @media(max-width:420px){
   .cal-day{min-height:50px;padding:5px 4px}
   .cal-day-num{font-size:10px}
   .cal-day-pnl{font-size:8.5px}
-  .cal-day-count{display:none}
+  .cal-day-count{font-size:7px}
+  .cal-day-pairs{font-size:6.5px}
   .cal-week-card{padding:8px 4px 7px;gap:2px}
   .cal-week-label{font-size:8px}
   .cal-week-pnl{font-size:11px}
