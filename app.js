@@ -7820,11 +7820,15 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
   const cBlue  = _calCssVar('--blue', '#60a5fa');
 
   if (row1) {
+    const _calNetIsDollar = (_pnlToggleMode === '$');
+    const _calTotalPct = monthTrades.reduce((a, t) => a + _pctOfTrade(t), 0);
+    const _calNetVal = _calNetIsDollar ? totalUSD : _calTotalPct;
+    const _calNetDisplay = _calNetIsDollar ? fmtUSD(totalUSD) : ((_calTotalPct >= 0 ? '+' : '') + _calTotalPct.toFixed(1) + '%');
     row1.innerHTML = `
-      <div class="cal-an-card">
+      <div class="cal-an-card cal-an-card--toggle" onclick="toggleNetPnl()" title="Tap to toggle $ / %">
         <div class="cal-an-left">
-          <div class="cal-an-label">Net P&amp;L <span class="info-dot">i</span></div>
-          <div class="cal-an-value ${totalUSD >= 0 ? 'green' : 'red'}">${fmtUSD(totalUSD)}</div>
+          <div class="cal-an-label">Net P&amp;L <span class="info-dot">i</span> <span class="cal-an-toggle-hint">tap to toggle</span></div>
+          <div class="cal-an-value ${_calNetVal >= 0 ? 'green' : 'red'}">${_calNetDisplay}</div>
         </div>
         <div class="cal-an-badge">${monthTrades.length}</div>
       </div>

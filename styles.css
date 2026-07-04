@@ -10389,6 +10389,14 @@ body {
 }
 [data-theme="light"] .cal-an-card{background:var(--glass-2);box-shadow:var(--shadow-xs)}
 .cal-an-card:hover{border-color:var(--glass-border-h);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.cal-an-card--toggle{cursor:pointer;user-select:none}
+.cal-an-card--toggle:hover{border-color:rgba(99,179,237,0.35)}
+.cal-an-card--toggle:active{transform:scale(0.97)}
+.cal-an-toggle-hint{
+  font-size:8px;color:var(--text3);text-transform:uppercase;
+  letter-spacing:.06em;opacity:.7;margin-left:2px;
+  font-family:var(--font-body);font-weight:600;
+}
 
 .cal-an-left{display:flex;flex-direction:column;gap:8px;min-width:0}
 .cal-an-label{font-size:11.5px;color:var(--text3);display:flex;align-items:center;gap:5px;font-weight:700;letter-spacing:.01em}
