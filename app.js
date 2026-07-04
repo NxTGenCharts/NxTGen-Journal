@@ -7951,9 +7951,17 @@ function calExportImage() {
     const rowBg  = isLight ? '#eef1f6' : '#11151f';
     const cardBg = isLight ? '#f5f7fa' : '#0d1119';
 
+    // Same pre-baked logo PNGs the share-card export uses — a real <img src="logo.svg">
+    // is unreliable inside html2canvas (file:// / CORS / SVG quirks), so we swap in a
+    // baked bitmap that's guaranteed to render, already matched to the active theme.
+    const brandLogo = isLight ? _LOGO_LIGHT_B64 : _LOGO_DARK_B64;
+    const dim        = _calCssVar('--text3', '#8b94a7');
+    const monthLabel = MONTH_NAMES_LONG[calMonth] + ' ' + calYear;
+    const stampLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
     html2canvas(scrollEl, {
       backgroundColor: bg,
-      scale: 2,
+      scale: 2.5,
       useCORS: true,
       allowTaint: true,
       logging: false,
@@ -7969,6 +7977,33 @@ function calExportImage() {
           el.style.webkitTextFillColor = 'initial';
           el.style.color = text;
         });
+
+        // Brand the export like a real report: a logo/title header up top and a
+        // subtle site-credit footer at the bottom, both baked into the image itself
+        // and matched to whichever theme (dark/light) was active when exporting.
+        const clonedScroll = clonedDoc.querySelector('#page-calendar .cal-page-scroll');
+        if (clonedScroll) {
+          clonedScroll.style.padding = '22px 26px 18px';
+          clonedScroll.style.background = bg;
+
+          const header = clonedDoc.createElement('div');
+          header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding-bottom:4px;';
+          header.innerHTML =
+            '<div style="display:flex;align-items:center;gap:10px;">' +
+              '<img src="' + brandLogo + '" style="height:28px;width:auto;display:block;">' +
+              '<span style="font-weight:700;font-size:16px;color:' + text + ';letter-spacing:.2px;">NxTGen Trading Journal</span>' +
+            '</div>' +
+            '<div style="font-size:12px;color:' + dim + ';white-space:nowrap;">' + monthLabel + ' &middot; Exported ' + stampLabel + '</div>';
+
+          const footer = clonedDoc.createElement('div');
+          footer.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;padding-top:10px;opacity:.65;';
+          footer.innerHTML =
+            '<img src="' + brandLogo + '" style="height:14px;width:auto;display:block;">' +
+            '<span style="font-size:11px;color:' + dim + ';">nxtgencharts.github.io/NxTGen-Journal</span>';
+
+          clonedScroll.insertBefore(header, clonedScroll.firstChild);
+          clonedScroll.appendChild(footer);
+        }
 
         // html2canvas has no support for backdrop-filter (used everywhere for the
         // "frosted glass" panels) and only partial support for inset box-shadows
