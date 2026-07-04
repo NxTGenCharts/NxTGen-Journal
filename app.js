@@ -9757,22 +9757,26 @@ function _setFabXY(el, x, y) {
   el.style.bottom = 'auto';
   return p;
 }
+function _fabDefaultXY(el) {
+  // Default: bottom-right, clear of the mobile bottom nav if present
+  const bottomNav = document.querySelector('.mob-bottom-nav');
+  const navH = (bottomNav && window.innerWidth <= 768) ? bottomNav.offsetHeight : 0;
+  const w = el.offsetWidth || 44, h = el.offsetHeight || 44;
+  return { x: window.innerWidth - w - 20, y: window.innerHeight - h - 24 - navH };
+}
 function _initFabPosition(el) {
-  let saved = null;
-  try { saved = JSON.parse(localStorage.getItem(_FAB_POS_KEY) || 'null'); } catch (e) {}
-  if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
-    _setFabXY(el, saved.x, saved.y);
-  } else {
-    // Default: bottom-right, clear of the mobile bottom nav if present
-    const bottomNav = document.querySelector('.mob-bottom-nav');
-    const navH = (bottomNav && window.innerWidth <= 768) ? bottomNav.offsetHeight : 0;
-    const w = el.offsetWidth || 44, h = el.offsetHeight || 44;
-    _setFabXY(el, window.innerWidth - w - 20, window.innerHeight - h - 24 - navH);
-  }
+  // Always start at the default position on load/reload — dragging only
+  // repositions the FAB for the current session, it is never persisted.
+  try { localStorage.removeItem(_FAB_POS_KEY); } catch (e) {}
+  const d = _fabDefaultXY(el);
+  _setFabXY(el, d.x, d.y);
   _makeFabDraggable(el);
   window.addEventListener('resize', () => {
-    const rect = el.getBoundingClientRect();
-    _setFabXY(el, rect.left, rect.top);
+    // Recompute against the default corner so the FAB stays clear of the
+    // bottom nav / screen edge on resize, rather than freezing wherever
+    // it was last dragged to.
+    const d = _fabDefaultXY(el);
+    _setFabXY(el, d.x, d.y);
   });
 }
 function _fabClick(el) {
@@ -9847,8 +9851,8 @@ function _makeFabDraggable(el) {
     document.removeEventListener('touchmove', onMove);
     document.removeEventListener('touchend', onUp);
     if (moved) {
-      const rect = el.getBoundingClientRect();
-      try { localStorage.setItem(_FAB_POS_KEY, JSON.stringify({ x: rect.left, y: rect.top })); } catch (e) {}
+      // Position is intentionally NOT persisted — the FAB always returns
+      // to its default corner on the next load/reload.
       el.dataset.justDragged = '1';
       setTimeout(() => { delete el.dataset.justDragged; }, 60);
     }
