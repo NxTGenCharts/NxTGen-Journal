@@ -7956,7 +7956,7 @@ function calExportImage() {
     // baked bitmap that's guaranteed to render, already matched to the active theme.
     const brandLogo = isLight ? _LOGO_LIGHT_B64 : _LOGO_DARK_B64;
     const dim        = _calCssVar('--text3', '#8b94a7');
-    const stampLabel = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const stampLabel = formatUserDateTime(new Date(), { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
 
     html2canvas(scrollEl, {
       backgroundColor: bg,
@@ -8030,6 +8030,19 @@ function calExportImage() {
           #page-calendar .cal-an-card {
             background: ${cardBg} !important;
             box-shadow: none !important;
+          }
+          #page-calendar .cal-nav {
+            background: ${cardBg} !important;
+            box-shadow: none !important;
+            color: ${text} !important;
+          }
+          #page-calendar .form-select,
+          #page-calendar .acc-size-input {
+            background: ${cardBg} !important;
+            box-shadow: none !important;
+          }
+          #page-calendar .cal-week-days {
+            background: ${rowBg} !important;
           }
           #page-calendar .cal-page-scroll {
             overflow: visible !important;
