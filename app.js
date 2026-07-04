@@ -8044,6 +8044,10 @@ function calExportImage() {
           #page-calendar .cal-week-days {
             background: ${rowBg} !important;
           }
+          #page-calendar .cal-day-count,
+          #page-calendar .cal-day-pairs {
+            display: block !important;
+          }
           #page-calendar .cal-page-scroll {
             overflow: visible !important;
           }
