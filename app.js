@@ -7956,8 +7956,7 @@ function calExportImage() {
     // baked bitmap that's guaranteed to render, already matched to the active theme.
     const brandLogo = isLight ? _LOGO_LIGHT_B64 : _LOGO_DARK_B64;
     const dim        = _calCssVar('--text3', '#8b94a7');
-    const monthLabel = MONTH_NAMES_LONG[calMonth] + ' ' + calYear;
-    const stampLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const stampLabel = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
     html2canvas(scrollEl, {
       backgroundColor: bg,
@@ -7987,19 +7986,16 @@ function calExportImage() {
           clonedScroll.style.background = bg;
 
           const header = clonedDoc.createElement('div');
-          header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding-bottom:4px;';
+          header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding-bottom:8px;';
           header.innerHTML =
-            '<div style="display:flex;align-items:center;gap:10px;">' +
-              '<img src="' + brandLogo + '" style="height:28px;width:auto;display:block;">' +
-              '<span style="font-weight:700;font-size:16px;color:' + text + ';letter-spacing:.2px;">NxTGen Trading Journal</span>' +
-            '</div>' +
-            '<div style="font-size:12px;color:' + dim + ';white-space:nowrap;">' + monthLabel + ' &middot; Exported ' + stampLabel + '</div>';
+            '<img src="' + brandLogo + '" style="height:52px;width:auto;display:block;">' +
+            '<div style="font-size:13px;color:' + dim + ';white-space:nowrap;">Exported ' + stampLabel + '</div>';
 
           const footer = clonedDoc.createElement('div');
-          footer.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;padding-top:10px;opacity:.65;';
+          footer.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:10px;padding-top:14px;opacity:.9;';
           footer.innerHTML =
-            '<img src="' + brandLogo + '" style="height:14px;width:auto;display:block;">' +
-            '<span style="font-size:11px;color:' + dim + ';">nxtgencharts.github.io/NxTGen-Journal</span>';
+            '<img src="' + brandLogo + '" style="height:24px;width:auto;display:block;">' +
+            '<span style="font-size:12px;color:' + dim + ';">nxtgencharts.github.io/NxTGen-Journal</span>';
 
           clonedScroll.insertBefore(header, clonedScroll.firstChild);
           clonedScroll.appendChild(footer);
@@ -8047,9 +8043,29 @@ function calExportImage() {
         clonedDoc.head.appendChild(style);
       },
     }).then(canvas => {
+      // Composite onto a fixed-width, high-resolution canvas instead of shipping the
+      // raw content-sized capture — keeps every export a consistent, non-square,
+      // landscape frame regardless of how tall the calendar happens to be that month.
+      // Width is pinned exactly to the target; height is allowed to grow past the
+      // target only if a month's content genuinely needs more room, so no week row
+      // or analytics card is ever cropped or squished to force a fit.
+      const TARGET_W = 2910;
+      const TARGET_H = 1898;
+      const fitScale = TARGET_W / canvas.width;
+      const drawW = TARGET_W;
+      const drawH = canvas.height * fitScale;
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width  = TARGET_W;
+      outCanvas.height = Math.max(TARGET_H, Math.round(drawH));
+      const ctx = outCanvas.getContext('2d');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, outCanvas.width, outCanvas.height);
+      const dy = Math.max(0, (outCanvas.height - drawH) / 2);
+      ctx.drawImage(canvas, 0, dy, drawW, drawH);
+
       const link = document.createElement('a');
       link.download = 'NxTGen_Calendar_' + MONTH_NAMES_LONG[calMonth] + '_' + calYear + '.png';
-      link.href = canvas.toDataURL('image/png');
+      link.href = outCanvas.toDataURL('image/png');
       document.body.appendChild(link);
       link.click();
       link.remove();
