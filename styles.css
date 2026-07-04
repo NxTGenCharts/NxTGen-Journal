@@ -10455,6 +10455,7 @@ body {
   color:var(--text2);cursor:pointer;transition:var(--t-fast);
 }
 .cal-icon-btn:hover{background:var(--glass-3);color:var(--text);border-color:var(--glass-border-h);transform:translateY(-1px)}
+.cal-icon-btn svg{width:15px;height:15px;flex-shrink:0;display:block}
 
 /* ── Monthly stats pill row ──────────────────────── */
 .cal-stats-pill-row{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--text2);font-weight:700;flex-wrap:wrap;padding:2px 2px 0}
@@ -10561,6 +10562,7 @@ body {
   .cal-today-btn{font-size:11px;padding:6px 12px}
   .cal-header-icons{gap:5px}
   .cal-icon-btn{width:28px;height:28px;font-size:12px}
+  .cal-icon-btn svg{width:13px;height:13px}
   .cal-stats-pill-row{font-size:11px;gap:7px}
   .cal-dow{font-size:9px;padding:6px 0;letter-spacing:.05em}
   .cal-day{min-height:58px;padding:6px 5px}

@@ -7941,8 +7941,15 @@ function calExportImage() {
     scrollEl.style.minHeight = 'auto';
     scrollEl.style.height    = 'auto';
 
-    const bg   = _calCssVar('--bg', '#080b12');
-    const text = _calCssVar('--text', '#f8fafc');
+    const bg      = _calCssVar('--bg', '#080b12');
+    const text    = _calCssVar('--text', '#f8fafc');
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    // Solid, opaque stand-ins for the translucent "glass" surfaces. html2canvas
+    // doesn't support backdrop-filter, so any panel that relies on blur-behind
+    // to look right renders as a flat, washed-out grey slab instead — this
+    // swaps those panels to a real solid colour before capture.
+    const rowBg  = isLight ? '#eef1f6' : '#11151f';
+    const cardBg = isLight ? '#f5f7fa' : '#0d1119';
 
     html2canvas(scrollEl, {
       backgroundColor: bg,
@@ -7962,6 +7969,47 @@ function calExportImage() {
           el.style.webkitTextFillColor = 'initial';
           el.style.color = text;
         });
+
+        // html2canvas has no support for backdrop-filter (used everywhere for the
+        // "frosted glass" panels) and only partial support for inset box-shadows
+        // and decorative gradient pseudo-elements. Left alone, these render as
+        // dull grey rectangles stamped over the header row, the grid, and the
+        // week-total cards. Flatten all of it to solid colours for the export
+        // only — the on-screen UI is untouched since this only edits the clone.
+        const style = clonedDoc.createElement('style');
+        style.textContent = `
+          #page-calendar .cal-page-scroll * {
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+          }
+          #page-calendar .cal-grid-wrap::before,
+          #page-calendar .cal-grid-wrap::after {
+            display: none !important;
+            content: none !important;
+          }
+          #page-calendar .cal-grid-wrap {
+            background: ${cardBg} !important;
+            box-shadow: none !important;
+          }
+          #page-calendar .cal-dow-row {
+            background: ${rowBg} !important;
+          }
+          #page-calendar .cal-week-card,
+          #page-calendar .cal-kpi,
+          #page-calendar .cal-an-card {
+            background: ${cardBg} !important;
+            box-shadow: none !important;
+          }
+          #page-calendar .cal-page-scroll {
+            overflow: visible !important;
+          }
+          #page-calendar .cal-page-scroll ::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+          }
+        `;
+        clonedDoc.head.appendChild(style);
       },
     }).then(canvas => {
       const link = document.createElement('a');
