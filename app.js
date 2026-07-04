@@ -9717,18 +9717,16 @@ function _getFabMode() {
 function _setFabMode(mode) {
   try { localStorage.setItem(_FAB_MODE_KEY, mode); } catch (e) {}
 }
-const _FAB_BOT_SVG = `<svg class="fab-chat-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
-  <path d="M4.6 11.6C4.6 7.13 8.13 3.6 12.5 3.6S20.4 7.13 20.4 11.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
-  <rect x="3.1" y="10.3" width="3.3" height="5.6" rx="1.65" fill="#fff"/>
-  <rect x="17.6" y="10.3" width="3.3" height="5.6" rx="1.65" fill="#fff"/>
-  <rect x="7" y="8.5" width="11" height="9.4" rx="4.7" fill="#fff"/>
-  <circle cx="10.35" cy="13.15" r="1.05" fill="#5b21b6"/>
-  <circle cx="14.65" cy="13.15" r="1.05" fill="#5b21b6"/>
-  <path d="M9.3 17.7c1 .95 2.25 1.35 3.65 1.2 1.7-.18 2.95-.85 3.95-1.9" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>
-  <rect x="16.4" y="17.55" width="2.7" height="1.75" rx="0.875" fill="#fff"/>
+const _FAB_CHAT_SVG = `<svg class="fab-chat-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <path d="M4 5.5C4 4.67 4.67 4 5.5 4h13c.83 0 1.5.67 1.5 1.5v9c0 .83-.67 1.5-1.5 1.5H9l-4 3.5v-3.5H5.5C4.67 15.5 4 14.83 4 14v-8.5z" fill="#fff"/>
+  <circle cx="8.4" cy="9.7" r="1.15" fill="#7c3aed"/>
+  <circle cx="12.4" cy="9.7" r="1.15" fill="#7c3aed"/>
+  <circle cx="16.4" cy="9.7" r="1.15" fill="#7c3aed"/>
 </svg>`;
-const _FAB_CHAT_SVG = _FAB_BOT_SVG;
-const _FAB_AFF_SVG = _FAB_BOT_SVG.replace('fab-chat-svg', 'fab-aff-svg');
+const _FAB_AFF_SVG = `<svg class="fab-aff-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <path d="M12.3 2.6c.15-.5.86-.5 1.01 0l1.44 4.83c.5 1.68 1.82 3 3.5 3.5l4.83 1.44c.5.15.5.86 0 1.01l-4.83 1.44c-1.68.5-3 1.82-3.5 3.5l-1.44 4.83c-.15.5-.86.5-1.01 0l-1.44-4.83c-.5-1.68-1.82-3-3.5-3.5L2.53 13.4c-.5-.15-.5-.86 0-1.01l4.83-1.44c1.68-.5 3-1.82 3.5-3.5l1.44-4.83z" fill="#fff"/>
+  <path d="M19 2.2c.09-.3.5-.3.58 0l.5 1.7c.15.5.54.9 1.05 1.05l1.7.5c.3.09.3.5 0 .58l-1.7.5c-.5.15-.9.54-1.05 1.05l-.5 1.7c-.09.3-.5.3-.58 0l-.5-1.7c-.15-.5-.54-.9-1.05-1.05l-1.7-.5c-.3-.09-.3-.5 0-.58l1.7-.5c.5-.15.9-.54 1.05-1.05l.5-1.7z" fill="#fff" opacity=".82"/>
+</svg>`;
 function _renderFabIcon(el) {
   if (!el) return;
   const mode = _getFabMode();
@@ -9743,9 +9741,8 @@ function _renderFabIcon(el) {
   }
 }
 
-// ── Affirmation FAB — freely draggable during the session, but always
-//    resets to its default spot (bottom-right, clear of the mobile nav)
-//    on every reload — drag position is intentionally NOT persisted. ──
+// ── Affirmation FAB — freely draggable anywhere on screen (desktop + mobile) ──
+const _FAB_POS_KEY = 'affirmation_fab_pos';
 function _clampFabXY(el, x, y) {
   const w = el.offsetWidth || 44, h = el.offsetHeight || 44;
   const maxX = Math.max(6, window.innerWidth - w - 6);
@@ -9760,17 +9757,20 @@ function _setFabXY(el, x, y) {
   el.style.bottom = 'auto';
   return p;
 }
-function _setFabDefaultPos(el) {
-  const bottomNav = document.querySelector('.mob-bottom-nav');
-  const navH = (bottomNav && window.innerWidth <= 768) ? bottomNav.offsetHeight : 0;
-  const w = el.offsetWidth || 44, h = el.offsetHeight || 44;
-  _setFabXY(el, window.innerWidth - w - 20, window.innerHeight - h - 24 - navH);
-}
 function _initFabPosition(el) {
-  _setFabDefaultPos(el);
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(_FAB_POS_KEY) || 'null'); } catch (e) {}
+  if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
+    _setFabXY(el, saved.x, saved.y);
+  } else {
+    // Default: bottom-right, clear of the mobile bottom nav if present
+    const bottomNav = document.querySelector('.mob-bottom-nav');
+    const navH = (bottomNav && window.innerWidth <= 768) ? bottomNav.offsetHeight : 0;
+    const w = el.offsetWidth || 44, h = el.offsetHeight || 44;
+    _setFabXY(el, window.innerWidth - w - 20, window.innerHeight - h - 24 - navH);
+  }
   _makeFabDraggable(el);
   window.addEventListener('resize', () => {
-    // Keep it clamped on-screen on resize/rotate; still session-only, not saved.
     const rect = el.getBoundingClientRect();
     _setFabXY(el, rect.left, rect.top);
   });
@@ -9847,8 +9847,8 @@ function _makeFabDraggable(el) {
     document.removeEventListener('touchmove', onMove);
     document.removeEventListener('touchend', onUp);
     if (moved) {
-      // Session-only: intentionally not persisted, so it's back at the
-      // default spot next time the page loads.
+      const rect = el.getBoundingClientRect();
+      try { localStorage.setItem(_FAB_POS_KEY, JSON.stringify({ x: rect.left, y: rect.top })); } catch (e) {}
       el.dataset.justDragged = '1';
       setTimeout(() => { delete el.dataset.justDragged; }, 60);
     }
