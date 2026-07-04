@@ -7730,14 +7730,17 @@ function renderCalWeekSidebar(cells, dayMap) {
   let html = '';
   for (let row = 0; row < cells.length; row += 7) {
     const weekCells = cells.slice(row, row + 7);
-    let total = 0, activeDays = 0;
+    let total = 0, totalPct = 0, activeDays = 0;
     weekCells.forEach(c => {
       const dateStr = c.year + '-' + String(c.month).padStart(2, '0') + '-' + String(c.day).padStart(2, '0');
       const d = dayMap[dateStr];
-      if (d) { total += d.totalPnlUSD; activeDays++; }
+      if (d) { total += d.totalPnlUSD; totalPct += d.trades.reduce((a, t) => a + _pctOfTrade(t), 0); activeDays++; }
     });
-    const cls = total > 0 ? 'green' : total < 0 ? 'red' : 'zero';
-    html += `<div class="cal-week-card"><div class="cal-week-label">Week ${(row / 7) + 1}</div><div class="cal-week-pnl ${cls}">${fmtUSD(total)}</div><div class="cal-week-days">${activeDays} day${activeDays === 1 ? '' : 's'}</div></div>`;
+    const _weekIsDollar = (_pnlToggleMode === '$');
+    const _weekVal = _weekIsDollar ? total : totalPct;
+    const _weekDisplay = _weekIsDollar ? fmtUSD(total) : ((totalPct >= 0 ? '+' : '') + totalPct.toFixed(1) + '%');
+    const cls = _weekVal > 0 ? 'green' : _weekVal < 0 ? 'red' : 'zero';
+    html += `<div class="cal-week-card"><div class="cal-week-label">Week ${(row / 7) + 1}</div><div class="cal-week-pnl ${cls}">${_weekDisplay}</div><div class="cal-week-days">${activeDays} day${activeDays === 1 ? '' : 's'}</div></div>`;
   }
   col.innerHTML = html;
 }
@@ -7819,11 +7822,12 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
   const cRed   = _calCssVar('--red', '#f87171');
   const cBlue  = _calCssVar('--blue', '#60a5fa');
 
+  const _calIsDollar  = (_pnlToggleMode === '$');
+  const _calTotalPct  = monthTrades.reduce((a, t) => a + _pctOfTrade(t), 0);
+  const _calNetVal     = _calIsDollar ? totalUSD : _calTotalPct;
+  const _calNetDisplay = _calIsDollar ? fmtUSD(totalUSD) : ((_calTotalPct >= 0 ? '+' : '') + _calTotalPct.toFixed(1) + '%');
+
   if (row1) {
-    const _calNetIsDollar = (_pnlToggleMode === '$');
-    const _calTotalPct = monthTrades.reduce((a, t) => a + _pctOfTrade(t), 0);
-    const _calNetVal = _calNetIsDollar ? totalUSD : _calTotalPct;
-    const _calNetDisplay = _calNetIsDollar ? fmtUSD(totalUSD) : ((_calTotalPct >= 0 ? '+' : '') + _calTotalPct.toFixed(1) + '%');
     row1.innerHTML = `
       <div class="cal-an-card cal-an-card--toggle" onclick="toggleNetPnl()" title="Tap to toggle $ / %">
         <div class="cal-an-left">
@@ -7890,7 +7894,7 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
   }
 
   if (pillRow) {
-    pillRow.innerHTML = `<span class="lbl">Monthly stats:</span> <span class="cal-pill ${totalUSD >= 0 ? 'green' : ''}">${fmtUSD(totalUSD)}</span> <span class="cal-pill">${tradingDaysCount} day${tradingDaysCount === 1 ? '' : 's'}</span>`;
+    pillRow.innerHTML = `<span class="lbl">Monthly stats:</span> <span class="cal-pill ${_calNetVal >= 0 ? 'green' : ''}">${_calNetDisplay}</span> <span class="cal-pill">${tradingDaysCount} day${tradingDaysCount === 1 ? '' : 's'}</span>`;
   }
 }
 
