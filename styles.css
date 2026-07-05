@@ -10499,6 +10499,7 @@ body {
   position:relative;overflow:hidden;
   box-shadow:var(--shadow-sm);
   min-height:112px;
+  min-width:0;
 }
 [data-theme="light"] .cal-an-card{background:var(--glass-2);box-shadow:var(--shadow-xs)}
 .cal-an-card:hover{border-color:var(--glass-border-h);transform:translateY(-1px);box-shadow:var(--shadow-md)}
