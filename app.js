@@ -210,7 +210,6 @@ const GOALS=[
 let trades = [];
 let deletedTrades = [];
 let _pnlToggleMode = '%'; // '%' (default) | '$' — toggled by tapping Net PnL card
-let _avgWLToggleMode = '%'; // '%' (default) | '$' — toggled by tapping Avg win/loss card
 
 // ── Robust R:R parser ──────────────────────────────────
 // Parses free-text risk:reward entries like "1:3", "1:2.5", "2:5", " 1 : 3 "
@@ -6760,12 +6759,8 @@ function updateKPIs() {
   const _avgLPctFmt = _avgLPct.toFixed(2) + '%';
   const _awEl = document.getElementById('kpi-aw');
   const _alEl = document.getElementById('kpi-al');
-  if (_awEl) _awEl.dataset.pct = _avgWPctFmt;
-  if (_alEl) _alEl.dataset.pct = _avgLPctFmt;
-  if (_avgWLToggleMode === '%') {
-    if (_awEl) _awEl.textContent = _avgWPctFmt;
-    if (_alEl) _alEl.textContent = _avgLPctFmt;
-  }
+  if (_awEl) _awEl.textContent = _avgWPctFmt;
+  if (_alEl) _alEl.textContent = _avgLPctFmt;
   const rrEl = document.getElementById('kpi-rr'); if (rrEl) rrEl.textContent = avgRR ? '1:' + avgRR : '—';
   const wsEl = document.getElementById('kpi-ws'); if (wsEl) wsEl.textContent = streak > 0 ? streak + '↑ (best:' + maxStreak + ')' : maxStreak ? '0 (best:' + maxStreak + ')' : '0';
 
@@ -6826,36 +6821,34 @@ function updateKPIs() {
   }
 
   // ── Avg win/loss trade ──
-  // The ratio + bar proportions are always computed from the %-normalized
-  // values, never raw dollars. Raw dollar PnL isn't comparable trade-to-trade
-  // when trades come from accounts of different sizes, so a $-based ratio
-  // (e.g. "17.92x") can look wildly different from — and be more misleading
-  // than — the true, size-adjusted win/loss ratio. The toggle only changes
-  // which unit the two supporting numbers below the bar are shown in.
+  // The ratio + bar proportions are computed from the %-normalized values,
+  // never raw dollars — raw dollar PnL isn't comparable trade-to-trade when
+  // trades come from accounts of different sizes, so a $-based ratio can be
+  // wildly different from, and more misleading than, the true size-adjusted
+  // win/loss ratio. Both $ and % are always shown together below the bar so
+  // nothing is hidden behind a toggle.
   const _awAbs = Math.abs(_avgWPct), _alAbs = Math.abs(_avgLPct);
   const _avgBarTotalPct = (_awAbs + _alAbs) || 1;
   const _avgWinPctBar = (_awAbs / _avgBarTotalPct) * 100;
   const _hasLosses = _lossPcts.length > 0;
-  const _avgRatioFmt = _hasLosses ? (_awAbs / _alAbs).toFixed(2) + 'x' : (_awAbs > 0 ? '∞x' : '—');
+  const _avgRatioEl = document.getElementById('kpi-avgratio');
+  if (_hasLosses) {
+    if (_avgRatioEl) { _avgRatioEl.textContent = (_awAbs / _alAbs).toFixed(2) + 'x'; _avgRatioEl.title = ''; }
+  } else {
+    // No losing trades logged yet — the ratio is undefined, not infinite.
+    if (_avgRatioEl) { _avgRatioEl.textContent = '—'; _avgRatioEl.title = 'No losing trades logged yet — ratio unavailable'; }
+  }
   const _awDollarFmt = fmtUSD(avgWDollars);
   const _alDollarFmt = fmtUSD(-Math.abs(avgLDollars));
 
   const _awBarEl = document.getElementById('kpi-aw-bar');
   const _alBarEl = document.getElementById('kpi-al-bar');
-  const _avgRatioEl = document.getElementById('kpi-avgratio');
-  if (_awEl) _awEl.dataset.dollar = _awDollarFmt;
-  if (_alEl) _alEl.dataset.dollar = _alDollarFmt;
+  const _awSubEl = document.getElementById('kpi-aw-sub');
+  const _alSubEl = document.getElementById('kpi-al-sub');
   if (_awBarEl) _awBarEl.style.width = _avgWinPctBar.toFixed(1) + '%';
   if (_alBarEl) _alBarEl.style.width = (100 - _avgWinPctBar).toFixed(1) + '%';
-  if (_avgRatioEl) _avgRatioEl.textContent = _avgRatioFmt;
-
-  if (_avgWLToggleMode === '%') {
-    if (_awEl) _awEl.textContent = _avgWPctFmt;
-    if (_alEl) _alEl.textContent = _avgLPctFmt;
-  } else {
-    if (_awEl) _awEl.textContent = _awDollarFmt;
-    if (_alEl) _alEl.textContent = _alDollarFmt;
-  }
+  if (_awSubEl) _awSubEl.textContent = _awDollarFmt;
+  if (_alSubEl) _alSubEl.textContent = _alDollarFmt;
 
   document.querySelectorAll('.kpi-value, .cal-an-value').forEach(el => { el.style.transform = 'scale(1.04)'; el.style.transition = 'transform 0.3s ease'; setTimeout(() => el.style.transform = '', 320); });
 
@@ -7389,26 +7382,6 @@ function _renderHeatmap(trades) {
           <div style="width:12px;height:12px;border-radius:3px;background:${col};flex-shrink:0"></div>${lbl}
         </div>`).join('')}
     </div>`;
-}
-
-// ── Avg win/loss toggle ────────────────────────────────
-// Note: the ratio (header number) and the bar proportions are always
-// %-normalized (see updateKPIs) since raw dollars aren't comparable across
-// differently-sized accounts. This toggle only swaps the unit of the two
-// supporting numbers shown beneath the bar.
-function toggleAvgWinLoss() {
-  _avgWLToggleMode = (_avgWLToggleMode === '%') ? '$' : '%';
-  const card = document.getElementById('kpi-awl-card');
-  const awEl = document.getElementById('kpi-aw');
-  const alEl = document.getElementById('kpi-al');
-  if (card) { card.classList.add('kpi-pnl-flipping'); setTimeout(() => card.classList.remove('kpi-pnl-flipping'), 300); }
-  if (_avgWLToggleMode === '$') {
-    if (awEl) awEl.textContent = awEl.dataset.dollar || '+$0.00';
-    if (alEl) alEl.textContent = alEl.dataset.dollar || '-$0.00';
-  } else {
-    if (awEl) awEl.textContent = awEl.dataset.pct || '+0.00%';
-    if (alEl) alEl.textContent = alEl.dataset.pct || '0.00%';
-  }
 }
 
 // ── Net PnL toggle ────────────────────────────────────
@@ -7976,17 +7949,22 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
   const denom = wins + losses;
   const tradeWR = denom > 0 ? (wins / denom) * 100 : 0;
 
-  let grossProfit = 0, grossLoss = 0, winSum = 0, lossSum = 0;
+  let grossProfit = 0, grossLoss = 0, winSum = 0, lossSum = 0, winSumPct = 0, lossSumPct = 0;
   monthTrades.forEach(t => {
     const usd = toPnlDollars(t, accSize);
-    if (usd > 0) { grossProfit += usd; winSum += usd; }
-    else if (usd < 0) { grossLoss += Math.abs(usd); lossSum += Math.abs(usd); }
+    const pct = accSize > 0 ? (usd / accSize) * 100 : 0;
+    if (usd > 0) { grossProfit += usd; winSum += usd; winSumPct += pct; }
+    else if (usd < 0) { grossLoss += Math.abs(usd); lossSum += Math.abs(usd); lossSumPct += Math.abs(pct); }
   });
   const profitFactor = grossLoss > 0 ? (grossProfit / grossLoss) : (grossProfit > 0 ? grossProfit : 0);
   const pfFraction = (grossProfit + grossLoss) > 0 ? grossProfit / (grossProfit + grossLoss) : 0;
   const avgWin = wins > 0 ? winSum / wins : 0;
   const avgLoss = losses > 0 ? lossSum / losses : 0;
-  const avgRatio = avgLoss > 0 ? (avgWin / avgLoss) : (avgWin > 0 ? avgWin : 0);
+  const avgWinPct = wins > 0 ? winSumPct / wins : 0;
+  const avgLossPct = losses > 0 ? lossSumPct / losses : 0;
+  // Ratio is only meaningful once there's at least one losing trade to compare
+  // against — otherwise it's undefined, not infinite, so show a dash instead.
+  const avgRatio = losses > 0 ? (avgWin / avgLoss) : null;
   const barTotal = avgWin + avgLoss || 1;
   const winPct = (avgWin / barTotal) * 100;
 
@@ -8051,7 +8029,7 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
       <div class="cal-an-card">
         <div class="cal-an-left" style="flex:0 0 auto">
           <div class="cal-an-label">Avg win/loss trade <span class="info-dot">i</span></div>
-          <div class="cal-an-value">${avgRatio.toFixed(2)}</div>
+          <div class="cal-an-value"${avgRatio === null ? ' title="No losing trades logged yet — ratio unavailable"' : ''}>${avgRatio === null ? '—' : avgRatio.toFixed(2) + 'x'}</div>
         </div>
         <div class="cal-an-bar-wrap">
           <div class="cal-an-bar-track">
@@ -8059,8 +8037,14 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
             <div class="cal-an-bar-seg red" style="width:${(100 - winPct).toFixed(1)}%"></div>
           </div>
           <div class="cal-an-bar-labels">
-            <span class="green">${fmtUSD(avgWin)}</span>
-            <span class="red">${fmtUSD(-avgLoss)}</span>
+            <span class="cal-an-bar-stat">
+              <span class="cal-an-bar-main green">${(avgWinPct >= 0 ? '+' : '') + avgWinPct.toFixed(2)}%</span>
+              <span class="cal-an-bar-sub">${fmtUSD(avgWin)}</span>
+            </span>
+            <span class="cal-an-bar-stat right">
+              <span class="cal-an-bar-main red">-${avgLossPct.toFixed(2)}%</span>
+              <span class="cal-an-bar-sub">${fmtUSD(-avgLoss)}</span>
+            </span>
           </div>
         </div>
       </div>`;

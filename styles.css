@@ -10422,6 +10422,10 @@ body {
 .cal-an-bar-labels{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:13px;font-weight:800}
 .cal-an-bar-labels .green{color:var(--green)}
 .cal-an-bar-labels .red{color:var(--red)}
+.cal-an-bar-stat{display:flex;flex-direction:column;gap:1px;line-height:1.25}
+.cal-an-bar-stat.right{align-items:flex-end;text-align:right}
+.cal-an-bar-main{font-family:var(--font-mono);font-size:13px;font-weight:800}
+.cal-an-bar-sub{font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--text3)}
 
 /* ── Calendar header row (month nav + today + icons) ─ */
 .cal-page-header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -10501,6 +10505,8 @@ body {
   .cal-an-bar-wrap{gap:5px}
   .cal-an-bar-track{height:7px}
   .cal-an-bar-labels{font-size:10px}
+  .cal-an-bar-main{font-size:10px}
+  .cal-an-bar-sub{font-size:9px}
 
   /* ── Weekly summary: moved BELOW the calendar as its own roomy row, not squeezed to the side ── */
   .cal-grid-with-weeks{flex-direction:column;gap:14px;align-items:stretch}

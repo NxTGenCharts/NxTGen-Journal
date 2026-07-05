@@ -179,14 +179,23 @@
                     <div class="cal-an-value teal" id="kpi-ws">—</div>
                   </div>
                 </div>
-                <div class="cal-an-card cal-an-card--toggle" id="kpi-awl-card" onclick="toggleAvgWinLoss()" title="Tap to toggle % / $">
+                <div class="cal-an-card" id="kpi-awl-card" title="Average win and average loss per trade, in both $ and %">
                   <div class="cal-an-left" style="flex:0 0 auto">
-                    <div class="cal-an-label"><span class="cal-kpi-icon">📊</span><span>Avg win/loss trade</span> <span class="info-dot">i</span> <span class="cal-an-toggle-hint">tap to toggle</span></div>
+                    <div class="cal-an-label"><span class="cal-kpi-icon">📊</span><span>Avg win/loss trade</span> <span class="info-dot">i</span></div>
                     <div class="cal-an-value" id="kpi-avgratio">—</div>
                   </div>
                   <div class="cal-an-bar-wrap">
                     <div class="cal-an-bar-track"><div class="cal-an-bar-seg green" id="kpi-aw-bar" style="width:50%"></div><div class="cal-an-bar-seg red" id="kpi-al-bar" style="width:50%"></div></div>
-                    <div class="cal-an-bar-labels"><span class="green" id="kpi-aw">—</span><span class="red" id="kpi-al">—</span></div>
+                    <div class="cal-an-bar-labels">
+                      <span class="cal-an-bar-stat">
+                        <span class="cal-an-bar-main green" id="kpi-aw">—</span>
+                        <span class="cal-an-bar-sub" id="kpi-aw-sub">—</span>
+                      </span>
+                      <span class="cal-an-bar-stat right">
+                        <span class="cal-an-bar-main red" id="kpi-al">—</span>
+                        <span class="cal-an-bar-sub" id="kpi-al-sub">—</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
