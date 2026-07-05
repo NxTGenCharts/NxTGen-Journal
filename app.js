@@ -5550,7 +5550,6 @@ function _accDrawEquityCurve(name) {
 
 function accShowDetail(name) {
   const drawer = document.getElementById('acc-detail-drawer');
-  const title  = document.getElementById('acc-detail-title');
   const body   = document.getElementById('acc-detail-body');
   if (!drawer || !body) return;
 
@@ -5567,8 +5566,6 @@ function accShowDetail(name) {
     return (pct >= 0 ? '+' : '') + pct.toFixed(3) + '%';
   };
   const fmtPlain = (dollars) => (dollars === null || dollars === undefined) ? '—' : (dollars >= 0 ? '+$' : '-$') + Math.abs(dollars).toFixed(2);
-
-  title.textContent = name;
 
   const isArchived = acc.status === 'archived';
   const netProfitPct = accSize > 0 ? (m.netDollars / accSize) * 100 : null;
@@ -5589,6 +5586,7 @@ function accShowDetail(name) {
 
   const heroHtml = `
     <div class="acc-hero">
+      <button class="acc-hero-close" onclick="accCloseDetail()" title="Close" aria-label="Close">✕</button>
       <div>
         <div class="acc-hero-top">
           <span class="acc-hero-name">${name}</span>
@@ -8012,9 +8010,8 @@ async function _saveEdit(id) {
 
   // If account detail drawer is open, refresh it immediately too
   const drawer = document.getElementById('acc-detail-drawer');
-  if (drawer && drawer.classList.contains('open')) {
-    const titleEl = document.getElementById('acc-detail-title');
-    if (titleEl?.textContent) accShowDetail(titleEl.textContent);
+  if (drawer && drawer.classList.contains('open') && _accActiveName) {
+    accShowDetail(_accActiveName);
   }
 
   showToast(t.pair + ' updated ✓', 'restore');
