@@ -4777,6 +4777,11 @@ body{
 [data-theme="light"] #page-trash .cover{
   background:linear-gradient(135deg,rgba(185,28,28,0.88),rgba(220,38,38,0.80),rgba(185,28,28,0.88))!important;
 }
+/* Label needs its own theme-aware color — a plain red label on a red
+   background (dark maroon in dark mode, bright red in light mode) has almost
+   no contrast, which was making it unreadable, especially in light theme. */
+#page-trash .cover-label{color:#ff9fa8!important}
+[data-theme="light"] #page-trash .cover-label{color:rgba(255,255,255,0.92)!important}
 
 /* Scrollbar — match theme */
 [data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.15)}
