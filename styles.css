@@ -467,6 +467,23 @@ body{
 .page.active{display:block}
 .page-inner{max-width:920px;margin:0 auto;min-width:0}
 .dash-layout .page-inner,.dash-left .page-inner{max-width:none;margin:0}
+/* Full-width ("port view") pages — same edge-to-edge treatment as
+   Trade Log, Calendar, and Dashboard. Everything else still uses the
+   centered 920px column above by default. */
+#page-watchlist .page-inner,
+#page-accounts .page-inner,
+#page-ai .page-inner,
+#page-playbook .page-inner,
+#page-goals .page-inner,
+#page-quarter .page-inner,
+#page-monthly .page-inner,
+#page-trash .page-inner,
+#page-profile .page-inner{
+  max-width:none;
+  width:100%;
+  margin:0;
+  box-sizing:border-box;
+}
 
 @keyframes pageIn{
   from{opacity:0;transform:translateY(10px)}
@@ -1423,6 +1440,7 @@ body{
   line-height: 1.72;
   color: var(--text);
   max-height: 680px;
+  max-width: 900px;
   overflow-y: auto;
 }
 
@@ -2033,7 +2051,7 @@ body{
 
 /* Bubbles */
 .chat-bubble {
-  max-width: 78%; border-radius: 16px;
+  max-width: min(78%, 640px); border-radius: 16px;
   padding: 10px 13px 7px;
   font-size: 13px; line-height: 1.62;
   position: relative; word-break: break-word;
