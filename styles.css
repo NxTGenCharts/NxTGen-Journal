@@ -10622,11 +10622,11 @@ body {
   .cal-an-grid.row2{grid-template-columns:repeat(2,1fr)}
 
   .cal-an-card{
-    flex-direction:column;align-items:flex-start;justify-content:flex-start;
+    flex-direction:row;align-items:center;justify-content:space-between;
     gap:6px;padding:10px 10px;min-height:0;border-radius:var(--r-lg);
   }
   .cal-an-grid.row2 .cal-an-card{min-height:0}
-  .cal-an-left{gap:3px;width:100%}
+  .cal-an-left{gap:3px;width:auto;min-width:0}
   .cal-an-label{font-size:9px;gap:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cal-an-label .info-dot{width:10px;height:10px;font-size:7px}
   .cal-an-value{font-size:15px;letter-spacing:-.3px}
@@ -10634,11 +10634,12 @@ body {
   .cal-an-mini-icon{width:26px;height:26px}
 
   /* Shrink SVG gauges to fit the compact cards (viewBox keeps them proportional) */
-  .cal-an-gauge-col{width:100%;align-items:flex-start;gap:3px}
-  .cal-an-gauge-col svg{width:58px !important;max-width:58px;height:auto !important;aspect-ratio:108/68}
+  .cal-an-gauge-col{width:auto;flex:0 0 auto;align-items:center;gap:3px}
+  .cal-an-gauge-col svg{width:44px !important;max-width:44px;height:auto !important;aspect-ratio:108/68}
   .cal-an-gauge-legend{gap:3px}
   .cal-an-legend-chip{padding:1px 5px;font-size:8px}
-  .cal-an-ring-col svg{width:38px !important;max-width:38px;height:auto !important;aspect-ratio:1/1}
+  .cal-an-ring-col{flex:0 0 auto}
+  .cal-an-ring-col svg{width:32px !important;max-width:32px;height:auto !important;aspect-ratio:1/1}
   .cal-an-bar-wrap{gap:5px}
   .cal-an-bar-track{height:7px}
   .cal-an-bar-labels{font-size:10px}
@@ -10714,8 +10715,8 @@ body {
   .cal-an-grid{gap:5px}
   .cal-an-value{font-size:13px}
   .cal-an-label{font-size:8.5px}
-  .cal-an-gauge-col svg{width:46px !important;max-width:46px;aspect-ratio:108/68}
-  .cal-an-ring-col svg{width:32px !important;max-width:32px;aspect-ratio:1/1}
+  .cal-an-gauge-col svg{width:40px !important;max-width:40px;aspect-ratio:108/68}
+  .cal-an-ring-col svg{width:28px !important;max-width:28px;aspect-ratio:1/1}
 }
 @media(max-width:360px){
   #page-calendar{padding-left:8px;padding-right:8px}
