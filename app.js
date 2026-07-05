@@ -210,6 +210,22 @@ const GOALS=[
 let trades = [];
 let deletedTrades = [];
 let _pnlToggleMode = '%'; // '%' (default) | '$' — toggled by tapping Net PnL card
+let _avgWLToggleMode = '%'; // '%' (default) | '$' — toggled by tapping Avg win/loss card
+
+// ── Robust R:R parser ──────────────────────────────────
+// Parses free-text risk:reward entries like "1:3", "1:2.5", "2:5", " 1 : 3 "
+// and returns the true reward-to-risk ratio (reward / risk), not just the
+// second number — so it works correctly regardless of how the risk side
+// was entered (previously this assumed risk was always exactly "1").
+function _parseRR(rrStr) {
+  if (!rrStr) return null;
+  const m = String(rrStr).match(/([\d.]+)\s*:\s*([\d.]+)/);
+  if (!m) return null;
+  const risk = parseFloat(m[1]);
+  const reward = parseFloat(m[2]);
+  if (!risk || isNaN(risk) || isNaN(reward)) return null;
+  return reward / risk;
+}
 let _modalChecklist = []; // checked items in new-trade modal
 let _checklistWarningAcked = false; // allows bypass on second save click
 let _modalMentalState = 'Focused'; // mental state for new-trade modal
@@ -2854,8 +2870,8 @@ function _renderDetail(id) {
 
   // ── Review Tab ─────────────────────────────────────────────────────────
   const plannedRrVal = t.plannedRr || '';
-  const actualRrNum  = (() => { const m = (t.rr || '').match(/1:([\d.]+)/); return m ? parseFloat(m[1]) : null; })();
-  const plannedRrNum = (() => { const m = plannedRrVal.match(/1:([\d.]+)/); return m ? parseFloat(m[1]) : null; })();
+  const actualRrNum  = _parseRR(t.rr);
+  const plannedRrNum = _parseRR(plannedRrVal);
   const rrDiff = (actualRrNum && plannedRrNum) ? (actualRrNum - plannedRrNum).toFixed(2) : null;
   const rrDiffColor = rrDiff === null ? 'var(--text3)' : parseFloat(rrDiff) >= 0 ? 'var(--green)' : 'var(--red)';
   const retakeState = s.wouldRetake !== undefined ? s.wouldRetake : t.wouldRetake;
@@ -6099,7 +6115,7 @@ function buildGoals() {
     let maxStreak=0, cur=0;
     sorted.forEach(t => { if(t.outcome==='Win'){cur++;maxStreak=Math.max(maxStreak,cur);}else cur=0; });
     // Best RR
-    const rrAll = trades.map(t => { const m=(t.rr||'').match(/1:([\d.]+)/); return m?{v:parseFloat(m[1]),t}:null; }).filter(Boolean);
+    const rrAll = trades.map(t => { const v = _parseRR(t.rr); return v !== null ? {v,t} : null; }).filter(Boolean);
     const bestRR = rrAll.length ? rrAll.reduce((a,b)=>b.v>a.v?b:a,rrAll[0]) : null;
 
     pbTbody.innerHTML = [
@@ -6723,7 +6739,7 @@ function updateKPIs() {
     const _isPos = _showDollar ? (_totalDollars >= 0) : (_totalPct >= 0);
     _pnlValueEl.className = 'cal-an-value ' + (_isPos ? 'green' : 'red');
   }
-  const rrNums = trades.map(t => { const m = (t.rr || '').match(/1:([\d.]+)/); return m ? parseFloat(m[1]) : null; }).filter(x => x !== null);
+  const rrNums = trades.map(t => _parseRR(t.rr)).filter(x => x !== null);
   const avgRR = rrNums.length ? (rrNums.reduce((a, b) => a + b, 0) / rrNums.length).toFixed(1) : null;
   const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date));
   let streak = 0, maxStreak = 0, curStreak = 0;
@@ -6740,8 +6756,16 @@ function updateKPIs() {
   const _lossPcts = trades.filter(t => _pctOfTrade(t) < 0).map(_pctOfTrade);
   const _avgWPct  = _winPcts.length  ? _winPcts.reduce((a, b) => a + b, 0)  / _winPcts.length  : 0;
   const _avgLPct  = _lossPcts.length ? _lossPcts.reduce((a, b) => a + b, 0) / _lossPcts.length : 0;
-  document.getElementById('kpi-aw').textContent = (_avgWPct >= 0 ? '+' : '') + _avgWPct.toFixed(2) + '%';
-  document.getElementById('kpi-al').textContent = _avgLPct.toFixed(2) + '%';
+  const _avgWPctFmt = (_avgWPct >= 0 ? '+' : '') + _avgWPct.toFixed(2) + '%';
+  const _avgLPctFmt = _avgLPct.toFixed(2) + '%';
+  const _awEl = document.getElementById('kpi-aw');
+  const _alEl = document.getElementById('kpi-al');
+  if (_awEl) _awEl.dataset.pct = _avgWPctFmt;
+  if (_alEl) _alEl.dataset.pct = _avgLPctFmt;
+  if (_avgWLToggleMode === '%') {
+    if (_awEl) _awEl.textContent = _avgWPctFmt;
+    if (_alEl) _alEl.textContent = _avgLPctFmt;
+  }
   const rrEl = document.getElementById('kpi-rr'); if (rrEl) rrEl.textContent = avgRR ? '1:' + avgRR : '—';
   const wsEl = document.getElementById('kpi-ws'); if (wsEl) wsEl.textContent = streak > 0 ? streak + '↑ (best:' + maxStreak + ')' : maxStreak ? '0 (best:' + maxStreak + ')' : '0';
 
@@ -6801,16 +6825,41 @@ function updateKPIs() {
     _pfRingEl.style.visibility = (typeof _pfMode !== 'undefined' && _pfMode === 'exp') ? 'hidden' : 'visible';
   }
 
+  // ── Avg win/loss trade — % variant (based on account-relative return) ──
   const _awAbs = Math.abs(_avgWPct), _alAbs = Math.abs(_avgLPct);
-  const _avgBarTotal = (_awAbs + _alAbs) || 1;
-  const _avgWinPct = (_awAbs / _avgBarTotal) * 100;
-  const _avgRatio = _alAbs > 0 ? (_awAbs / _alAbs) : (_awAbs > 0 ? _awAbs : 0);
+  const _avgBarTotalPct = (_awAbs + _alAbs) || 1;
+  const _avgWinPctBar = (_awAbs / _avgBarTotalPct) * 100;
+  const _avgRatioPct = _alAbs > 0 ? (_awAbs / _alAbs) : (_awAbs > 0 ? _awAbs : 0);
+  // ── Avg win/loss trade — $ variant (based on actual dollar PnL) ──
+  const _awDAbs = Math.abs(avgWDollars), _alDAbs = Math.abs(avgLDollars);
+  const _avgBarTotalD = (_awDAbs + _alDAbs) || 1;
+  const _avgWinPctBarD = (_awDAbs / _avgBarTotalD) * 100;
+  const _avgRatioDollar = _alDAbs > 0 ? (_awDAbs / _alDAbs) : (_awDAbs > 0 ? _awDAbs : 0);
+  const _awDollarFmt = fmtUSD(avgWDollars);
+  const _alDollarFmt = fmtUSD(-Math.abs(avgLDollars));
+
   const _awBarEl = document.getElementById('kpi-aw-bar');
   const _alBarEl = document.getElementById('kpi-al-bar');
-  if (_awBarEl) _awBarEl.style.width = _avgWinPct.toFixed(1) + '%';
-  if (_alBarEl) _alBarEl.style.width = (100 - _avgWinPct).toFixed(1) + '%';
   const _avgRatioEl = document.getElementById('kpi-avgratio');
-  if (_avgRatioEl) _avgRatioEl.textContent = _avgRatio.toFixed(2);
+  if (_awEl) _awEl.dataset.dollar = _awDollarFmt;
+  if (_alEl) _alEl.dataset.dollar = _alDollarFmt;
+  if (_awBarEl) { _awBarEl.dataset.pctWidth = _avgWinPctBar.toFixed(1); _awBarEl.dataset.dollarWidth = _avgWinPctBarD.toFixed(1); }
+  if (_alBarEl) { _alBarEl.dataset.pctWidth = (100 - _avgWinPctBar).toFixed(1); _alBarEl.dataset.dollarWidth = (100 - _avgWinPctBarD).toFixed(1); }
+  if (_avgRatioEl) { _avgRatioEl.dataset.pct = _avgRatioPct.toFixed(2); _avgRatioEl.dataset.dollar = _avgRatioDollar.toFixed(2); }
+
+  if (_avgWLToggleMode === '%') {
+    if (_awBarEl) _awBarEl.style.width = _avgWinPctBar.toFixed(1) + '%';
+    if (_alBarEl) _alBarEl.style.width = (100 - _avgWinPctBar).toFixed(1) + '%';
+    if (_avgRatioEl) _avgRatioEl.textContent = _avgRatioPct.toFixed(2);
+    if (_awEl) _awEl.textContent = _avgWPctFmt;
+    if (_alEl) _alEl.textContent = _avgLPctFmt;
+  } else {
+    if (_awBarEl) _awBarEl.style.width = _avgWinPctBarD.toFixed(1) + '%';
+    if (_alBarEl) _alBarEl.style.width = (100 - _avgWinPctBarD).toFixed(1) + '%';
+    if (_avgRatioEl) _avgRatioEl.textContent = _avgRatioDollar.toFixed(2);
+    if (_awEl) _awEl.textContent = _awDollarFmt;
+    if (_alEl) _alEl.textContent = _alDollarFmt;
+  }
 
   document.querySelectorAll('.kpi-value, .cal-an-value').forEach(el => { el.style.transform = 'scale(1.04)'; el.style.transition = 'transform 0.3s ease'; setTimeout(() => el.style.transform = '', 320); });
 
@@ -7344,6 +7393,32 @@ function _renderHeatmap(trades) {
           <div style="width:12px;height:12px;border-radius:3px;background:${col};flex-shrink:0"></div>${lbl}
         </div>`).join('')}
     </div>`;
+}
+
+// ── Avg win/loss toggle ────────────────────────────────
+function toggleAvgWinLoss() {
+  // Cycle: % → $ → % …
+  _avgWLToggleMode = (_avgWLToggleMode === '%') ? '$' : '%';
+  const card = document.getElementById('kpi-awl-card');
+  const awEl = document.getElementById('kpi-aw');
+  const alEl = document.getElementById('kpi-al');
+  const awBarEl = document.getElementById('kpi-aw-bar');
+  const alBarEl = document.getElementById('kpi-al-bar');
+  const ratioEl = document.getElementById('kpi-avgratio');
+  if (card) { card.classList.add('kpi-pnl-flipping'); setTimeout(() => card.classList.remove('kpi-pnl-flipping'), 300); }
+  if (_avgWLToggleMode === '$') {
+    if (awEl) awEl.textContent = awEl.dataset.dollar || '+$0.00';
+    if (alEl) alEl.textContent = alEl.dataset.dollar || '-$0.00';
+    if (awBarEl) awBarEl.style.width = (awBarEl.dataset.dollarWidth || '50') + '%';
+    if (alBarEl) alBarEl.style.width = (alBarEl.dataset.dollarWidth || '50') + '%';
+    if (ratioEl) ratioEl.textContent = ratioEl.dataset.dollar || '—';
+  } else {
+    if (awEl) awEl.textContent = awEl.dataset.pct || '+0.00%';
+    if (alEl) alEl.textContent = alEl.dataset.pct || '0.00%';
+    if (awBarEl) awBarEl.style.width = (awBarEl.dataset.pctWidth || '50') + '%';
+    if (alBarEl) alBarEl.style.width = (alBarEl.dataset.pctWidth || '50') + '%';
+    if (ratioEl) ratioEl.textContent = ratioEl.dataset.pct || '—';
+  }
 }
 
 // ── Net PnL toggle ────────────────────────────────────

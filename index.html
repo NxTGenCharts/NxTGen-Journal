@@ -179,9 +179,9 @@
                     <div class="cal-an-value teal" id="kpi-ws">—</div>
                   </div>
                 </div>
-                <div class="cal-an-card">
+                <div class="cal-an-card cal-an-card--toggle" id="kpi-awl-card" onclick="toggleAvgWinLoss()" title="Tap to toggle % / $">
                   <div class="cal-an-left" style="flex:0 0 auto">
-                    <div class="cal-an-label"><span class="cal-kpi-icon">📊</span><span>Avg win/loss trade</span> <span class="info-dot">i</span></div>
+                    <div class="cal-an-label"><span class="cal-kpi-icon">📊</span><span>Avg win/loss trade</span> <span class="info-dot">i</span> <span class="cal-an-toggle-hint">tap to toggle</span></div>
                     <div class="cal-an-value" id="kpi-avgratio">—</div>
                   </div>
                   <div class="cal-an-bar-wrap">
@@ -194,7 +194,7 @@
               <!-- Row 3: compact stat chips — same icon style as the Calendar page's KPI strip -->
               <div class="kpi-grid dash-kpi-mini">
                 <div class="kpi-card"><div class="kpi-label"><span class="cal-kpi-icon">🗂</span><span>Total trades</span></div><div class="kpi-value blue" id="kpi-total">—</div></div>
-                <div class="kpi-card"><div class="kpi-label"><span class="cal-kpi-icon">📐</span><span>Risk:reward</span></div><div class="kpi-value blue" id="kpi-rr">—</div></div>
+                <div class="kpi-card" title="Average planned risk:reward ratio across your logged trades"><div class="kpi-label"><span class="cal-kpi-icon">📐</span><span>Avg risk:reward</span></div><div class="kpi-value blue" id="kpi-rr">—</div></div>
                 <div class="kpi-card"><div class="kpi-label"><span class="cal-kpi-icon">🛡</span><span>Max drawdown</span></div><div class="kpi-value green" id="kpi-dd">—</div></div>
                 <div class="kpi-card" title="% of trades rated 4★ or 5★ — your execution quality score">
                   <div class="kpi-label"><span class="cal-kpi-icon">🧠</span><span>Consistency score</span></div>
