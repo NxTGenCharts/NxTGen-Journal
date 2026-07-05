@@ -6825,16 +6825,18 @@ function updateKPIs() {
     _pfRingEl.style.visibility = (typeof _pfMode !== 'undefined' && _pfMode === 'exp') ? 'hidden' : 'visible';
   }
 
-  // ── Avg win/loss trade — % variant (based on account-relative return) ──
+  // ── Avg win/loss trade ──
+  // The ratio + bar proportions are always computed from the %-normalized
+  // values, never raw dollars. Raw dollar PnL isn't comparable trade-to-trade
+  // when trades come from accounts of different sizes, so a $-based ratio
+  // (e.g. "17.92x") can look wildly different from — and be more misleading
+  // than — the true, size-adjusted win/loss ratio. The toggle only changes
+  // which unit the two supporting numbers below the bar are shown in.
   const _awAbs = Math.abs(_avgWPct), _alAbs = Math.abs(_avgLPct);
   const _avgBarTotalPct = (_awAbs + _alAbs) || 1;
   const _avgWinPctBar = (_awAbs / _avgBarTotalPct) * 100;
-  const _avgRatioPct = _alAbs > 0 ? (_awAbs / _alAbs) : (_awAbs > 0 ? _awAbs : 0);
-  // ── Avg win/loss trade — $ variant (based on actual dollar PnL) ──
-  const _awDAbs = Math.abs(avgWDollars), _alDAbs = Math.abs(avgLDollars);
-  const _avgBarTotalD = (_awDAbs + _alDAbs) || 1;
-  const _avgWinPctBarD = (_awDAbs / _avgBarTotalD) * 100;
-  const _avgRatioDollar = _alDAbs > 0 ? (_awDAbs / _alDAbs) : (_awDAbs > 0 ? _awDAbs : 0);
+  const _hasLosses = _lossPcts.length > 0;
+  const _avgRatioFmt = _hasLosses ? (_awAbs / _alAbs).toFixed(2) + 'x' : (_awAbs > 0 ? '∞x' : '—');
   const _awDollarFmt = fmtUSD(avgWDollars);
   const _alDollarFmt = fmtUSD(-Math.abs(avgLDollars));
 
@@ -6843,20 +6845,14 @@ function updateKPIs() {
   const _avgRatioEl = document.getElementById('kpi-avgratio');
   if (_awEl) _awEl.dataset.dollar = _awDollarFmt;
   if (_alEl) _alEl.dataset.dollar = _alDollarFmt;
-  if (_awBarEl) { _awBarEl.dataset.pctWidth = _avgWinPctBar.toFixed(1); _awBarEl.dataset.dollarWidth = _avgWinPctBarD.toFixed(1); }
-  if (_alBarEl) { _alBarEl.dataset.pctWidth = (100 - _avgWinPctBar).toFixed(1); _alBarEl.dataset.dollarWidth = (100 - _avgWinPctBarD).toFixed(1); }
-  if (_avgRatioEl) { _avgRatioEl.dataset.pct = _avgRatioPct.toFixed(2); _avgRatioEl.dataset.dollar = _avgRatioDollar.toFixed(2); }
+  if (_awBarEl) _awBarEl.style.width = _avgWinPctBar.toFixed(1) + '%';
+  if (_alBarEl) _alBarEl.style.width = (100 - _avgWinPctBar).toFixed(1) + '%';
+  if (_avgRatioEl) _avgRatioEl.textContent = _avgRatioFmt;
 
   if (_avgWLToggleMode === '%') {
-    if (_awBarEl) _awBarEl.style.width = _avgWinPctBar.toFixed(1) + '%';
-    if (_alBarEl) _alBarEl.style.width = (100 - _avgWinPctBar).toFixed(1) + '%';
-    if (_avgRatioEl) _avgRatioEl.textContent = _avgRatioPct.toFixed(2);
     if (_awEl) _awEl.textContent = _avgWPctFmt;
     if (_alEl) _alEl.textContent = _avgLPctFmt;
   } else {
-    if (_awBarEl) _awBarEl.style.width = _avgWinPctBarD.toFixed(1) + '%';
-    if (_alBarEl) _alBarEl.style.width = (100 - _avgWinPctBarD).toFixed(1) + '%';
-    if (_avgRatioEl) _avgRatioEl.textContent = _avgRatioDollar.toFixed(2);
     if (_awEl) _awEl.textContent = _awDollarFmt;
     if (_alEl) _alEl.textContent = _alDollarFmt;
   }
@@ -7396,28 +7392,22 @@ function _renderHeatmap(trades) {
 }
 
 // ── Avg win/loss toggle ────────────────────────────────
+// Note: the ratio (header number) and the bar proportions are always
+// %-normalized (see updateKPIs) since raw dollars aren't comparable across
+// differently-sized accounts. This toggle only swaps the unit of the two
+// supporting numbers shown beneath the bar.
 function toggleAvgWinLoss() {
-  // Cycle: % → $ → % …
   _avgWLToggleMode = (_avgWLToggleMode === '%') ? '$' : '%';
   const card = document.getElementById('kpi-awl-card');
   const awEl = document.getElementById('kpi-aw');
   const alEl = document.getElementById('kpi-al');
-  const awBarEl = document.getElementById('kpi-aw-bar');
-  const alBarEl = document.getElementById('kpi-al-bar');
-  const ratioEl = document.getElementById('kpi-avgratio');
   if (card) { card.classList.add('kpi-pnl-flipping'); setTimeout(() => card.classList.remove('kpi-pnl-flipping'), 300); }
   if (_avgWLToggleMode === '$') {
     if (awEl) awEl.textContent = awEl.dataset.dollar || '+$0.00';
     if (alEl) alEl.textContent = alEl.dataset.dollar || '-$0.00';
-    if (awBarEl) awBarEl.style.width = (awBarEl.dataset.dollarWidth || '50') + '%';
-    if (alBarEl) alBarEl.style.width = (alBarEl.dataset.dollarWidth || '50') + '%';
-    if (ratioEl) ratioEl.textContent = ratioEl.dataset.dollar || '—';
   } else {
     if (awEl) awEl.textContent = awEl.dataset.pct || '+0.00%';
     if (alEl) alEl.textContent = alEl.dataset.pct || '0.00%';
-    if (awBarEl) awBarEl.style.width = (awBarEl.dataset.pctWidth || '50') + '%';
-    if (alBarEl) alBarEl.style.width = (alBarEl.dataset.pctWidth || '50') + '%';
-    if (ratioEl) ratioEl.textContent = ratioEl.dataset.pct || '—';
   }
 }
 
