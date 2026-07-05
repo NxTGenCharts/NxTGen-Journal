@@ -2579,9 +2579,10 @@ body{
 
 /* Detail drawer */
 .acc-detail-drawer{background:var(--glass-1);border:1px solid var(--glass-border);
-  border-radius:var(--r-lg);margin-bottom:20px;overflow-x:visible;overflow-y:hidden;
-  max-height:0;transition:max-height .3s ease, opacity .25s ease;opacity:0}
-.acc-detail-drawer.open{max-height:600px;opacity:1}
+  border-radius:var(--r-lg);margin-bottom:20px;overflow:visible;
+  opacity:0;transform:translateY(-8px);pointer-events:none;
+  transition:opacity .3s var(--ease-out), transform .3s var(--ease-out)}
+.acc-detail-drawer.open{opacity:1;transform:translateY(0);pointer-events:auto}
 .acc-detail-header{display:flex;align-items:center;justify-content:space-between;
   padding:14px 18px;border-bottom:1px solid var(--glass-border);
   position:sticky;top:0;background:var(--glass-1);z-index:1;
@@ -2598,6 +2599,105 @@ body{
 .acc-ds-val.red{color:var(--red)}
 .acc-ds-val.blue{color:var(--blue)}
 .acc-ds-val.gold{color:var(--gold)}
+
+/* ════════ ACCOUNT ANALYTICS — institutional dashboard ════════ */
+.acc-an{ animation:pageIn .3s var(--ease-out) }
+
+/* — Hero — */
+.acc-hero{
+  display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;
+  background:linear-gradient(145deg,var(--glass-2) 0%,var(--glass-0) 100%);
+  border:1px solid var(--glass-border);border-radius:var(--r-xl);
+  padding:20px 22px;margin-bottom:16px;position:relative;overflow:hidden;
+}
+.acc-hero::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(ellipse 70% 60% at 85% 15%,rgba(96,165,250,0.07) 0%,transparent 60%);
+}
+.acc-hero-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;position:relative;z-index:1}
+.acc-hero-name{font-family:var(--font-head);font-size:19px;font-weight:800;letter-spacing:-.02em}
+.acc-hero-badges{display:flex;gap:6px;flex-wrap:wrap}
+.acc-hero-badge{font-size:10px;font-weight:700;letter-spacing:.03em;padding:3px 9px;border-radius:var(--r-full);
+  background:var(--glass-2);border:1px solid var(--glass-border);color:var(--text2)}
+.acc-hero-badge.status-active{background:var(--green-dim);border-color:rgba(52,211,153,.3);color:var(--green)}
+.acc-hero-badge.status-archived{background:var(--glass-2);color:var(--text3)}
+.acc-hero-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:14px 18px;position:relative;z-index:1}
+.acc-hero-stat{min-width:0}
+.acc-hero-stat-label{font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:3px}
+.acc-hero-stat-val{font-family:var(--font-head);font-size:17px;font-weight:800;letter-spacing:-.01em;font-feature-settings:'tnum'}
+.acc-hero-stat-val.green{color:var(--green)}
+.acc-hero-stat-val.red{color:var(--red)}
+.acc-hero-stat-val.gold{color:var(--gold)}
+.acc-hero-stat-val.blue{color:var(--blue)}
+
+/* Health gauge (right side of hero) */
+.acc-health{display:flex;flex-direction:column;align-items:center;gap:2px;position:relative;z-index:1;flex-shrink:0}
+.acc-health-ring-wrap{position:relative;width:104px;height:104px}
+.acc-health-ring-wrap svg{position:absolute;inset:0}
+.acc-health-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.acc-health-grade{font-family:var(--font-head);font-size:22px;font-weight:800;line-height:1}
+.acc-health-score{font-size:9.5px;color:var(--text3);margin-top:2px;font-weight:600}
+.acc-health-label{font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-top:6px}
+.acc-health-why{position:relative;z-index:1;margin-top:2px}
+.acc-health-why-btn{font-size:10px;color:var(--blue);background:none;border:none;cursor:pointer;font-family:var(--font-body);font-weight:600;padding:2px 4px}
+.acc-health-why-panel{
+  display:none;position:absolute;right:0;top:calc(100% + 6px);width:230px;z-index:20;
+  background:var(--bg2);border:1px solid var(--glass-border);border-radius:var(--r-md);
+  padding:10px 12px;box-shadow:var(--shadow-lg);font-size:11px;color:var(--text2);line-height:1.5;
+}
+.acc-health-why-panel.show{display:block}
+.acc-health-why-panel ul{margin:0;padding-left:16px}
+.acc-health-why-panel li{margin-bottom:3px}
+
+@media(max-width:640px){
+  .acc-hero{grid-template-columns:1fr}
+  .acc-health{flex-direction:row;justify-content:flex-start;gap:12px;margin-top:4px}
+  .acc-health-ring-wrap{width:76px;height:76px}
+  .acc-health-grade{font-size:17px}
+}
+
+/* — KPI Scorecard — */
+.acc-kpi-scorecard{
+  display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;
+}
+.acc-kpi-card{
+  position:relative;background:var(--glass-1);border:1px solid var(--glass-border);
+  border-radius:var(--r-md);padding:12px 13px;overflow:hidden;
+  transition:transform .18s var(--ease-out),border-color .18s var(--ease-out),box-shadow .18s var(--ease-out);
+}
+.acc-kpi-card:hover{transform:translateY(-2px);border-color:var(--glass-border-h);box-shadow:var(--shadow-sm)}
+.acc-kpi-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:6px}
+.acc-kpi-card-label{font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;font-weight:600;
+  display:flex;align-items:center;gap:4px;cursor:help}
+.acc-kpi-card-trend{font-size:9.5px;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:2px}
+.acc-kpi-card-trend.up{color:var(--green)}
+.acc-kpi-card-trend.down{color:var(--red)}
+.acc-kpi-card-trend.flat{color:var(--text3)}
+.acc-kpi-card-val{font-family:var(--font-head);font-size:18px;font-weight:800;letter-spacing:-.01em;
+  font-feature-settings:'tnum';margin-bottom:6px}
+.acc-kpi-card-val.green{color:var(--green)}
+.acc-kpi-card-val.red{color:var(--red)}
+.acc-kpi-card-val.gold{color:var(--gold)}
+.acc-kpi-card-spark{width:100%;height:26px;display:block}
+
+@media(max-width:1080px){ .acc-kpi-scorecard{grid-template-columns:repeat(4,1fr)} }
+@media(max-width:900px){ .acc-kpi-scorecard{grid-template-columns:repeat(3,1fr)} }
+@media(max-width:640px){ .acc-kpi-scorecard{grid-template-columns:repeat(2,1fr);gap:8px} }
+
+/* — Equity curve section — */
+.acc-eq-section{
+  background:var(--glass-0);border:1px solid var(--glass-border);border-radius:var(--r-lg);
+  padding:16px 18px 12px;margin-bottom:16px;
+}
+.acc-eq-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.acc-eq-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text2)}
+.acc-eq-toggles{display:flex;gap:6px;flex-wrap:wrap}
+.acc-eq-canvas-wrap{position:relative;width:100%}
+.acc-eq-empty{color:var(--text3);text-align:center;padding:40px 10px;font-style:italic;font-size:12px}
+
+/* Section headers reused for new analytics blocks */
+.acc-an-sec-head{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);
+  margin:0 0 10px}
 
 /* Milestone edit/delete buttons */
 .acc-ms-actions{margin-left:auto;display:flex;gap:4px;opacity:0;transition:opacity .15s}

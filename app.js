@@ -5267,7 +5267,10 @@ function _renderAccGrid() {
   grid.innerHTML = html;
 }
 
-/* ── Account detail drawer ── */
+/* ── Account detail drawer — institutional analytics dashboard ── */
+
+let _accEqMode      = 'balance'; // 'balance' | 'daily' | 'drawdown'
+let _accActiveName  = null;
 
 async function _accDetailSetMode(accountName, mode) {
   const list = _getCustomAccounts();
@@ -5278,120 +5281,483 @@ async function _accDetailSetMode(accountName, mode) {
   buildAccounts();
   accShowDetail(accountName);
 }
+
+// Single source of truth for every card/chart on the account analytics dashboard.
+function _accComputeAnalytics(name) {
+  const acc     = _getCustomAccounts().find(a => a.name === name) || {};
+  const accSize = parseFloat(acc.size) || 0;
+  const pnlMode = acc.pnlMode || '%';
+
+  const atDesc = trades.filter(t => t.account === name).sort((a,b) => b.date.localeCompare(a.date));
+  const at     = [...atDesc].sort((a,b) => a.date.localeCompare(b.date)); // ascending, for curves
+
+  const dollars = t => toPnlDollars(t, accSize);
+  const wins    = at.filter(t => t.outcome === 'Win');
+  const losses  = at.filter(t => t.outcome === 'Loss');
+  const bes     = at.filter(t => t.outcome !== 'Win' && t.outcome !== 'Loss');
+
+  const sum          = arr => arr.reduce((s,t) => s + dollars(t), 0);
+  const netDollars   = sum(at);
+  const grossW       = sum(wins);
+  const grossL       = Math.abs(sum(losses));
+  const pf           = grossL > 0 ? grossW / grossL : (grossW > 0 ? Infinity : 0);
+  const wr           = at.length ? (wins.length / at.length) * 100 : 0;
+  const avgWDollars  = wins.length   ? grossW / wins.length   : null;
+  const avgLDollars  = losses.length ? grossL / losses.length : null;
+  const largestWin   = wins.length   ? Math.max(...wins.map(dollars))   : null;
+  const largestLoss  = losses.length ? Math.min(...losses.map(dollars)) : null;
+  const expectancy   = at.length ? netDollars / at.length : 0;
+
+  const rrVals = at.map(t => _parseRR(t.rr)).filter(v => v !== null && !isNaN(v));
+  const avgRR  = rrVals.length ? rrVals.reduce((a,b) => a+b, 0) / rrVals.length : null;
+
+  // Cumulative balance curve + underwater drawdown series + per-day P&L
+  let cum = 0, peak = 0, maxDD = 0;
+  const curve    = [];
+  const ddSeries = [];
+  const dailyMap = {};
+  at.forEach((t, idx) => {
+    cum += dollars(t);
+    peak = Math.max(peak, cum);
+    const dd = peak - cum;
+    maxDD = Math.max(maxDD, dd);
+    curve.push({ i: idx, date: t.date, cum, outcome: t.outcome });
+    ddSeries.push({ i: idx, date: t.date, dd: -dd });
+    dailyMap[t.date] = (dailyMap[t.date] || 0) + dollars(t);
+  });
+  const maxDDPct       = accSize > 0 ? (maxDD / accSize) * 100 : (peak > 0 ? (maxDD / peak) * 100 : 0);
+  const recoveryFactor = maxDD > 0 ? netDollars / maxDD : (netDollars > 0 ? Infinity : 0);
+
+  const dailyEntries = Object.entries(dailyMap).sort((a,b) => a[0].localeCompare(b[0]));
+  const dailySeries   = dailyEntries.map(([date, val], idx) => ({ i: idx, date, val }));
+
+  const tradingDays     = Object.keys(dailyMap).length;
+  const avgTradesPerDay = tradingDays ? (at.length / tradingDays) : 0;
+
+  // Rolling series for KPI sparklines
+  const rollNet = []; { let c = 0; at.forEach(t => { c += dollars(t); rollNet.push(c); }); }
+  const rollWR  = []; { let w = 0; at.forEach((t,i) => { if (t.outcome==='Win') w++; rollWR.push((w/(i+1))*100); }); }
+  const rollPF  = []; { let gw=0, gl=0; at.forEach(t => { const d=dollars(t); if (d>0) gw+=d; else gl+=Math.abs(d); rollPF.push(gl>0 ? gw/gl : (gw>0?3:0)); }); }
+  const rollExp = rollNet.map((v,i) => v/(i+1));
+  const rollRR  = []; { let s=0, n=0; at.forEach(t => { const r=_parseRR(t.rr); if (r!==null && !isNaN(r)) { s+=r; n++; } rollRR.push(n? s/n : 0); }); }
+  const rollDD  = ddSeries.map(p => p.dd);
+  const rollCount = at.map((_,i) => i+1);
+
+  // Trend: first half of trade sequence vs second half
+  const mid = Math.floor(at.length / 2);
+  const firstHalf  = at.slice(0, mid);
+  const secondHalf = at.slice(mid);
+  const halfNet = arr => sum(arr);
+  const halfWR  = arr => arr.length ? (arr.filter(t=>t.outcome==='Win').length/arr.length)*100 : 0;
+  const halfPF  = arr => {
+    const w = sum(arr.filter(t=>t.outcome==='Win'));
+    const l = Math.abs(sum(arr.filter(t=>t.outcome==='Loss')));
+    return l>0 ? w/l : (w>0?3:0);
+  };
+
+  // Consistency — same "quality rating" basis the Dashboard uses
+  const rated = at.filter(t => (t.rating||0) > 0);
+  const consistency = rated.length ? Math.round((rated.filter(t=>(t.rating||0)>=4).length/rated.length)*100) : null;
+
+  return {
+    acc, accSize, pnlMode, at, atDesc, wins, losses, bes,
+    netDollars, grossW, grossL, pf, wr, avgWDollars, avgLDollars,
+    largestWin, largestLoss, expectancy, avgRR,
+    curve, ddSeries, dailySeries, maxDD, maxDDPct, recoveryFactor,
+    tradingDays, avgTradesPerDay, consistency,
+    firstHalf, secondHalf, halfNet, halfWR, halfPF,
+    rollNet, rollWR, rollPF, rollExp, rollRR, rollDD, rollCount,
+    dollars,
+  };
+}
+
+// Composite 0–100 health score from what the journal can actually measure:
+// profitability (profit factor), win rate, drawdown control, and setup
+// quality/consistency. Weighted, then mapped to a letter grade.
+function _accHealthScore(m) {
+  if (!m.at.length) return { score: null, grade: '—', reasons: ['Log trades under this account to generate a health score.'] };
+
+  const pfScore   = Math.max(0, Math.min(1, (isFinite(m.pf) ? m.pf : 3) / 3)) * 30;
+  const wrScore   = Math.max(0, Math.min(1, m.wr / 100)) * 20;
+  const ddScore   = Math.max(0, 1 - Math.min(1, m.maxDDPct / 25)) * 25;
+  const consScore = (m.consistency !== null ? m.consistency / 100 : 0.6) * 15;
+  const expScore  = m.expectancy > 0 ? 10 : 0;
+
+  const total = Math.round(pfScore + wrScore + ddScore + consScore + expScore);
+  let grade;
+  if      (total >= 90) grade = 'A+';
+  else if (total >= 80) grade = 'A';
+  else if (total >= 70) grade = 'B+';
+  else if (total >= 60) grade = 'B';
+  else if (total >= 50) grade = 'C';
+  else                   grade = 'D';
+
+  const reasons = [
+    isFinite(m.pf)
+      ? `Profit factor of ${m.pf.toFixed(2)}x ${m.pf>=1.5?'is strong':'has room to improve'}.`
+      : 'No losing trades yet to measure profit factor against.',
+    `Win rate of ${m.wr.toFixed(1)}% ${m.wr>=55?'is healthy':'is on the lower side'}.`,
+    `Max drawdown of ${m.maxDDPct.toFixed(1)}% ${m.maxDDPct<=10?'shows tight risk control':'is elevated — watch position sizing'}.`,
+  ];
+  if (m.consistency !== null) reasons.push(`${m.consistency}% of rated trades were 4★+ quality setups.`);
+
+  return { score: total, grade, reasons };
+}
+
+function _accGradeColor(grade) {
+  if (grade === 'A+' || grade === 'A') return _calCssVar('--green', '#34d399');
+  if (grade === 'B+' || grade === 'B') return _calCssVar('--blue', '#60a5fa');
+  if (grade === 'C') return _calCssVar('--gold', '#fbbf24');
+  if (grade === 'D') return _calCssVar('--red', '#f87171');
+  return _calCssVar('--text3', '#94a3b8');
+}
+
+// Small inline trend series → tiny canvas sparkline (no axes, just shape).
+function _accDrawSparkline(canvas, points, color) {
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.clientWidth || 90;
+  const H = canvas.clientHeight || 26;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+  if (!points || points.length < 2) return;
+  const min = Math.min(...points), max = Math.max(...points);
+  const range = (max - min) || 1;
+  const stepX = W / (points.length - 1);
+  const py = v => H - 3 - ((v - min) / range) * (H - 6);
+
+  ctx.beginPath();
+  points.forEach((v, i) => { const x = i * stepX, y = py(v); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+  ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
+  ctx.globalAlpha = 0.14; ctx.fillStyle = color; ctx.fill(); ctx.globalAlpha = 1;
+
+  ctx.beginPath();
+  points.forEach((v, i) => { const x = i * stepX, y = py(v); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+  ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+}
+
+// Trend badge comparing the first half of the trade history to the second half.
+function _accTrendBadge(firstVal, secondVal, { suffix = '', invert = false } = {}) {
+  if (!isFinite(firstVal) || !isFinite(secondVal)) return { dir: 'flat', text: '—' };
+  const diff = secondVal - firstVal;
+  if (Math.abs(diff) < 0.001) return { dir: 'flat', text: '±0' + suffix };
+  let dir = diff > 0 ? 'up' : 'down';
+  if (invert) dir = dir === 'up' ? 'down' : 'up';
+  const arrow = diff > 0 ? '▲' : '▼';
+  return { dir, text: `${arrow} ${Math.abs(diff).toFixed(1)}${suffix}` };
+}
+
+function _accKpiCardHtml(id, label, tooltip, valStr, valClass, spark, sparkColor, trend) {
+  return `
+    <div class="acc-kpi-card">
+      <div class="acc-kpi-card-top">
+        <span class="acc-kpi-card-label" title="${tooltip}">${label}</span>
+        <span class="acc-kpi-card-trend ${trend.dir}">${trend.text}</span>
+      </div>
+      <div class="acc-kpi-card-val ${valClass}">${valStr}</div>
+      <canvas class="acc-kpi-card-spark" id="${id}"></canvas>
+    </div>`;
+}
+
+function setAccEqMode(mode, btn) {
+  _accEqMode = mode;
+  document.querySelectorAll('.acc-eq-toggle-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  if (_accActiveName) _accDrawEquityCurve(_accActiveName);
+}
+
+function _accDrawEquityCurve(name) {
+  const canvas  = document.getElementById('acc-eq-canvas');
+  const emptyEl = document.getElementById('acc-eq-empty');
+  if (!canvas) return;
+  const m = _accComputeAnalytics(name);
+  const mode = _accEqMode;
+
+  let series;
+  if      (mode === 'daily')     series = m.dailySeries.map(p => ({ x: p.i, y: p.val,  date: p.date }));
+  else if (mode === 'drawdown')  series = m.ddSeries.map(p    => ({ x: p.i, y: p.dd,   date: p.date }));
+  else                            series = m.curve.map(p       => ({ x: p.i, y: p.cum,  date: p.date, outcome: p.outcome }));
+
+  if (series.length < 2) {
+    canvas.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'block';
+    return;
+  }
+  canvas.style.display = 'block';
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth - 4 || 600;
+  const H = 200;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 16, right: 14, bottom: 26, left: 58 };
+  const cW = W - pad.left - pad.right, cH = H - pad.top - pad.bottom;
+  const ys = series.map(p => p.y);
+  const minY = Math.min(0, ...ys), maxY = Math.max(0, ...ys);
+  const rangeY = (maxY - minY) || 1;
+  const px = i => pad.left + (i / (series.length - 1)) * cW;
+  const py = v => pad.top + cH - ((v - minY) / rangeY) * cH;
+
+  const zeroY = py(0);
+  ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(pad.left + cW, zeroY);
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = '10px system-ui,sans-serif'; ctx.textAlign = 'right';
+  const fmtAxis = v => (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(0);
+  [minY, (minY + maxY) / 2, maxY].forEach(v => ctx.fillText(fmtAxis(v), pad.left - 6, py(v) + 4));
+
+  ctx.textAlign = 'center';
+  [[0, series[0].date], [Math.floor(series.length / 2), series[Math.floor(series.length / 2)]?.date], [series.length - 1, series[series.length - 1].date]]
+    .forEach(([i, d]) => { if (d) ctx.fillText(String(d).slice(5), px(i), H - 6); });
+
+  if (mode === 'daily') {
+    const barW = Math.max(3, (cW / series.length) * 0.6);
+    series.forEach((p, i) => {
+      ctx.fillStyle = p.y >= 0 ? '#22c55e' : '#ef4444';
+      const y0 = py(0), y1 = py(p.y);
+      ctx.fillRect(px(i) - barW / 2, Math.min(y0, y1), barW, Math.max(1, Math.abs(y1 - y0)));
+    });
+  } else {
+    const isPos = series[series.length - 1].y >= 0;
+    const fillTop = mode === 'drawdown' ? 'rgba(239,68,68,0.30)' : (isPos ? 'rgba(34,197,94,0.28)' : 'rgba(239,68,68,0.28)');
+    const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + cH);
+    grad.addColorStop(0, fillTop); grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath(); ctx.moveTo(px(0), py(series[0].y));
+    series.forEach((p, i) => { if (i > 0) ctx.lineTo(px(i), py(p.y)); });
+    ctx.lineTo(px(series.length - 1), py(0)); ctx.lineTo(px(0), py(0)); ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+
+    const colPos = '#22c55e', colNeg = '#ef4444', colFlat = '#60a5fa';
+    for (let i = 1; i < series.length; i++) {
+      ctx.beginPath(); ctx.moveTo(px(i - 1), py(series[i - 1].y)); ctx.lineTo(px(i), py(series[i].y));
+      ctx.strokeStyle = mode === 'drawdown' ? '#ef4444' : (series[i].outcome === 'Win' ? colPos : series[i].outcome === 'Loss' ? colNeg : colFlat);
+      ctx.lineWidth = 2; ctx.stroke();
+    }
+  }
+
+  const last = series[series.length - 1];
+  ctx.font = 'bold 12px system-ui,sans-serif'; ctx.textAlign = 'left';
+  ctx.fillStyle = last.y >= 0 ? '#22c55e' : '#ef4444';
+  ctx.fillText((last.y >= 0 ? '+$' : '-$') + Math.abs(last.y).toFixed(2), Math.max(pad.left, px(series.length - 1) - 46), py(last.y) - 8);
+}
+
 function accShowDetail(name) {
   const drawer = document.getElementById('acc-detail-drawer');
   const title  = document.getElementById('acc-detail-title');
   const body   = document.getElementById('acc-detail-body');
   if (!drawer || !body) return;
 
-  const acc     = _getCustomAccounts().find(a => a.name === name) || {};
-  const accSize = parseFloat(acc.size) || 0;
-  const pnlMode = acc.pnlMode || '%';
-
-  const at     = trades.filter(t => t.account === name).sort((a,b) => b.date.localeCompare(a.date));
-  const wins   = at.filter(t => t.outcome === 'Win');
-  const losses = at.filter(t => t.outcome === 'Loss');
-  const wr     = at.length ? ((wins.length / at.length) * 100).toFixed(1) : 0;
-
-  // Always sum in $ first using each trade's own pnlUnit, then display per pnlMode
-  const sumDollars = (arr) => arr.reduce((s, t) => s + toPnlDollars(t, accSize), 0);
+  _accActiveName = name;
+  const m = _accComputeAnalytics(name);
+  const { acc, accSize, pnlMode, at } = m;
+  const health = _accHealthScore(m);
 
   const fmtVal = (dollars) => {
     if (dollars === null || dollars === undefined) return '—';
     const d = parseFloat(dollars) || 0;
-    if (pnlMode === '$') {
-      return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2);
-    }
-    // pnlMode '%' — convert dollars → % using account size
-    if (accSize > 0) {
-      const pct = (d / accSize) * 100;
-      return (pct >= 0 ? '+' : '') + pct.toFixed(3) + '%';
-    }
-    // No account size — fall back to $ display
-    return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2);
+    if (pnlMode === '$' || accSize === 0) return (d >= 0 ? '+$' : '-$') + Math.abs(d).toFixed(2);
+    const pct = (d / accSize) * 100;
+    return (pct >= 0 ? '+' : '') + pct.toFixed(3) + '%';
   };
-
-  const netDollars = sumDollars(at);
-  const avgWDollars = wins.length   ? sumDollars(wins)   / wins.length   : null;
-  const avgLDollars = losses.length ? sumDollars(losses) / losses.length : null;
-  const grossW      = sumDollars(wins);
-  const grossL      = Math.abs(sumDollars(losses));
-  const pf          = grossL > 0 ? (grossW / grossL).toFixed(2) : '∞';
+  const fmtPlain = (dollars) => (dollars === null || dollars === undefined) ? '—' : (dollars >= 0 ? '+$' : '-$') + Math.abs(dollars).toFixed(2);
 
   title.textContent = name;
+
+  const isArchived = acc.status === 'archived';
+  const netProfitPct = accSize > 0 ? (m.netDollars / accSize) * 100 : null;
+
+  // ── Hero ──
+  const heroBadges = `
+    <span class="acc-hero-badge status-${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span>
+    ${acc.type ? `<span class="acc-hero-badge">${acc.type}</span>` : ''}
+  `;
   const sizeNote = accSize > 0
     ? `$${accSize.toLocaleString()}`
-    : `<span style="color:var(--gold)" title="Set size in Manage Accounts">⚠ No size set</span>`;
+    : `<span style="color:var(--gold)" title="Set size in Manage Accounts">⚠ Not set</span>`;
+
+  const healthColor = _accGradeColor(health.grade);
+  const healthRingSvg = health.score !== null
+    ? _calRingGauge(health.score / 100, healthColor, _calCssVar('--glass-3', 'rgba(255,255,255,0.12)'), 104)
+    : _calRingGauge(0, healthColor, _calCssVar('--glass-3', 'rgba(255,255,255,0.12)'), 104);
+
+  const heroHtml = `
+    <div class="acc-hero">
+      <div>
+        <div class="acc-hero-top">
+          <span class="acc-hero-name">${name}</span>
+          ${heroBadges}
+          <div style="display:flex;gap:0;border:1px solid var(--glass-border);border-radius:6px;overflow:hidden;margin-left:auto">
+            <button onclick="_accDetailSetMode('${name.replace(/'/g,"\\'")}','\$')"
+              style="padding:4px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;
+              background:${pnlMode==='$'?'var(--blue)':'var(--glass-1)'};
+              color:${pnlMode==='$'?'#fff':'var(--text3)'};font-family:var(--font-body)">$ USD</button>
+            <button onclick="_accDetailSetMode('${name.replace(/'/g,"\\'")}','%')"
+              style="padding:4px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;
+              background:${pnlMode==='%'?'var(--blue)':'var(--glass-1)'};
+              color:${pnlMode==='%'?'#fff':'var(--text3)'};font-family:var(--font-body)">% PCT</button>
+          </div>
+        </div>
+        <div class="acc-hero-grid">
+          <div class="acc-hero-stat"><div class="acc-hero-stat-label">Account Size</div><div class="acc-hero-stat-val">${sizeNote}</div></div>
+          <div class="acc-hero-stat"><div class="acc-hero-stat-label">Net Profit</div><div class="acc-hero-stat-val ${m.netDollars>=0?'green':'red'}">${fmtPlain(m.netDollars)}</div></div>
+          <div class="acc-hero-stat"><div class="acc-hero-stat-label">Profit %</div><div class="acc-hero-stat-val ${m.netDollars>=0?'green':'red'}">${netProfitPct!==null ? (netProfitPct>=0?'+':'')+netProfitPct.toFixed(2)+'%' : '—'}</div></div>
+          <div class="acc-hero-stat"><div class="acc-hero-stat-label">Win Rate</div><div class="acc-hero-stat-val ${m.wr>=55?'green':'red'}">${at.length?m.wr.toFixed(1)+'%':'—'}</div></div>
+          <div class="acc-hero-stat"><div class="acc-hero-stat-label">Profit Factor</div><div class="acc-hero-stat-val gold">${at.length?(isFinite(m.pf)?m.pf.toFixed(2)+'x':'∞'):'—'}</div></div>
+          <div class="acc-hero-stat"><div class="acc-hero-stat-label">Trades</div><div class="acc-hero-stat-val blue">${at.length || '—'}</div></div>
+          <div class="acc-hero-stat"><div class="acc-hero-stat-label">Trading Days</div><div class="acc-hero-stat-val">${m.tradingDays || '—'}</div></div>
+          <div class="acc-hero-stat"><div class="acc-hero-stat-label">Max Drawdown</div><div class="acc-hero-stat-val ${m.maxDDPct<=10?'green':'red'}">${at.length?m.maxDDPct.toFixed(1)+'%':'—'}</div></div>
+        </div>
+      </div>
+      <div class="acc-health">
+        <div class="acc-health-ring-wrap">
+          ${healthRingSvg}
+          <div class="acc-health-center">
+            <div class="acc-health-grade" style="color:${healthColor}">${health.grade}</div>
+            <div class="acc-health-score">${health.score!==null?health.score+'/100':''}</div>
+          </div>
+        </div>
+        <div class="acc-health-label">Account Health</div>
+        <div class="acc-health-why" style="position:relative">
+          <button class="acc-health-why-btn" onclick="_accToggleWhy(event)">Why this score?</button>
+          <div class="acc-health-why-panel" id="acc-health-why-panel">
+            <ul>${health.reasons.map(r => `<li>${r}</li>`).join('')}</ul>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  // ── KPI Scorecard ──
+  const trendWR  = _accTrendBadge(m.halfWR(m.firstHalf), m.halfWR(m.secondHalf), { suffix: '%' });
+  const trendNet = _accTrendBadge(m.halfNet(m.firstHalf), m.halfNet(m.secondHalf), { suffix: '' });
+  const trendPF  = _accTrendBadge(m.halfPF(m.firstHalf), m.halfPF(m.secondHalf), { suffix: 'x' });
+
+  const kpiCards = [
+    _accKpiCardHtml('acc-spark-net',  'Net Profit',     'Total profit across all logged trades.',            fmtPlain(m.netDollars), m.netDollars>=0?'green':'red', m.rollNet, m.netDollars>=0?'#34d399':'#f87171', trendNet),
+    _accKpiCardHtml('acc-spark-pf',   'Profit Factor',  'Gross profit ÷ gross loss. Above 1.5x is strong.',   at.length?(isFinite(m.pf)?m.pf.toFixed(2)+'x':'∞'):'—', 'gold', m.rollPF, '#fbbf24', trendPF),
+    _accKpiCardHtml('acc-spark-wr',   'Win Rate',       'Percentage of trades closed as a win.',              at.length?m.wr.toFixed(1)+'%':'—', m.wr>=55?'green':'red', m.rollWR, '#60a5fa', trendWR),
+    _accKpiCardHtml('acc-spark-exp',  'Expectancy',     'Average $ result per trade taken.',                  at.length?fmtPlain(m.expectancy):'—', m.expectancy>=0?'green':'red', m.rollExp, m.expectancy>=0?'#34d399':'#f87171', {dir:'flat',text:'per trade'}),
+    _accKpiCardHtml('acc-spark-rr',   'Avg R:R',        'Average reward-to-risk ratio across trades with R:R logged.', m.avgRR!==null?m.avgRR.toFixed(2)+'R':'—', '', m.rollRR, '#a78bfa', {dir:'flat',text:''}),
+    _accKpiCardHtml('acc-spark-dd',   'Max Drawdown',   'Largest peak-to-trough decline in account balance.', at.length?fmtPlain(-m.maxDD):'—', m.maxDDPct<=10?'green':'red', m.rollDD, '#f87171', {dir:'flat',text:m.maxDDPct.toFixed(1)+'%'}),
+    _accKpiCardHtml('acc-spark-rec',  'Recovery Factor','Net profit ÷ max drawdown — higher recovers faster.', at.length?(isFinite(m.recoveryFactor)?m.recoveryFactor.toFixed(2)+'x':'∞'):'—', 'blue', m.rollNet, '#60a5fa', {dir:'flat',text:''}),
+    _accKpiCardHtml('acc-spark-aw',   'Avg Win',        'Average profit on winning trades.',                  fmtPlain(m.avgWDollars), 'green', m.rollNet, '#34d399', {dir:'flat',text:''}),
+    _accKpiCardHtml('acc-spark-al',   'Avg Loss',       'Average loss on losing trades.',                     fmtPlain(m.avgLDollars), 'red', m.rollNet, '#f87171', {dir:'flat',text:''}),
+    _accKpiCardHtml('acc-spark-cnt',  'Trades Taken',   `${m.wins.length} wins · ${m.losses.length} losses · ${m.bes.length} B/E`, at.length, '', m.rollCount, '#60a5fa', {dir:'flat',text:''}),
+  ].join('');
+
+  // ── Equity curve section ──
+  const eqSection = `
+    <div class="acc-eq-section">
+      <div class="acc-eq-head">
+        <span class="acc-eq-title">Equity Curve</span>
+        <div class="acc-eq-toggles">
+          <button class="dash-filter-btn acc-eq-toggle-btn ${_accEqMode==='balance'?'active':''}" onclick="setAccEqMode('balance',this)">Balance</button>
+          <button class="dash-filter-btn acc-eq-toggle-btn ${_accEqMode==='daily'?'active':''}" onclick="setAccEqMode('daily',this)">Daily P/L</button>
+          <button class="dash-filter-btn acc-eq-toggle-btn ${_accEqMode==='drawdown'?'active':''}" onclick="setAccEqMode('drawdown',this)">Drawdown</button>
+        </div>
+      </div>
+      <div class="acc-eq-canvas-wrap">
+        <canvas id="acc-eq-canvas"></canvas>
+        <div class="acc-eq-empty" id="acc-eq-empty" style="display:none">Log at least 2 trades on this account to see the equity curve.</div>
+      </div>
+    </div>`;
 
   body.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-      <span style="font-size:11px;color:var(--text3)">
-        Account: <strong style="color:var(--text)">${sizeNote}</strong>
-      </span>
-      <div style="display:flex;gap:0;border:1px solid var(--glass-border);border-radius:6px;overflow:hidden">
-        <button onclick="_accDetailSetMode('${name}','\$')"
-          style="padding:4px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;
-          background:${pnlMode==='$'?'var(--blue)':'var(--glass-1)'};
-          color:${pnlMode==='$'?'#fff':'var(--text3)'};font-family:var(--font-body)">$ USD</button>
-        <button onclick="_accDetailSetMode('${name}','%')"
-          style="padding:4px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;
-          background:${pnlMode==='%'?'var(--blue)':'var(--glass-1)'};
-          color:${pnlMode==='%'?'#fff':'var(--text3)'};font-family:var(--font-body)">% PCT</button>
-      </div>
+    <div class="acc-an">
+      ${heroHtml}
+      <div class="acc-an-sec-head">Performance Scorecard</div>
+      <div class="acc-kpi-scorecard">${kpiCards}</div>
+      ${eqSection}
+      ${at.length === 0
+        ? '<div style="color:var(--text3);text-align:center;padding:30px;font-style:italic">No trades logged under this account yet.</div>'
+        : `<div class="acc-an-sec-head">Trade Log</div>
+           <div class="data-table-wrap" style="overflow-x:auto">
+            <table class="data-table" style="width:100%">
+              <thead>
+                <tr>
+                  <th>Date</th><th>Pair</th><th>Pos</th><th>Outcome</th>
+                  <th>P/L</th><th>R:R</th><th>Strategy</th><th style="width:72px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${m.atDesc.map(t => {
+                  const _td     = toPnlDollars(t, accSize);
+                  const pnlColor = _td >= 0 ? 'outcome-win' : 'outcome-loss';
+                  const pnlDisp  = fmtVal(_td);
+                  const outClass = t.outcome==='Win'?'outcome-win':t.outcome==='Loss'?'outcome-loss':'outcome-be';
+                  const posClass = t.pos==='Buy'?'pos-buy':'pos-sell';
+                  return `
+                  <tr class="acc-trade-row" onclick="openDetail(${t.id})" title="Click to view / edit trade"
+                      onmouseenter="this.querySelector('.acc-tr-actions').style.opacity='1'"
+                      onmouseleave="this.querySelector('.acc-tr-actions').style.opacity='0'">
+                    <td class="mono" style="color:var(--text2)">${t.date}</td>
+                    <td class="bold">${t.pair}</td>
+                    <td><span class="${posClass}">${t.pos}</span></td>
+                    <td class="${outClass}">${t.outcome}</td>
+                    <td class="${pnlColor} mono">${pnlDisp}</td>
+                    <td class="mono">${t.rr||'—'}</td>
+                    <td style="color:var(--text2);font-size:11px">${t.strategy||'—'}</td>
+                    <td class="acc-tr-actions" style="opacity:0;transition:opacity .15s;white-space:nowrap;text-align:right">
+                      <button onclick="event.stopPropagation();openDetail(${t.id},true)"
+                        style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;margin-right:3px">✏️</button>
+                      <button onclick="event.stopPropagation();quickDelete(${t.id});accShowDetail('${name.replace(/'/g, "\\'")}')"
+                        style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer">🗑</button>
+                    </td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>`}
     </div>
-    <div class="acc-detail-stats">
-      <div class="acc-ds"><div class="acc-ds-label">Trades</div><div class="acc-ds-val blue">${at.length}</div></div>
-      <div class="acc-ds"><div class="acc-ds-label">Win Rate</div><div class="acc-ds-val ${parseFloat(wr)>=60?'green':'red'}">${wr}%</div></div>
-      <div class="acc-ds"><div class="acc-ds-label">Net PnL</div><div class="acc-ds-val ${netDollars>=0?'green':'red'}">${fmtVal(netDollars)}</div></div>
-      <div class="acc-ds"><div class="acc-ds-label">Avg Win</div><div class="acc-ds-val green">${fmtVal(avgWDollars)}</div></div>
-      <div class="acc-ds"><div class="acc-ds-label">Avg Loss</div><div class="acc-ds-val red">${fmtVal(avgLDollars)}</div></div>
-      <div class="acc-ds"><div class="acc-ds-label">Profit Factor</div><div class="acc-ds-val gold">${pf}x</div></div>
-    </div>
-    ${at.length === 0
-      ? '<div style="color:var(--text3);text-align:center;padding:30px;font-style:italic">No trades logged under this account yet.</div>'
-      : `<div class="data-table-wrap" style="overflow-x:auto">
-          <table class="data-table" style="width:100%">
-            <thead>
-              <tr>
-                <th>Date</th><th>Pair</th><th>Pos</th><th>Outcome</th>
-                <th>P/L</th><th>R:R</th><th>Strategy</th><th style="width:72px"></th>
-              </tr>
-            </thead>
-            <tbody>
-              ${at.map(t => {
-                const _td     = toPnlDollars(t, accSize);
-                const pnlColor = _td >= 0 ? 'outcome-win' : 'outcome-loss';
-                const pnlDisp  = fmtVal(_td);
-                const outClass = t.outcome==='Win'?'outcome-win':t.outcome==='Loss'?'outcome-loss':'outcome-be';
-                const posClass = t.pos==='Buy'?'pos-buy':'pos-sell';
-                return `
-                <tr class="acc-trade-row" onclick="openDetail(${t.id})" title="Click to view / edit trade"
-                    onmouseenter="this.querySelector('.acc-tr-actions').style.opacity='1'"
-                    onmouseleave="this.querySelector('.acc-tr-actions').style.opacity='0'">
-                  <td class="mono" style="color:var(--text2)">${t.date}</td>
-                  <td class="bold">${t.pair}</td>
-                  <td><span class="${posClass}">${t.pos}</span></td>
-                  <td class="${outClass}">${t.outcome}</td>
-                  <td class="${pnlColor} mono">${pnlDisp}</td>
-                  <td class="mono">${t.rr||'—'}</td>
-                  <td style="color:var(--text2);font-size:11px">${t.strategy||'—'}</td>
-                  <td class="acc-tr-actions" style="opacity:0;transition:opacity .15s;white-space:nowrap;text-align:right">
-                    <button onclick="event.stopPropagation();openDetail(${t.id},true)"
-                      style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;margin-right:3px">✏️</button>
-                    <button onclick="event.stopPropagation();quickDelete(${t.id});accShowDetail('${name.replace(/'/g, "\'")}')"
-                      style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer">🗑</button>
-                  </td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>`}
   `;
+
+  // Draw sparklines + equity curve after the new DOM has been laid out
+  requestAnimationFrame(() => {
+    const sparkSpecs = [
+      ['acc-spark-net', m.rollNet, m.netDollars>=0?'#34d399':'#f87171'],
+      ['acc-spark-pf',  m.rollPF,  '#fbbf24'],
+      ['acc-spark-wr',  m.rollWR,  '#60a5fa'],
+      ['acc-spark-exp', m.rollExp, m.expectancy>=0?'#34d399':'#f87171'],
+      ['acc-spark-rr',  m.rollRR,  '#a78bfa'],
+      ['acc-spark-dd',  m.rollDD,  '#f87171'],
+      ['acc-spark-rec', m.rollNet, '#60a5fa'],
+      ['acc-spark-aw',  m.rollNet, '#34d399'],
+      ['acc-spark-al',  m.rollNet, '#f87171'],
+      ['acc-spark-cnt', m.rollCount, '#60a5fa'],
+    ];
+    sparkSpecs.forEach(([id, data, color]) => _accDrawSparkline(document.getElementById(id), data, color));
+    _accDrawEquityCurve(name);
+  });
 
   drawer.style.display = '';
   requestAnimationFrame(() => drawer.classList.add('open'));
   drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
+
+function _accToggleWhy(ev) {
+  ev.stopPropagation();
+  const panel = document.getElementById('acc-health-why-panel');
+  if (!panel) return;
+  const willShow = !panel.classList.contains('show');
+  panel.classList.toggle('show', willShow);
+  if (willShow) {
+    const closeOnOutside = (e) => {
+      if (!panel.contains(e.target)) { panel.classList.remove('show'); document.removeEventListener('click', closeOnOutside); }
+    };
+    setTimeout(() => document.addEventListener('click', closeOnOutside), 0);
+  }
+}
+
+window.addEventListener('resize', () => {
+  const drawer = document.getElementById('acc-detail-drawer');
+  if (_accActiveName && drawer && drawer.classList.contains('open')) _accDrawEquityCurve(_accActiveName);
+});
 
 function accCloseDetail() {
   const drawer = document.getElementById('acc-detail-drawer');
