@@ -6775,6 +6775,7 @@ function updateKPIs() {
   _drawSparkline();
   // ── New feature renders ──
   _renderConsistencyKPI(trades);
+  _renderNxtScore(trades);
   _checkDailyLossLimit(trades);
   setTimeout(() => { _drawEquityCurve(); _renderHeatmap(trades); }, 50);
   const subEl = document.getElementById('dash-last-updated');
@@ -6946,7 +6947,7 @@ function setDashPreset(preset, btn) {
   if (cust) cust.style.display = preset === 'custom' ? 'flex' : 'none';
   // Rebuild all dashboard views with filtered trades
   updateKPIs(); buildPairTable(); buildKillzoneTable(); buildStrategyTable(); buildMonthlyTable();
-  _drawEquityCurve(); _renderHeatmap(_getFilteredTrades()); _renderConsistencyKPI(_getFilteredTrades()); _checkDailyLossLimit(trades);
+  _drawEquityCurve(); _renderHeatmap(_getFilteredTrades()); _renderConsistencyKPI(_getFilteredTrades()); _renderNxtScore(_getFilteredTrades()); _checkDailyLossLimit(trades);
 }
 
 // ── Profit Factor / Expectancy toggle ─────────────────
@@ -7146,6 +7147,68 @@ function _calcConsistencyStreak(trades) {
   let streak = 0;
   for (const t of sorted) { if ((t.rating || 0) >= 4) streak++; else break; }
   return streak;
+}
+
+// ── NxTGen Score — composite triangle score (Win %, Profit Factor, Win/Loss ratio) ──
+function _renderNxtScore(trades) {
+  const wrap    = document.getElementById('nxt-score-tri-wrap');
+  const valueEl = document.getElementById('nxt-score-value');
+  if (!wrap || !valueEl) return;
+
+  if (!trades.length) {
+    valueEl.textContent = '—';
+    wrap.innerHTML = _nxtTriangleSVG([0, 0, 0], ['Win %', 'Win/Loss', 'Profit factor']);
+    return;
+  }
+
+  const total  = trades.length;
+  const wins   = trades.filter(t => t.outcome === 'Win').length;
+  const wr     = (wins / total) * 100;
+
+  const tradeDollars = trades.map(t => toPnlDollars(t, getAccSizeForAccount(t.account)));
+  const winD  = tradeDollars.filter((d, i) => trades[i].pnl > 0);
+  const lossD = tradeDollars.filter((d, i) => trades[i].pnl < 0);
+  const avgW  = winD.length  ? winD.reduce((a, b) => a + b, 0)  / winD.length  : 0;
+  const avgL  = lossD.length ? Math.abs(lossD.reduce((a, b) => a + b, 0) / lossD.length) : 0;
+  const pfNum = lossD.length ? Math.abs(winD.reduce((a, b) => a + b, 0)) / Math.abs(lossD.reduce((a, b) => a + b, 0)) : (winD.length ? 999 : 0);
+  const rrRatio = avgL > 0 ? avgW / avgL : (avgW > 0 ? 999 : 0);
+
+  // Normalise each axis to 0–100
+  const winAxis = Math.max(0, Math.min(100, wr));
+  const pfAxis  = Math.max(0, Math.min(100, (Math.min(pfNum, 3) / 3) * 100));
+  const rrAxis  = Math.max(0, Math.min(100, (Math.min(rrRatio, 3) / 3) * 100));
+
+  const score = Math.round((winAxis + pfAxis + rrAxis) / 3);
+  valueEl.textContent = score;
+  valueEl.style.color = score >= 70 ? 'var(--green)' : score >= 45 ? 'var(--gold)' : 'var(--red)';
+
+  wrap.innerHTML = _nxtTriangleSVG([winAxis, rrAxis, pfAxis], ['Win %', 'Win/Loss', 'Profit factor']);
+}
+
+// Builds a 3-axis radar/triangle chart as an inline SVG string.
+// values: array of 3 numbers 0–100, in order [top, bottom-left, bottom-right]
+function _nxtTriangleSVG(values, labels) {
+  const cx = 100, cy = 96, R = 62;
+  // Vertex angles: top, bottom-left, bottom-right (equilateral triangle)
+  const angles = [-90, 150, 30].map(d => (d * Math.PI) / 180);
+  const pt = (ratio, angle) => [cx + R * ratio * Math.cos(angle), cy + R * ratio * Math.sin(angle)];
+
+  const outer = angles.map(a => pt(1, a));
+  const mid   = angles.map(a => pt(0.5, a));
+  const dataPts = angles.map((a, i) => pt(Math.max(values[i], 0) / 100, a));
+
+  const toPath = pts => pts.map(p => p.join(',')).join(' ');
+  const labelPts = angles.map(a => pt(1.30, a));
+
+  return `
+    <svg viewBox="0 0 200 190" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="${toPath(outer)}" fill="none" stroke="var(--glass-border)" stroke-width="1"/>
+      <polygon points="${toPath(mid)}" fill="none" stroke="var(--glass-border)" stroke-width="1" opacity="0.6"/>
+      ${angles.map(a => { const o = pt(1, a); return `<line x1="${cx}" y1="${cy}" x2="${o[0]}" y2="${o[1]}" stroke="var(--glass-border)" stroke-width="1"/>`; }).join('')}
+      <polygon points="${toPath(dataPts)}" fill="rgba(167,139,250,0.28)" stroke="var(--purple)" stroke-width="1.6"/>
+      ${dataPts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="var(--purple)"/>`).join('')}
+      ${labelPts.map((p, i) => `<text x="${p[0]}" y="${p[1]}" text-anchor="middle" dominant-baseline="middle" font-size="10" fill="var(--text3)" font-family="var(--font-head)">${labels[i]}</text>`).join('')}
+    </svg>`;
 }
 
 // ── Daily Loss Limit Alert ─────────────────────────────────────────────────

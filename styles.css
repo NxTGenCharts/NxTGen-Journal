@@ -2604,22 +2604,14 @@ body{
   .acc-detail-stats{grid-template-columns:repeat(2,1fr)}
 }
 
-/* ════════════ DASHBOARD TWO-COLUMN LAYOUT ══════════════ */
+/* ════════════ DASHBOARD — SINGLE ORGANIZED COLUMN ══════════════ */
 .page#page-dashboard { overflow-y: auto; overflow-x: clip; }
-.page#page-dashboard > .dash-layout { max-width: 1600px; margin: 0 auto; width: 100%; }
+.page#page-dashboard > .dash-layout { max-width: 1280px; margin: 0 auto; width: 100%; }
 
-/* Desktop: grid shrinks right col to 0 when cal hidden */
 .dash-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 400px;
-  gap: 0;
-  align-items: start;
+  display: block;
   width: 100%;
   box-sizing: border-box;
-  transition: grid-template-columns 0.40s cubic-bezier(0.4,0,0.2,1);
-}
-.dash-layout.cal-hidden {
-  grid-template-columns: minmax(0, 1fr) 0px;
 }
 
 .dash-left {
@@ -2629,138 +2621,50 @@ body{
   box-sizing: border-box;
 }
 
-/* Right column — full-height sticky drawer */
-.dash-right {
-  position: sticky;
-  top: 0;
-  min-width: 0;
-  height: calc(100vh - var(--topbar));
-  overflow: hidden;
+/* ── Widgets row: KPI bento grid + NxTGen Score, side by side ── */
+.dash-widgets-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 14px;
+  align-items: stretch;
+  margin-bottom: 10px;
 }
+.dash-widgets-row .kpi-grid-bento { margin-bottom: 0; height: 100%; }
 
-/* ── Floating tab button that rides the panel edge ── */
-.cal-slide-toggle {
-  position: fixed;
-  top: 50%;
-  right: 400px;
-  transform: translateY(-50%);
-  z-index: 90;
-  width: 20px;
-  height: 56px;
-  border-radius: 10px 0 0 10px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
-  border: 1px solid var(--glass-border);
-  border-right: none;
-  color: var(--text3);
-  cursor: pointer;
-  display: none; /* shown on desktop only */
-  align-items: center;
-  justify-content: center;
-  transition: right 0.40s cubic-bezier(0.4,0,0.2,1),
-              background 0.18s, color 0.18s, box-shadow 0.18s;
-  box-shadow: -2px 0 14px rgba(0,0,0,0.30),
-              inset 1px 0 0 rgba(255,255,255,0.06);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-.cal-slide-toggle:hover {
-  background: linear-gradient(180deg, rgba(96,165,250,0.14) 0%, rgba(96,165,250,0.07) 100%);
-  color: var(--blue);
-  box-shadow: -2px 0 18px rgba(96,165,250,0.18),
-              inset 1px 0 0 rgba(96,165,250,0.12);
-}
-.cal-slide-toggle.cal-hidden {
-  right: 0;
-}
-.cal-slide-toggle svg {
-  display: block;
-  transition: transform 0.32s var(--ease-spring);
-}
-.cal-slide-toggle.cal-hidden svg {
-  transform: rotate(180deg);
-}
-[data-theme="light"] .cal-slide-toggle {
-  background: linear-gradient(180deg, rgba(255,255,255,0.88) 0%, rgba(248,250,252,0.80) 100%);
-  border-color: rgba(0,0,0,0.09);
-  box-shadow: -2px 0 12px rgba(0,0,0,0.09);
-  color: var(--text3);
-}
-[data-theme="light"] .cal-slide-toggle:hover {
-  color: var(--blue);
-  box-shadow: -2px 0 16px rgba(79,70,229,0.14);
-}
-@media(min-width:1081px) {
-  /* JS will set display:'' (flex) when dashboard is active; hidden on all other pages */
-  .cal-slide-toggle { display: none; }
-}
-
-/* ── Calendar panel: full-height right drawer ── */
+/* ── Calendar panel: normal in-flow section, styled like other dashboard cards ── */
 .dash-cal-panel {
-  background: linear-gradient(180deg,
-    rgba(13,17,26,0.97) 0%,
-    rgba(11,15,24,0.96) 100%);
-  border-left: 1px solid var(--glass-border);
-  border-radius: 0;
-  padding: 20px 18px 24px;
-  backdrop-filter: blur(44px) saturate(2.0);
-  -webkit-backdrop-filter: blur(44px) saturate(2.0);
-  box-shadow: -6px 0 36px rgba(0,0,0,0.28),
-              inset 1px 0 0 rgba(255,255,255,0.04);
+  background: var(--glass-0);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  padding: 16px 18px 20px;
   position: relative;
-  width: 400px;
-  height: 100%;
+  width: 100%;
   box-sizing: border-box;
-  overflow-y: auto;
-  overflow-x: hidden;
-  /* Slide out to the right when hidden */
-  transform: translateX(0);
-  opacity: 1;
-  transition: transform 0.40s cubic-bezier(0.4,0,0.2,1),
-              opacity  0.30s ease;
-}
-/* When grid collapses, slide the panel itself out */
-.dash-layout.cal-hidden .dash-cal-panel {
-  transform: translateX(100%);
-  opacity: 0;
-  pointer-events: none;
+  margin-bottom: 20px;
+  overflow: visible;
 }
 .dash-cal-panel::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: radial-gradient(ellipse 70% 45% at 60% 20%,
-    rgba(96,165,250,0.06) 0%, transparent 60%);
+  border-radius: inherit;
+  background: radial-gradient(ellipse 70% 45% at 60% 0%,
+    rgba(96,165,250,0.05) 0%, transparent 60%);
   pointer-events: none;
 }
 [data-theme="light"] .dash-cal-panel {
-  background: linear-gradient(180deg,
-    rgba(255,255,255,0.94) 0%,
-    rgba(248,250,252,0.90) 100%);
-  border-color: rgba(0,0,0,0.09);
-  box-shadow: -4px 0 24px rgba(0,0,0,0.07),
-              inset 1px 0 0 rgba(255,255,255,0.9);
+  background: var(--glass-1);
+  box-shadow: var(--shadow-md), inset 0 1px 0 var(--glass-shine);
 }
-
-/* Scrollbar inside cal panel */
-.dash-cal-panel::-webkit-scrollbar { width: 3px; }
-.dash-cal-panel::-webkit-scrollbar-thumb { background: var(--glass-2); border-radius: 99px; }
 
 .dash-cal-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
+  justify-content: flex-end;
+  margin-bottom: 12px;
   gap: 8px;
-}
-.dash-cal-title {
-  font-family: var(--font-head);
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--text);
-  letter-spacing: -0.2px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  position: relative;
+  z-index: 1;
 }
 .dash-cal-controls {
   display: flex;
@@ -2769,23 +2673,23 @@ body{
   flex-shrink: 0;
 }
 
-/* Compact KPI strip — 2 col */
+/* Compact KPI strip — 4 col on desktop */
 .dash-cal-panel .cal-kpi-row {
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-  padding: 0 0 10px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 0 0 12px;
 }
 .dash-cal-panel .cal-kpi {
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-radius: var(--r-md);
 }
-.dash-cal-panel .cal-kpi-val { font-size: 14px; }
-.dash-cal-panel .cal-kpi-label { font-size: 8px; }
+.dash-cal-panel .cal-kpi-val { font-size: 15px; }
+.dash-cal-panel .cal-kpi-label { font-size: 8.5px; }
 
 /* Calendar day cells */
 .dash-cal-panel .cal-day {
-  min-height: 58px;
-  padding: 5px 6px;
+  min-height: 64px;
+  padding: 6px 7px;
 }
 .dash-cal-panel .cal-day-num { font-size: 11px; }
 .dash-cal-panel .cal-day-pnl { font-size: 9.5px; }
@@ -2796,35 +2700,15 @@ body{
 .dash-cal-panel .cal-dow { font-size: 8px; padding: 5px 0; }
 .dash-cal-panel .cal-nav { width: 28px; height: 28px; font-size: 15px; }
 
-/* ── Responsive: stack on narrow viewport ── */
+/* ── Responsive breakpoints ── */
 @media (max-width: 1080px) {
-  .dash-layout {
-    grid-template-columns: 1fr !important;
-    transition: none;
-  }
-  .dash-right {
-    position: static;
-    height: auto;
-    overflow: visible;
-  }
-  .dash-cal-panel {
-    width: 100%;
-    border-left: none;
-    border-top: 1px solid var(--glass-border);
-    border-radius: var(--r-xl);
-    transform: none !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    box-shadow: var(--shadow-md);
-    height: auto;
-    overflow: visible;
-    padding: 16px;
-    background: var(--glass-1);
-    box-shadow: var(--shadow-lg), inset 0 1px 0 var(--glass-shine);
-  }
-  .cal-slide-toggle { display: none !important; }
-  .dash-cal-panel .cal-kpi-row { grid-template-columns: repeat(3, 1fr); gap: 5px; }
-  .dash-cal-panel .cal-day { min-height: 62px; }
+  .dash-widgets-row { grid-template-columns: minmax(0, 1fr) 220px; }
+}
+
+@media (max-width: 900px) {
+  .dash-widgets-row { grid-template-columns: 1fr; }
+  .nxt-score-card { max-width: 380px; margin: 0 auto; width: 100%; }
+  .dash-cal-panel .cal-kpi-row { grid-template-columns: repeat(3, 1fr); gap: 6px; }
 }
 
 @media (max-width: 640px) {
@@ -2843,6 +2727,84 @@ body{
   .dash-cal-panel .cal-dow { font-size: 7px; padding: 4px 0; }
   .dash-cal-panel .cal-nav { width: 24px; height: 24px; font-size: 12px; }
   .dash-cal-panel .cal-month-label { font-size: 13px; min-width: 120px; }
+}
+
+/* ════════════ NXTGEN SCORE WIDGET ══════════════ */
+.nxt-score-card {
+  background: var(--glass-0);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+.nxt-score-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 80% 0%, rgba(167,139,250,0.08) 0%, transparent 65%);
+  pointer-events: none;
+}
+[data-theme="light"] .nxt-score-card { background: var(--glass-1); box-shadow: var(--shadow-md), inset 0 1px 0 var(--glass-shine); }
+.nxt-score-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+}
+.nxt-score-title {
+  font-family: var(--font-head);
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.1px;
+}
+.nxt-score-badge {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--purple);
+  background: rgba(167,139,250,0.14);
+  border: 1px solid rgba(167,139,250,0.3);
+  border-radius: 5px;
+  padding: 2px 6px;
+}
+.nxt-score-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  position: relative;
+  z-index: 1;
+}
+.nxt-score-tri-wrap { width: 100%; max-width: 170px; }
+.nxt-score-tri-wrap svg { width: 100%; height: auto; display: block; }
+.nxt-score-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-top: 6px;
+  border-top: 1px solid var(--glass-border);
+  position: relative;
+  z-index: 1;
+}
+.nxt-score-foot-label {
+  font-size: 9.5px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.nxt-score-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--purple);
+  letter-spacing: -0.5px;
 }
 
 /* ════════════ CHECKLIST ════════════════════════ */
@@ -4002,34 +3964,21 @@ body{
     max-width:calc(100vw - 24px);width:340px;z-index:600;
   }
 
-  /* ── Dashboard: single-column on mobile, cal below stats ── */
+  /* ── Dashboard: single-column on mobile, cal is a normal in-flow section ── */
   .dash-layout{
-    display: flex !important;
-    flex-direction: column;
-    gap: 0;
+    display: block;
     padding: 0;
-    transition: none !important;
   }
-  .dash-layout.cal-hidden { grid-template-columns: 1fr !important; }
   .dash-left{ width:100%; min-width:0; padding:12px 12px 16px; }
-  .dash-right{ order:1; width:100%; position:static; height:auto; overflow:visible; }
   .dash-cal-panel{
-    width:100% !important;
-    height:auto !important;
-    overflow:visible !important;
-    transform:none !important;
-    opacity:1 !important;
-    pointer-events:auto !important;
-    border-left:none;
-    border-top:1px solid var(--glass-border);
-    border-radius:0;
-    padding:14px 12px 80px;
-    background: var(--bg2);
-    box-shadow: none;
+    width:100%;
+    height:auto;
+    overflow:visible;
+    border-radius: var(--r-lg);
+    padding: 12px;
+    background: var(--glass-0);
   }
   .dash-cal-panel .cal-kpi-row{ grid-template-columns:repeat(2,1fr);gap:4px }
-  /* Hide the floating slide toggle on mobile — not needed */
-  .cal-slide-toggle{ display:none !important; }
 
   /* ── Misc ── */
   .insight{ font-size:12px;padding:12px 14px;border-radius:var(--r-md) }

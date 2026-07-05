@@ -143,32 +143,47 @@
             </div>
           </div>
 
-          <div class="kpi-grid kpi-grid-bento">
-            <div class="kpi-card kpi-card-hero">
-              <div class="kpi-label">Win rate</div>
-              <div class="kpi-value green" id="kpi-wr">—</div>
+          <div class="dash-widgets-row">
+            <div class="kpi-grid kpi-grid-bento">
+              <div class="kpi-card kpi-card-hero">
+                <div class="kpi-label">Win rate</div>
+                <div class="kpi-value green" id="kpi-wr">—</div>
+              </div>
+              <div class="kpi-card kpi-card-hero pnl-hero kpi-card--toggle" id="kpi-pnl-card" onclick="toggleNetPnl()" title="Tap to toggle $ / %">
+                <div class="kpi-label">Net PnL <span class="kpi-toggle-hint">tap to toggle</span></div>
+                <div class="kpi-value green" id="kpi-pnl">—</div>
+                <canvas id="kpi-sparkline" style="width:100%;height:36px;margin-top:6px;display:none"></canvas>
+              </div>
+              <div class="kpi-card"><div class="kpi-label">Total trades</div><div class="kpi-value blue" id="kpi-total">—</div></div>
+              <div class="kpi-card kpi-card--toggle" id="kpi-pf-card" onclick="togglePf()" title="Tap to toggle Profit Factor / Expectancy">
+                <div class="kpi-label">Profit factor <span class="kpi-toggle-hint">tap to toggle</span></div>
+                <div class="kpi-value gold" id="kpi-pf">—</div>
+              </div>
+              <div class="kpi-card"><div class="kpi-label">Risk:reward</div><div class="kpi-value blue" id="kpi-rr">—</div></div>
+              <div class="kpi-card"><div class="kpi-label">Win streak</div><div class="kpi-value teal" id="kpi-ws">—</div></div>
+              <div class="kpi-card"><div class="kpi-label">Avg win</div><div class="kpi-value green" id="kpi-aw">—</div></div>
+              <div class="kpi-card"><div class="kpi-label">Avg loss</div><div class="kpi-value red" id="kpi-al">—</div></div>
+              <div class="kpi-card"><div class="kpi-label">Max drawdown</div><div class="kpi-value green" id="kpi-dd">—</div></div>
+              <div class="kpi-card" title="% of trades rated 4★ or 5★ — your execution quality score">
+                <div class="kpi-label">Consistency score</div>
+                <div class="kpi-value blue" id="kpi-consistency">—</div>
+                <div style="font-size:10px;color:var(--text3);margin-top:2px" id="kpi-consistency-sub"></div>
+              </div>
             </div>
-            <div class="kpi-card kpi-card-hero pnl-hero kpi-card--toggle" id="kpi-pnl-card" onclick="toggleNetPnl()" title="Tap to toggle $ / %">
-              <div class="kpi-label">Net PnL <span class="kpi-toggle-hint">tap to toggle</span></div>
-              <div class="kpi-value green" id="kpi-pnl">—</div>
-              <canvas id="kpi-sparkline" style="width:100%;height:36px;margin-top:6px;display:none"></canvas>
-            </div>
-            <div class="kpi-card"><div class="kpi-label">Total trades</div><div class="kpi-value blue" id="kpi-total">—</div></div>
-            <div class="kpi-card kpi-card--toggle" id="kpi-pf-card" onclick="togglePf()" title="Tap to toggle Profit Factor / Expectancy">
-              <div class="kpi-label">Profit factor <span class="kpi-toggle-hint">tap to toggle</span></div>
-              <div class="kpi-value gold" id="kpi-pf">—</div>
-            </div>
-            <div class="kpi-card"><div class="kpi-label">Risk:reward</div><div class="kpi-value blue" id="kpi-rr">—</div></div>
-            <div class="kpi-card"><div class="kpi-label">Win streak</div><div class="kpi-value teal" id="kpi-ws">—</div></div>
-          </div>
-          <div class="kpi-grid" style="margin-bottom:10px">
-            <div class="kpi-card"><div class="kpi-label">Avg win</div><div class="kpi-value green" id="kpi-aw">—</div></div>
-            <div class="kpi-card"><div class="kpi-label">Avg loss</div><div class="kpi-value red" id="kpi-al">—</div></div>
-            <div class="kpi-card"><div class="kpi-label">Max drawdown</div><div class="kpi-value green" id="kpi-dd">—</div></div>
-            <div class="kpi-card" title="% of trades rated 4★ or 5★ — your execution quality score">
-              <div class="kpi-label">Consistency score</div>
-              <div class="kpi-value blue" id="kpi-consistency">—</div>
-              <div style="font-size:10px;color:var(--text3);margin-top:2px" id="kpi-consistency-sub"></div>
+
+            <!-- NxTGen Score -->
+            <div class="nxt-score-card" id="nxt-score-card" title="Composite score of your win rate, profit factor and win/loss ratio">
+              <div class="nxt-score-head">
+                <span class="nxt-score-title">NxTGen Score</span>
+                <span class="nxt-score-badge">BETA</span>
+              </div>
+              <div class="nxt-score-body">
+                <div class="nxt-score-tri-wrap" id="nxt-score-tri-wrap"></div>
+              </div>
+              <div class="nxt-score-foot">
+                <span class="nxt-score-foot-label">Your NxTGen Score</span>
+                <span class="nxt-score-value" id="nxt-score-value">—</span>
+              </div>
             </div>
           </div>
 
@@ -176,6 +191,37 @@
           <div class="insight">
             <span class="insight-ico">💡</span>
             <span class="insight-text" id="dash-insight-text">Analysing your data…</span>
+          </div>
+
+          <!-- Trading Calendar (moved inline, no longer a sliding side panel) -->
+          <div class="sec-head">📅 Trading Calendar</div>
+          <div class="dash-cal-panel" id="dash-cal-panel">
+            <div class="dash-cal-top">
+              <div class="dash-cal-controls">
+                <select class="form-select" id="cal-acc-filter" onchange="_onCalAccFilterChange()" style="font-size:11px;padding:4px 8px;height:28px">
+                  <option value="">All accounts</option>
+                </select>
+                <input type="number" class="acc-size-input" id="cal-acc-size" value="5000" oninput="renderCalendar()" title="Account size for USD calc" style="width:72px;font-size:11px;padding:4px 6px;height:28px">
+              </div>
+            </div>
+
+            <div class="dash-cal-body" id="dash-cal-body">
+              <div class="cal-header" style="padding:8px 0 8px">
+                <div class="cal-nav" onclick="calNav(-1)">‹</div>
+                <div class="cal-month-label" id="cal-month-label">Loading…</div>
+                <div class="cal-nav" onclick="calNav(1)">›</div>
+              </div>
+
+              <div class="cal-kpi-row" id="cal-kpi-row"></div>
+
+              <div class="cal-grid-wrap">
+                <div class="cal-dow-row" id="cal-dow-row">
+                  <div class="cal-dow">SUN</div><div class="cal-dow">MON</div><div class="cal-dow">TUE</div>
+                  <div class="cal-dow">WED</div><div class="cal-dow">THU</div><div class="cal-dow">FRI</div><div class="cal-dow">SAT</div>
+                </div>
+                <div class="cal-days" id="cal-days"></div>
+              </div>
+            </div>
           </div>
 
           <!-- Pair Performance -->
@@ -251,45 +297,6 @@
             <div id="corr-heatmap-wrap"></div>
           </div>
         </div>
-
-        <!-- ── RIGHT COLUMN: inline calendar ── -->
-        <div class="dash-right" id="dash-right">
-          <div class="dash-cal-panel" id="dash-cal-panel">
-            <!-- Calendar header row -->
-            <div class="dash-cal-top">
-              <div class="dash-cal-title">📅 Trading Calendar</div>
-              <div class="dash-cal-controls">
-                <select class="form-select" id="cal-acc-filter" onchange="_onCalAccFilterChange()" style="font-size:11px;padding:4px 8px;height:28px">
-                  <option value="">All accounts</option>
-                </select>
-                <input type="number" class="acc-size-input" id="cal-acc-size" value="5000" oninput="renderCalendar()" title="Account size for USD calc" style="width:72px;font-size:11px;padding:4px 6px;height:28px">
-              </div>
-            </div>
-
-            <!-- Collapsible body -->
-            <div class="dash-cal-body" id="dash-cal-body">
-              <!-- Month nav -->
-              <div class="cal-header" style="padding:8px 0 8px">
-                <div class="cal-nav" onclick="calNav(-1)">‹</div>
-                <div class="cal-month-label" id="cal-month-label">Loading…</div>
-                <div class="cal-nav" onclick="calNav(1)">›</div>
-              </div>
-
-              <!-- KPI strip -->
-              <div class="cal-kpi-row" id="cal-kpi-row"></div>
-
-              <!-- Calendar grid -->
-              <div class="cal-grid-wrap">
-                <div class="cal-dow-row" id="cal-dow-row">
-                  <div class="cal-dow">SUN</div><div class="cal-dow">MON</div><div class="cal-dow">TUE</div>
-                  <div class="cal-dow">WED</div><div class="cal-dow">THU</div><div class="cal-dow">FRI</div><div class="cal-dow">SAT</div>
-                </div>
-                <div class="cal-days" id="cal-days"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
 
       </div>
     </div>
@@ -1127,13 +1134,6 @@
 
   </div><!-- /main -->
 </div><!-- /layout -->
-
-<!-- ══ DESKTOP CALENDAR SLIDE TOGGLE ══ -->
-<button class="cal-slide-toggle" id="cal-slide-toggle" onclick="toggleDashCalendar()" title="Toggle calendar" aria-label="Toggle calendar panel">
-  <svg id="cal-toggle-icon" width="10" height="16" viewBox="0 0 10 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M7 2L2 8L7 14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-</button>
 
 <!-- ══ TRADE DETAIL PANEL ══ -->
 <div class="detail-panel" id="detail-panel">
