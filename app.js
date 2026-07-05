@@ -5591,16 +5591,6 @@ function accShowDetail(name) {
         <div class="acc-hero-top">
           <span class="acc-hero-name">${name}</span>
           ${heroBadges}
-          <div style="display:flex;gap:0;border:1px solid var(--glass-border);border-radius:6px;overflow:hidden;margin-left:auto">
-            <button onclick="_accDetailSetMode('${name.replace(/'/g,"\\'")}','\$')"
-              style="padding:4px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;
-              background:${pnlMode==='$'?'var(--blue)':'var(--glass-1)'};
-              color:${pnlMode==='$'?'#fff':'var(--text3)'};font-family:var(--font-body)">$ USD</button>
-            <button onclick="_accDetailSetMode('${name.replace(/'/g,"\\'")}','%')"
-              style="padding:4px 12px;font-size:11px;font-weight:700;border:none;cursor:pointer;
-              background:${pnlMode==='%'?'var(--blue)':'var(--glass-1)'};
-              color:${pnlMode==='%'?'#fff':'var(--text3)'};font-family:var(--font-body)">% PCT</button>
-          </div>
         </div>
         <div class="acc-hero-grid">
           <div class="acc-hero-stat"><div class="acc-hero-stat-label">Account Size</div><div class="acc-hero-stat-val">${sizeNote}</div></div>
