@@ -4788,6 +4788,11 @@ body{
   opacity:1!important;
   text-shadow:none!important;
 }
+#page-trash .cover-sub,
+[data-theme="light"] #page-trash .cover-sub{
+  color:rgba(255,255,255,.85)!important;
+  opacity:1!important;
+}
 
 /* Scrollbar — match theme */
 [data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.15)}
