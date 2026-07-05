@@ -10043,7 +10043,7 @@ function _fabDefaultXY(el) {
   const bottomNav = document.querySelector('.mob-bottom-nav');
   const navH = (bottomNav && window.innerWidth <= 768) ? bottomNav.offsetHeight : 0;
   const w = el.offsetWidth || 44, h = el.offsetHeight || 44;
-  return { x: window.innerWidth - w - 20, y: window.innerHeight - h - 24 - navH };
+  return { x: window.innerWidth - w - 20, y: window.innerHeight - h - 90 - navH };
 }
 function _initFabPosition(el) {
   // Always start at the default position on load/reload — dragging only

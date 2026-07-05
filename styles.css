@@ -3457,7 +3457,7 @@ body{
 }
 .affirmation-close-btn:hover{filter:brightness(1.1)}
 .affirmation-fab{
-  position:fixed;right:20px;bottom:88px;
+  position:fixed;right:20px;bottom:90px;
   width:53px;height:53px;border-radius:50%;
   background:linear-gradient(135deg,var(--blue) 0%,var(--purple) 100%);
   border:1px solid var(--glass-border);
