@@ -10500,6 +10500,7 @@ body {
   box-shadow:var(--shadow-sm);
   min-height:112px;
   min-width:0;
+  container-type:inline-size;
 }
 [data-theme="light"] .cal-an-card{background:var(--glass-2);box-shadow:var(--shadow-xs)}
 .cal-an-card:hover{border-color:var(--glass-border-h);transform:translateY(-1px);box-shadow:var(--shadow-md)}
@@ -10512,10 +10513,10 @@ body {
   font-family:var(--font-body);font-weight:600;
 }
 
-.cal-an-left{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-width:64px}
-.cal-an-label{font-size:11.5px;color:var(--text3);display:flex;align-items:center;gap:5px;font-weight:700;letter-spacing:.01em}
+.cal-an-left{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-width:0;overflow:hidden}
+.cal-an-label{font-size:11.5px;color:var(--text3);display:flex;align-items:center;gap:5px;font-weight:700;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cal-an-label .info-dot{width:13px;height:13px;border-radius:50%;border:1.4px solid var(--text3);display:inline-flex;align-items:center;justify-content:center;font-size:8.5px;opacity:.55;flex-shrink:0}
-.cal-an-value{font-family:var(--font-mono);font-size:27px;font-weight:800;letter-spacing:-.6px;line-height:1;white-space:nowrap}
+.cal-an-value{font-family:var(--font-mono);font-size:clamp(15px,10cqi,27px);font-weight:800;letter-spacing:-.6px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cal-an-value.green{color:var(--green);text-shadow:0 0 22px var(--green-glow)}
 .cal-an-value.red{color:var(--red);text-shadow:0 0 22px var(--red-glow)}
 
@@ -10533,21 +10534,21 @@ body {
 }
 
 /* ── Gauge column (semicircle) ───────────────────── */
-.cal-an-gauge-col{display:flex;flex-direction:column;align-items:center;gap:5px;flex:0 1 108px;min-width:52px}
+.cal-an-gauge-col{display:flex;flex-direction:column;align-items:center;gap:5px;flex:0 0 auto;width:clamp(40px,34cqi,108px);min-width:0}
 /* Lock intrinsic shape so a CSS width override can never squash/stretch the arc —
    this is what was distorting the win/BE/loss ring into a torn/uneven shape. */
 .cal-an-gauge-col svg{display:block;width:100%;height:auto;aspect-ratio:108/68;overflow:visible}
-.cal-an-gauge-legend{display:flex;gap:5px}
+.cal-an-gauge-legend{display:flex;gap:clamp(2px,1.5cqi,5px)}
 .cal-an-legend-chip{
-  padding:2px 7px;border-radius:var(--r-full);font-size:10px;font-weight:800;
-  font-family:var(--font-mono);background:var(--glass-2);color:var(--text2);
+  padding:2px clamp(4px,2cqi,7px);border-radius:var(--r-full);font-size:clamp(8px,3.2cqi,10px);font-weight:800;
+  font-family:var(--font-mono);background:var(--glass-2);color:var(--text2);white-space:nowrap;
 }
 .cal-an-legend-chip.green{color:var(--green);background:var(--green-dim)}
 .cal-an-legend-chip.blue{color:var(--blue);background:var(--blue-dim)}
 .cal-an-legend-chip.red{color:var(--red);background:var(--red-dim)}
 
 /* ── Ring gauge (profit factor) ──────────────────── */
-.cal-an-ring-col{flex:0 1 76px;min-width:40px}
+.cal-an-ring-col{flex:0 0 auto;width:clamp(28px,24cqi,76px);min-width:0}
 .cal-an-ring-col svg{display:block;width:100%;height:auto;aspect-ratio:1/1;overflow:visible}
 
 /* ── Avg win/loss bar card ───────────────────────── */
@@ -10633,13 +10634,11 @@ body {
   .cal-an-badge{position:static;padding:1px 7px;font-size:9.5px;align-self:flex-start;margin-top:-2px}
   .cal-an-mini-icon{width:26px;height:26px}
 
-  /* Shrink SVG gauges to fit the compact cards (viewBox keeps them proportional) */
-  .cal-an-gauge-col{width:auto;flex:0 0 auto;align-items:center;gap:3px}
-  .cal-an-gauge-col svg{width:44px !important;max-width:44px;height:auto !important;aspect-ratio:108/68}
+  /* Gauge sizing now scales continuously via container query units on the base rule;
+     just tighten gaps for the compact mobile card. */
+  .cal-an-gauge-col{gap:3px}
   .cal-an-gauge-legend{gap:3px}
-  .cal-an-legend-chip{padding:1px 5px;font-size:8px}
-  .cal-an-ring-col{flex:0 0 auto}
-  .cal-an-ring-col svg{width:32px !important;max-width:32px;height:auto !important;aspect-ratio:1/1}
+  .cal-an-legend-chip{padding:1px 5px}
   .cal-an-bar-wrap{gap:5px}
   .cal-an-bar-track{height:7px}
   .cal-an-bar-labels{font-size:10px}
@@ -10713,10 +10712,6 @@ body {
   .cal-week-pnl{font-size:11px}
   .cal-week-days{font-size:7px;padding:1.5px 5px}
   .cal-an-grid{gap:5px}
-  .cal-an-value{font-size:13px}
-  .cal-an-label{font-size:8.5px}
-  .cal-an-gauge-col svg{width:40px !important;max-width:40px;aspect-ratio:108/68}
-  .cal-an-ring-col svg{width:28px !important;max-width:28px;aspect-ratio:1/1}
 }
 @media(max-width:360px){
   #page-calendar{padding-left:8px;padding-right:8px}
