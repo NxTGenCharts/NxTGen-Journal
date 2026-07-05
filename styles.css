@@ -10153,20 +10153,27 @@ body {
    COMPACT REFRESH — Dashboard calendar KPI strip + Watchlist header
    ════════════════════════════════════════════════════════════════ */
 
-/* ── Dashboard calendar: tighter KPI strip (Trades / P&L / Best / Worst / Day win rate) ── */
+/* ── Dashboard calendar: always a single compact row (Trades / P&L / Best / Worst / Day win rate) ── */
 .dash-cal-panel .cal-kpi-row {
-  grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
   padding: 0 0 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.dash-cal-panel .cal-kpi-row::-webkit-scrollbar { display: none; }
 .dash-cal-panel .cal-kpi {
-  padding: 6px 7px;
+  flex: 1 1 0;
+  min-width: 88px;
+  padding: 7px 9px;
   border-radius: var(--r-sm, 8px);
 }
-.dash-cal-panel .cal-kpi-label { font-size: 7px; margin-bottom: 1px; letter-spacing: 0.06em; }
-.dash-cal-panel .cal-kpi-val { font-size: 12.5px; }
+.dash-cal-panel .cal-kpi-label { font-size: 7.5px; margin-bottom: 1px; letter-spacing: 0.05em; white-space: nowrap; }
+.dash-cal-panel .cal-kpi-val { font-size: 13px; white-space: nowrap; }
 .dash-cal-panel .cal-kpi-val .cal-kpi-sub,
 .dash-cal-panel .cal-kpi small { font-size: 7px; }
+.dash-cal-panel .cal-kpi-sub-row { font-size: 7.5px; gap: 4px; }
 
 /* Slightly tighter panel chrome to match */
 .dash-cal-panel { padding: 16px 14px 20px; }
@@ -10176,19 +10183,22 @@ body {
 .dash-cal-panel .cal-nav { width: 24px; height: 24px; font-size: 13px; }
 
 @media (max-width: 1080px) {
-  .dash-cal-panel .cal-kpi-row { grid-template-columns: repeat(5, 1fr); gap: 4px; }
-  .dash-cal-panel .cal-kpi { padding: 5px 4px; }
+  .dash-cal-panel .cal-kpi { min-width: 78px; padding: 6px 8px; }
+  .dash-cal-panel .cal-kpi-label { font-size: 7px; }
+  .dash-cal-panel .cal-kpi-val { font-size: 12px; }
+}
+
+@media (max-width: 640px) {
+  .dash-cal-panel .cal-kpi-row { gap: 5px; }
+  .dash-cal-panel .cal-kpi { min-width: 68px; padding: 6px 7px; flex: 0 0 auto; }
   .dash-cal-panel .cal-kpi-label { font-size: 6.5px; }
   .dash-cal-panel .cal-kpi-val { font-size: 11px; }
 }
 
-@media (max-width: 640px) {
-  .dash-cal-panel .cal-kpi-row { grid-template-columns: repeat(3, 1fr); gap: 4px; }
-  .dash-cal-panel .cal-kpi { padding: 5px 4px; }
-}
-
 @media (max-width: 420px) {
-  .dash-cal-panel .cal-kpi-row { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+  .dash-cal-panel .cal-kpi { min-width: 62px; padding: 5px 6px; }
+  .dash-cal-panel .cal-kpi-label { font-size: 6px; }
+  .dash-cal-panel .cal-kpi-val { font-size: 10px; }
 }
 
 /* ── Watchlist: compact hero header ── */
