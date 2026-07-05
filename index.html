@@ -144,30 +144,63 @@
           </div>
 
           <div class="dash-widgets-row">
-            <div class="kpi-grid kpi-grid-bento">
-              <div class="kpi-card kpi-card-hero">
-                <div class="kpi-label">Win rate</div>
-                <div class="kpi-value green" id="kpi-wr">—</div>
+            <div class="dash-kpi-analytics">
+              <!-- Row 1: hero analytics — same shape gauges & icon style as the Calendar page -->
+              <div class="cal-an-grid dash-an-row1">
+                <div class="cal-an-card cal-an-card--toggle" id="kpi-pnl-card" onclick="toggleNetPnl()" title="Tap to toggle $ / %">
+                  <div class="cal-an-left">
+                    <div class="cal-an-label"><span class="cal-kpi-icon">💰</span><span>Net P&amp;L</span> <span class="info-dot">i</span> <span class="cal-an-toggle-hint">tap to toggle</span></div>
+                    <div class="cal-an-value green" id="kpi-pnl">—</div>
+                    <canvas id="kpi-sparkline" style="width:100%;height:28px;margin-top:4px;display:none"></canvas>
+                  </div>
+                  <div class="cal-an-badge" id="kpi-total-badge">0</div>
+                </div>
+                <div class="cal-an-card">
+                  <div class="cal-an-left">
+                    <div class="cal-an-label"><span class="cal-kpi-icon">🎯</span><span>Win rate</span> <span class="info-dot">i</span></div>
+                    <div class="cal-an-value green" id="kpi-wr">—</div>
+                  </div>
+                  <div class="cal-an-gauge-col" id="kpi-wr-gauge"></div>
+                </div>
+                <div class="cal-an-card cal-an-card--toggle" id="kpi-pf-card" onclick="togglePf()" title="Tap to toggle Profit Factor / Expectancy">
+                  <div class="cal-an-left">
+                    <div class="cal-an-label"><span class="cal-kpi-icon">⚖️</span><span id="kpi-pf-label-text">Profit factor</span> <span class="info-dot">i</span> <span class="cal-an-toggle-hint">tap to toggle</span></div>
+                    <div class="cal-an-value gold" id="kpi-pf">—</div>
+                  </div>
+                  <div class="cal-an-ring-col" id="kpi-pf-ring"></div>
+                </div>
               </div>
-              <div class="kpi-card kpi-card-hero pnl-hero kpi-card--toggle" id="kpi-pnl-card" onclick="toggleNetPnl()" title="Tap to toggle $ / %">
-                <div class="kpi-label">Net PnL <span class="kpi-toggle-hint">tap to toggle</span></div>
-                <div class="kpi-value green" id="kpi-pnl">—</div>
-                <canvas id="kpi-sparkline" style="width:100%;height:36px;margin-top:6px;display:none"></canvas>
+
+              <!-- Row 2: win streak + avg win/loss bar (mirrors Calendar page's Day win % / Avg win-loss row) -->
+              <div class="cal-an-grid row2 dash-an-row2">
+                <div class="cal-an-card">
+                  <div class="cal-an-left">
+                    <div class="cal-an-label"><span class="cal-kpi-icon">🔥</span><span>Win streak</span> <span class="info-dot">i</span></div>
+                    <div class="cal-an-value teal" id="kpi-ws">—</div>
+                  </div>
+                </div>
+                <div class="cal-an-card">
+                  <div class="cal-an-left" style="flex:0 0 auto">
+                    <div class="cal-an-label"><span class="cal-kpi-icon">📊</span><span>Avg win/loss trade</span> <span class="info-dot">i</span></div>
+                    <div class="cal-an-value" id="kpi-avgratio">—</div>
+                  </div>
+                  <div class="cal-an-bar-wrap">
+                    <div class="cal-an-bar-track"><div class="cal-an-bar-seg green" id="kpi-aw-bar" style="width:50%"></div><div class="cal-an-bar-seg red" id="kpi-al-bar" style="width:50%"></div></div>
+                    <div class="cal-an-bar-labels"><span class="green" id="kpi-aw">—</span><span class="red" id="kpi-al">—</span></div>
+                  </div>
+                </div>
               </div>
-              <div class="kpi-card"><div class="kpi-label">Total trades</div><div class="kpi-value blue" id="kpi-total">—</div></div>
-              <div class="kpi-card kpi-card--toggle" id="kpi-pf-card" onclick="togglePf()" title="Tap to toggle Profit Factor / Expectancy">
-                <div class="kpi-label">Profit factor <span class="kpi-toggle-hint">tap to toggle</span></div>
-                <div class="kpi-value gold" id="kpi-pf">—</div>
-              </div>
-              <div class="kpi-card"><div class="kpi-label">Risk:reward</div><div class="kpi-value blue" id="kpi-rr">—</div></div>
-              <div class="kpi-card"><div class="kpi-label">Win streak</div><div class="kpi-value teal" id="kpi-ws">—</div></div>
-              <div class="kpi-card"><div class="kpi-label">Avg win</div><div class="kpi-value green" id="kpi-aw">—</div></div>
-              <div class="kpi-card"><div class="kpi-label">Avg loss</div><div class="kpi-value red" id="kpi-al">—</div></div>
-              <div class="kpi-card"><div class="kpi-label">Max drawdown</div><div class="kpi-value green" id="kpi-dd">—</div></div>
-              <div class="kpi-card" title="% of trades rated 4★ or 5★ — your execution quality score">
-                <div class="kpi-label">Consistency score</div>
-                <div class="kpi-value blue" id="kpi-consistency">—</div>
-                <div style="font-size:10px;color:var(--text3);margin-top:2px" id="kpi-consistency-sub"></div>
+
+              <!-- Row 3: compact stat chips — same icon style as the Calendar page's KPI strip -->
+              <div class="kpi-grid dash-kpi-mini">
+                <div class="kpi-card"><div class="kpi-label"><span class="cal-kpi-icon">🗂</span><span>Total trades</span></div><div class="kpi-value blue" id="kpi-total">—</div></div>
+                <div class="kpi-card"><div class="kpi-label"><span class="cal-kpi-icon">📐</span><span>Risk:reward</span></div><div class="kpi-value blue" id="kpi-rr">—</div></div>
+                <div class="kpi-card"><div class="kpi-label"><span class="cal-kpi-icon">🛡</span><span>Max drawdown</span></div><div class="kpi-value green" id="kpi-dd">—</div></div>
+                <div class="kpi-card" title="% of trades rated 4★ or 5★ — your execution quality score">
+                  <div class="kpi-label"><span class="cal-kpi-icon">🧠</span><span>Consistency score</span></div>
+                  <div class="kpi-value blue" id="kpi-consistency">—</div>
+                  <div style="font-size:10px;color:var(--text3);margin-top:2px" id="kpi-consistency-sub"></div>
+                </div>
               </div>
             </div>
 

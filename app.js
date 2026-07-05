@@ -6721,7 +6721,7 @@ function updateKPIs() {
   const _pnlValueEl = document.getElementById('kpi-pnl');
   if (_pnlValueEl) {
     const _isPos = _showDollar ? (_totalDollars >= 0) : (_totalPct >= 0);
-    _pnlValueEl.className = 'kpi-value ' + (_isPos ? 'green' : 'red');
+    _pnlValueEl.className = 'cal-an-value ' + (_isPos ? 'green' : 'red');
   }
   const rrNums = trades.map(t => { const m = (t.rr || '').match(/1:([\d.]+)/); return m ? parseFloat(m[1]) : null; }).filter(x => x !== null);
   const avgRR = rrNums.length ? (rrNums.reduce((a, b) => a + b, 0) / rrNums.length).toFixed(1) : null;
@@ -6769,7 +6769,50 @@ function updateKPIs() {
   if (pfEl) pfEl.dataset.pf  = pf + 'x';
   if (pfEl) pfEl.dataset.exp = (_expPct >= 0 ? '+' : '') + _expPct.toFixed(2) + '%';
   if (expEl) { expEl.dataset.pf = pf + 'x'; expEl.dataset.exp = pfEl?.dataset.exp || ''; }
-  document.querySelectorAll('.kpi-value').forEach(el => { el.style.transform = 'scale(1.04)'; el.style.transition = 'transform 0.3s ease'; setTimeout(() => el.style.transform = '', 320); });
+
+  // ── Shape analytics — same gauge components as the Calendar page ──
+  const _dashBadgeEl = document.getElementById('kpi-total-badge');
+  if (_dashBadgeEl) _dashBadgeEl.textContent = total;
+
+  const _dCGreen = _calCssVar('--green', '#34d399');
+  const _dCRed   = _calCssVar('--red', '#f87171');
+  const _dCBlue  = _calCssVar('--blue', '#60a5fa');
+  const bes = Math.max(0, total - wins - losses);
+
+  const _wrGaugeEl = document.getElementById('kpi-wr-gauge');
+  if (_wrGaugeEl) {
+    _wrGaugeEl.innerHTML = _calSemiGauge([
+      { value: wins,   color: _dCGreen },
+      { value: bes,    color: _dCBlue },
+      { value: losses, color: _dCRed }
+    ]) + `<div class="cal-an-gauge-legend">
+      <span class="cal-an-legend-chip green">${wins}</span>
+      <span class="cal-an-legend-chip blue">${bes}</span>
+      <span class="cal-an-legend-chip red">${losses}</span>
+    </div>`;
+  }
+
+  const _grossProfit = winDollars.reduce((a, b) => a + b, 0);
+  const _grossLoss   = Math.abs(lossDollars.reduce((a, b) => a + b, 0));
+  const _pfFraction  = (_grossProfit + _grossLoss) > 0 ? _grossProfit / (_grossProfit + _grossLoss) : 0;
+  const _pfRingEl = document.getElementById('kpi-pf-ring');
+  if (_pfRingEl) {
+    _pfRingEl.innerHTML = _calRingGauge(_pfFraction, _dCGreen, _dCRed);
+    _pfRingEl.style.visibility = (typeof _pfMode !== 'undefined' && _pfMode === 'exp') ? 'hidden' : 'visible';
+  }
+
+  const _awAbs = Math.abs(_avgWPct), _alAbs = Math.abs(_avgLPct);
+  const _avgBarTotal = (_awAbs + _alAbs) || 1;
+  const _avgWinPct = (_awAbs / _avgBarTotal) * 100;
+  const _avgRatio = _alAbs > 0 ? (_awAbs / _alAbs) : (_awAbs > 0 ? _awAbs : 0);
+  const _awBarEl = document.getElementById('kpi-aw-bar');
+  const _alBarEl = document.getElementById('kpi-al-bar');
+  if (_awBarEl) _awBarEl.style.width = _avgWinPct.toFixed(1) + '%';
+  if (_alBarEl) _alBarEl.style.width = (100 - _avgWinPct).toFixed(1) + '%';
+  const _avgRatioEl = document.getElementById('kpi-avgratio');
+  if (_avgRatioEl) _avgRatioEl.textContent = _avgRatio.toFixed(2);
+
+  document.querySelectorAll('.kpi-value, .cal-an-value').forEach(el => { el.style.transform = 'scale(1.04)'; el.style.transition = 'transform 0.3s ease'; setTimeout(() => el.style.transform = '', 320); });
 
   // ── Equity sparkline in Net PnL card ──
   _drawSparkline();
@@ -6958,18 +7001,20 @@ function togglePf() {
   const card = document.getElementById('kpi-pf-card');
   if (!el) return;
   if (card) { card.classList.add('kpi-pnl-flipping'); setTimeout(() => card.classList.remove('kpi-pnl-flipping'), 300); }
+  const lbl = document.getElementById('kpi-pf-label-text');
   if (_pfMode === 'exp') {
-    const lbl = card?.querySelector('.kpi-label');
-    if (lbl) lbl.childNodes[0].textContent = 'Expectancy ';
+    if (lbl) lbl.textContent = 'Expectancy';
     el.textContent = el.dataset.exp || '—';
     const isPos = parseFloat(el.dataset.exp) >= 0;
-    el.className = 'kpi-value ' + (isPos ? 'green' : 'red');
+    el.className = 'cal-an-value ' + (isPos ? 'green' : 'red');
   } else {
-    const lbl = card?.querySelector('.kpi-label');
-    if (lbl) lbl.childNodes[0].textContent = 'Profit factor ';
+    if (lbl) lbl.textContent = 'Profit factor';
     el.textContent = el.dataset.pf || '—';
-    el.className = 'kpi-value gold';
+    el.className = 'cal-an-value gold';
   }
+  // Ring gauge doesn't apply to Expectancy mode — hide/show accordingly
+  const ring = document.getElementById('kpi-pf-ring');
+  if (ring) ring.style.visibility = (_pfMode === 'exp') ? 'hidden' : 'visible';
 }
 
 // ── Equity sparkline ──────────────────────────────────
@@ -7313,10 +7358,10 @@ function toggleNetPnl() {
   // Swap value + colour instantly from stored data attributes
   if (_pnlToggleMode === '$') {
     el.textContent = el.dataset.dollar || '+$0.00';
-    el.className   = 'kpi-value ' + (el.dataset.dollarPos === '1' ? 'green' : 'red');
+    el.className   = 'cal-an-value ' + (el.dataset.dollarPos === '1' ? 'green' : 'red');
   } else {
     el.textContent = el.dataset.pct || '+0.0%';
-    el.className   = 'kpi-value ' + (el.dataset.pctPos === '1' ? 'green' : 'red');
+    el.className   = 'cal-an-value ' + (el.dataset.pctPos === '1' ? 'green' : 'red');
   }
   // Re-render calendar cells to match the new mode
   renderCalendar();
