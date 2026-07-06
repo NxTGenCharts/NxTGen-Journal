@@ -5602,11 +5602,22 @@ body{
   justify-content: center;
   padding: 3.5%;
   box-sizing: border-box;
+  overflow: hidden;
 }
-/* Wide targets (landscape / wallpaper) — card is height-limited */
-.sm-frame.sm-fit-h .sm-card-scaler .sm-card { height: 100%; width: auto; max-width: 100%; }
-/* Tall targets (square / portrait / phone story) — card is width-limited */
-.sm-frame.sm-fit-w .sm-card-scaler .sm-card { width: 100%; height: auto; max-height: 100%; }
+/* .sm-card-fit holds the card at its NATURAL (unscaled) design size and is
+   itself shrunk/grown with a CSS transform so the whole card — whatever its
+   real content height turns out to be — always fits entirely inside the
+   frame ("contain" behaviour), instead of being clipped by height:100%/
+   width:100% tricks that don't work on ordinary block content. Width,
+   height and the transform: scale(...) are computed in JS
+   (_smFitCardToFrame) from the card's actual rendered size, so this stays
+   correct for every export-size preset and at any viewport width. */
+.sm-card-fit {
+  position: relative;
+  transform-origin: center center;
+  flex-shrink: 0;
+}
+.sm-card-fit .sm-card { width: 480px; max-width: none; }
 
 /* ── Card ── */
 .sm-card {
@@ -5619,7 +5630,7 @@ body{
   font-family: var(--font-body);
   box-shadow: 0 24px 60px rgba(0,0,0,0.35);
 }
-.sm-card-scaler .sm-card { max-width: none; box-shadow: 0 18px 44px rgba(0,0,0,0.45); }
+.sm-card-fit .sm-card { box-shadow: 0 18px 44px rgba(0,0,0,0.45); }
 
 @media (max-width: 480px) {
   .sm-frame { border-radius: var(--r, 10px); max-width: 100%; }
