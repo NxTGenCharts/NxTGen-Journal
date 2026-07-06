@@ -3125,10 +3125,10 @@ async function detSave(id) {
     if (ok) {
       btn.classList.add('saved');
       btn.textContent = '✓ Saved';
-      setTimeout(() => { btn.classList.remove('saved'); btn.textContent = '<svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save Notes'; }, 2500);
+      setTimeout(() => { btn.classList.remove('saved'); btn.innerHTML = '<svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save Notes'; }, 2500);
     } else {
       btn.textContent = '✗ Error — retry';
-      setTimeout(() => { btn.textContent = '<svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save Notes'; }, 3000);
+      setTimeout(() => { btn.innerHTML = '<svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save Notes'; }, 3000);
     }
   }
 }
@@ -3316,7 +3316,7 @@ async function saveTrade() {
       _checklistWarningAcked = true; // allow second click to bypass
     }
     const btn = document.querySelector('#modal .btn-primary');
-    if (btn) { btn.disabled = false; btn.textContent = '<svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save Trade'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save Trade'; }
     return;
   }
   _checklistWarningAcked = false;
@@ -3340,7 +3340,7 @@ async function saveTrade() {
   const lossReasonVal = document.getElementById('m-loss-reason')?.value || '';
   if (outcome === 'Loss' && !lossReasonVal) {
     showToast('Please select a Loss Reason before saving.', 'danger');
-    if (btn) { btn.disabled = false; btn.textContent = '<svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save Trade'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save Trade'; }
     document.getElementById('loss-reason-field').style.display = 'block';
     document.getElementById('m-loss-reason').style.outline = '2px solid var(--red)';
     setTimeout(() => { const el = document.getElementById('m-loss-reason'); if (el) el.style.outline = ''; }, 2000);
@@ -3972,11 +3972,10 @@ function _wlBuildDailyGameplan(week) {
               Mindset Check
             </label>
             <div class="wl-day-mindset-btns" id="wl-day-mindset-${week.id}-${activeDay}">
-              ${['<svg class="icn" aria-hidden="true"><use href="#ic-meditate"></use></svg> Focused','<svg class="icn" aria-hidden="true"><use href="#ic-zap"></use></svg> Eager','<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg> Tired','<svg class="icn" aria-hidden="true"><use href="#ic-frown"></use></svg> Frustrated','<svg class="icn" aria-hidden="true"><use href="#ic-meh"></use></svg> Neutral'].map(m => {
-                const mKey = m.split(' ')[1];
+              ${[['meditate','Focused'],['zap','Eager'],['moon','Tired'],['frown','Frustrated'],['meh','Neutral']].map(([ic,mKey]) => {
                 const isSelected = plan.mindset === mKey;
                 return `<button class="wl-day-mindset-btn${isSelected ? ' selected' : ''}"
-                  onclick="_wlSetDayMindset('${week.id}','${activeDay}','${mKey}',this)">${m}</button>`;
+                  onclick="_wlSetDayMindset('${week.id}','${activeDay}','${mKey}',this)">${icon(ic)} ${mKey}</button>`;
               }).join('')}
             </div>
           </div>
@@ -7131,7 +7130,7 @@ function updateKPIs() {
   if (_awEl) _awEl.textContent = _avgWPctFmt;
   if (_alEl) _alEl.textContent = _avgLPctFmt;
   const rrEl = document.getElementById('kpi-rr'); if (rrEl) rrEl.textContent = avgRR ? '1:' + avgRR : '—';
-  const wsEl = document.getElementById('kpi-ws'); if (wsEl) wsEl.textContent = streak > 0 ? streak + '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg> (best:' + maxStreak + ')' : maxStreak ? '0 (best:' + maxStreak + ')' : '0';
+  const wsEl = document.getElementById('kpi-ws'); if (wsEl) wsEl.innerHTML = streak > 0 ? streak + '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg> (best:' + maxStreak + ')' : maxStreak ? '0 (best:' + maxStreak + ')' : '0';
 
   // ── Max Drawdown — peak-to-trough on cumulative % equity curve ──
   const _ddSorted = [...trades].sort((a, b) => a.date.localeCompare(b.date));
@@ -7678,11 +7677,11 @@ function _checkDailyLossLimit(allTrades) {
   const bodyEl = document.getElementById('daily-loss-alert-body');
   if (todayPnl <= -dailyLimit) {
     alertEl.style.display = 'flex';
-    if (titleEl) titleEl.textContent = `<svg class="icn" aria-hidden="true"><use href="#ic-siren"></use></svg> Daily Loss Limit Reached (${todayPnl.toFixed(1)}%)`;
+    if (titleEl) titleEl.innerHTML = `<svg class="icn" aria-hidden="true"><use href="#ic-siren"></use></svg> Daily Loss Limit Reached (${todayPnl.toFixed(1)}%)`;
     if (bodyEl) bodyEl.textContent = `You've hit your ${dailyLimit.toFixed(1)}% daily limit. Step away — protect your account.`;
   } else if (lossCount >= 2 && todayPnl < 0) {
     alertEl.style.display = 'flex';
-    if (titleEl) titleEl.textContent = `<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg> ${lossCount} Losses Today (${todayPnl.toFixed(1)}%)`;
+    if (titleEl) titleEl.innerHTML = `<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg> ${lossCount} Losses Today (${todayPnl.toFixed(1)}%)`;
     if (bodyEl) bodyEl.textContent = `Two consecutive losses detected. Consider pausing and reviewing your bias before the next trade.`;
   } else {
     alertEl.style.display = 'none';
@@ -7903,7 +7902,7 @@ function toggleTheme() {
   const isLight = doc.getAttribute('data-theme') === 'light';
   doc.setAttribute('data-theme', isLight ? '' : 'light');
   const btn = document.getElementById('theme-btn');
-  if (btn) { btn.textContent = isLight ? '<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg>' : '<svg class="icn" aria-hidden="true"><use href="#ic-sun"></use></svg>'; btn.classList.add('spinning'); setTimeout(() => btn.classList.remove('spinning'), 420); }
+  if (btn) { btn.innerHTML = isLight ? '<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg>' : '<svg class="icn" aria-hidden="true"><use href="#ic-sun"></use></svg>'; btn.classList.add('spinning'); setTimeout(() => btn.classList.remove('spinning'), 420); }
   try { localStorage.setItem('nxtgen_theme', isLight ? 'dark' : 'light'); } catch (e) {}
 }
 function loadTheme() {
@@ -7912,7 +7911,7 @@ function loadTheme() {
     const isDark = t !== 'light';
     document.documentElement.setAttribute('data-theme', isDark ? '' : 'light');
     const btn = document.getElementById('theme-btn');
-    if (btn) btn.textContent = isDark ? '<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg>' : '<svg class="icn" aria-hidden="true"><use href="#ic-sun"></use></svg>';
+    if (btn) btn.innerHTML = isDark ? '<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg>' : '<svg class="icn" aria-hidden="true"><use href="#ic-sun"></use></svg>';
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
   } catch (e) {}
 }
@@ -8619,7 +8618,7 @@ function calExportImage() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      showToast('Calendar image saved! <svg class="icn" aria-hidden="true"><use href="#ic-image"></use></svg>', 'success');
+      showToast('Calendar image saved!', 'success');
     }).catch(err => {
       console.error('Calendar export failed:', err);
       showToast('Export failed — ' + (err && err.message ? err.message : 'please try again'), 'danger');
@@ -8958,7 +8957,7 @@ function openEmptyTrashModal() {
 // ── GLASS MODAL & TOAST ───────────────────────────────
 let _gmCallback = null;
 function openGlassModal({ icon, title, body, confirmLabel, confirmClass, onConfirm, onCancel }) {
-  document.getElementById('gm-icon').textContent = icon || '<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg>';
+  document.getElementById('gm-icon').innerHTML = icon || '<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg>';
   document.getElementById('gm-title').textContent = title || 'Confirm';
   document.getElementById('gm-body').innerHTML = body || '';
   _gmCallback = onConfirm || null;
@@ -9531,7 +9530,7 @@ function _rebuildAccMgrList() {
   if (elDeleted) {
     elDeleted.innerHTML = deletedItems.length
       ? list.map((a,i) => a.status === 'deleted' ? renderDeleted(a,i) : '').join('')
-      : '<div class="acc-mgr-empty acc-mgr-empty-deleted"><span style="font-size:24px">\u2714\ufe0f</span><br>No deleted accounts.</div>';
+      : '<div class="acc-mgr-empty acc-mgr-empty-deleted"><span style="font-size:24px">' + icon('check-c',{cls:'icn-green'}) + '</span><br>No deleted accounts.</div>';
   }
 }
 
@@ -9556,7 +9555,7 @@ async function _softDeleteAccount(i) {
   const acc = list[i];
   if (!acc) return;
   openGlassModal({
-    icon: '\uD83D\uDDD1\uFE0F',
+    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg>',
     title: 'Delete Account?',
     body: `<strong>${acc.name}</strong> will be moved to the Deleted tab.<br><small style="color:var(--text3)">You can restore or permanently delete it from there.</small>`,
     confirmLabel: 'Move to Deleted',
@@ -9579,7 +9578,7 @@ async function _restoreDeletedAccount(i) {
   await _saveCustomAccounts(list);
   _rebuildAccMgrList();
   _refreshAccountDropdowns();
-  showToast('Account restored \u2714', 'restore');
+  showToast('Account restored', 'restore');
   buildAccounts();
 }
 
@@ -9588,7 +9587,7 @@ async function _permDeleteAccount(i) {
   const acc = list[i];
   if (!acc) return;
   openGlassModal({
-    icon: '\u26A0\uFE0F',
+    icon: '<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg>',
     title: 'Permanently Delete?',
     body: `<strong>${acc.name}</strong> will be deleted forever.<br><small style="color:var(--red)">This action cannot be undone.</small>`,
     confirmLabel: 'Delete Forever',
@@ -9953,7 +9952,7 @@ function smRefreshPnl() {
 
 function smSetPnlMode(mode,btn){_sharePnlMode=mode;document.querySelectorAll('#sm-pnl-seg .sm-seg-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const r=document.getElementById('sm-usd-row');if(r)r.style.display=mode==='pct'?'none':'';smRefreshPnl();}
 function smSetFmt(fmt,btn){_shareFmt=fmt;document.querySelectorAll('.sm-fmt-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
-function smToggleTheme(){_shareCardTheme=_shareCardTheme==='dark'?'light':'dark';const c=document.getElementById('sm-card');if(c)c.className='sm-card '+_shareCardTheme;const b=document.getElementById('sm-theme-btn');if(b)b.textContent=_shareCardTheme==='dark'?'<svg class="icn" aria-hidden="true"><use href="#ic-sun"></use></svg>':'<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg>';}
+function smToggleTheme(){_shareCardTheme=_shareCardTheme==='dark'?'light':'dark';const c=document.getElementById('sm-card');if(c)c.className='sm-card '+_shareCardTheme;const b=document.getElementById('sm-theme-btn');if(b)b.innerHTML=_shareCardTheme==='dark'?'<svg class="icn" aria-hidden="true"><use href="#ic-sun"></use></svg>':'<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg>';}
 function closeShareModal(){
   const o=document.getElementById('share-modal-overlay');
   if(!o)return;
@@ -9972,7 +9971,7 @@ function closeShareModal(){
   if (_smActivePage) { _smActivePage.style.overflow = ''; _smActivePage.scrollTop = _smActivePageScroll; _smActivePage = null; }
   setTimeout(()=>o.remove(),260);
 }
-function _smSetLoading(btnId,spinId,lblId,on,lbl){const btn=document.getElementById(btnId),sp=document.getElementById(spinId),lb=document.getElementById(lblId);if(!btn)return;btn.disabled=on;if(sp)sp.classList.toggle('active',on);if(lb){lb.style.opacity=on?'0':'1';if(lbl&&!on)lb.textContent=lbl;}}
+function _smSetLoading(btnId,spinId,lblId,on,lbl){const btn=document.getElementById(btnId),sp=document.getElementById(spinId),lb=document.getElementById(lblId);if(!btn)return;btn.disabled=on;if(sp)sp.classList.toggle('active',on);if(lb){lb.style.opacity=on?'0':'1';if(lbl&&!on)lb.innerHTML=lbl;}}
 
 // ── Pre-baked logo PNGs: generated from logo.svg at build time ──
 // Dark card: all logo elements recoloured to white on transparent
@@ -10029,7 +10028,7 @@ async function smDownload(){
   try{const t=trades.find(x=>x.id===_shareTradeId),filename=`NxTGen_${(t||{pair:'Trade'}).pair}_${(t||{date:'trade'}).date}`,canvas=await _smCapture();
     if(_shareFmt==='pdf'){const{jsPDF}=window.jspdf,pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'}),pw=pdf.internal.pageSize.getWidth(),iw=pw-30,ih=(canvas.height/canvas.width)*iw;pdf.addImage(canvas.toDataURL('image/jpeg',0.96),'JPEG',15,20,iw,ih);pdf.save(filename+'.pdf');}
     else{const link=document.createElement('a');link.download=filename+'.jpg';link.href=canvas.toDataURL('image/jpeg',0.96);link.click();}
-    showToast('Trade card saved! <svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg>','success');
+    showToast('Trade card saved!','success');
   }catch(e){console.error(e);showToast('Export failed — try again','danger');}
   _smSetLoading('sm-dl-btn','sm-dl-spin','sm-dl-lbl',false,'<svg class="icn" aria-hidden="true"><use href="#ic-download"></use></svg> Download');
 }
@@ -10037,13 +10036,13 @@ async function smShareNative(){
   _smSetLoading('sm-share-btn','sm-share-spin','sm-share-lbl',true);
   try{const t=trades.find(x=>x.id===_shareTradeId),canvas=await _smCapture();
     canvas.toBlob(async blob=>{const file=new File([blob],`NxTGen_${(t||{pair:'Trade'}).pair}.jpg`,{type:'image/jpeg'}),shareData={files:[file],title:`NxTGen · ${(t||{}).pair}`,text:`${(t||{}).pair} ${(t||{}).pos} · ${(t||{}).pnl>=0?'+':''}${(t||{}).pnl}% — NxTGen Journal`};
-      if(navigator.canShare&&navigator.canShare(shareData)){try{await navigator.share(shareData);showToast('Shared! <svg class="icn" aria-hidden="true"><use href="#ic-link"></use></svg>','success');}catch(e){if(e.name!=='AbortError')_smClipboardFallback(canvas);}}
+      if(navigator.canShare&&navigator.canShare(shareData)){try{await navigator.share(shareData);showToast('Shared!','success');}catch(e){if(e.name!=='AbortError')_smClipboardFallback(canvas);}}
       else _smClipboardFallback(canvas);
       _smSetLoading('sm-share-btn','sm-share-spin','sm-share-lbl',false,'<svg class="icn" aria-hidden="true"><use href="#ic-link"></use></svg> Share');
     },'image/jpeg',0.96);
   }catch(e){console.error(e);showToast('Share failed','danger');_smSetLoading('sm-share-btn','sm-share-spin','sm-share-lbl',false,'<svg class="icn" aria-hidden="true"><use href="#ic-link"></use></svg> Share');}
 }
-function _smClipboardFallback(canvas){canvas.toBlob(async blob=>{try{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);showToast('Copied to clipboard! <svg class="icn" aria-hidden="true"><use href="#ic-clipboard"></use></svg>','success');}catch{const l=document.createElement('a');l.download='NxTGen_Trade.jpg';l.href=canvas.toDataURL('image/jpeg',0.96);l.click();showToast('Saved! <svg class="icn" aria-hidden="true"><use href="#ic-image"></use></svg>','success');};},'image/png');}
+function _smClipboardFallback(canvas){canvas.toBlob(async blob=>{try{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);showToast('Copied to clipboard!','success');}catch{const l=document.createElement('a');l.download='NxTGen_Trade.jpg';l.href=canvas.toDataURL('image/jpeg',0.96);l.click();showToast('Saved!','success');};},'image/png');}
 function _smEnsureLibs(cb){if(typeof html2canvas!=='undefined'&&typeof window.jspdf!=='undefined'){cb();return;}const h2c=document.createElement('script');h2c.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';h2c.onload=()=>{const jpdf=document.createElement('script');jpdf.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';jpdf.onload=cb;document.head.appendChild(jpdf);};document.head.appendChild(h2c);}
 
 // ════════════════════════════════════════════════════════════════════
