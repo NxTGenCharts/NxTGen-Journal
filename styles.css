@@ -5689,6 +5689,62 @@ body{
 .sm-card.light .sm-tag-gold  .sm-dot { background: #b45309; }
 .sm-card.light .sm-tag-blue  .sm-dot { background: #4f46e5; }
 .sm-card.light .sm-tag-green .sm-dot { background: #059669; }
+.sm-tag-dir-buy  .sm-dot { background: #34d399; }
+.sm-tag-dir-sell .sm-dot { background: #f87171; }
+.sm-card.light .sm-tag-dir-buy  .sm-dot { background: #059669; }
+.sm-card.light .sm-tag-dir-sell .sm-dot { background: #dc2626; }
+
+/* ── Trend hero (big backdrop line behind ticker/pnl) ── */
+.sm-trend-hero { position: relative; height: 46px; margin: 0 22px -30px; pointer-events: none; }
+.sm-trend-hero svg { width: 100%; height: 100%; overflow: visible; }
+.sm-trend-hero path { fill: none; stroke-width: 2; opacity: 0.55; }
+.sm-card.dark  .sm-trend-hero path.trend-win  { stroke: #34d399; }
+.sm-card.dark  .sm-trend-hero path.trend-loss { stroke: #f87171; }
+.sm-card.dark  .sm-trend-hero path.trend-be   { stroke: #fbbf24; }
+.sm-card.light .sm-trend-hero path.trend-win  { stroke: #059669; }
+.sm-card.light .sm-trend-hero path.trend-loss { stroke: #dc2626; }
+.sm-card.light .sm-trend-hero path.trend-be   { stroke: #b45309; }
+
+/* ── Score rings (execution / discipline / efficiency + edge grade) ── */
+.sm-rings { display: flex; align-items: center; justify-content: space-between; padding: 14px 22px 4px; gap: 8px; }
+.sm-ring-item { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; }
+.sm-ring-svg { width: 52px; height: 52px; transform: rotate(-90deg); }
+.sm-ring-track { fill: none; stroke-width: 5; }
+.sm-card.dark  .sm-ring-track { stroke: rgba(255,255,255,0.08); }
+.sm-card.light .sm-ring-track { stroke: rgba(0,0,0,0.08); }
+.sm-ring-fill { fill: none; stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 0.3s; }
+.sm-ring-wrap { position: relative; width: 52px; height: 52px; }
+.sm-ring-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+.sm-ring-label { font-size: 8.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.45; text-align: center; }
+.sm-edge-grade { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 0 0 auto; padding-left: 10px; border-left: 1px solid; }
+.sm-card.dark  .sm-edge-grade { border-color: rgba(255,255,255,0.09); }
+.sm-card.light .sm-edge-grade { border-color: rgba(0,0,0,0.09); }
+.sm-edge-grade-val { font-size: 24px; font-weight: 900; letter-spacing: -0.5px; line-height: 1; }
+.sm-edge-grade-lbl { font-size: 8.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.45; }
+
+/* ── Mini stat row (risk / checklist score / rating) ── */
+.sm-mini-stats { display: flex; padding: 10px 22px 0; gap: 0; }
+.sm-mini-stat { flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: center; padding: 8px 4px; }
+.sm-mini-stat + .sm-mini-stat { border-left: 1px solid; }
+.sm-card.dark  .sm-mini-stat + .sm-mini-stat { border-color: rgba(255,255,255,0.07); }
+.sm-card.light .sm-mini-stat + .sm-mini-stat { border-color: rgba(0,0,0,0.08); }
+.sm-mini-stat-val { font-size: 15px; font-weight: 800; letter-spacing: -0.3px; }
+.sm-mini-stat-lbl { font-size: 8.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.4; }
+
+/* ── Checklist grid ── */
+.sm-checklist-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.4; padding: 14px 22px 6px; }
+.sm-checklist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; padding: 0 22px 8px; }
+.sm-check-item { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; }
+.sm-check-icon { flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid; }
+.sm-card.dark  .sm-check-icon { border-color: rgba(255,255,255,0.18); }
+.sm-card.light .sm-check-icon { border-color: rgba(0,0,0,0.18); }
+.sm-check-icon svg { width: 9px; height: 9px; stroke: #fff; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.sm-check-icon.checked { background: #34d399; border-color: #34d399; }
+.sm-card.light .sm-check-icon.checked { background: #059669; border-color: #059669; }
+.sm-check-item:not(.checked) { opacity: 0.35; }
+
+/* ── Narrative quote (pretrade thesis / trade notes) ── */
+.sm-narrative-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.4; padding: 8px 22px 4px; }
 
 .sm-notes-row { padding: 0 22px 10px; }
 .sm-notes { padding: 10px 14px; border-radius: 0; font-size: 12px; line-height: 1.6; font-style: italic; border-left: 3px solid #fbbf24; }
@@ -5729,7 +5785,14 @@ body{
 [data-theme="light"] .sm-usd-prefix { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.09); }
 .sm-usd-input { flex: 1; padding: 8px 12px; background: transparent; border: none; outline: none; color: var(--text); font-family: var(--font-mono, monospace); font-size: 13px; }
 
-.sm-fmt-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sm-select-wrap { position: relative; }
+.sm-select { width: 100%; appearance: none; padding: 10px 34px 10px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); border-radius: 0; color: var(--text); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+[data-theme="light"] .sm-select { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.09); }
+.sm-select-wrap::after { content: ''; position: absolute; right: 13px; top: 50%; width: 7px; height: 7px; border-right: 1.5px solid var(--text3); border-bottom: 1.5px solid var(--text3); transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+.sm-dpi-hint { font-size: 10.5px; color: var(--text3); display: flex; align-items: center; gap: 5px; }
+.sm-dpi-hint .sm-dpi-good { color: #34d399; font-weight: 700; }
+
+.sm-fmt-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
 .sm-fmt-btn { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 0; cursor: pointer; text-align: left; color: var(--text); font-family: inherit; transition: background 0.16s, border-color 0.16s, transform 0.12s; }
 .sm-fmt-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); transform: translateY(-1px); }
 .sm-fmt-btn.active { background: rgba(251,191,36,0.10); border-color: rgba(251,191,36,0.40); }
@@ -5777,6 +5840,14 @@ body{
   .view-stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
   .star-editor-row { gap: 6px; }
   .star-opt { min-width: 56px; padding: 8px 10px; }
+  .sm-ring-svg, .sm-ring-wrap { width: 44px; height: 44px; }
+  .sm-ring-num { font-size: 11px; }
+  .sm-edge-grade-val { font-size: 20px; }
+  .sm-rings { gap: 4px; padding: 12px 16px 4px; }
+  .sm-checklist-grid { padding: 0 16px 6px; }
+  .sm-mini-stats { padding: 8px 16px 0; }
+  .sm-fmt-desc { display: none; }
+  .sm-fmt-btn { padding: 10px 8px; justify-content: center; text-align: center; flex-direction: column; gap: 6px; }
 }
 @media (max-width: 380px) {
   .sm-hero { flex-direction: column; align-items: flex-start; gap: 8px; }
@@ -5784,6 +5855,9 @@ body{
   .sm-actions { grid-template-columns: 1fr; }
   .sm-fmt-row  { grid-template-columns: 1fr; }
   .view-stats-grid { grid-template-columns: 1fr; }
+  .sm-checklist-grid { grid-template-columns: 1fr; }
+  .sm-rings { flex-wrap: wrap; justify-content: center; }
+  .sm-edge-grade { border-left: none; border-top: 1px solid rgba(255,255,255,0.09); padding-left: 0; padding-top: 10px; flex-basis: 100%; }
 }
 
 /* ══════════════════════════════════════════════════════

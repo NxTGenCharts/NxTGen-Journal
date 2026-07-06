@@ -9786,7 +9786,14 @@ function _onCalAccSize2Change() {
 }
 
 // ── SHARE MODAL ────────────────────────────────────────────────────────────
-let _shareFmt = 'jpg', _sharePnlMode = 'pct', _shareCardTheme = 'dark', _shareTradeId = null, _smScrollY = 0, _smActivePage = null, _smActivePageScroll = 0;
+let _shareFmt = 'jpg', _sharePnlMode = 'pct', _shareCardTheme = 'dark', _shareTradeId = null, _smScrollY = 0, _smActivePage = null, _smActivePageScroll = 0, _shareSizePreset = 'print4';
+const SM_SIZE_PRESETS = {
+  social: { label: 'Social · 1080px (fast)',        w: 1080 },
+  hd:     { label: 'HD · 1536px',                   w: 1536 },
+  print4: { label: 'Print · 300 DPI @ 4in card',     w: 1200 },
+  print5: { label: 'Print · 300 DPI @ 5in card',     w: 1500 },
+  ultra:  { label: 'Ultra · 2160px (4K)',           w: 2160 },
+};
 
 function openShareModal(id) {
   const t = trades.find(x => x.id === id); if (!t) return;
@@ -9823,10 +9830,10 @@ function openShareModal(id) {
             </div>
             <div class="sm-badge" id="sm-badge"></div>
           </div>
+          <div class="sm-trend-hero" id="sm-trend-hero" aria-hidden="true"><svg viewBox="0 0 400 46" preserveAspectRatio="none"><path id="sm-trend-path" d="" /></svg></div>
           <div class="sm-hero">
             <div class="sm-hero-left">
               <div class="sm-pair" id="sm-pair">${t.pair}</div>
-              <div class="sm-direction"><span class="sm-dir-arrow" id="sm-dir-arrow"></span><span id="sm-dir-text">${t.pos} &nbsp;·&nbsp; ${t.kz}</span></div>
             </div>
             <div class="sm-hero-right"><div class="sm-pnl-block" id="sm-pnl-block"></div><div class="sm-pnl-label">Net PnL</div></div>
           </div>
@@ -9837,14 +9844,25 @@ function openShareModal(id) {
           </div>
           <div class="sm-rule"></div>
           <div class="sm-tags">
+            <div class="sm-tag" id="sm-tag-dir"><span class="sm-dot"></span><span id="sm-dir-text">${t.pos}</span></div>
             <div class="sm-tag sm-tag-gold"><span class="sm-dot"></span><span id="sm-tag-kz">${t.kz}</span></div>
             <div class="sm-tag sm-tag-blue"><span class="sm-dot"></span><span id="sm-tag-date">${t.date}</span></div>
             <div class="sm-tag sm-tag-green"><span class="sm-dot"></span><span>${t.account}</span></div>
           </div>
+          <div class="sm-rings" id="sm-rings"></div>
+          <div class="sm-mini-stats" id="sm-mini-stats"></div>
+          <div class="sm-checklist-lbl" id="sm-checklist-lbl" style="display:none">Entry Checklist</div>
+          <div class="sm-checklist-grid" id="sm-checklist-grid"></div>
+          <div class="sm-narrative-lbl" id="sm-narrative-lbl" style="display:none">Trade Narrative</div>
           <div class="sm-notes-row" id="sm-notes-row"><div class="sm-notes" id="sm-notes"></div></div>
           <div class="sm-bottom-row"><div class="sm-stars" id="sm-stars"></div><div class="sm-risk-tag">${t.risk || '—'} risk</div></div>
           <div class="sm-footer"><span class="sm-footer-url">nxtgencharts.github.io/NxTGen-Journal</span><img class="sm-footer-logo" src="logo.svg" alt="NxTGen"></div>
         </div>
+      </div>
+      <div class="sm-section">
+        <div class="sm-section-lbl">Export size</div>
+        <div class="sm-select-wrap"><select class="sm-select" id="sm-size-preset" onchange="smSetSizePreset(this.value)"></select></div>
+        <div class="sm-dpi-hint" id="sm-dpi-hint"></div>
       </div>
       <div class="sm-section">
         <div class="sm-section-lbl">PnL display</div>
@@ -9862,6 +9880,7 @@ function openShareModal(id) {
         <div class="sm-section-lbl">Export format</div>
         <div class="sm-fmt-row">
           <button class="sm-fmt-btn active" id="sm-fmt-jpg" onclick="smSetFmt('jpg',this)"><span class="sm-fmt-icon"><svg class="icn" aria-hidden="true"><use href="#ic-image"></use></svg></span><div><div class="sm-fmt-name">JPG Image</div><div class="sm-fmt-desc">Best for social sharing</div></div></button>
+          <button class="sm-fmt-btn" id="sm-fmt-png" onclick="smSetFmt('png',this)"><span class="sm-fmt-icon"><svg class="icn" aria-hidden="true"><use href="#ic-image"></use></svg></span><div><div class="sm-fmt-name">PNG Image</div><div class="sm-fmt-desc">Lossless, transparent bg</div></div></button>
           <button class="sm-fmt-btn" id="sm-fmt-pdf" onclick="smSetFmt('pdf',this)"><span class="sm-fmt-icon"><svg class="icn" aria-hidden="true"><use href="#ic-notebook"></use></svg></span><div><div class="sm-fmt-name">PDF Document</div><div class="sm-fmt-desc">Best for records &amp; print</div></div></button>
         </div>
       </div>
@@ -9910,26 +9929,154 @@ function openShareModal(id) {
   overlay._smSyncViewport = _smSyncViewport;
 
   requestAnimationFrame(() => { overlay.style.display = 'flex'; requestAnimationFrame(() => overlay.classList.add('open')); });
+  smInitSizePresets();
   _smEnsureLibs(() => smPopulateCard(id));
 }
 
+function smInitSizePresets(){
+  const sel = document.getElementById('sm-size-preset');
+  if (!sel) return;
+  sel.innerHTML = Object.entries(SM_SIZE_PRESETS).map(([k,p]) => `<option value="${k}"${k===_shareSizePreset?' selected':''}>${p.label}</option>`).join('');
+  updateSmDpiHint();
+}
+function smSetSizePreset(key){
+  _shareSizePreset = SM_SIZE_PRESETS[key] ? key : 'print4';
+  updateSmDpiHint();
+}
+function updateSmDpiHint(){
+  const hint = document.getElementById('sm-dpi-hint');
+  if (!hint) return;
+  const preset = SM_SIZE_PRESETS[_shareSizePreset] || SM_SIZE_PRESETS.print4;
+  // DPI estimate assumes the card prints at a 4in physical width — the
+  // baseline "trading card" print size. Anything at or above 300 DPI at
+  // that size is print-quality; we flag it so the person can see at a
+  // glance whether their chosen size clears that bar.
+  const dpi = Math.round(preset.w / 4);
+  const good = dpi >= 300;
+  hint.innerHTML = `${preset.w}px wide → <span class="${good ? 'sm-dpi-good' : ''}">≈${dpi} DPI</span> @ 4in print${good ? ' ✓' : ''}`;
+}
+
+// ── Edge score rings: derive an execution / discipline / efficiency
+// score (0-100 each) from data already on the trade, plus a rollup
+// letter grade. Purely a presentational summary — not a trading signal.
+function computeEdgeScores(t){
+  const total = CHECKLIST_ITEMS.length;
+  const checked = Array.isArray(t.checklist) ? t.checklist.length : 0;
+  const execution = total > 0 ? Math.round((checked/total)*100) : 50;
+  const rating = t.rating || 0;
+  const discipline = Math.round((rating/5)*100);
+  const outcomeBase = t.outcome === 'Win' ? 90 : t.outcome === 'B.E' ? 65 : 40;
+  const efficiency = Math.max(0, Math.min(100, Math.round((outcomeBase + discipline)/2)));
+  const avg = (execution + discipline + efficiency) / 3;
+  let grade;
+  if (avg >= 90) grade = 'A+';
+  else if (avg >= 80) grade = 'A';
+  else if (avg >= 70) grade = 'B+';
+  else if (avg >= 60) grade = 'B';
+  else if (avg >= 50) grade = 'C+';
+  else grade = 'C';
+  return { execution, discipline, efficiency, grade };
+}
+function _smRingSvg(pct, colorClass){
+  const r = 21, c = 2*Math.PI*r, off = c - (Math.max(0,Math.min(100,pct))/100)*c;
+  return `<div class="sm-ring-wrap">
+    <svg class="sm-ring-svg" viewBox="0 0 52 52">
+      <circle class="sm-ring-track" cx="26" cy="26" r="${r}"></circle>
+      <circle class="sm-ring-fill ${colorClass}" cx="26" cy="26" r="${r}" stroke-dasharray="${c}" stroke-dashoffset="${off}"></circle>
+    </svg>
+    <div class="sm-ring-num">${pct}</div>
+  </div>`;
+}
+function buildSmRings(t){
+  const el = document.getElementById('sm-rings');
+  if (!el) return;
+  const s = computeEdgeScores(t);
+  const cls = v => v>=70?'ring-good':v>=45?'ring-mid':'ring-low';
+  el.innerHTML = `
+    <div class="sm-ring-item">${_smRingSvg(s.execution,cls(s.execution))}<div class="sm-ring-label">Execution</div></div>
+    <div class="sm-ring-item">${_smRingSvg(s.discipline,cls(s.discipline))}<div class="sm-ring-label">Discipline</div></div>
+    <div class="sm-ring-item">${_smRingSvg(s.efficiency,cls(s.efficiency))}<div class="sm-ring-label">Efficiency</div></div>
+    <div class="sm-edge-grade"><div class="sm-edge-grade-val">${s.grade}</div><div class="sm-edge-grade-lbl">Edge Grade</div></div>`;
+  // color the ring strokes to match outcome (uses currentColor via inline style since class alone can't set stroke per-instance easily)
+  el.querySelectorAll('.sm-ring-fill').forEach(c => {
+    const isGood = c.classList.contains('ring-good'), isMid = c.classList.contains('ring-mid');
+    c.style.stroke = isGood ? '#34d399' : isMid ? '#fbbf24' : '#f87171';
+  });
+}
+function buildSmMiniStats(t){
+  const el = document.getElementById('sm-mini-stats');
+  if (!el) return;
+  const checked = Array.isArray(t.checklist) ? t.checklist.length : 0;
+  el.innerHTML = `
+    <div class="sm-mini-stat"><div class="sm-mini-stat-val">${t.risk || '—'}</div><div class="sm-mini-stat-lbl">Risk</div></div>
+    <div class="sm-mini-stat"><div class="sm-mini-stat-val">${checked}/${CHECKLIST_ITEMS.length}</div><div class="sm-mini-stat-lbl">Checklist</div></div>
+    <div class="sm-mini-stat"><div class="sm-mini-stat-val">${t.rating || 0}/5</div><div class="sm-mini-stat-lbl">Rating</div></div>`;
+}
+function buildSmChecklistGrid(t){
+  const grid = document.getElementById('sm-checklist-grid');
+  const lbl  = document.getElementById('sm-checklist-lbl');
+  if (!grid) return;
+  const checkedIdx = Array.isArray(t.checklist) ? t.checklist : [];
+  if (!CHECKLIST_ITEMS.length){ grid.innerHTML=''; if(lbl) lbl.style.display='none'; return; }
+  if (lbl) lbl.style.display = '';
+  grid.innerHTML = CHECKLIST_ITEMS.map((label, i) => {
+    const on = checkedIdx.includes(i);
+    return `<div class="sm-check-item ${on?'checked':''}"><span class="sm-check-icon ${on?'checked':''}">${on?icon('check',{cls:'icn-sm'}):''}</span><span>${label}</span></div>`;
+  }).join('');
+}
+// Deterministic seeded "random" walk so the same trade always renders the
+// same backdrop line (purely decorative, not real price action).
+function _smSeedRandom(seed){
+  let s = seed % 2147483647; if (s<=0) s += 2147483646;
+  return () => (s = s*16807 % 2147483647) / 2147483647;
+}
+function drawSmTrendHero(t){
+  const path = document.getElementById('sm-trend-path');
+  const wrap = document.getElementById('sm-trend-hero');
+  if (!path) return;
+  const seed = String(t.id||1).split('').reduce((a,c)=>a+c.charCodeAt(0),0) + (t.pair||'').length;
+  const rnd = _smSeedRandom(seed || 1);
+  const up = t.outcome !== 'Loss';
+  const points = 10, w = 400, h = 46;
+  let y = h*0.65, d = `M0,${y.toFixed(1)}`;
+  for (let i=1;i<=points;i++){
+    const x = (w/points)*i;
+    const bias = up ? -3.2 : 2.6;
+    y = Math.max(4, Math.min(h-4, y + bias + (rnd()-0.5)*10));
+    d += ` L${x.toFixed(1)},${y.toFixed(1)}`;
+  }
+  path.setAttribute('d', d);
+  path.classList.remove('trend-win','trend-loss','trend-be');
+  path.classList.add(t.outcome==='Win'?'trend-win':t.outcome==='Loss'?'trend-loss':'trend-be');
+  if (wrap) wrap.style.color = t.outcome==='Win' ? '#34d399' : t.outcome==='Loss' ? '#f87171' : '#fbbf24';
+}
+
 function smPopulateCard(id) {
+
   const t = trades.find(x => x.id === id); if (!t) return;
   const badge = document.getElementById('sm-badge');
   const bMap = {Win:['WIN','sm-badge-win'],Loss:['LOSS','sm-badge-loss'],'B.E':['B/E','sm-badge-be']};
   const [bl,bc] = bMap[t.outcome]||['—',''];
   if (badge){badge.textContent=bl;badge.className='sm-badge '+bc;}
-  const arr=document.getElementById('sm-dir-arrow');
-  if(arr){arr.textContent=t.pos==='Buy'?'▲':'▼';arr.className='sm-dir-arrow '+(t.pos==='Buy'?'arr-buy':'arr-sell');}
+  const dirTag=document.getElementById('sm-tag-dir');
+  if(dirTag){dirTag.className='sm-tag '+(t.pos==='Buy'?'sm-tag-dir-buy':'sm-tag-dir-sell');}
+  const dirText=document.getElementById('sm-dir-text');
+  if(dirText){dirText.textContent=(t.pos==='Buy'?'▲ ':'▼ ')+t.pos;}
   const glow=document.getElementById('sm-glow');
   if(glow)glow.className='sm-glow-blob '+(t.outcome==='Win'?'glow-win':t.outcome==='Loss'?'glow-loss':'glow-be');
   const chartColor=t.outcome==='Win'?'#34d399':t.outcome==='Loss'?'#f87171':'#fbbf24';
   const cl=document.getElementById('sm-chartline'); if(cl)cl.style.stroke=chartColor;
   const stars=document.getElementById('sm-stars');
   if(stars)stars.innerHTML=[1,2,3,4,5].map(n=>`<span style="opacity:${n<=t.rating?1:0.2}">${icon('star',{cls:'icn-sm'})}</span>`).join('');
-  const notesRow=document.getElementById('sm-notes-row'),notesEl=document.getElementById('sm-notes');
-  if(notesEl&&t.notes&&t.notes.trim()){notesEl.textContent=t.notes.length>130?t.notes.substring(0,127)+'…':t.notes;if(notesRow)notesRow.style.display='';}
-  else{if(notesRow)notesRow.style.display='none';}
+  drawSmTrendHero(t);
+  buildSmRings(t);
+  buildSmMiniStats(t);
+  buildSmChecklistGrid(t);
+  const notesRow=document.getElementById('sm-notes-row'),notesEl=document.getElementById('sm-notes'),narrLbl=document.getElementById('sm-narrative-lbl');
+  const narrativeText = (t.notes && t.notes.trim()) ? t.notes : (t.pretrade && t.pretrade.trim() ? t.pretrade : '');
+  if(notesEl && narrativeText){notesEl.textContent=narrativeText.length>150?narrativeText.substring(0,147)+'…':narrativeText;if(notesRow)notesRow.style.display='';if(narrLbl)narrLbl.style.display='';}
+  else{if(notesRow)notesRow.style.display='none';if(narrLbl)narrLbl.style.display='none';}
+  smInitSizePresets();
   smRefreshPnl();
 }
 
@@ -9999,8 +10146,15 @@ async function _smCapture() {
   // Two frames for browser to paint
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
+  // Scale so the exported canvas hits the selected preset's target pixel
+  // width (regardless of how large/small the card renders in this
+  // particular browser window) — this is what keeps the 300+ DPI print
+  // presets accurate no matter the viewport.
+  const preset = SM_SIZE_PRESETS[_shareSizePreset] || SM_SIZE_PRESETS.print4;
+  const scale  = Math.max(1, preset.w / card.offsetWidth);
+
   const canvas = await html2canvas(card, {
-    scale: 5,
+    scale,
     useCORS: true,
     backgroundColor: null,
     logging: false,
@@ -10027,6 +10181,7 @@ async function smDownload(){
   _smSetLoading('sm-dl-btn','sm-dl-spin','sm-dl-lbl',true);
   try{const t=trades.find(x=>x.id===_shareTradeId),filename=`NxTGen_${(t||{pair:'Trade'}).pair}_${(t||{date:'trade'}).date}`,canvas=await _smCapture();
     if(_shareFmt==='pdf'){const{jsPDF}=window.jspdf,pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'}),pw=pdf.internal.pageSize.getWidth(),iw=pw-30,ih=(canvas.height/canvas.width)*iw;pdf.addImage(canvas.toDataURL('image/jpeg',0.96),'JPEG',15,20,iw,ih);pdf.save(filename+'.pdf');}
+    else if(_shareFmt==='png'){const link=document.createElement('a');link.download=filename+'.png';link.href=canvas.toDataURL('image/png');link.click();}
     else{const link=document.createElement('a');link.download=filename+'.jpg';link.href=canvas.toDataURL('image/jpeg',0.96);link.click();}
     showToast('Trade card saved!','success');
   }catch(e){console.error(e);showToast('Export failed — try again','danger');}
