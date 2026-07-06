@@ -9786,13 +9786,17 @@ function _onCalAccSize2Change() {
 }
 
 // ── SHARE MODAL ────────────────────────────────────────────────────────────
-let _shareFmt = 'jpg', _sharePnlMode = 'pct', _shareCardTheme = 'dark', _shareTradeId = null, _smScrollY = 0, _smActivePage = null, _smActivePageScroll = 0, _shareSizePreset = 'print4';
+let _shareFmt = 'jpg', _sharePnlMode = 'pct', _shareCardTheme = 'dark', _shareTradeId = null, _smScrollY = 0, _smActivePage = null, _smActivePageScroll = 0, _shareSizePreset = 'ig_square';
+// Each preset is an exact export canvas size (not just a resolution
+// multiplier on the card's own shape) — the preview frame's aspect
+// ratio and the exported canvas dimensions both match w×h exactly.
+// ppi/printIn are the print-quality badge values for the DPI hint.
 const SM_SIZE_PRESETS = {
-  social: { label: 'Social · 1080px (fast)',        w: 1080 },
-  hd:     { label: 'HD · 1536px',                   w: 1536 },
-  print4: { label: 'Print · 300 DPI @ 4in card',     w: 1200 },
-  print5: { label: 'Print · 300 DPI @ 5in card',     w: 1500 },
-  ultra:  { label: 'Ultra · 2160px (4K)',           w: 2160 },
+  ig_square:   { label: 'Instagram Square · 4096²',           w: 4096, h: 4096, ppi: 400, printIn: 10.5 },
+  tw_landscape:{ label: 'Twitter Landscape · 4096×2304',      w: 4096, h: 2304, ppi: 400, printIn: 10.5 },
+  portrait:    { label: 'Portrait · 3072×4096',               w: 3072, h: 4096, ppi: 400, printIn: 10.5 },
+  wallpaper:   { label: 'Desktop Wallpaper · 3840×2160',      w: 3840, h: 2160, ppi: 400, printIn: 10.5 },
+  phone_story: { label: 'Phone Story · 2160×3840',            w: 2160, h: 3840, ppi: 400, printIn: 10.5 },
 };
 
 function openShareModal(id) {
@@ -9814,6 +9818,9 @@ function openShareModal(id) {
     </div>
     <div class="sm-body">
       <div class="sm-card-wrap">
+        <div class="sm-frame ${_shareCardTheme}" id="sm-frame">
+          <div class="sm-frame-bg" id="sm-frame-bg"></div>
+          <div class="sm-card-scaler" id="sm-card-scaler">
         <div class="sm-card ${_shareCardTheme}" id="sm-card">
           <div class="sm-bg-layer">
             <svg class="sm-chart-bg" viewBox="0 0 600 260" preserveAspectRatio="none" aria-hidden="true">
@@ -9857,6 +9864,8 @@ function openShareModal(id) {
           <div class="sm-notes-row" id="sm-notes-row"><div class="sm-notes" id="sm-notes"></div></div>
           <div class="sm-bottom-row"><div class="sm-stars" id="sm-stars"></div><div class="sm-risk-tag">${t.risk || '—'} risk</div></div>
           <div class="sm-footer"><span class="sm-footer-url">nxtgencharts.github.io/NxTGen-Journal</span><img class="sm-footer-logo" src="logo.svg" alt="NxTGen"></div>
+        </div>
+          </div>
         </div>
       </div>
       <div class="sm-section">
@@ -9922,6 +9931,12 @@ function openShareModal(id) {
     overlay.style.transform = `translateY(${vv.offsetTop}px)`;
   };
   _smSyncViewport();
+  // The "Render scale" hint is derived from the frame's live rendered
+  // width, so it needs to stay accurate as the viewport (and therefore
+  // the responsive frame) resizes.
+  const _smSyncDpiHint = () => updateSmDpiHint();
+  window.addEventListener('resize', _smSyncDpiHint);
+  overlay._smSyncDpiHint = _smSyncDpiHint;
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', _smSyncViewport);
     window.visualViewport.addEventListener('scroll', _smSyncViewport);
@@ -9937,23 +9952,39 @@ function smInitSizePresets(){
   const sel = document.getElementById('sm-size-preset');
   if (!sel) return;
   sel.innerHTML = Object.entries(SM_SIZE_PRESETS).map(([k,p]) => `<option value="${k}"${k===_shareSizePreset?' selected':''}>${p.label}</option>`).join('');
+  _smApplyFrameAspect();
   updateSmDpiHint();
 }
 function smSetSizePreset(key){
-  _shareSizePreset = SM_SIZE_PRESETS[key] ? key : 'print4';
+  _shareSizePreset = SM_SIZE_PRESETS[key] ? key : 'ig_square';
+  _smApplyFrameAspect();
   updateSmDpiHint();
+}
+// Applies the selected preset's aspect ratio to the live preview frame
+// so the on-screen card responsively reflows into a square / landscape
+// / portrait / wallpaper / phone-story shape instead of always staying
+// the same fixed portrait block regardless of what's selected.
+function _smApplyFrameAspect(){
+  const frame = document.getElementById('sm-frame');
+  if (!frame) return;
+  const preset = SM_SIZE_PRESETS[_shareSizePreset] || SM_SIZE_PRESETS.ig_square;
+  frame.style.setProperty('--sm-ar', `${preset.w} / ${preset.h}`);
+  const wide = preset.w >= preset.h;
+  frame.classList.toggle('sm-fit-h', wide);
+  frame.classList.toggle('sm-fit-w', !wide);
 }
 function updateSmDpiHint(){
   const hint = document.getElementById('sm-dpi-hint');
   if (!hint) return;
-  const preset = SM_SIZE_PRESETS[_shareSizePreset] || SM_SIZE_PRESETS.print4;
-  // DPI estimate assumes the card prints at a 4in physical width — the
-  // baseline "trading card" print size. Anything at or above 300 DPI at
-  // that size is print-quality; we flag it so the person can see at a
-  // glance whether their chosen size clears that bar.
-  const dpi = Math.round(preset.w / 4);
-  const good = dpi >= 300;
-  hint.innerHTML = `${preset.w}px wide → <span class="${good ? 'sm-dpi-good' : ''}">≈${dpi} DPI</span> @ 4in print${good ? ' ✓' : ''}`;
+  const preset = SM_SIZE_PRESETS[_shareSizePreset] || SM_SIZE_PRESETS.ig_square;
+  // Render scale = how much larger the exported canvas is than the frame
+  // as it's actually drawn on screen right now — this is what keeps the
+  // final export pixel-perfect at preset.w × preset.h regardless of the
+  // viewport the person is exporting from.
+  const frame = document.getElementById('sm-frame');
+  const baseW = frame && frame.offsetWidth > 0 ? frame.offsetWidth : 480;
+  const scale = Math.max(1, preset.w / baseW);
+  hint.innerHTML = `Render scale: ${scale.toFixed(1)}x → <span class="sm-dpi-good">${preset.w} × ${preset.h} px</span> · ≈ ${preset.ppi} ppi @ ${preset.printIn}in print`;
 }
 
 // ── Edge score rings: derive an execution / discipline / efficiency
@@ -10099,7 +10130,7 @@ function smRefreshPnl() {
 
 function smSetPnlMode(mode,btn){_sharePnlMode=mode;document.querySelectorAll('#sm-pnl-seg .sm-seg-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const r=document.getElementById('sm-usd-row');if(r)r.style.display=mode==='pct'?'none':'';smRefreshPnl();}
 function smSetFmt(fmt,btn){_shareFmt=fmt;document.querySelectorAll('.sm-fmt-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
-function smToggleTheme(){_shareCardTheme=_shareCardTheme==='dark'?'light':'dark';const c=document.getElementById('sm-card');if(c)c.className='sm-card '+_shareCardTheme;const b=document.getElementById('sm-theme-btn');if(b)b.innerHTML=_shareCardTheme==='dark'?'<svg class="icn" aria-hidden="true"><use href="#ic-sun"></use></svg>':'<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg>';}
+function smToggleTheme(){_shareCardTheme=_shareCardTheme==='dark'?'light':'dark';const c=document.getElementById('sm-card');if(c)c.className='sm-card '+_shareCardTheme;const f=document.getElementById('sm-frame');if(f)f.classList.toggle('light',_shareCardTheme==='light');const b=document.getElementById('sm-theme-btn');if(b)b.innerHTML=_shareCardTheme==='dark'?'<svg class="icn" aria-hidden="true"><use href="#ic-sun"></use></svg>':'<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg>';}
 function closeShareModal(){
   const o=document.getElementById('share-modal-overlay');
   if(!o)return;
@@ -10108,6 +10139,7 @@ function closeShareModal(){
     window.visualViewport.removeEventListener('resize', o._smSyncViewport);
     window.visualViewport.removeEventListener('scroll', o._smSyncViewport);
   }
+  if (o._smSyncDpiHint) window.removeEventListener('resize', o._smSyncDpiHint);
   document.body.style.position = '';
   document.body.style.top = '';
   document.body.style.left = '';
@@ -10146,15 +10178,15 @@ async function _smCapture() {
   // Two frames for browser to paint
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  // Scale so the exported canvas hits the selected preset's target pixel
-  // width (regardless of how large/small the card renders in this
-  // particular browser window) — this is what keeps the 300+ DPI print
-  // presets accurate no matter the viewport.
-  const preset = SM_SIZE_PRESETS[_shareSizePreset] || SM_SIZE_PRESETS.print4;
-  const scale  = Math.max(1, preset.w / card.offsetWidth);
+  const preset = SM_SIZE_PRESETS[_shareSizePreset] || SM_SIZE_PRESETS.ig_square;
 
-  const canvas = await html2canvas(card, {
-    scale,
+  // Capture the card itself at a resolution sharp enough to still look
+  // crisp once it's scaled to fit inside the target canvas below —
+  // independent of the preset's aspect ratio, since the card's own
+  // design proportions never change, only how it's composited.
+  const cardScale = Math.max(2, Math.min(4, preset.w / card.offsetWidth, preset.h / card.offsetHeight));
+  const cardCanvas = await html2canvas(card, {
+    scale: cardScale,
     useCORS: true,
     backgroundColor: null,
     logging: false,
@@ -10175,7 +10207,39 @@ async function _smCapture() {
     img.style.cssText = origStyles[i];
   });
 
-  return canvas;
+  // Composite onto an export canvas that is EXACTLY the selected
+  // preset's pixel dimensions (this is the fix for exports always
+  // coming out in the card's natural portrait shape regardless of
+  // preset — the final image now always matches Square/Landscape/
+  // Portrait/Wallpaper/Phone Story exactly). The card is centered and
+  // scaled to fit (never stretched), and any leftover space is filled
+  // with a soft themed backdrop matching the live preview frame.
+  const out = document.createElement('canvas');
+  out.width  = preset.w;
+  out.height = preset.h;
+  const ctx = out.getContext('2d');
+
+  const bgColors = theme === 'light'
+    ? ['#ffffff', '#f4f7ff', '#eef2fc']
+    : ['#0d1424', '#0a0f1c', '#0d1530'];
+  const grad = ctx.createLinearGradient(0, 0, preset.w, preset.h);
+  grad.addColorStop(0, bgColors[0]);
+  grad.addColorStop(0.6, bgColors[1]);
+  grad.addColorStop(1, bgColors[2]);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, preset.w, preset.h);
+
+  const pad = Math.round(Math.min(preset.w, preset.h) * 0.035);
+  const availW = preset.w - pad * 2;
+  const availH = preset.h - pad * 2;
+  const fitScale = Math.min(availW / cardCanvas.width, availH / cardCanvas.height);
+  const drawW = cardCanvas.width * fitScale;
+  const drawH = cardCanvas.height * fitScale;
+  const dx = (preset.w - drawW) / 2;
+  const dy = (preset.h - drawH) / 2;
+  ctx.drawImage(cardCanvas, dx, dy, drawW, drawH);
+
+  return out;
 }
 async function smDownload(){
   _smSetLoading('sm-dl-btn','sm-dl-spin','sm-dl-lbl',true);

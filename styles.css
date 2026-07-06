@@ -5551,7 +5551,62 @@ body{
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
-.sm-card-wrap { display: flex; justify-content: center; }
+.sm-card-wrap { display: flex; justify-content: center; width: 100%; }
+
+/* ── Export-size frame ──────────────────────────────────────────────
+   Wraps the fixed-design .sm-card so the PREVIEW visually matches the
+   aspect ratio the user picked (square / landscape / portrait / etc).
+   The card itself keeps its natural design proportions and is scaled
+   to fit (never stretched/distorted); extra space is filled with a
+   soft themed backdrop so the preview looks intentional rather than
+   letterboxed-by-accident. Export (_smCapture) mirrors this exact
+   composition at the target pixel dimensions. Fully responsive: the
+   frame's aspect-ratio is set inline via --sm-ar, and its width is
+   fluid (100% up to a max), so it reflows at any viewport size. */
+.sm-frame {
+  position: relative;
+  width: 100%;
+  max-width: min(480px, 100%);
+  aspect-ratio: var(--sm-ar, 3 / 4);
+  border-radius: var(--r-lg, 14px);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  isolation: isolate;
+  transition: aspect-ratio 0.3s cubic-bezier(0.22,1,0.36,1), max-width 0.3s ease;
+  background: #0a0f1c;
+}
+.sm-frame.light { background: #eef2fc; }
+.sm-frame-bg {
+  position: absolute;
+  inset: -15%;
+  z-index: 0;
+  pointer-events: none;
+  filter: blur(46px) saturate(1.15);
+  opacity: 0.6;
+  transition: background 0.3s ease;
+  background: linear-gradient(145deg, #0d1424 0%, #0a0f1c 60%, #0d1530 100%);
+}
+.sm-frame.light .sm-frame-bg {
+  opacity: 0.5;
+  background: linear-gradient(145deg, #ffffff 0%, #f4f7ff 60%, #eef2fc 100%);
+}
+.sm-card-scaler {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3.5%;
+  box-sizing: border-box;
+}
+/* Wide targets (landscape / wallpaper) — card is height-limited */
+.sm-frame.sm-fit-h .sm-card-scaler .sm-card { height: 100%; width: auto; max-width: 100%; }
+/* Tall targets (square / portrait / phone story) — card is width-limited */
+.sm-frame.sm-fit-w .sm-card-scaler .sm-card { width: 100%; height: auto; max-height: 100%; }
 
 /* ── Card ── */
 .sm-card {
@@ -5562,6 +5617,13 @@ body{
   isolation: isolate;
   border-radius: 0;
   font-family: var(--font-body);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+}
+.sm-card-scaler .sm-card { max-width: none; box-shadow: 0 18px 44px rgba(0,0,0,0.45); }
+
+@media (max-width: 480px) {
+  .sm-frame { border-radius: var(--r, 10px); max-width: 100%; }
+  .sm-card-scaler { padding: 3%; }
 }
 .sm-card.dark {
   background: linear-gradient(145deg, #0d1424 0%, #0a0f1c 60%, #0d1530 100%);
