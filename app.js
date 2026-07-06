@@ -14,6 +14,25 @@ const BASE_URL      = 'https://nxtgencharts.github.io/NxTGen-Journal';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
+// ══════════════════════════════════════════════════════
+// ICON SYSTEM — every icon used across the app renders as an
+// inline <svg><use> referencing the sprite injected once in
+// index.html (#icon-sprite). This keeps markup lightweight,
+// scales cleanly, and inherits color from surrounding text via
+// currentColor — so icons adapt automatically to light/dark
+// theme and to hover/active/disabled states.
+// Usage: icon('star')  → decorative, aria-hidden
+//        icon('trash', {label:'Delete trade'}) → adds aria-label
+// ══════════════════════════════════════════════════════
+function icon(name, opts) {
+  opts = opts || {};
+  const cls = 'icn' + (opts.cls ? ' ' + opts.cls : '');
+  const a11y = opts.label
+    ? 'role="img" aria-label="' + opts.label + '"'
+    : 'aria-hidden="true"';
+  return '<svg class="' + cls + '" ' + a11y + '><use href="#ic-' + name + '"></use></svg>';
+}
+
 // ── PnL formatting helper ─────────────────────────────────────────────────
 // Every trade has t.pnl (number) and t.pnlUnit ('$' or '%').
 // MT5 imported trades: pnlUnit='$', pnl is real dollar P/L.
@@ -193,16 +212,16 @@ const MODELS=[
   {title:"NxtGen - Mod",strategyName:"NxtGen - Mod",status:"active",dir:"SMT + CISD",sub:"SMT divergence confirms manipulation · CISD gives entry",steps:["Identify SMT between GBPUSD/EURUSD or Gold/DXY","One pair makes new high/low while other fails → SMT confirmed","Wait for CISD on 1h or 30m","Enter on 3m/5m · tight SL","Target: opposing liquidity pool"]},
 ];
 const WL_PAIRS=[
-  {name:"GBPUSD",priority:"🔴 HIGH",bias:"Bear",tfs:[{tf:"Weekly",bias:"bear"},{tf:"Daily",bias:"bear"},{tf:"4H",bias:"bear"},{tf:"1H",bias:"neu"}],note:"Setup: NxtGen IRL>ERL · Key: 1.2650 OB · R:R 1:3 · London kill zone · Watch 1am manipulation"},
-  {name:"XAUUSD",priority:"🔴 HIGH",bias:"Bull",tfs:[{tf:"Weekly",bias:"bull"},{tf:"Daily",bias:"bull"},{tf:"4H",bias:"neu"}],note:"Setup: IRL>ERL bounce · Target: 3100 EQL · R:R 1:4 · Asian range then NY breakout"},
-  {name:"EURUSD",priority:"🟡 MED",bias:"Bear",tfs:[{tf:"Weekly",bias:"bear"},{tf:"Daily",bias:"bear"},{tf:"4H",bias:"bear"}],note:"Setup: Liquidity sweep · FOMC risk — wait for NY open · R:R 1:3"},
-  {name:"GBPJPY",priority:"🟡 MED",bias:"Bull",tfs:[{tf:"Weekly",bias:"bull"},{tf:"Daily",bias:"bull"},{tf:"4H",bias:"neu"}],note:"Check DXY correlation · SMT divergence with GBPUSD · R:R 1:5"},
+  {name:"GBPUSD",priority:"HIGH",bias:"Bear",tfs:[{tf:"Weekly",bias:"bear"},{tf:"Daily",bias:"bear"},{tf:"4H",bias:"bear"},{tf:"1H",bias:"neu"}],note:"Setup: NxtGen IRL>ERL · Key: 1.2650 OB · R:R 1:3 · London kill zone · Watch 1am manipulation"},
+  {name:"XAUUSD",priority:"HIGH",bias:"Bull",tfs:[{tf:"Weekly",bias:"bull"},{tf:"Daily",bias:"bull"},{tf:"4H",bias:"neu"}],note:"Setup: IRL>ERL bounce · Target: 3100 EQL · R:R 1:4 · Asian range then NY breakout"},
+  {name:"EURUSD",priority:"MED",bias:"Bear",tfs:[{tf:"Weekly",bias:"bear"},{tf:"Daily",bias:"bear"},{tf:"4H",bias:"bear"}],note:"Setup: Liquidity sweep · FOMC risk — wait for NY open · R:R 1:3"},
+  {name:"GBPJPY",priority:"MED",bias:"Bull",tfs:[{tf:"Weekly",bias:"bull"},{tf:"Daily",bias:"bull"},{tf:"4H",bias:"neu"}],note:"Check DXY correlation · SMT divergence with GBPUSD · R:R 1:5"},
 ];
 const PREWEEK_CHECKS=["DXY analysis complete","All high-priority pairs analyzed top-down","Key news events noted (WAT times)","Weekly levels drawn on charts","London KZ confirmed: 9am–12pm WAT","New York KZ confirmed: 3pm–6pm WAT","Asian KZ confirmed: 2am–5am WAT","Max 2 trades/day set","Max daily loss −2% set","Max weekly loss −5% set","No pending FOMO setups","Mindset: calm and rule-based"];
 const MILESTONES=["Pass GFT $5k Phase 1","Pass GFT $10k Phase 1","Receive first funded payout","Scale to $50k funded","Scale to $100k funded","Open personal live account","Consistent $1k/month"];
 const GOALS=[
-  {q:"Q1 2026 ✅",items:[{t:"Log every trade with full notes",done:true},{t:"Achieve 70%+ win rate in March",done:true},{t:"Pass first GFT challenge (Phase 1)",done:true},{t:"Build consistent London session routine",done:true},{t:"Achieve $1,000 profit from funded accounts",done:false}]},
-  {q:"Q2 2026 🔵 Active",items:[{t:"Maintain 70%+ win rate",done:true},{t:"Pass GFT $10k Phase 1",done:false},{t:"Receive first funded payout",done:false},{t:"Trade 3 consecutive winning weeks",done:false},{t:"Build Sunday watchlist habit",done:false}]},
+  {q:"Q1 2026 — Complete",items:[{t:"Log every trade with full notes",done:true},{t:"Achieve 70%+ win rate in March",done:true},{t:"Pass first GFT challenge (Phase 1)",done:true},{t:"Build consistent London session routine",done:true},{t:"Achieve $1,000 profit from funded accounts",done:false}]},
+  {q:"Q2 2026 — Active",items:[{t:"Maintain 70%+ win rate",done:true},{t:"Pass GFT $10k Phase 1",done:false},{t:"Receive first funded payout",done:false},{t:"Trade 3 consecutive winning weeks",done:false},{t:"Build Sunday watchlist habit",done:false}]},
   {q:"Q3 2026",items:[{t:"Scale to 2% risk on top setups",done:false},{t:"Add NASDAQ to watchlist",done:false},{t:"Achieve $3,000 total payouts",done:false}]},
 ];
 
@@ -898,7 +917,7 @@ function _aiRenderChartThumbs() {
   wrap.innerHTML = _aiChartImages.map((img, i) => `
     <div class="ai-chart-thumb">
       <img src="${img.dataUrl}" alt="${img.name}">
-      <button class="ai-chart-thumb-del" onclick="aiRemoveChart(${i})">✕</button>
+      <button class="ai-chart-thumb-del" onclick="aiRemoveChart(${i})"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
       <div class="ai-chart-thumb-name">${img.name.replace(/\.[^.]+$/,'').slice(0,18)}</div>
     </div>`).join('');
 }
@@ -998,7 +1017,7 @@ async function aiRun() {
     const isSetup = msg.includes('404') || msg.includes('relay');
     if (responseBody) responseBody.innerHTML = `
       <div class="ai-error">
-        <strong>⚠ ${isSetup ? 'Edge Function not deployed yet' : isAuth ? 'Auth error' : 'Error'}</strong><br>
+        <strong><svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg> ${isSetup ? 'Edge Function not deployed yet' : isAuth ? 'Auth error' : 'Error'}</strong><br>
         ${isSetup
           ? 'The AI proxy function needs to be deployed to Supabase once. See the setup instructions in your journal.'
           : msg}
@@ -1055,7 +1074,7 @@ function _aiRenderHistory() {
     const content = typeof m.content === 'string' ? m.content
       : (m.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
     return `<div class="ai-history-turn ${isUser ? 'user' : 'assistant'}">
-      <div class="ai-history-role">${isUser ? '👤 You' : '🤖 AI Coach'}</div>
+      <div class="ai-history-role">${isUser ? '<svg class="icn" aria-hidden="true"><use href="#ic-user"></use></svg> You' : '<svg class="icn" aria-hidden="true"><use href="#ic-robot"></use></svg> AI Coach'}</div>
       <div class="ai-history-content">${isUser ? content.slice(0,200) + (content.length>200?'…':'') : _aiFormatResponse(content)}</div>
     </div>`;
   }).reverse().join('');
@@ -1245,16 +1264,16 @@ let _chatStreaming    = false;
 let _chatMsgCount    = 0;
 
 const _CHAT_COMMANDS = [
-  { cmd: '/daily',    icon: '📅', label: 'Daily Brief',       desc: 'Get your daily trading brief' },
-  { cmd: '/weekly',   icon: '📊', label: 'Weekly Review',     desc: 'Full week performance review' },
-  { cmd: '/monthly',  icon: '🗓', label: 'Monthly Review',    desc: 'Deep monthly analysis' },
-  { cmd: '/pattern',  icon: '🔬', label: 'Pattern Analysis',  desc: 'Find your statistical edges' },
-  { cmd: '/psych',    icon: '🧠', label: 'Psychology',        desc: 'Emotional pattern analysis' },
-  { cmd: '/plan',     icon: '🗺', label: 'Trading Plan',      desc: 'Review & improve your plan' },
-  { cmd: '/chart',    icon: '📸', label: 'Chart Read',        desc: 'Analyse uploaded charts' },
-  { cmd: '/stats',    icon: '📈', label: 'Quick Stats',       desc: 'Your key trading numbers' },
-  { cmd: '/clear',    icon: '🗑', label: 'Clear Chat',        desc: 'Start a fresh conversation' },
-  { cmd: '/export',   icon: '⬇', label: 'Export Chat',       desc: 'Download conversation as text' },
+  { cmd: '/daily',    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-calendar"></use></svg>', label: 'Daily Brief',       desc: 'Get your daily trading brief' },
+  { cmd: '/weekly',   icon: '<svg class="icn" aria-hidden="true"><use href="#ic-chart-bar"></use></svg>', label: 'Weekly Review',     desc: 'Full week performance review' },
+  { cmd: '/monthly',  icon: '<svg class="icn" aria-hidden="true"><use href="#ic-calendar"></use></svg>', label: 'Monthly Review',    desc: 'Deep monthly analysis' },
+  { cmd: '/pattern',  icon: '<svg class="icn" aria-hidden="true"><use href="#ic-flask"></use></svg>', label: 'Pattern Analysis',  desc: 'Find your statistical edges' },
+  { cmd: '/psych',    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-brain"></use></svg>', label: 'Psychology',        desc: 'Emotional pattern analysis' },
+  { cmd: '/plan',     icon: '<svg class="icn" aria-hidden="true"><use href="#ic-map"></use></svg>', label: 'Trading Plan',      desc: 'Review & improve your plan' },
+  { cmd: '/chart',    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-camera"></use></svg>', label: 'Chart Read',        desc: 'Analyse uploaded charts' },
+  { cmd: '/stats',    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-trend-up"></use></svg>', label: 'Quick Stats',       desc: 'Your key trading numbers' },
+  { cmd: '/clear',    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg>', label: 'Clear Chat',        desc: 'Start a fresh conversation' },
+  { cmd: '/export',   icon: '<svg class="icn" aria-hidden="true"><use href="#ic-download"></use></svg>', label: 'Export Chat',       desc: 'Download conversation as text' },
 ];
 
 const _CHAT_WELCOME = `Hey! I'm your NxTGen AI Coach — I have full access to your trade journal, performance data, and trading models.
@@ -1426,7 +1445,7 @@ function _chatRenderImagePreview() {
   wrap.innerHTML = _chatImages.map((img, i) => `
     <div class="chat-img-thumb">
       <img src="${img.dataUrl}" alt="chart">
-      <button class="chat-img-del" onclick="chatRemoveImage(${i})">✕</button>
+      <button class="chat-img-del" onclick="chatRemoveImage(${i})"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
     </div>`).join('');
 }
 
@@ -1516,7 +1535,7 @@ async function chatSend() {
 
   } catch (err) {
     _chatRemoveTyping(typingId);
-    _chatAddBubble('error', `⚠ ${err.message || 'Connection error'}. Check your Edge Function is deployed.`, Date.now());
+    _chatAddBubble('error', `<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg> ${err.message || 'Connection error'}. Check your Edge Function is deployed.`, Date.now());
   }
 
   _chatStreaming = false;
@@ -1593,7 +1612,7 @@ function _chatAddBubble(role, content, ts, animate, images) {
   bubble.className = `chat-msg-row ${isUser ? 'user' : 'assistant'}${animate ? ' animate-in' : ''}`;
   bubble.id = id;
   bubble.innerHTML = `
-    ${!isUser ? `<div class="chat-avatar-sm">✦</div>` : ''}
+    ${!isUser ? `<div class="chat-avatar-sm"><svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg></div>` : ''}
     <div class="chat-bubble ${isUser ? 'user' : isErr ? 'error' : 'assistant'}">
       ${imgHtml}
       <div class="chat-bubble-content">${contentHtml}</div>
@@ -1602,7 +1621,7 @@ function _chatAddBubble(role, content, ts, animate, images) {
         ${!isUser && !isErr ? `<button class="chat-bubble-copy" onclick="_chatCopyBubble('${id}')" title="Copy">⎘</button>` : ''}
       </div>
     </div>
-    ${isUser ? `<div class="chat-avatar-sm user">👤</div>` : ''}
+    ${isUser ? `<div class="chat-avatar-sm user"><svg class="icn" aria-hidden="true"><use href="#ic-user"></use></svg></div>` : ''}
   `;
 
   // Insert before quick-chips if they exist
@@ -1624,7 +1643,7 @@ function _chatAddTypingIndicator() {
   div.className = 'chat-msg-row assistant';
   div.id = id;
   div.innerHTML = `
-    <div class="chat-avatar-sm">✦</div>
+    <div class="chat-avatar-sm"><svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg></div>
     <div class="chat-bubble assistant typing">
       <div class="chat-typing-dots"><span></span><span></span><span></span></div>
     </div>`;
@@ -1669,7 +1688,7 @@ function _chatLightbox(src) {
     lb = document.createElement('div');
     lb.id = 'chat-lightbox';
     lb.className = 'wl-lightbox';
-    lb.innerHTML = `<button class="wl-lightbox-close" onclick="document.getElementById('chat-lightbox').classList.remove('open')">✕</button><img id="chat-lb-img" src="" alt="chart">`;
+    lb.innerHTML = `<button class="wl-lightbox-close" onclick="document.getElementById('chat-lightbox').classList.remove('open')"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button><img id="chat-lb-img" src="" alt="chart">`;
     lb.addEventListener('click', e => { if (e.target === lb) lb.classList.remove('open'); });
     document.body.appendChild(lb);
   }
@@ -1954,8 +1973,8 @@ function nav(pageId, sbEl, label, extra) {
 
 // ── DASHBOARD: PAIR TABLE ────────────────────────────
 function _sortIndicator(col, sortState) {
-  if (sortState.col !== col) return '<span class="sort-icon">⇅</span>';
-  return sortState.dir === -1 ? '<span class="sort-icon active">↓</span>' : '<span class="sort-icon active">↑</span>';
+  if (sortState.col !== col) return '<span class="sort-icon"><svg class="icn" aria-hidden="true"><use href="#ic-sort"></use></svg></span>';
+  return sortState.dir === -1 ? '<span class="sort-icon active"><svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg></span>' : '<span class="sort-icon active"><svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg></span>';
 }
 function _sortHeader(label, col, sortStateKey, buildFn, extra) {
   const _sortMap = { _sortPair, _sortKz, _sortStrategy, _sortMonthly };
@@ -2046,7 +2065,7 @@ function buildPairTable(sortCol) {
   const thead = document.getElementById('pair-table-head');
   if (!tbody) return;
   if (!pairs.length) {
-    tbody.innerHTML = _emptyRow(5, '📊 No trades logged yet — <button class="empty-cta" onclick="openModal()">+ Add your first trade</button>');
+    tbody.innerHTML = _emptyRow(5, '<svg class="icn" aria-hidden="true"><use href="#ic-chart-bar"></use></svg> No trades logged yet — <button class="empty-cta" onclick="openModal()">+ Add your first trade</button>');
     return;
   }
   let rows = pairs.map(p => {
@@ -2180,11 +2199,10 @@ function openKzDrilldown(session) {
   const wrCls  = wr >= 70 ? 'pill-green' : wr >= 50 ? 'pill-gold' : 'pill-red';
   const pnlColor = netDollars >= 0 ? 'var(--green)' : 'var(--red)';
   const pnlDisp  = _fmtGroupPnl(netDollars, kzTrades);
-  const KZ_ICONS = { 'London':'🇬🇧', 'New York':'🗽', 'Asian':'🌏', 'Tokyo':'🗼' };
-  const icon = KZ_ICONS[session] || '🕐';
+  const kzIconHtml = icon('clock');
 
   _openDrillModal('kz-drilldown-overlay',
-    icon + ' ' + session,
+    kzIconHtml + ' ' + session,
     kzTrades.length + ' trade' + (kzTrades.length !== 1 ? 's' : ''),
     wins + 'W &middot; ' + losses + 'L &middot; ' + be + 'BE',
     wr + '% win', wrCls, pnlDisp, pnlColor,
@@ -2219,7 +2237,7 @@ function openStratDrilldown(strategy) {
   const pnlDisp  = _fmtGroupPnl(netDollars, stTrades);
 
   _openDrillModal('strat-drilldown-overlay',
-    '📋 ' + label,
+    '<svg class="icn" aria-hidden="true"><use href="#ic-clipboard"></use></svg> ' + label,
     stTrades.length + ' trade' + (stTrades.length !== 1 ? 's' : ''),
     wins + 'W &middot; ' + losses + 'L &middot; ' + be + 'BE',
     wr + '% win', wrCls, pnlDisp, pnlColor,
@@ -2253,7 +2271,7 @@ function openMonthDrilldown(key) {
   const pnlDisp  = _fmtGroupPnl(netDollars, moTrades);
 
   _openDrillModal('month-drilldown-overlay',
-    '📅 ' + label,
+    '<svg class="icn" aria-hidden="true"><use href="#ic-calendar"></use></svg> ' + label,
     moTrades.length + ' trade' + (moTrades.length !== 1 ? 's' : ''),
     wins + 'W &middot; ' + losses + 'L &middot; ' + be + 'BE',
     wr + '% win', wrCls, pnlDisp, pnlColor,
@@ -2350,10 +2368,10 @@ function buildKillzoneTable(sortCol) {
   const tbody = document.getElementById('kz-table-body');
   const thead = document.getElementById('kz-table-head');
   if (!tbody) return;
-  const KZ_META = { 'London':{'icon':'🇬🇧'},'New York':{'icon':'🗽'},'Asian':{'icon':'🌏'},'Tokyo':{'icon':'🗼'} };
+  const KZ_META = { 'London':{'icon':icon('clock')},'New York':{'icon':icon('clock')},'Asian':{'icon':icon('clock')},'Tokyo':{'icon':icon('clock')} };
   const sessions = [...new Set(trades.map(t => t.kz))].filter(Boolean);
   if (!sessions.length) {
-    tbody.innerHTML = _emptyRow(5, '⏰ No killzone data yet — tag your trades with a session');
+    tbody.innerHTML = _emptyRow(5, icon('clock',{cls:'icn-sm'}) + ' No killzone data yet — tag your trades with a session');
     return;
   }
   let rows = sessions.map(s => {
@@ -2363,7 +2381,7 @@ function buildKillzoneTable(sortCol) {
     const netDollars = st.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
     const avgDollars = netDollars / st.length;
     const avgPct = _totalPctForGroup(st) / st.length;
-    const icon   = (KZ_META[s] || {}).icon || '🕐';
+    const icon   = (KZ_META[s] || {}).icon || '<svg class="icn" aria-hidden="true"><use href="#ic-clock"></use></svg>';
     return { s, count: st.length, wr, avgDollars, avgPct, st, icon };
   });
   rows.sort((a, b) => {
@@ -2402,7 +2420,7 @@ function buildStrategyTable(sortCol) {
   const untagged = trades.filter(t => !t.strategy || !t.strategy.trim());
   const strategies = [...new Set(tagged.map(t => t.strategy))];
   if (!trades.length) {
-    tbody.innerHTML = _emptyRow(4, '📐 No strategies tagged yet — add a strategy when logging trades');
+    tbody.innerHTML = _emptyRow(4, '<svg class="icn" aria-hidden="true"><use href="#ic-ruler"></use></svg> No strategies tagged yet — add a strategy when logging trades');
     return;
   }
   let rows = strategies.map(s => {
@@ -2455,7 +2473,7 @@ function buildMonthlyTable(sortCol) {
   if (!tbody) return;
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   if (!trades.length) {
-    tbody.innerHTML = _emptyRow(8, '📅 No trades logged yet — tap <strong>+ New Trade</strong> to begin');
+    tbody.innerHTML = _emptyRow(8, '<svg class="icn" aria-hidden="true"><use href="#ic-calendar"></use></svg> No trades logged yet — tap <strong>+ New Trade</strong> to begin');
     return;
   }
   const monthKeys = [...new Set(trades.map(t => t.date.slice(0, 7)))];
@@ -2518,7 +2536,7 @@ function refreshPairFilter() {
 }
 
 // ── TRADE TABLE ───────────────────────────────────────
-function starsHTML(n) { n = Math.max(3, Math.min(5, n || 3)); return '★'.repeat(n) + '<span class="empty">' + '★'.repeat(5 - n) + '</span>'; }
+function starsHTML(n) { n = Math.max(3, Math.min(5, n || 3)); return icon('star').repeat(n) + '<span class="empty">' + icon('star').repeat(5 - n) + '</span>'; }
 
 /* Semantic killzone pill — maps session name → colour class */
 function kzPill(session) {
@@ -2530,9 +2548,7 @@ function kzPill(session) {
     'Tokyo':    'kz-pill-asian'
   };
   const cls = map[session] || 'pill pill-grey';
-  const icons = { 'London': '🇬🇧 ', 'New York': '🗽 ', 'Asian': '🌏 ', 'Tokyo': '🌏 ' };
-  const icon = icons[session] || '';
-  return `<span class="${cls}">${icon}${session}</span>`;
+  return `<span class="${cls}">${icon('clock',{cls:'icn-sm'})} ${session}</span>`;
 }
 
 /* Semantic killzone text colour (for plain-text cells) */
@@ -2564,11 +2580,11 @@ function renderTradeTable(list) {
       <td style="color:var(--text2);font-size:12px">${t.account}</td>
       <td class="stars">${starsHTML(t.rating)}</td>
       <td class="row-actions" id="ra-${t.id}" style="white-space:nowrap;opacity:0;transition:opacity .15s">
-        <button onclick="event.stopPropagation();openDetail(${t.id},true)" style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;margin-right:4px">✏️</button>
-        <button onclick="event.stopPropagation();quickDelete(${t.id})" style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">🗑</button>
+        <button onclick="event.stopPropagation();openDetail(${t.id},true)" style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;margin-right:4px"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg></button>
+        <button onclick="event.stopPropagation();quickDelete(${t.id})" style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg></button>
       </td>
     </tr>`;
-  }).join('') : _emptyRow(12, '📋 No trades match your filter — try adjusting the search or filters above');
+  }).join('') : _emptyRow(12, '<svg class="icn" aria-hidden="true"><use href="#ic-clipboard"></use></svg> No trades match your filter — try adjusting the search or filters above');
   const countEl = document.getElementById('trade-count');
   if (countEl) {
     const sumPct = list.reduce((a, t) => a + _pnlPctValue(t), 0);
@@ -2695,16 +2711,16 @@ function _renderDetail(id) {
     <div class="det-panel-header">
       <div style="display:flex;align-items:center;gap:8px">
         ${_detEditMode
-          ? `<button class="det-btn edit-active" onclick="_toggleEditMode(${id})" style="padding:5px 10px">✕ Cancel</button>
-             <button class="det-btn" onclick="_saveEdit(${id})" style="background:rgba(52,211,153,.15);border-color:var(--green);color:var(--green);padding:5px 10px">💾 Save Changes</button>`
-          : `<button class="det-btn" onclick="_toggleEditMode(${id})" style="padding:5px 10px">✏️ Edit</button>
-             <button class="det-btn del-btn" onclick="_confirmDelete(${id})" style="padding:5px 10px">🗑 Delete</button>
-             <button class="det-btn det-share-btn" onclick="openShareModal(${id})" style="padding:5px 10px" title="Share trade card">📤 Share</button>`
+          ? `<button class="det-btn edit-active" onclick="_toggleEditMode(${id})" style="padding:5px 10px"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg> Cancel</button>
+             <button class="det-btn" onclick="_saveEdit(${id})" style="background:rgba(52,211,153,.15);border-color:var(--green);color:var(--green);padding:5px 10px"><svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save Changes</button>`
+          : `<button class="det-btn" onclick="_toggleEditMode(${id})" style="padding:5px 10px"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Edit</button>
+             <button class="det-btn del-btn" onclick="_confirmDelete(${id})" style="padding:5px 10px"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg> Delete</button>
+             <button class="det-btn det-share-btn" onclick="openShareModal(${id})" style="padding:5px 10px" title="Share trade card"><svg class="icn" aria-hidden="true"><use href="#ic-upload"></use></svg> Share</button>`
         }
       </div>
       <div style="display:flex;align-items:center;gap:6px">
         <button class="det-panel-expand" onclick="toggleDetailSize(${id})" title="${expandTip}">${expandIcon}</button>
-        <button class="det-panel-close" onclick="closeDetail()" title="Close">✕</button>
+        <button class="det-panel-close" onclick="closeDetail()" title="Close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
       </div>
     </div>`;
 
@@ -2720,7 +2736,7 @@ function _renderDetail(id) {
 
   const tabsHTML = ['overview', 'charts', 'notes', 'review'].map(tab => `
     <div class="det-tab${_detActiveTab === tab ? ' active' : ''}" data-tab="${tab}" onclick="_switchDetTab('${tab}',${id})">
-      ${tab === 'overview' ? 'Overview' : tab === 'charts' ? '📷 Charts' : tab === 'notes' ? '📝 Notes' : '🔍 Review'}
+      ${tab === 'overview' ? 'Overview' : tab === 'charts' ? '<svg class="icn" aria-hidden="true"><use href="#ic-camera"></use></svg> Charts' : tab === 'notes' ? '<svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Notes' : '<svg class="icn" aria-hidden="true"><use href="#ic-search"></use></svg> Review'}
     </div>`).join('');
 
   const viewStats = `
@@ -2762,13 +2778,13 @@ function _renderDetail(id) {
       <div class="form-field"><label class="form-label">Outcome</label><select class="form-select" id="e-outcome"><option${t.outcome === 'Win' ? ' selected' : ''}>Win</option><option${t.outcome === 'Loss' ? ' selected' : ''}>Loss</option><option${t.outcome === 'B.E' ? ' selected' : ''}>B.E</option></select></div>
       <div class="form-field"><label class="form-label">Killzone</label><select class="form-select" id="e-kz"><option${t.kz === 'London' ? ' selected' : ''}>London</option><option${t.kz === 'New York' ? ' selected' : ''}>New York</option><option${t.kz === 'Asian' ? ' selected' : ''}>Asian</option></select></div>
       <div class="form-field"><label class="form-label">Risk per Trade</label><input type="text" class="form-input" id="e-risk" value="${t.risk || ''}" placeholder="e.g. 0.5%"></div>
-      <div class="form-field" style="grid-column:span 2"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Account <button type="button" onclick="_openManageAccounts()" style="font-size:10px;padding:2px 8px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);color:var(--blue);border-radius:4px;cursor:pointer;font-family:inherit">⚙ Manage</button></label><select class="form-select" id="e-acc">${_buildAccountOptions(t.account)}</select></div>
+      <div class="form-field" style="grid-column:span 2"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Account <button type="button" onclick="_openManageAccounts()" style="font-size:10px;padding:2px 8px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);color:var(--blue);border-radius:4px;cursor:pointer;font-family:inherit"><svg class="icn" aria-hidden="true"><use href="#ic-settings"></use></svg> Manage</button></label><select class="form-select" id="e-acc">${_buildAccountOptions(t.account)}</select></div>
       <div class="form-field"><label class="form-label">Strategy</label><select class="form-select" id="e-strat" onchange="_handleCustomSelect(this,'e-strat-custom')">${_buildStrategyOptions(t.strategy)}</select><input type="text" class="form-input" id="e-strat-custom" placeholder="Enter strategy name…" style="display:none;margin-top:6px" value="${_getActiveStrategies().find(m=>(m.strategyName||m.title)===t.strategy) ? '' : (t.strategy||'')}"></div>
       <div class="form-field"><label class="form-label">TF Alignment</label><select class="form-select" id="e-tf" onchange="_handleCustomSelect(this,'e-tf-custom')"><option${t.tf === '30m > 3m' ? ' selected' : ''}>30m > 3m</option><option${t.tf === '1h > 5m' ? ' selected' : ''}>1h > 5m</option><option${t.tf === '1h > 3m' ? ' selected' : ''}>1h > 3m</option><option${t.tf === '4h > 15m' ? ' selected' : ''}>4h > 15m</option><option${t.tf === 'D1 > 1h' ? ' selected' : ''}>D1 > 1h</option><option${t.tf === '15m > 1m' ? ' selected' : ''}>15m > 1m</option><option${t.tf === '15m > 3m' ? ' selected' : ''}>15m > 3m</option><option value="__custom__">＋ Custom…</option></select><input type="text" class="form-input" id="e-tf-custom" placeholder="e.g. 2h > 5m" style="display:none;margin-top:6px" value="${['30m > 3m','1h > 5m','1h > 3m','4h > 15m','D1 > 1h','15m > 1m','15m > 3m'].includes(t.tf) ? '' : t.tf}"></div>
     </div>
     <div class="form-field" style="margin-bottom:10px"><label class="form-label">Rating <span style="font-size:10px;color:var(--text3);font-weight:400;text-transform:none">(tap a star)</span></label>
       <div id="star-editor" data-rating="${t.rating}" class="star-editor-row">
-        ${[3,4,5].map(n => `<span class="star-opt${n === t.rating ? ' selected' : ''}" onclick="setStarRating(${id},${n})" title="${n} stars"><span class="star-pips">${'★'.repeat(n)}${'☆'.repeat(5-n)}</span><span class="star-lbl">${n}★</span></span>`).join('')}
+        ${[3,4,5].map(n => `<span class="star-opt${n === t.rating ? ' selected' : ''}" onclick="setStarRating(${id},${n})" title="${n} stars"><span class="star-pips">${icon('star').repeat(n)}${icon('star-o').repeat(5-n)}</span><span class="star-lbl">${n}${icon('star',{cls:'icn-sm'})}</span></span>`).join('')}
       </div>
     </div>
     <div id="del-confirm-area"></div>`;
@@ -2801,7 +2817,7 @@ function _renderDetail(id) {
         <div class="chart-sort-hint" id="chart-sort-hint-${id}">
           ${_detEditMode
             ? '<span>⠿ Hold &amp; drag to reorder · Tap slot to replace image</span>'
-            : '<span>Tap a chart to view · ✏️ Edit to replace</span>'}
+            : '<span>Tap a chart to view · <svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Edit to replace</span>'}
         </div>
         <div class="chart-sort-grid" id="chart-sort-grid-${id}" data-tradeid="${id}">
           ${chartLabels.map((lbl, i) => {
@@ -2823,8 +2839,8 @@ function _renderDetail(id) {
                    onclick="${hasImg && !_detEditMode ? `openLightboxById(${id},${i})` : (_detEditMode ? `triggerImg(${id},${i})` : '')}">
                 ${hasImg
                   ? `<img src="${s.charts[i]}" alt="${lbl}" draggable="false">
-                     <div class="chart-sort-overlay">${_detEditMode ? '<span class="drag-handle">⠿</span>🔄' : '🔍 View'}</div>`
-                  : `<div class="chart-sort-empty"><span>📷</span><span>Add chart</span></div>`}
+                     <div class="chart-sort-overlay">${_detEditMode ? '<span class="drag-handle">⠿</span><svg class="icn" aria-hidden="true"><use href="#ic-refresh"></use></svg>' : '<svg class="icn" aria-hidden="true"><use href="#ic-search"></use></svg> View'}</div>`
+                  : `<div class="chart-sort-empty"><span><svg class="icn" aria-hidden="true"><use href="#ic-camera"></use></svg></span><span>Add chart</span></div>`}
               </div>
               <div class="chart-sort-footer">
                 <input type="text" class="chart-sort-label" value="${lbl}"
@@ -2832,9 +2848,9 @@ function _renderDetail(id) {
                   onfocus="this.style.borderColor='rgba(96,165,250,.45)'"
                   onblur="this.style.borderColor='var(--glass-border)'"
                   ${!_detEditMode ? 'readonly' : ''}>
-                ${_detEditMode ? `<button class="chart-sort-del" onclick="removeChartSlot(${id},${i})" title="Remove slot">✕</button>` : ''}
+                ${_detEditMode ? `<button class="chart-sort-del" onclick="removeChartSlot(${id},${i})" title="Remove slot"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>` : ''}
               </div>
-              ${hasImg && _detEditMode ? `<button class="chart-sort-clear" onclick="clearChartImage(${id},${i})">✕ Clear</button>` : ''}
+              ${hasImg && _detEditMode ? `<button class="chart-sort-clear" onclick="clearChartImage(${id},${i})"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg> Clear</button>` : ''}
             </div>`;
           }).join('')}
         </div>
@@ -2864,7 +2880,7 @@ function _renderDetail(id) {
           placeholder="What mistakes were made, if any?"
         >${s.mistakes || ''}</textarea>
       </div>
-      <button class="save-btn" id="det-save" onclick="detSave(${id})">💾 Save Notes</button>
+      <button class="save-btn" id="det-save" onclick="detSave(${id})"><svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save Notes</button>
     </div>`;
 
   // ── Review Tab ─────────────────────────────────────────────────────────
@@ -2892,7 +2908,7 @@ function _renderDetail(id) {
           </div>
         </div>
         ${rrDiff !== null ? `<div style="font-size:11px;color:var(--text3);margin-top:8px;padding:8px;background:var(--glass-0);border-radius:var(--r-sm);border:1px solid var(--glass-border)">
-          ${parseFloat(rrDiff) >= 0 ? '✅ You captured more R than planned — good patience.' : '⚠️ You captured less R than planned — did you cut early or move SL?'}
+          ${parseFloat(rrDiff) >= 0 ? '<svg class="icn icn-green" aria-hidden="true"><use href="#ic-check-c"></use></svg> You captured more R than planned — good patience.' : '<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg> You captured less R than planned — did you cut early or move SL?'}
         </div>` : ''}
       </div>
 
@@ -2910,14 +2926,14 @@ function _renderDetail(id) {
       <div class="detail-section">
         <div class="detail-section-label">Would You Take This Trade Again?</div>
         <div style="display:flex;gap:10px;margin-top:8px">
-          <button class="retake-btn${retakeState === true ? ' active-yes' : ''}" onclick="_setRetake(${id},true)">✅ Yes, same setup</button>
-          <button class="retake-btn${retakeState === false ? ' active-no' : ''}" onclick="_setRetake(${id},false)">❌ No, avoid next time</button>
+          <button class="retake-btn${retakeState === true ? ' active-yes' : ''}" onclick="_setRetake(${id},true)"><svg class="icn icn-green" aria-hidden="true"><use href="#ic-check-c"></use></svg> Yes, same setup</button>
+          <button class="retake-btn${retakeState === false ? ' active-no' : ''}" onclick="_setRetake(${id},false)"><svg class="icn icn-red" aria-hidden="true"><use href="#ic-close-c"></use></svg> No, avoid next time</button>
         </div>
         ${retakeState !== null && retakeState !== undefined ? `
         <div style="margin-top:10px;padding:10px;background:var(--glass-0);border:1px solid var(--glass-border);border-radius:var(--r-sm);font-size:12px;color:var(--text2)">
           ${retakeState
-            ? '✅ Marked as a replicable setup. Add it to your playbook if it isn\'t already.'
-            : '❌ Marked to avoid. Review what made this trade suboptimal and document the lesson.'}
+            ? '<svg class="icn icn-green" aria-hidden="true"><use href="#ic-check-c"></use></svg> Marked as a replicable setup. Add it to your playbook if it isn\'t already.'
+            : '<svg class="icn icn-red" aria-hidden="true"><use href="#ic-close-c"></use></svg> Marked to avoid. Review what made this trade suboptimal and document the lesson.'}
         </div>` : ''}
       </div>
 
@@ -3109,10 +3125,10 @@ async function detSave(id) {
     if (ok) {
       btn.classList.add('saved');
       btn.textContent = '✓ Saved';
-      setTimeout(() => { btn.classList.remove('saved'); btn.textContent = '💾 Save Notes'; }, 2500);
+      setTimeout(() => { btn.classList.remove('saved'); btn.textContent = '<svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save Notes'; }, 2500);
     } else {
       btn.textContent = '✗ Error — retry';
-      setTimeout(() => { btn.textContent = '💾 Save Notes'; }, 3000);
+      setTimeout(() => { btn.textContent = '<svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save Notes'; }, 3000);
     }
   }
 }
@@ -3139,10 +3155,10 @@ function openLightbox(src, label) {
         style="padding:7px 14px;border-radius:8px;background:rgba(255,255,255,0.1);
         border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:12px;
         text-decoration:none;font-family:sans-serif"
-        onclick="event.stopPropagation()">⬇ Download</a>
+        onclick="event.stopPropagation()"><svg class="icn" aria-hidden="true"><use href="#ic-download"></use></svg> Download</a>
       <button onclick="document.getElementById('chart-lightbox').remove()"
         style="padding:7px 14px;border-radius:8px;background:rgba(255,255,255,0.1);
-        border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:16px;cursor:pointer">✕</button>
+        border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:16px;cursor:pointer"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
     </div>
     <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px;
       text-transform:uppercase;letter-spacing:0.1em">${label}</div>
@@ -3300,7 +3316,7 @@ async function saveTrade() {
       _checklistWarningAcked = true; // allow second click to bypass
     }
     const btn = document.querySelector('#modal .btn-primary');
-    if (btn) { btn.disabled = false; btn.textContent = '💾 Save Trade'; }
+    if (btn) { btn.disabled = false; btn.textContent = '<svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save Trade'; }
     return;
   }
   _checklistWarningAcked = false;
@@ -3324,7 +3340,7 @@ async function saveTrade() {
   const lossReasonVal = document.getElementById('m-loss-reason')?.value || '';
   if (outcome === 'Loss' && !lossReasonVal) {
     showToast('Please select a Loss Reason before saving.', 'danger');
-    if (btn) { btn.disabled = false; btn.textContent = '💾 Save Trade'; }
+    if (btn) { btn.disabled = false; btn.textContent = '<svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save Trade'; }
     document.getElementById('loss-reason-field').style.display = 'block';
     document.getElementById('m-loss-reason').style.outline = '2px solid var(--red)';
     setTimeout(() => { const el = document.getElementById('m-loss-reason'); if (el) el.style.outline = ''; }, 2000);
@@ -3683,18 +3699,18 @@ function _wlSetWeek(id) {
 function _wlRenderWeekContent(week, container) {
   const dxyClass    = week.dxy === 'bull' ? 'bull' : week.dxy === 'bear' ? 'bear' : 'neu';
   const marketClass = week.market === 'risk-on' ? 'risk-on' : week.market === 'risk-off' ? 'risk-off' : 'neu';
-  const dxyLabel    = week.dxy === 'bull' ? '↑ Bullish' : week.dxy === 'bear' ? '↓ Bearish' : '→ Neutral';
-  const mktLabel    = week.market === 'risk-on' ? '✦ Risk-On' : week.market === 'risk-off' ? '✦ Risk-Off' : '→ Neutral';
+  const dxyLabel    = week.dxy === 'bull' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg> Bullish' : week.dxy === 'bear' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg> Bearish' : '→ Neutral';
+  const mktLabel    = week.market === 'risk-on' ? '<svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg> Risk-On' : week.market === 'risk-off' ? '<svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg> Risk-Off' : '→ Neutral';
 
   // Pair cards HTML
   const pairCards = week.pairs.map((p, pi) => {
     const priClass = p.priority === 'high' ? 'high' : p.priority === 'med' ? 'med' : 'low';
     const biasClass = p.bias === 'bull' ? 'bull' : 'bear';
-    const biasLabel = p.bias === 'bull' ? '↑ Bullish' : '↓ Bearish';
+    const biasLabel = p.bias === 'bull' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg> Bullish' : '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg> Bearish';
     const firstChart = (p.charts && p.charts.length > 0) ? p.charts[0].url : null;
     const tfHtml = (p.tfs || []).map(tf => {
       const tc = tf.bias === 'bull' ? 'tf-bull' : tf.bias === 'bear' ? 'tf-bear' : 'tf-neu';
-      const arrow = tf.bias === 'bull' ? '↑' : tf.bias === 'bear' ? '↓' : '→';
+      const arrow = tf.bias === 'bull' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg>' : tf.bias === 'bear' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg>' : '→';
       return `<span class="tf-chip ${tc}">${tf.tf} ${arrow}</span>`;
     }).join('');
 
@@ -3704,7 +3720,7 @@ function _wlRenderWeekContent(week, container) {
         ${firstChart
           ? `<img class="wl-card-chart-img" src="${firstChart}" alt="${p.name} chart" loading="lazy">
              ${p.charts.length > 1 ? `<div class="wl-card-chart-count">+${p.charts.length} charts</div>` : ''}`
-          : `<div class="wl-card-chart-placeholder"><span>📈</span><p>Tap to add charts</p></div>`}
+          : `<div class="wl-card-chart-placeholder"><span><svg class="icn" aria-hidden="true"><use href="#ic-trend-up"></use></svg></span><p>Tap to add charts</p></div>`}
       </div>
       <div class="wl-card-body">
         <div class="wl-card-pair-row">
@@ -3736,8 +3752,8 @@ function _wlRenderWeekContent(week, container) {
           <span class="wl-badge ${marketClass}">${mktLabel}</span>
         </div>
         <div class="wl-week-actions">
-          <button class="wl-week-btn" onclick="_wlEditWeek('${week.id}');event.stopPropagation()">✎ Edit</button>
-          <button class="wl-week-btn danger" onclick="_wlConfirmDeleteWeek('${week.id}');event.stopPropagation()">✕ Delete</button>
+          <button class="wl-week-btn" onclick="_wlEditWeek('${week.id}');event.stopPropagation()"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Edit</button>
+          <button class="wl-week-btn danger" onclick="_wlConfirmDeleteWeek('${week.id}');event.stopPropagation()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg> Delete</button>
         </div>
       </div>
     </div>
@@ -3757,7 +3773,7 @@ function _wlRenderWeekContent(week, container) {
     <div class="wl-cal-section">
       <div class="wl-cal-header">
         <div class="wl-cal-title">
-          <span class="wl-cal-icon">📅</span>
+          <span class="wl-cal-icon"><svg class="icn" aria-hidden="true"><use href="#ic-calendar"></use></svg></span>
           Economic Calendar
           <span class="wl-cal-week-range">${week.weekDate}${week.weekDateEnd ? ' – ' + week.weekDateEnd : ''}</span>
         </div>
@@ -3766,7 +3782,7 @@ function _wlRenderWeekContent(week, container) {
           <button class="wl-cal-cur-btn" onclick="_wlCalOpenCurrencyPicker('${week.id}')" title="Filter currencies">
             <span id="wl-cal-cur-label-${week.id}">…</span> ▾
           </button>
-          <button class="wl-cal-refresh-btn" onclick="_wlCalLoad('${week.id}','${week.weekDate}','${week.weekDateEnd||week.weekDate}',true)" title="Refresh">↻</button>
+          <button class="wl-cal-refresh-btn" onclick="_wlCalLoad('${week.id}','${week.weekDate}','${week.weekDateEnd||week.weekDate}',true)" title="Refresh"><svg class="icn" aria-hidden="true"><use href="#ic-refresh"></use></svg></button>
         </div>
       </div>
       <!-- Currency picker dropdown (hidden by default) -->
@@ -3848,7 +3864,7 @@ function _wlBuildDailyGameplan(week) {
     const pp = (plan.pairs || []).find(x => x.name === p.name) || {};
     const bias = pp.bias || p.bias || 'neu';
     const bClass = bias === 'bull' ? 'bull' : bias === 'bear' ? 'bear' : 'neu';
-    const bLabel = bias === 'bull' ? '↑ Bull' : bias === 'bear' ? '↓ Bear' : '→ Neu';
+    const bLabel = bias === 'bull' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg> Bull' : bias === 'bear' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg> Bear' : '→ Neu';
     return `
     <div class="wl-day-pair-row">
       <div class="wl-day-pair-name">${p.name}</div>
@@ -3881,7 +3897,7 @@ function _wlBuildDailyGameplan(week) {
   <div class="wl-daily-section">
     <div class="wl-daily-header">
       <div class="wl-daily-title">
-        <span class="wl-daily-icon">📋</span>
+        <span class="wl-daily-icon"><svg class="icn" aria-hidden="true"><use href="#ic-clipboard"></use></svg></span>
         Daily Gameplan
       </div>
       <div class="wl-daily-subtitle">What do you want to see each day? Log your bias &amp; expectations before the session.</div>
@@ -3936,14 +3952,14 @@ function _wlBuildDailyGameplan(week) {
                 <img class="wl-day-chart-thumb" src="${c.url}" alt="chart ${ci+1}"
                   onclick="_wlOpenLightbox('${c.url}')">
                 <div class="wl-day-chart-label">${c.label || ''}</div>
-                <button class="wl-day-chart-del" onclick="_wlDeleteDayChart('${week.id}','${activeDay}',${ci})" title="Remove">✕</button>
+                <button class="wl-day-chart-del" onclick="_wlDeleteDayChart('${week.id}','${activeDay}',${ci})" title="Remove"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
               </div>`).join('');
             return `
             ${imgs.length > 0 ? `<div class="wl-day-chart-grid" id="wl-day-chart-grid-${week.id}-${activeDay}">${thumbs}</div>` : `<div class="wl-day-chart-grid wl-day-chart-grid--empty" id="wl-day-chart-grid-${week.id}-${activeDay}"></div>`}
             <label class="wl-day-upload-zone" id="wl-day-upload-zone-${week.id}-${activeDay}">
               <input type="file" accept="image/*" multiple style="display:none"
                 onchange="_wlHandleDayChartUpload(this,'${week.id}','${activeDay}')">
-              <span class="wl-day-upload-icon">📸</span>
+              <span class="wl-day-upload-icon"><svg class="icn" aria-hidden="true"><use href="#ic-camera"></use></svg></span>
               <span class="wl-day-upload-text">Upload screenshots — PNG, JPG, WebP</span>
               <span class="wl-day-upload-hint">Charts sync automatically across all devices</span>
             </label>`;
@@ -3956,7 +3972,7 @@ function _wlBuildDailyGameplan(week) {
               Mindset Check
             </label>
             <div class="wl-day-mindset-btns" id="wl-day-mindset-${week.id}-${activeDay}">
-              ${['🧘 Focused','⚡ Eager','😴 Tired','😤 Frustrated','😐 Neutral'].map(m => {
+              ${['<svg class="icn" aria-hidden="true"><use href="#ic-meditate"></use></svg> Focused','<svg class="icn" aria-hidden="true"><use href="#ic-zap"></use></svg> Eager','<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg> Tired','<svg class="icn" aria-hidden="true"><use href="#ic-frown"></use></svg> Frustrated','<svg class="icn" aria-hidden="true"><use href="#ic-meh"></use></svg> Neutral'].map(m => {
                 const mKey = m.split(' ')[1];
                 const isSelected = plan.mindset === mKey;
                 return `<button class="wl-day-mindset-btn${isSelected ? ' selected' : ''}"
@@ -3966,13 +3982,13 @@ function _wlBuildDailyGameplan(week) {
           </div>
           <div class="wl-day-action-btns">
             <button class="wl-day-save-btn" onclick="_wlSaveDayPlanManual('${week.id}','${activeDay}')" title="Save day plan">
-              💾 Save
+              <svg class="icn" aria-hidden="true"><use href="#ic-save"></use></svg> Save
             </button>
             <button class="wl-day-edit-btn" onclick="_wlEditDayPlan('${week.id}','${activeDay}')" title="Edit day plan">
-              ✎ Edit
+              <svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Edit
             </button>
             <button class="wl-day-clear-btn" onclick="_wlClearDayPlan('${week.id}','${activeDay}')">
-              🗑 Delete
+              <svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg> Delete
             </button>
           </div>
         </div>
@@ -4031,7 +4047,7 @@ async function _wlCycleDayPairBias(weekId, day, pairName, btn) {
   else pairs.push({ name: pairName, note: '', bias: newBias });
   week.dailyPlans[day].pairs = pairs;
   // Update button instantly without full re-render
-  const bLabel = newBias === 'bull' ? '↑ Bull' : newBias === 'bear' ? '↓ Bear' : '→ Neu';
+  const bLabel = newBias === 'bull' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg> Bull' : newBias === 'bear' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg> Bear' : '→ Neu';
   btn.textContent = bLabel;
   btn.className = `wl-day-bias-btn ${newBias}`;
   await _wlSaveWeek(week);
@@ -4155,7 +4171,7 @@ function _wlRefreshDayChartGrid(weekId, day, charts) {
       <img class="wl-day-chart-thumb" src="${c.url}" alt="chart ${ci+1}"
         onclick="_wlOpenLightbox('${c.url}')">
       <div class="wl-day-chart-label">${c.label || ''}</div>
-      <button class="wl-day-chart-del" onclick="_wlDeleteDayChart('${weekId}','${day}',${ci})" title="Remove">✕</button>
+      <button class="wl-day-chart-del" onclick="_wlDeleteDayChart('${weekId}','${day}',${ci})" title="Remove"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
     </div>`).join('');
   // Restore hint text on the zone
   const hint = document.querySelector(`#wl-day-upload-zone-${weekId}-${day} .wl-day-upload-hint`);
@@ -4370,12 +4386,12 @@ function _wlCalRenderIframe(body, startDate, weekId, endDate) {
   body.innerHTML = `
     <div class="wl-cal-iframe-wrap">
       <div class="wl-cal-iframe-notice">
-        <span class="wl-cal-iframe-icon">📅</span>
+        <span class="wl-cal-iframe-icon"><svg class="icn" aria-hidden="true"><use href="#ic-calendar"></use></svg></span>
         <div>
           <div class="wl-cal-iframe-title">${isPastWeek ? 'Historical Calendar' : 'Live Forex Factory Calendar'}</div>
           <div class="wl-cal-iframe-sub">${isPastWeek ? 'Events for week of ' : 'Showing events for '}${weekLabel}</div>
         </div>
-        <a href="${ffUrl}" target="_blank" rel="noopener" class="wl-cal-ff-link">Open in FF ↗</a>
+        <a href="${ffUrl}" target="_blank" rel="noopener" class="wl-cal-ff-link">Open in FF ${icon('arrow-right', {cls:'icn-sm'})}</a>
       </div>
       <iframe
         src="${ffUrl}"
@@ -4446,14 +4462,14 @@ function _wlCalIframeError(weekId, startDate, endDate) {
 
   return `
     <div class="wl-cal-ff-fallback">
-      <div class="wl-cal-ff-fallback-icon">📅</div>
+      <div class="wl-cal-ff-fallback-icon"><svg class="icn" aria-hidden="true"><use href="#ic-calendar"></use></svg></div>
       <div class="wl-cal-ff-fallback-title">${isPastWeek ? 'View Past Week on Forex Factory' : 'View on Forex Factory'}</div>
       ${note}
       <a href="${ffUrl}" target="_blank" rel="noopener" class="wl-btn-primary" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;padding:9px 20px;border-radius:999px;font-size:12px;font-weight:700;background:var(--gold);color:#000">
-        📅 Open FF Calendar — ${weekLabel}
+        <svg class="icn" aria-hidden="true"><use href="#ic-calendar"></use></svg> Open FF Calendar — ${weekLabel}
       </a>
       <div style="margin-top:12px">
-        <button class="wl-cal-retry" onclick="_wlCalLoad('${weekId}','${startDate}','${endDate}',true)">↻ Retry data fetch</button>
+        <button class="wl-cal-retry" onclick="_wlCalLoad('${weekId}','${startDate}','${endDate}',true)"><svg class="icn" aria-hidden="true"><use href="#ic-refresh"></use></svg> Retry data fetch</button>
       </div>
     </div>`;
 }
@@ -4467,9 +4483,9 @@ function _wlCalBuildFilters(weekId) {
   if (!wrap) return;
   const btns = [
     { key:'all',  label:'All' },
-    { key:'high', label:'🔴 High' },
-    { key:'med',  label:'🟡 Med' },
-    { key:'low',  label:'⚪ Low' },
+    { key:'high', label:'<svg class="icn icn-red" aria-hidden="true"><use href="#ic-dot"></use></svg> High' },
+    { key:'med',  label:'<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-dot"></use></svg> Med' },
+    { key:'low',  label:'<svg class="icn icn-muted" aria-hidden="true"><use href="#ic-dot-o"></use></svg> Low' },
   ];
   wrap.innerHTML = btns.map(b =>
     `<button class="wl-cal-filter-btn${b.key === savedImpact ? ' active' : ''}"
@@ -4529,8 +4545,7 @@ function _wlCalOpenCurrencyPicker(weekId) {
 }
 
 function _wlCurFlag(cur) {
-  const flags = { USD:'🇺🇸',EUR:'🇪🇺',GBP:'🇬🇧',JPY:'🇯🇵',AUD:'🇦🇺',NZD:'🇳🇿',CAD:'🇨🇦',CHF:'🇨🇭',CNY:'🇨🇳' };
-  return flags[cur] || '🌐';
+  return icon('globe', {cls:'icn-sm'});
 }
 
 function _wlCalCurToggle(weekId, cur, chk) {
@@ -4597,7 +4612,7 @@ function _wlCalRender(weekId, events, startDate, endDate) {
 
   if (!filtered.length) {
     body.innerHTML = `<div class="wl-cal-empty">
-      <span>📭</span>
+      <span><svg class="icn" aria-hidden="true"><use href="#ic-inbox"></use></svg></span>
       <span>No ${impact !== 'all' ? impact + '-impact ' : ''}events for selected currencies this week</span>
     </div>`;
     return;
@@ -4638,7 +4653,7 @@ function _wlCalRender(weekId, events, startDate, endDate) {
             <div class="wl-cal-event-row">
               <span class="wl-cal-currency">${e.country}</span>
               <span class="wl-cal-event-name">${e.title}</span>
-              ${isMyPair ? '<span class="wl-cal-pair-tag">★</span>' : ''}
+              ${isMyPair ? '<span class="wl-cal-pair-tag">' + icon('star',{cls:'icn-sm'}) + '</span>' : ''}
             </div>
             <div class="wl-cal-event-meta">
               <span class="wl-cal-time">${timeStr}</span>
@@ -4713,13 +4728,13 @@ function _wlShowWeekModal(week, defaultDate) {
       <div class="wl-form-row">
         <label class="wl-form-label">DXY Bias</label>
         <select class="wl-form-select" id="wl-f-dxy">
-          ${['bull','bear','neu'].map(v => `<option value="${v}"${(!week&&v==='neu')||(week&&week.dxy===v)?' selected':''}>${v==='bull'?'↑ Bullish':v==='bear'?'↓ Bearish':'→ Neutral'}</option>`).join('')}
+          ${['bull','bear','neu'].map(v => `<option value="${v}"${(!week&&v==='neu')||(week&&week.dxy===v)?' selected':''}>${v==='bull'?'<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg> Bullish':v==='bear'?'<svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg> Bearish':'→ Neutral'}</option>`).join('')}
         </select>
       </div>
       <div class="wl-form-row">
         <label class="wl-form-label">Market Bias</label>
         <select class="wl-form-select" id="wl-f-market">
-          ${['risk-on','risk-off','neu'].map(v => `<option value="${v}"${(!week&&v==='neu')||(week&&week.market===v)?' selected':''}>${v==='risk-on'?'✦ Risk-On':v==='risk-off'?'✦ Risk-Off':'→ Neutral'}</option>`).join('')}
+          ${['risk-on','risk-off','neu'].map(v => `<option value="${v}"${(!week&&v==='neu')||(week&&week.market===v)?' selected':''}>${v==='risk-on'?'<svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg> Risk-On':v==='risk-off'?'<svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg> Risk-Off':'→ Neutral'}</option>`).join('')}
         </select>
       </div>
     </div>
@@ -4832,11 +4847,11 @@ function _wlOpenPairDetail(weekId, pairIdx) {
 function _wlShowPairViewModal(weekId, pairIdx, p) {
   const priClass  = p.priority === 'high' ? 'high' : p.priority === 'med' ? 'med' : 'low';
   const biasClass = p.bias === 'bull' ? 'bull' : 'bear';
-  const biasLabel = p.bias === 'bull' ? '↑ Bullish' : '↓ Bearish';
+  const biasLabel = p.bias === 'bull' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg> Bullish' : '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg> Bearish';
 
   const tfHtml = (p.tfs || []).map(tf => {
     const tc    = tf.bias === 'bull' ? 'tf-bull' : tf.bias === 'bear' ? 'tf-bear' : 'tf-neu';
-    const arrow = tf.bias === 'bull' ? '↑' : tf.bias === 'bear' ? '↓' : '→';
+    const arrow = tf.bias === 'bull' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg>' : tf.bias === 'bear' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg>' : '→';
     return `<span class="tf-chip ${tc}">${tf.tf} ${arrow}</span>`;
   }).join('');
 
@@ -4857,7 +4872,7 @@ function _wlShowPairViewModal(weekId, pairIdx, p) {
         <span class="wl-badge ${biasClass}">${biasLabel}</span>
         <span class="wl-badge ${priClass === 'high' ? 'bear' : priClass === 'med' ? '' : 'bull'}"
           style="${priClass==='med'?'background:rgba(251,191,36,0.12);color:var(--gold);border-color:rgba(251,191,36,0.3)':''}">
-          ${p.priority === 'high' ? '🔴 High' : p.priority === 'med' ? '🟡 Medium' : '🟢 Low'}
+          ${p.priority === 'high' ? '<svg class="icn icn-red" aria-hidden="true"><use href="#ic-dot"></use></svg> High' : p.priority === 'med' ? '<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-dot"></use></svg> Medium' : '<svg class="icn icn-green" aria-hidden="true"><use href="#ic-dot"></use></svg> Low'}
         </span>
       </div>
       <div class="wl-card-tfs" style="margin-top:10px">${tfHtml}</div>
@@ -4871,7 +4886,7 @@ function _wlShowPairViewModal(weekId, pairIdx, p) {
 
     <div class="wl-form-actions" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--glass-border)">
       <button class="wl-btn-secondary" onclick="wlClosePairModal()">Close</button>
-      <button class="wl-btn-primary" onclick="wlClosePairModal();_wlEditPairDirect('${weekId}',${pairIdx})">✎ Edit</button>
+      <button class="wl-btn-primary" onclick="wlClosePairModal();_wlEditPairDirect('${weekId}',${pairIdx})"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Edit</button>
     </div>
   `;
 
@@ -4902,7 +4917,7 @@ function _wlShowPairModal(pair) {
     <div class="wl-chart-thumb-wrap">
       <img class="wl-chart-thumb" src="${c.url}" alt="chart">
       <div class="wl-chart-thumb-label">${c.label || 'Chart ' + (ci+1)}</div>
-      <button class="wl-chart-thumb-del" onclick="_wlRemovePendingChart(${ci})">✕</button>
+      <button class="wl-chart-thumb-del" onclick="_wlRemovePendingChart(${ci})"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
     </div>
   `).join('');
 
@@ -4910,7 +4925,7 @@ function _wlShowPairModal(pair) {
     <div class="wl-tf-opt">
       <span style="color:var(--text2);font-size:11px;min-width:42px">${tf.tf}</span>
       <select onchange="_wlTfChange(${ti},this.value)">
-        ${_WL_BIAS_OPTS.map(b => `<option value="${b}"${b===tf.bias?' selected':''}>${b==='bull'?'↑ Bull':b==='bear'?'↓ Bear':'→ Neu'}</option>`).join('')}
+        ${_WL_BIAS_OPTS.map(b => `<option value="${b}"${b===tf.bias?' selected':''}>${b==='bull'?'<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg> Bull':b==='bear'?'<svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg> Bear':'→ Neu'}</option>`).join('')}
       </select>
     </div>
   `).join('');
@@ -4929,7 +4944,7 @@ function _wlShowPairModal(pair) {
       <div class="wl-form-row">
         <label class="wl-form-label">Priority</label>
         <select class="wl-form-select" id="wl-p-priority">
-          ${['high','med','low'].map(v => `<option value="${v}"${pair&&pair.priority===v?' selected':''}>${v==='high'?'🔴 High':v==='med'?'🟡 Medium':'🟢 Low'}</option>`).join('')}
+          ${['high','med','low'].map(v => `<option value="${v}"${pair&&pair.priority===v?' selected':''}>${v==='high'?'<svg class="icn icn-red" aria-hidden="true"><use href="#ic-dot"></use></svg> High':v==='med'?'<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-dot"></use></svg> Medium':'<svg class="icn icn-green" aria-hidden="true"><use href="#ic-dot"></use></svg> Low'}</option>`).join('')}
         </select>
       </div>
     </div>
@@ -4937,8 +4952,8 @@ function _wlShowPairModal(pair) {
       <div class="wl-form-row">
         <label class="wl-form-label">Bias</label>
         <select class="wl-form-select" id="wl-p-bias">
-          <option value="bull"${pair&&pair.bias==='bull'?' selected':''}>↑ Bullish</option>
-          <option value="bear"${pair&&pair.bias==='bear'?' selected':''}>↓ Bearish</option>
+          <option value="bull"${pair&&pair.bias==='bull'?' selected':''}><svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg> Bullish</option>
+          <option value="bear"${pair&&pair.bias==='bear'?' selected':''}><svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg> Bearish</option>
         </select>
       </div>
 
@@ -4955,7 +4970,7 @@ function _wlShowPairModal(pair) {
       <label class="wl-form-label">Chart Images</label>
       ${_wlPendingCharts.length > 0 ? `<div class="wl-chart-gallery" id="wl-chart-gallery">${chartGallery}</div>` : ''}
       <div class="wl-chart-upload-zone" onclick="document.getElementById('wl-chart-file-input').click()">
-        <span style="font-size:26px">📸</span>
+        <span style="font-size:26px"><svg class="icn" aria-hidden="true"><use href="#ic-camera"></use></svg></span>
         <p>Click to upload chart screenshots (PNG, JPG, WebP)</p>
       </div>
       <input type="file" id="wl-chart-file-input" accept="image/*" multiple style="display:none" onchange="_wlHandleChartUpload(this)">
@@ -5010,7 +5025,7 @@ async function _wlHandleChartUpload(input) {
     <div class="wl-chart-thumb-wrap">
       <img class="wl-chart-thumb" src="${c.url}" alt="chart">
       <div class="wl-chart-thumb-label">${c.label || 'Chart ' + (ci+1)}</div>
-      <button class="wl-chart-thumb-del" onclick="_wlRemovePendingChart(${ci})">✕</button>
+      <button class="wl-chart-thumb-del" onclick="_wlRemovePendingChart(${ci})"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
     </div>
   `).join('');
   if (gallery) {
@@ -5036,7 +5051,7 @@ function _wlRemovePendingChart(idx) {
       <div class="wl-chart-thumb-wrap">
         <img class="wl-chart-thumb" src="${c.url}" alt="chart">
         <div class="wl-chart-thumb-label">${c.label || 'Chart ' + (ci+1)}</div>
-        <button class="wl-chart-thumb-del" onclick="_wlRemovePendingChart(${ci})">✕</button>
+        <button class="wl-chart-thumb-del" onclick="_wlRemovePendingChart(${ci})"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
       </div>
     `).join('');
   }
@@ -5099,7 +5114,7 @@ function _wlOpenLightbox(url) {
     lb = document.createElement('div');
     lb.id = 'wl-lightbox';
     lb.className = 'wl-lightbox';
-    lb.innerHTML = `<button class="wl-lightbox-close" onclick="_wlCloseLightbox()">✕</button><img id="wl-lb-img" src="" alt="chart">`;
+    lb.innerHTML = `<button class="wl-lightbox-close" onclick="_wlCloseLightbox()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button><img id="wl-lb-img" src="" alt="chart">`;
     lb.addEventListener('click', e => { if (e.target === lb) _wlCloseLightbox(); });
     document.body.appendChild(lb);
   }
@@ -5189,7 +5204,7 @@ function _renderAccGrid() {
   if (!grid) return;
 
   if (!accounts.length) {
-    grid.innerHTML = `<div class="acc-empty">No accounts yet — click <strong>⚙ Manage Accounts</strong> to add one.</div>`;
+    grid.innerHTML = `<div class="acc-empty">No accounts yet — click <strong><svg class="icn" aria-hidden="true"><use href="#ic-settings"></use></svg> Manage Accounts</strong> to add one.</div>`;
     return;
   }
 
@@ -5255,7 +5270,7 @@ function _renderAccGrid() {
       ${last5.length ? `<div class="acc-recent-dots">${dots}<span class="acc-recent-label">Recent</span></div>` : ''}
       ${mt5Row}
       ${mt5Btn}
-      ${isArchived ? `<button class="acc-restore-btn" onclick="event.stopPropagation();_restoreAccountByName('${name.replace(/'/g,"\\'")}'">↩ Restore</button>` : ''}
+      ${isArchived ? `<button class="acc-restore-btn" onclick="event.stopPropagation();_restoreAccountByName('${name.replace(/'/g,"\\'")}'"><svg class="icn" aria-hidden="true"><use href="#ic-restore"></use></svg> Restore</button>` : ''}
     </div>`;
   };
 
@@ -5399,7 +5414,7 @@ function _accHealthScore(m) {
     `Win rate of ${m.wr.toFixed(1)}% ${m.wr>=55?'is healthy':'is on the lower side'}.`,
     `Max drawdown of ${m.maxDDPct.toFixed(1)}% ${m.maxDDPct<=10?'shows tight risk control':'is elevated — watch position sizing'}.`,
   ];
-  if (m.consistency !== null) reasons.push(`${m.consistency}% of rated trades were 4★+ quality setups.`);
+  if (m.consistency !== null) reasons.push(`${m.consistency}% of rated trades were 4${icon('star',{cls:'icn-sm icn-gold'})}+ quality setups.`);
 
   return { score: total, grade, reasons };
 }
@@ -5577,7 +5592,7 @@ function accShowDetail(name) {
   `;
   const sizeNote = accSize > 0
     ? `$${accSize.toLocaleString()}`
-    : `<span style="color:var(--gold)" title="Set size in Manage Accounts">⚠ Not set</span>`;
+    : `<span style="color:var(--gold)" title="Set size in Manage Accounts"><svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg> Not set</span>`;
 
   const healthColor = _accGradeColor(health.grade);
   const healthRingSvg = health.score !== null
@@ -5586,7 +5601,7 @@ function accShowDetail(name) {
 
   const heroHtml = `
     <div class="acc-hero">
-      <button class="acc-hero-close" onclick="accCloseDetail()" title="Close" aria-label="Close">✕</button>
+      <button class="acc-hero-close" onclick="accCloseDetail()" title="Close" aria-label="Close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
       <div>
         <div class="acc-hero-top">
           <span class="acc-hero-name">${name}</span>
@@ -5693,9 +5708,9 @@ function accShowDetail(name) {
                     <td style="color:var(--text2);font-size:11px">${t.strategy||'—'}</td>
                     <td class="acc-tr-actions" style="opacity:0;transition:opacity .15s;white-space:nowrap;text-align:right">
                       <button onclick="event.stopPropagation();openDetail(${t.id},true)"
-                        style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;margin-right:3px">✏️</button>
+                        style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;margin-right:3px"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg></button>
                       <button onclick="event.stopPropagation();quickDelete(${t.id});accShowDetail('${name.replace(/'/g, "\\'")}')"
-                        style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer">🗑</button>
+                        style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg></button>
                     </td>
                   </tr>`;
                 }).join('')}
@@ -5770,8 +5785,8 @@ function _renderPayoutLog() {
       <td class="outcome-win mono">$${parseFloat(p.amount).toLocaleString()}</td>
       <td><span class="pill ${p.status==='Received'?'pill-green':'pill-gold'}">${p.status}</span></td>
       <td style="text-align:right">
-        <button class="wl-week-btn" style="font-size:10px;padding:2px 8px" onclick="accEditPayout(${i})">✎</button>
-        <button class="wl-week-btn danger" style="font-size:10px;padding:2px 8px" onclick="accDeletePayout(${i})">✕</button>
+        <button class="wl-week-btn" style="font-size:10px;padding:2px 8px" onclick="accEditPayout(${i})"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg></button>
+        <button class="wl-week-btn danger" style="font-size:10px;padding:2px 8px" onclick="accDeletePayout(${i})"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
       </td>
     </tr>`).join('');
 }
@@ -5869,7 +5884,7 @@ function _renderMilestones() {
              onkeydown="if(event.key==='Enter'){msSaveEdit(${i})} else if(event.key==='Escape'){msCancelEdit()}">
       <div class="acc-ms-actions" style="opacity:1">
         <button class="wl-week-btn primary" style="font-size:10px;padding:2px 7px" onclick="msSaveEdit(${i})">✓ Done</button>
-        <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="msCancelEdit()">✕</button>
+        <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="msCancelEdit()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
       </div>
     </div>`;
     }
@@ -5886,8 +5901,8 @@ function _renderMilestones() {
       <div class="cl-box" onclick="accToggleMilestone(${i})">${m.done ? '✓' : ''}</div>
       <span class="cl-text" onclick="accToggleMilestone(${i})">${m.t}</span>
       <div class="acc-ms-actions">
-        <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="msStartEdit(${i});event.stopPropagation()">✎</button>
-        <button class="wl-week-btn danger" style="font-size:10px;padding:2px 7px" onclick="accDeleteMilestone(${i});event.stopPropagation()">✕</button>
+        <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="msStartEdit(${i});event.stopPropagation()"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg></button>
+        <button class="wl-week-btn danger" style="font-size:10px;padding:2px 7px" onclick="accDeleteMilestone(${i});event.stopPropagation()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
       </div>
     </div>`;
   }).join('');
@@ -6134,8 +6149,8 @@ function _openManageStrategies() {
   overlay.innerHTML = `
   <div class="acc-manager-modal">
     <div class="acc-manager-header">
-      <span>⚙ Manage Strategies</span>
-      <button onclick="document.getElementById('strat-manager-overlay').remove()" class="acc-mgr-close">✕</button>
+      <span><svg class="icn" aria-hidden="true"><use href="#ic-settings"></use></svg> Manage Strategies</span>
+      <button onclick="document.getElementById('strat-manager-overlay').remove()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
     </div>
     <div class="acc-manager-body">
       <div class="acc-mgr-tabs">
@@ -6242,7 +6257,7 @@ async function _toggleArchiveStrategy(mi) {
 async function _deleteStrategy(mi) {
   const m = _pbData.models[mi]; if (!m) return;
   openGlassModal({
-    icon: '🗑️',
+    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg>',
     title: 'Delete Strategy?',
     body: `<strong>${m.title}</strong> will be permanently removed.<br><small style="color:var(--text3)">Past trades using this strategy tag are not affected.</small>`,
     confirmLabel: 'Delete',
@@ -6277,8 +6292,8 @@ function buildPlaybook() {
             ${sName !== m.title ? `<div style="margin-top:4px;font-size:10px;color:var(--gold);opacity:.7">Strategy tag: <strong>${sName}</strong></div>` : ''}
           </div>
           <div style="display:flex;gap:5px;flex-shrink:0">
-            <button class="wl-week-btn" style="font-size:10px;padding:3px 9px" onclick="pbEditModelModal(${mi})">✎ Edit</button>
-            <button class="wl-week-btn${isArchived ? ' restore' : ' archive'}" style="font-size:10px;padding:3px 9px" onclick="pbToggleArchiveModel(${mi})">${isArchived ? '↩ Restore' : '⬛ Archive'}</button>
+            <button class="wl-week-btn" style="font-size:10px;padding:3px 9px" onclick="pbEditModelModal(${mi})"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Edit</button>
+            <button class="wl-week-btn${isArchived ? ' restore' : ' archive'}" style="font-size:10px;padding:3px 9px" onclick="pbToggleArchiveModel(${mi})">${isArchived ? '<svg class="icn" aria-hidden="true"><use href="#ic-restore"></use></svg> Restore' : '<svg class="icn" aria-hidden="true"><use href="#ic-archive"></use></svg> Archive'}</button>
           </div>
         </div>
         <div class="model-steps">${(m.steps||[]).map(s => `<div class="model-step">${s}</div>`).join('')}</div>
@@ -6295,7 +6310,7 @@ function buildPlaybook() {
       <div class="rule-card" style="display:flex;align-items:flex-start;gap:8px">
         <div class="rule-num" style="flex-shrink:0">RULE ${String(i+1).padStart(2,'0')}</div>
         <div class="rule-text" style="flex:1">${r}</div>
-        <button class="wl-week-btn danger" style="font-size:10px;padding:2px 7px;flex-shrink:0" onclick="pbDeleteRule(${i})">✕</button>
+        <button class="wl-week-btn danger" style="font-size:10px;padding:2px 7px;flex-shrink:0" onclick="pbDeleteRule(${i})"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
       </div>`).join('') +
       `<button class="wl-add-week-btn" style="margin-top:10px" onclick="pbAddRule()">＋ Add Rule</button>`;
   }
@@ -6317,8 +6332,8 @@ function _openModelEditModal(mi) {
   overlay.innerHTML = `
   <div class="acc-manager-modal" style="max-width:520px">
     <div class="acc-manager-header">
-      <span>${isNew ? '＋ Add Entry Model' : '✎ Edit Model'}</span>
-      <button onclick="document.getElementById('pb-model-edit-overlay').remove()" class="acc-mgr-close">✕</button>
+      <span>${isNew ? '＋ Add Entry Model' : '<svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Edit Model'}</span>
+      <button onclick="document.getElementById('pb-model-edit-overlay').remove()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
     </div>
     <div class="acc-manager-body" style="display:flex;flex-direction:column;gap:12px;padding:16px">
       <div>
@@ -6338,7 +6353,7 @@ function _openModelEditModal(mi) {
         <textarea id="pb-edit-steps" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:140px;resize:vertical;font-size:12px;line-height:1.6" placeholder="Step 1&#10;Step 2&#10;Step 3…">${(m.steps||[]).join('\n')}</textarea>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
-        ${!isNew ? `<button onclick="pbDeleteModel(${mi})" class="acc-mgr-btn del" style="padding:6px 14px;margin-right:auto">🗑 Delete</button>` : ''}
+        ${!isNew ? `<button onclick="pbDeleteModel(${mi})" class="acc-mgr-btn del" style="padding:6px 14px;margin-right:auto"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg> Delete</button>` : ''}
         <button onclick="document.getElementById('pb-model-edit-overlay').remove()" class="acc-mgr-btn" style="padding:6px 14px">Cancel</button>
         <button onclick="_pbSaveModelModal(${isNew ? 'null' : mi})" class="acc-mgr-add-btn" style="padding:6px 18px">Save</button>
       </div>
@@ -6381,7 +6396,7 @@ async function pbToggleArchiveModel(mi) {
 async function pbDeleteModel(mi) {
   const m = _pbData.models[mi]; if (!m) return;
   openGlassModal({
-    icon: '🗑️',
+    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg>',
     title: 'Delete Model?',
     body: `<strong>${m.title}</strong> will be permanently removed from your playbook.<br><small style="color:var(--text3)">Past trades using this strategy tag are not affected.</small>`,
     confirmLabel: 'Delete Model',
@@ -6483,7 +6498,7 @@ function buildGoals() {
   const goalsEl = document.getElementById('goals-list');
   if (goalsEl) {
     if (_goalsData.groups.length === 0) {
-      goalsEl.innerHTML = '<div class="wl-empty-state" style="padding:30px 0"><div class="wl-empty-icon">🎯</div><div class="wl-empty-title">No goals yet</div><div class="wl-empty-sub">Click + Add Group to create your first goal group.</div></div>';
+      goalsEl.innerHTML = '<div class="wl-empty-state" style="padding:30px 0"><div class="wl-empty-icon">' + icon('target') + '</div><div class="wl-empty-title">No goals yet</div><div class="wl-empty-sub">Click + Add Group to create your first goal group.</div></div>';
     } else {
       goalsEl.innerHTML = _goalsData.groups.map((g, gi) => {
         const gTotal = g.items.length;
@@ -6495,7 +6510,7 @@ function buildGoals() {
             <div style="font-size:12px;font-weight:700;color:var(--text2);letter-spacing:.3px">${g.q}</div>
             <div style="display:flex;gap:6px">
               <button class="wl-week-btn" style="font-size:10px;padding:3px 9px" onclick="goalsAddItem(${gi})">＋ Goal</button>
-              <button class="wl-week-btn danger" style="font-size:10px;padding:3px 9px" onclick="goalsDeleteGroup(${gi})">✕</button>
+              <button class="wl-week-btn danger" style="font-size:10px;padding:3px 9px" onclick="goalsDeleteGroup(${gi})"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
             </div>
           </div>
           <div class="acc-progress-wrap" style="margin-top:0;margin-bottom:10px">
@@ -6517,7 +6532,7 @@ function buildGoals() {
                      onkeydown="if(event.key==='Enter'){goalSaveEdit(${gi},${ii})} else if(event.key==='Escape'){goalCancelEdit()}">
               <div class="acc-ms-actions" style="opacity:1">
                 <button class="wl-week-btn primary" style="font-size:10px;padding:2px 7px" onclick="goalSaveEdit(${gi},${ii})">✓ Done</button>
-                <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="goalCancelEdit()">✕</button>
+                <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="goalCancelEdit()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
               </div>
             </div>`;
             }
@@ -6535,8 +6550,8 @@ function buildGoals() {
               <div class="cl-box">${item.done?'✓':''}</div>
               <span class="cl-text">${item.t}</span>
               <div class="acc-ms-actions">
-                <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="goalStartEdit(${gi},${ii});event.stopPropagation()">✎</button>
-                <button class="wl-week-btn danger" style="font-size:10px;padding:2px 7px" onclick="goalDeleteItem(${gi},${ii});event.stopPropagation()">✕</button>
+                <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="goalStartEdit(${gi},${ii});event.stopPropagation()"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg></button>
+                <button class="wl-week-btn danger" style="font-size:10px;padding:2px 7px" onclick="goalDeleteItem(${gi},${ii});event.stopPropagation()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
               </div>
             </div>`;
           }).join('')}
@@ -6555,7 +6570,7 @@ function buildGoals() {
   const affEl = document.getElementById('affirmations');
   if (affEl) {
     if (!_goalsData.affirmations || _goalsData.affirmations.length === 0) {
-      affEl.innerHTML = '<div class="wl-empty-state" style="padding:30px 0"><div class="wl-empty-icon">✨</div><div class="wl-empty-title">No affirmations yet</div><div class="wl-empty-sub">Click + Add above to create your first one.</div></div>';
+      affEl.innerHTML = '<div class="wl-empty-state" style="padding:30px 0"><div class="wl-empty-icon"><svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg></div><div class="wl-empty-title">No affirmations yet</div><div class="wl-empty-sub">Click + Add above to create your first one.</div></div>';
       return;
     }
     affEl.innerHTML = _goalsData.affirmations.map((a, i) => {
@@ -6570,7 +6585,7 @@ function buildGoals() {
         </div>
         <div class="acc-ms-actions" style="opacity:1">
           <button class="wl-week-btn primary" style="font-size:10px;padding:2px 7px" onclick="affSaveEdit(${i})">✓ Done</button>
-          <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="affCancelEdit()">✕</button>
+          <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="affCancelEdit()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
         </div>
       </div>`;
       }
@@ -6589,8 +6604,8 @@ function buildGoals() {
           <div class="rule-text" style="font-style:italic">"${a}"</div>
         </div>
         <div class="acc-ms-actions">
-          <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="affStartEdit(${i});event.stopPropagation()">✎</button>
-          <button class="wl-week-btn danger" style="font-size:10px;padding:2px 7px" onclick="affDeleteItem(${i});event.stopPropagation()">✕</button>
+          <button class="wl-week-btn" style="font-size:10px;padding:2px 7px" onclick="affStartEdit(${i});event.stopPropagation()"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg></button>
+          <button class="wl-week-btn danger" style="font-size:10px;padding:2px 7px" onclick="affDeleteItem(${i});event.stopPropagation()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
         </div>
       </div>`;
     }).join('');
@@ -6810,7 +6825,7 @@ function _renderGoalsProgress() {
 }
 
 function goalsAddGroup() {
-  const name = prompt('Goal group name (e.g. Q3 2026 🔵):');
+  const name = prompt('Goal group name (e.g. Q3 2026 <svg class="icn icn-blue" aria-hidden="true"><use href="#ic-dot"></use></svg>):');
   if (!name) return;
   _goalsData.groups.push({ q: name, items: [] });
   buildGoals();
@@ -6983,7 +6998,7 @@ async function buildMonthlyReview() {
             <td class="outcome-loss mono">${pctOf(t).toFixed(1)}%</td>
             <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.notes || '—'}</td>
           </tr>`).join('')
-      : '<tr><td colspan="5" style="color:var(--text3);text-align:center;font-style:italic">No losses this month 🎉</td></tr>';
+      : '<tr><td colspan="5" style="color:var(--text3);text-align:center;font-style:italic">No losses this month <svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg></td></tr>';
   }
 
   // Pair breakdown — each pair row expands to list its trades for the
@@ -7008,7 +7023,7 @@ async function buildMonthlyReview() {
             .sort((a,b) => a.date.localeCompare(b.date))
             .map(t => `
               <tr class="mr-clickable-row mr-pair-sub-row" data-group="${rowId}" style="display:none" onclick="event.stopPropagation();openDetail(${t.id})" title="Click to view trade">
-                <td style="padding-left:26px;color:var(--text3)">↳ ${t.date}</td>
+                <td style="padding-left:26px;color:var(--text3)"><svg class="icn" aria-hidden="true"><use href="#ic-arrow-right"></use></svg> ${t.date}</td>
                 <td colspan="2" style="color:var(--text2)">${t.strategy || '—'}</td>
                 <td class="${t.outcome==='Win'?'outcome-win':'outcome-loss'} mono">${pctOf(t)>=0?'+':''}${pctOf(t).toFixed(1)}%</td>
               </tr>`).join('');
@@ -7116,7 +7131,7 @@ function updateKPIs() {
   if (_awEl) _awEl.textContent = _avgWPctFmt;
   if (_alEl) _alEl.textContent = _avgLPctFmt;
   const rrEl = document.getElementById('kpi-rr'); if (rrEl) rrEl.textContent = avgRR ? '1:' + avgRR : '—';
-  const wsEl = document.getElementById('kpi-ws'); if (wsEl) wsEl.textContent = streak > 0 ? streak + '↑ (best:' + maxStreak + ')' : maxStreak ? '0 (best:' + maxStreak + ')' : '0';
+  const wsEl = document.getElementById('kpi-ws'); if (wsEl) wsEl.textContent = streak > 0 ? streak + '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg> (best:' + maxStreak + ')' : maxStreak ? '0 (best:' + maxStreak + ')' : '0';
 
   // ── Max Drawdown — peak-to-trough on cumulative % equity curve ──
   const _ddSorted = [...trades].sort((a, b) => a.date.localeCompare(b.date));
@@ -7261,7 +7276,7 @@ function updateKPIs() {
           const avgHighWr = highRatings.reduce((a, r) => a + r.wr, 0) / highRatings.length;
           const avgLowWr  = lowRatings.reduce((a, r) => a + r.wr, 0)  / lowRatings.length;
           if (avgHighWr - avgLowWr > 10) {
-            const highLabels = highRatings.map(r => `<strong>${r.r}★</strong>`).join(' and ');
+            const highLabels = highRatings.map(r => `<strong>${r.r}${icon('star',{cls:'icn-sm icn-gold'})}</strong>`).join(' and ');
             const diff = (avgHighWr - avgLowWr).toFixed(0);
             parts.push(`Only ${highLabels} setups → your data shows lower-rated trades underperform by ~${diff}% win rate`);
           }
@@ -7300,7 +7315,7 @@ function updateKPIs() {
         const topReason = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1])[0];
         const topPct = Math.round((topReason[1] / lossesWithReason.length) * 100);
         if (topPct >= 30) {
-          parts.push(`🔴 Top loss cause: <strong>"${topReason[0]}"</strong> (${topPct}% of losses) — address this first`);
+          parts.push(`<svg class="icn icn-red" aria-hidden="true"><use href="#ic-dot"></use></svg> Top loss cause: <strong>"${topReason[0]}"</strong> (${topPct}% of losses) — address this first`);
         }
       }
 
@@ -7576,7 +7591,7 @@ function _renderConsistencyKPI(trades) {
   el.className = 'kpi-value ' + (score >= 80 ? 'green' : score >= 60 ? 'gold' : 'red');
   if (sub) {
     const streak = _calcConsistencyStreak(trades);
-    sub.textContent = streak > 1 ? streak + ' quality trades in a row' : highQuality + '/' + trades.length + ' rated 4★+';
+    sub.textContent = streak > 1 ? streak + ' quality trades in a row' : highQuality + '/' + trades.length + ' rated 4-star+';
   }
 }
 function _calcConsistencyStreak(trades) {
@@ -7663,11 +7678,11 @@ function _checkDailyLossLimit(allTrades) {
   const bodyEl = document.getElementById('daily-loss-alert-body');
   if (todayPnl <= -dailyLimit) {
     alertEl.style.display = 'flex';
-    if (titleEl) titleEl.textContent = `🚨 Daily Loss Limit Reached (${todayPnl.toFixed(1)}%)`;
+    if (titleEl) titleEl.textContent = `<svg class="icn" aria-hidden="true"><use href="#ic-siren"></use></svg> Daily Loss Limit Reached (${todayPnl.toFixed(1)}%)`;
     if (bodyEl) bodyEl.textContent = `You've hit your ${dailyLimit.toFixed(1)}% daily limit. Step away — protect your account.`;
   } else if (lossCount >= 2 && todayPnl < 0) {
     alertEl.style.display = 'flex';
-    if (titleEl) titleEl.textContent = `⚠️ ${lossCount} Losses Today (${todayPnl.toFixed(1)}%)`;
+    if (titleEl) titleEl.textContent = `<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg> ${lossCount} Losses Today (${todayPnl.toFixed(1)}%)`;
     if (bodyEl) bodyEl.textContent = `Two consecutive losses detected. Consider pausing and reviewing your bias before the next trade.`;
   } else {
     alertEl.style.display = 'none';
@@ -7776,14 +7791,14 @@ function buildSidebarYears() {
     const curQ = getQuarter(new Date().toISOString());
     return `<div class="sb-section">
       <div class="sb-section-label" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleYear(${year})">
-        <span>${year}</span><span id="yr-arrow-${year}" style="font-size:10px;color:var(--text3)">▼</span>
+        <span>${year}</span><span id="yr-arrow-${year}" class="yr-arrow-icon open">${icon('chevron-right', {cls:'icn-sm'})}</span>
       </div>
       <div id="yr-quarters-${year}">${[1, 2, 3, 4].map(q => {
         const qt = trades.filter(t => getYear(t.date) === year && getQuarter(t.date) === q);
         const isActive = year === curYear && q === curQ;
         const hasTrades = qt.length > 0;
         return `<div class="sb-item${isActive ? ' q2' : ''}" id="sb-q-${year}-${q}" onclick="openQuarter(${year},${q},this)" style="opacity:${hasTrades || isActive ? 1 : 0.45}">
-          <span class="ico">${isActive ? '📂' : '📁'}</span>
+          <span class="ico">${isActive ? '<svg class="icn" aria-hidden="true"><use href="#ic-folder-open"></use></svg>' : '<svg class="icn" aria-hidden="true"><use href="#ic-folder"></use></svg>'}</span>
           <span class="lbl">Q${q} — ${Q_MONTHS[q]}</span>
           ${hasTrades ? `<span style="font-size:10px;color:var(--text3);margin-left:auto">${qt.length}</span>` : ''}
         </div>`;
@@ -7797,8 +7812,8 @@ function toggleYear(year) {
   const el = document.getElementById(`yr-quarters-${year}`);
   const ar = document.getElementById(`yr-arrow-${year}`);
   _yrOpen[year] = !(_yrOpen[year] !== false);
-  if (_yrOpen[year]) { el.style.display = 'none'; ar.textContent = '▶'; }
-  else { el.style.display = ''; ar.textContent = '▼'; }
+  if (_yrOpen[year]) { el.style.display = 'none'; ar.classList.remove('open'); }
+  else { el.style.display = ''; ar.classList.add('open'); }
 }
 function openQuarter(year, q, sbEl) { nav('quarter', sbEl, `Q${q} ${year} — ${Q_MONTHS[q]}`, { year, q }); }
 function renderQuarterPage(year, q) {
@@ -7876,7 +7891,7 @@ function renderQuarterPage(year, q) {
     <div class="sec-head">Month Breakdown</div>
     <div class="data-table-wrap"><table class="data-table" style="margin-bottom:20px"><thead><tr><th>Month</th><th>Trades</th><th>Win%</th><th>Net PnL</th><th>W/L/BE</th></tr></thead><tbody>${monthRows}</tbody></table></div>
     <div class="sec-head" style="display:flex;align-items:center;justify-content:space-between"><span>All Trades — Q${q} ${year}</span><button class="btn" onclick="openModal()" style="font-size:11px;padding:4px 10px">+ Add Trade</button></div>
-    <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Pair</th><th>Pos</th><th>R:R</th><th>PnL</th><th>Outcome</th><th>Killzone</th><th>Strategy</th><th>★</th></tr></thead><tbody>${tradeRows}</tbody></table></div>
+    <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Pair</th><th>Pos</th><th>R:R</th><th>PnL</th><th>Outcome</th><th>Killzone</th><th>Strategy</th><th>${icon('star',{label:'Rating'})}</th></tr></thead><tbody>${tradeRows}</tbody></table></div>
     <div style="margin-top:10px;font-size:12px;color:var(--text3)">${qt.length} trades · Click any row to view details</div>
     `}`;
 }
@@ -7888,7 +7903,7 @@ function toggleTheme() {
   const isLight = doc.getAttribute('data-theme') === 'light';
   doc.setAttribute('data-theme', isLight ? '' : 'light');
   const btn = document.getElementById('theme-btn');
-  if (btn) { btn.textContent = isLight ? '🌙' : '☀️'; btn.classList.add('spinning'); setTimeout(() => btn.classList.remove('spinning'), 420); }
+  if (btn) { btn.textContent = isLight ? '<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg>' : '<svg class="icn" aria-hidden="true"><use href="#ic-sun"></use></svg>'; btn.classList.add('spinning'); setTimeout(() => btn.classList.remove('spinning'), 420); }
   try { localStorage.setItem('nxtgen_theme', isLight ? 'dark' : 'light'); } catch (e) {}
 }
 function loadTheme() {
@@ -7897,7 +7912,7 @@ function loadTheme() {
     const isDark = t !== 'light';
     document.documentElement.setAttribute('data-theme', isDark ? '' : 'light');
     const btn = document.getElementById('theme-btn');
-    if (btn) btn.textContent = isDark ? '🌙' : '☀️';
+    if (btn) btn.textContent = isDark ? '<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg>' : '<svg class="icn" aria-hidden="true"><use href="#ic-sun"></use></svg>';
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
   } catch (e) {}
 }
@@ -7934,7 +7949,7 @@ function _switchDetTab(tab, id) {
 function _toggleEditMode(id) { _detEditMode = !_detEditMode; _detActiveTab = 'overview'; _renderDetail(id); }
 
 function _emoIcon(e) {
-  const map = {Calm:'😌',Relaxed:'😊',Confident:'💪',Focused:'🎯',Neutral:'😐',Anxious:'😰',Impatient:'⏳',Fearful:'😨',Greedy:'🤑',Revenge:'😤'};
+  const map = {Calm:'<svg class="icn" aria-hidden="true"><use href="#ic-smile"></use></svg>',Relaxed:'<svg class="icn" aria-hidden="true"><use href="#ic-smile"></use></svg>',Confident:'<svg class="icn" aria-hidden="true"><use href="#ic-thumbs-up"></use></svg>',Focused:'<svg class="icn" aria-hidden="true"><use href="#ic-target"></use></svg>',Neutral:'<svg class="icn" aria-hidden="true"><use href="#ic-meh"></use></svg>',Anxious:'<svg class="icn" aria-hidden="true"><use href="#ic-frown"></use></svg>',Impatient:'<svg class="icn" aria-hidden="true"><use href="#ic-clock"></use></svg>',Fearful:'<svg class="icn" aria-hidden="true"><use href="#ic-frown"></use></svg>',Greedy:'<svg class="icn" aria-hidden="true"><use href="#ic-dollar-c"></use></svg>',Revenge:'<svg class="icn" aria-hidden="true"><use href="#ic-frown"></use></svg>'};
   return map[e] || '';
 }
 
@@ -7953,7 +7968,7 @@ function setStarRating(id, n) {
   editor.querySelectorAll('.star-opt').forEach(el => {
     const v = parseInt(el.querySelector('.star-lbl').textContent);
     el.className = 'star-opt' + (v === n ? ' selected' : '');
-    el.querySelector('.star-pips').textContent = '★'.repeat(v) + '☆'.repeat(5 - v);
+    el.querySelector('.star-pips').innerHTML = icon('star').repeat(v) + icon('star-o').repeat(5 - v);
   });
 }
 
@@ -8023,7 +8038,7 @@ function _confirmDelete(id) {
       <div class="del-confirm-text">Move <strong>${t.pair}</strong> (${t.date}, ${_pnlLabel(t)}) to Trash?<br><span style="font-size:11px;color:var(--text3)">You can restore it from Trash anytime.</span></div>
       <div class="del-confirm-btns">
         <button class="del-no" onclick="document.getElementById('del-confirm-area').innerHTML=''">Cancel</button>
-        <button class="del-yes" onclick="_executeSoftDelete(${id})">🗑 Move to Trash</button>
+        <button class="del-yes" onclick="_executeSoftDelete(${id})"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg> Move to Trash</button>
       </div>
     </div>`;
   area.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -8152,7 +8167,7 @@ function groupTradesByDay(tradeList, accSize) {
 }
 function calculateDailyOutcome(totalPnlUSD) { if (totalPnlUSD > 0) return 'win'; if (totalPnlUSD < 0) return 'loss'; return 'breakeven'; }
 function calculateCalendarWinrate(dayMap) { const days = Object.values(dayMap); const winDays = days.filter(d => calculateDailyOutcome(d.totalPnlUSD !== undefined ? d.totalPnlUSD : d.totalPnl) === 'win').length; const lossDays = days.filter(d => calculateDailyOutcome(d.totalPnlUSD !== undefined ? d.totalPnlUSD : d.totalPnl) === 'loss').length; const beDays = days.filter(d => calculateDailyOutcome(d.totalPnlUSD !== undefined ? d.totalPnlUSD : d.totalPnl) === 'breakeven').length; const denom = winDays + lossDays; const wr = denom > 0 ? ((winDays / denom) * 100) : 0; return { winDays, lossDays, beDays, wr: parseFloat(wr.toFixed(2)) }; }
-function showCalTooltip(e, dayData, dateStr, accSize) { const tip = document.getElementById('cal-tooltip'); if (!tip || !dayData) return; const dt = new Date(dateStr + 'T12:00:00'); const dateLabel = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); const usd = dayData.totalPnlUSD !== undefined ? dayData.totalPnlUSD : dayData.trades.reduce((a, t) => a + toPnlDollars(t, accSize), 0); const outcome = calculateDailyOutcome(usd); const outLabel = outcome === 'win' ? '🟢 Winning Day' : outcome === 'loss' ? '🔴 Losing Day' : '⚪ Breakeven Day'; const outColor = outcome === 'win' ? 'var(--green)' : outcome === 'loss' ? 'var(--red)' : 'var(--text3)'; tip.innerHTML = `<div class="cal-tooltip-date">${dateLabel}</div><div class="cal-tooltip-row"><span class="k">Net PnL</span><span class="v" style="color:${usd >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtUSD(usd)}</span></div><div class="cal-tooltip-row"><span class="k">Total trades</span><span class="v">${dayData.trades.length}</span></div><div class="cal-tooltip-row"><span class="k">Wins</span><span class="v" style="color:var(--green)">${dayData.wins}</span></div><div class="cal-tooltip-row"><span class="k">Losses</span><span class="v" style="color:var(--red)">${dayData.losses}</span></div>${dayData.bes ? `<div class="cal-tooltip-row"><span class="k">Break evens</span><span class="v" style="color:var(--blue)">${dayData.bes}</span></div>` : ''}<hr class="cal-tooltip-divider"><div class="cal-tooltip-outcome" style="color:${outColor}">${outLabel}</div>`; const x = Math.min(e.clientX + 14, window.innerWidth - 224); const y = Math.min(e.clientY + 14, window.innerHeight - 200); tip.style.left = x + 'px'; tip.style.top = y + 'px'; tip.style.display = 'block'; }
+function showCalTooltip(e, dayData, dateStr, accSize) { const tip = document.getElementById('cal-tooltip'); if (!tip || !dayData) return; const dt = new Date(dateStr + 'T12:00:00'); const dateLabel = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); const usd = dayData.totalPnlUSD !== undefined ? dayData.totalPnlUSD : dayData.trades.reduce((a, t) => a + toPnlDollars(t, accSize), 0); const outcome = calculateDailyOutcome(usd); const outLabel = outcome === 'win' ? '<svg class="icn icn-green" aria-hidden="true"><use href="#ic-dot"></use></svg> Winning Day' : outcome === 'loss' ? '<svg class="icn icn-red" aria-hidden="true"><use href="#ic-dot"></use></svg> Losing Day' : '<svg class="icn icn-muted" aria-hidden="true"><use href="#ic-dot-o"></use></svg> Breakeven Day'; const outColor = outcome === 'win' ? 'var(--green)' : outcome === 'loss' ? 'var(--red)' : 'var(--text3)'; tip.innerHTML = `<div class="cal-tooltip-date">${dateLabel}</div><div class="cal-tooltip-row"><span class="k">Net PnL</span><span class="v" style="color:${usd >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtUSD(usd)}</span></div><div class="cal-tooltip-row"><span class="k">Total trades</span><span class="v">${dayData.trades.length}</span></div><div class="cal-tooltip-row"><span class="k">Wins</span><span class="v" style="color:var(--green)">${dayData.wins}</span></div><div class="cal-tooltip-row"><span class="k">Losses</span><span class="v" style="color:var(--red)">${dayData.losses}</span></div>${dayData.bes ? `<div class="cal-tooltip-row"><span class="k">Break evens</span><span class="v" style="color:var(--blue)">${dayData.bes}</span></div>` : ''}<hr class="cal-tooltip-divider"><div class="cal-tooltip-outcome" style="color:${outColor}">${outLabel}</div>`; const x = Math.min(e.clientX + 14, window.innerWidth - 224); const y = Math.min(e.clientY + 14, window.innerHeight - 200); tip.style.left = x + 'px'; tip.style.top = y + 'px'; tip.style.display = 'block'; }
 function hideCalTooltip() { const tip = document.getElementById('cal-tooltip'); if (tip) tip.style.display = 'none'; }
 
 function renderCalendar() {
@@ -8178,7 +8193,7 @@ function renderCalendar() {
     const bestUSD = bestDay ? dayMap[bestDay].totalPnlUSD : 0;
     const worstUSD = worstDay ? dayMap[worstDay].totalPnlUSD : 0;
     const wrColor = wr >= 70 ? 'green' : wr >= 50 ? 'white' : 'red';
-    const _kpiHtml = `<div class="cal-kpi"><div class="cal-kpi-label"><span class="cal-kpi-icon">🗂</span><span class="cal-kpi-text">Trades</span></div><div class="cal-kpi-val white">${totalTrades}<span style="font-size:10px;color:var(--text3);font-family:var(--font-body);margin-left:5px">${tradingDays.length}d</span></div></div><div class="cal-kpi"><div class="cal-kpi-label"><span class="cal-kpi-icon">💰</span><span class="cal-kpi-text">P&L</span></div><div class="cal-kpi-val ${totalUSD >= 0 ? 'green' : 'red'}">${fmtUSD(totalUSD)}</div></div><div class="cal-kpi"><div class="cal-kpi-label"><span class="cal-kpi-icon">📈</span><span class="cal-kpi-text">Best${bestDay ? ' (' + dayName(bestDay) + ')' : ''}</span></div><div class="cal-kpi-val green">${bestDay ? fmtUSD(bestUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label"><span class="cal-kpi-icon">📉</span><span class="cal-kpi-text">Worst${worstDay ? ' (' + dayName(worstDay) + ')' : ''}</span></div><div class="cal-kpi-val ${worstUSD < 0 ? 'red' : 'green'}">${worstDay ? fmtUSD(worstUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label"><span class="cal-kpi-icon">🎯</span><span class="cal-kpi-text">Day Win Rate</span></div><div class="cal-kpi-val ${wrColor}">${wr}%</div><div class="cal-kpi-sub-row"><span class="cal-kpi-sub green">▲${winDays}W</span><span class="cal-kpi-sub red">▼${lossDays}L</span><span class="cal-kpi-sub">⬤${beDays}BE</span></div></div>`;
+    const _kpiHtml = `<div class="cal-kpi"><div class="cal-kpi-label"><span class="cal-kpi-icon"><svg class="icn" aria-hidden="true"><use href="#ic-folder"></use></svg></span><span class="cal-kpi-text">Trades</span></div><div class="cal-kpi-val white">${totalTrades}<span style="font-size:10px;color:var(--text3);font-family:var(--font-body);margin-left:5px">${tradingDays.length}d</span></div></div><div class="cal-kpi"><div class="cal-kpi-label"><span class="cal-kpi-icon"><svg class="icn" aria-hidden="true"><use href="#ic-dollar-c"></use></svg></span><span class="cal-kpi-text">P&L</span></div><div class="cal-kpi-val ${totalUSD >= 0 ? 'green' : 'red'}">${fmtUSD(totalUSD)}</div></div><div class="cal-kpi"><div class="cal-kpi-label"><span class="cal-kpi-icon"><svg class="icn" aria-hidden="true"><use href="#ic-trend-up"></use></svg></span><span class="cal-kpi-text">Best${bestDay ? ' (' + dayName(bestDay) + ')' : ''}</span></div><div class="cal-kpi-val green">${bestDay ? fmtUSD(bestUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label"><span class="cal-kpi-icon"><svg class="icn" aria-hidden="true"><use href="#ic-trend-down"></use></svg></span><span class="cal-kpi-text">Worst${worstDay ? ' (' + dayName(worstDay) + ')' : ''}</span></div><div class="cal-kpi-val ${worstUSD < 0 ? 'red' : 'green'}">${worstDay ? fmtUSD(worstUSD) : '—'}</div></div><div class="cal-kpi"><div class="cal-kpi-label"><span class="cal-kpi-icon"><svg class="icn" aria-hidden="true"><use href="#ic-target"></use></svg></span><span class="cal-kpi-text">Day Win Rate</span></div><div class="cal-kpi-val ${wrColor}">${wr}%</div><div class="cal-kpi-sub-row"><span class="cal-kpi-sub green">▲${winDays}W</span><span class="cal-kpi-sub red">▼${lossDays}L</span><span class="cal-kpi-sub"><svg class="icn" aria-hidden="true"><use href="#ic-dot"></use></svg>${beDays}BE</span></div></div>`;
     if (kpiEl) kpiEl.innerHTML = _kpiHtml;
     if (kpiEl2) kpiEl2.innerHTML = _kpiHtml;
   }
@@ -8604,7 +8619,7 @@ function calExportImage() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      showToast('Calendar image saved! 🖼', 'success');
+      showToast('Calendar image saved! <svg class="icn" aria-hidden="true"><use href="#ic-image"></use></svg>', 'success');
     }).catch(err => {
       console.error('Calendar export failed:', err);
       showToast('Export failed — ' + (err && err.message ? err.message : 'please try again'), 'danger');
@@ -8629,14 +8644,14 @@ function openCalPopup(e, dateStr) {
   const losses   = dayTrades.filter(t => t.outcome === 'Loss').length;
   const outcome  = calculateDailyOutcome(totalUSD);
   const outColor = outcome === 'win' ? 'var(--green)' : outcome === 'loss' ? 'var(--red)' : 'var(--blue)';
-  const outLabel = outcome === 'win' ? 'Winning Day ▲' : outcome === 'loss' ? 'Losing Day ▼' : 'Breakeven Day ⬤';
+  const outLabel = outcome === 'win' ? 'Winning Day ▲' : outcome === 'loss' ? 'Losing Day ▼' : 'Breakeven Day <svg class="icn" aria-hidden="true"><use href="#ic-dot"></use></svg>';
   const dt       = new Date(dateStr + 'T12:00:00');
   const dateLabel = dt.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
 
   const tradeRows = dayTrades.map(t => {
     const pnlUSD = toPnlDollars(t, accSize);
     const pnlC   = pnlUSD > 0 ? 'var(--green)' : pnlUSD < 0 ? 'var(--red)' : 'var(--blue)';
-    const icon   = t.outcome === 'Win' ? '✅' : t.outcome === 'Loss' ? '❌' : '➖';
+    const icon   = t.outcome === 'Win' ? '<svg class="icn icn-green" aria-hidden="true"><use href="#ic-check-c"></use></svg>' : t.outcome === 'Loss' ? '<svg class="icn icn-red" aria-hidden="true"><use href="#ic-close-c"></use></svg>' : '<svg class="icn" aria-hidden="true"><use href="#ic-minus"></use></svg>';
     return '<div class="cal-popup-trade" onclick="closeCalPopup();openDetail(' + t.id + ')">'
       + '<div style="font-size:16px">' + icon + '</div>'
       + '<div class="cal-popup-pair">' + t.pair + '</div>'
@@ -8656,7 +8671,7 @@ function openCalPopup(e, dateStr) {
       + '</div>'
       + '<div style="display:flex;gap:6px;align-items:center">'
         + '<button onclick="closeCalPopup();openModal({date:\'' + dateStr + '\'})" style="font-size:11px;padding:4px 9px;border-radius:var(--r-sm);background:var(--blue-dim);border:1px solid rgba(96,165,250,.3);color:var(--blue);cursor:pointer">+ Add</button>'
-        + '<button class="cal-popup-close" onclick="closeCalPopup()">✕</button>'
+        + '<button class="cal-popup-close" onclick="closeCalPopup()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>'
       + '</div>'
     + '</div>'
     + tradeRows
@@ -8752,7 +8767,7 @@ function renderTrash() {
   if (!list) return;
   const filtered = getFilteredTrash();
   if (!deletedTrades.length) {
-    list.innerHTML = `<div class="trash-empty-state"><div style="font-size:56px;margin-bottom:14px">🗑</div><div style="font-size:16px;font-weight:600;margin-bottom:6px;color:var(--text)">Trash is empty</div><div style="font-size:13px;color:var(--text3);max-width:320px;margin:0 auto;line-height:1.6">Deleted trades appear here for ${trashSettings.autoDays} days. You can restore them anytime.</div></div>`;
+    list.innerHTML = `<div class="trash-empty-state"><div style="font-size:56px;margin-bottom:14px"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg></div><div style="font-size:16px;font-weight:600;margin-bottom:6px;color:var(--text)">Trash is empty</div><div style="font-size:13px;color:var(--text3);max-width:320px;margin:0 auto;line-height:1.6">Deleted trades appear here for ${trashSettings.autoDays} days. You can restore them anytime.</div></div>`;
     if (countEl) countEl.textContent = '';
     if (emptyBtn) emptyBtn.style.display = 'none';
     return;
@@ -8765,7 +8780,7 @@ function renderTrash() {
   const earlierGroup = filtered.filter(t => !t.deletedAt || new Date(t.deletedAt).toDateString() !== today);
   function trashCardHTML(t) {
     const pnlC = t.pnl > 0 ? 'outcome-win' : t.pnl < 0 ? 'outcome-loss' : 'outcome-be';
-    const outIcon = t.outcome === 'Win' ? '✅' : t.outcome === 'Loss' ? '❌' : '➖';
+    const outIcon = t.outcome === 'Win' ? '<svg class="icn icn-green" aria-hidden="true"><use href="#ic-check-c"></use></svg>' : t.outcome === 'Loss' ? '<svg class="icn icn-red" aria-hidden="true"><use href="#ic-close-c"></use></svg>' : '<svg class="icn" aria-hidden="true"><use href="#ic-minus"></use></svg>';
     const delDate = t.deletedAt ? new Date(t.deletedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Unknown';
     const expDays = daysUntilExpiry(t.deletedAt);
     const expClass = expDays <= 3 ? 'urgent' : expDays <= 7 ? 'warning' : 'ok';
@@ -8780,8 +8795,8 @@ function renderTrash() {
       </div>
       <div class="trash-card-pnl ${pnlC}" style="min-width:52px;text-align:right">${_pnlLabel(t)}</div>
       <div class="trash-card-actions">
-        <button class="glass-btn glass-btn-restore" style="font-size:11px;padding:5px 12px" onclick="event.stopPropagation();restoreTrade('${origId}')">↩ Restore</button>
-        <button class="glass-btn glass-btn-danger" style="font-size:11px;padding:5px 10px" onclick="event.stopPropagation();permanentDelete('${origId}')">✕</button>
+        <button class="glass-btn glass-btn-restore" style="font-size:11px;padding:5px 12px" onclick="event.stopPropagation();restoreTrade('${origId}')"><svg class="icn" aria-hidden="true"><use href="#ic-restore"></use></svg> Restore</button>
+        <button class="glass-btn glass-btn-danger" style="font-size:11px;padding:5px 10px" onclick="event.stopPropagation();permanentDelete('${origId}')"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
       </div>
     </div>`;
   }
@@ -8795,7 +8810,7 @@ async function quickDelete(id) {
   const t = trades.find(x => x.id === id);
   if (!t) return;
   openGlassModal({
-    icon: '🗑', title: 'Move to Trash?',
+    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg>', title: 'Move to Trash?',
     body: `<div class="glass-modal-trade-pill"><span class="${t.pos === 'Buy' ? 'pos-buy' : 'pos-sell'}">${t.pos}</span><strong>${t.pair}</strong><span style="color:var(--text3)">${t.date}</span><span class="${t.pnl >= 0 ? 'outcome-win' : 'outcome-loss'}">${_pnlLabel(t)}</span></div><div style="font-size:12px;color:var(--text3);margin-top:6px">Trade will be kept in Trash for ${trashSettings.autoDays} days. Restore anytime.</div>`,
     confirmLabel: 'Move to Trash', confirmClass: 'glass-btn-danger',
     onConfirm: async () => {
@@ -8868,7 +8883,7 @@ function permanentDelete(originalId) {
   const t = deletedTrades.find(x => (x.originalId || x.id) == originalId);
   if (!t) { showToast('Trade not found', 'danger'); return; }
   openGlassModal({
-    icon: '⚠️', title: 'Permanently Delete?',
+    icon: '<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg>', title: 'Permanently Delete?',
     body: `<div class="glass-modal-trade-pill"><strong>${t.pair}</strong><span style="color:var(--text3)">${t.date}</span><span class="${t.pnl >= 0 ? 'outcome-win' : 'outcome-loss'}">${_pnlLabel(t)}</span></div><div style="font-size:12px;color:var(--red);margin-top:8px;font-weight:500">This cannot be undone.</div>`,
     confirmLabel: 'Delete Forever', confirmClass: 'glass-btn-danger',
     onConfirm: async () => {
@@ -8900,7 +8915,7 @@ function permanentDelete(originalId) {
 function openEmptyTrashModal() {
   if (!deletedTrades.length) return;
   openGlassModal({
-    icon: '🗑', title: 'Empty Entire Trash?',
+    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg>', title: 'Empty Entire Trash?',
     body: `<strong>${deletedTrades.length} trade${deletedTrades.length !== 1 ? 's' : ''}</strong> will be permanently deleted.<br><br><div style="font-size:12px;color:var(--red);font-weight:500">All data will be lost forever. This cannot be undone.</div>`,
     confirmLabel: 'Empty Trash', confirmClass: 'glass-btn-danger',
     onConfirm: async () => {
@@ -8943,7 +8958,7 @@ function openEmptyTrashModal() {
 // ── GLASS MODAL & TOAST ───────────────────────────────
 let _gmCallback = null;
 function openGlassModal({ icon, title, body, confirmLabel, confirmClass, onConfirm, onCancel }) {
-  document.getElementById('gm-icon').textContent = icon || '⚠️';
+  document.getElementById('gm-icon').textContent = icon || '<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg>';
   document.getElementById('gm-title').textContent = title || 'Confirm';
   document.getElementById('gm-body').innerHTML = body || '';
   _gmCallback = onConfirm || null;
@@ -9016,8 +9031,8 @@ function _buildDaySessionMatrix() {
   html += '</tr></thead><tbody>';
 
   SESSIONS.forEach(s => {
-    const icon = s === 'London' ? '🇬🇧' : s === 'New York' ? '🗽' : '🌏';
-    html += `<tr><td style="padding:5px 8px;font-weight:600;color:var(--text1);white-space:nowrap">${icon} ${s}</td>`;
+    const sIcon = icon('clock', {cls:'icn-sm'});
+    html += `<tr><td style="padding:5px 8px;font-weight:600;color:var(--text1);white-space:nowrap">${sIcon} ${s}</td>`;
     DAYS.forEach(d => {
       const cell = matrix[s][d];
       if (cell.total === 0) {
@@ -9050,7 +9065,7 @@ function _buildDaySessionMatrix() {
     const bWrPct = Math.round(bestCell.wr * 100);
     const wWrPct = Math.round(worstCell.wr * 100);
     html += `<div style="margin-top:10px;padding:8px 10px;border-radius:6px;background:rgba(96,165,250,0.07);border:1px solid rgba(96,165,250,0.15);font-size:11px;color:var(--text2)">
-      💡 Best: <strong style="color:var(--green)">${bestCell.d} ${bestCell.s}</strong> (${bWrPct}% WR, ${bestCell.total} trades) &nbsp;·&nbsp; Worst: <strong style="color:var(--red)">${worstCell.d} ${worstCell.s}</strong> (${wWrPct}% WR, ${worstCell.total} trades)
+      <svg class="icn" aria-hidden="true"><use href="#ic-bulb"></use></svg> Best: <strong style="color:var(--green)">${bestCell.d} ${bestCell.s}</strong> (${bWrPct}% WR, ${bestCell.total} trades) &nbsp;·&nbsp; Worst: <strong style="color:var(--red)">${worstCell.d} ${worstCell.s}</strong> (${wWrPct}% WR, ${worstCell.total} trades)
     </div>`;
   }
 
@@ -9092,7 +9107,7 @@ function _buildLossPatternChart() {
   const topReason = sorted[0];
   if (topReason[1] >= 2) {
     html += `<div style="margin-top:12px;padding:8px 10px;border-radius:6px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);font-size:11px;color:var(--text2)">
-      🔴 <strong style="color:var(--red)">"${topReason[0]}"</strong> accounts for ${Math.round((topReason[1]/total)*100)}% of your losses — this is your #1 execution leak.
+      <svg class="icn icn-red" aria-hidden="true"><use href="#ic-dot"></use></svg> <strong style="color:var(--red)">"${topReason[0]}"</strong> accounts for ${Math.round((topReason[1]/total)*100)}% of your losses — this is your #1 execution leak.
     </div>`;
   }
   el.innerHTML = html;
@@ -9128,7 +9143,7 @@ function _buildChecklistDiscipline() {
     const skipLossPct = Math.round(skipRateLoss * 100);
     const skipWinPct  = Math.round(skipRateWin  * 100);
     const severity = correlation > 0.3 ? 'var(--red)' : correlation > 0.1 ? 'var(--gold)' : 'var(--green)';
-    const flag = correlation > 0.3 ? '🔴' : correlation > 0.1 ? '🟡' : '✅';
+    const flag = correlation > 0.3 ? '<svg class="icn icn-red" aria-hidden="true"><use href="#ic-dot"></use></svg>' : correlation > 0.1 ? '<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-dot"></use></svg>' : '<svg class="icn icn-green" aria-hidden="true"><use href="#ic-check-c"></use></svg>';
     html += `<div style="padding:8px 10px;border-radius:6px;background:rgba(255,255,255,0.03);border:1px solid var(--glass-border)">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
         <span style="font-size:12px;font-weight:600;color:var(--text1)">${flag} ${item}</span>
@@ -9404,14 +9419,14 @@ function _openManageAccounts() {
   overlay.innerHTML = `
   <div class="acc-manager-modal">
     <div class="acc-manager-header">
-      <span>⚙ Manage Accounts</span>
-      <button onclick="document.getElementById('acc-manager-overlay').remove()" class="acc-mgr-close">✕</button>
+      <span><svg class="icn" aria-hidden="true"><use href="#ic-settings"></use></svg> Manage Accounts</span>
+      <button onclick="document.getElementById('acc-manager-overlay').remove()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
     </div>
     <div class="acc-manager-body">
       <div class="acc-mgr-tabs">
         <button class="acc-mgr-tab active" onclick="_accMgrTab('active',this)">Active</button>
         <button class="acc-mgr-tab" onclick="_accMgrTab('archived',this)">Archived</button>
-        <button class="acc-mgr-tab acc-mgr-tab-del" onclick="_accMgrTab('deleted',this)">🗑 Deleted</button>
+        <button class="acc-mgr-tab acc-mgr-tab-del" onclick="_accMgrTab('deleted',this)"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg> Deleted</button>
       </div>
       <div id="acc-mgr-list-active" class="acc-mgr-list"></div>
       <div id="acc-mgr-list-archived" class="acc-mgr-list" style="display:none"></div>
@@ -9630,7 +9645,7 @@ function _editAccount(i) {
         </select>
         <div class="acc-mgr-actions" style="margin-left:auto">
           <button onclick="_saveEditAccount(${i})" class="acc-mgr-btn edit" title="Save">✓</button>
-          <button onclick="_rebuildAccMgrList()" class="acc-mgr-btn" title="Cancel">✕</button>
+          <button onclick="_rebuildAccMgrList()" class="acc-mgr-btn" title="Cancel"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
         </div>
       </div>
     </div>`;
@@ -9785,10 +9800,10 @@ function openShareModal(id) {
   overlay.innerHTML = `
   <div class="sm-modal" id="sm-modal">
     <div class="sm-header">
-      <div class="sm-title"><span>📤</span> Share Trade Card</div>
+      <div class="sm-title"><span><svg class="icn" aria-hidden="true"><use href="#ic-upload"></use></svg></span> Share Trade Card</div>
       <div class="sm-header-right">
-        <button class="sm-icon-btn" id="sm-theme-btn" onclick="smToggleTheme()" title="Toggle card theme">${_shareCardTheme === 'dark' ? '☀️' : '🌙'}</button>
-        <button class="sm-icon-btn sm-close-btn" onclick="closeShareModal()">✕</button>
+        <button class="sm-icon-btn" id="sm-theme-btn" onclick="smToggleTheme()" title="Toggle card theme">${_shareCardTheme === 'dark' ? '<svg class="icn" aria-hidden="true"><use href="#ic-sun"></use></svg>' : '<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg>'}</button>
+        <button class="sm-icon-btn sm-close-btn" onclick="closeShareModal()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
       </div>
     </div>
     <div class="sm-body">
@@ -9847,13 +9862,13 @@ function openShareModal(id) {
       <div class="sm-section">
         <div class="sm-section-lbl">Export format</div>
         <div class="sm-fmt-row">
-          <button class="sm-fmt-btn active" id="sm-fmt-jpg" onclick="smSetFmt('jpg',this)"><span class="sm-fmt-icon">🖼</span><div><div class="sm-fmt-name">JPG Image</div><div class="sm-fmt-desc">Best for social sharing</div></div></button>
-          <button class="sm-fmt-btn" id="sm-fmt-pdf" onclick="smSetFmt('pdf',this)"><span class="sm-fmt-icon">📄</span><div><div class="sm-fmt-name">PDF Document</div><div class="sm-fmt-desc">Best for records &amp; print</div></div></button>
+          <button class="sm-fmt-btn active" id="sm-fmt-jpg" onclick="smSetFmt('jpg',this)"><span class="sm-fmt-icon"><svg class="icn" aria-hidden="true"><use href="#ic-image"></use></svg></span><div><div class="sm-fmt-name">JPG Image</div><div class="sm-fmt-desc">Best for social sharing</div></div></button>
+          <button class="sm-fmt-btn" id="sm-fmt-pdf" onclick="smSetFmt('pdf',this)"><span class="sm-fmt-icon"><svg class="icn" aria-hidden="true"><use href="#ic-notebook"></use></svg></span><div><div class="sm-fmt-name">PDF Document</div><div class="sm-fmt-desc">Best for records &amp; print</div></div></button>
         </div>
       </div>
       <div class="sm-actions">
-        <button class="sm-btn sm-btn-primary" id="sm-dl-btn" onclick="smDownload()"><span class="sm-spinner" id="sm-dl-spin"></span><span id="sm-dl-lbl">⬇ Download</span></button>
-        <button class="sm-btn sm-btn-ghost" id="sm-share-btn" onclick="smShareNative()"><span class="sm-spinner sm-spinner-light" id="sm-share-spin"></span><span id="sm-share-lbl">🔗 Share</span></button>
+        <button class="sm-btn sm-btn-primary" id="sm-dl-btn" onclick="smDownload()"><span class="sm-spinner" id="sm-dl-spin"></span><span id="sm-dl-lbl"><svg class="icn" aria-hidden="true"><use href="#ic-download"></use></svg> Download</span></button>
+        <button class="sm-btn sm-btn-ghost" id="sm-share-btn" onclick="smShareNative()"><span class="sm-spinner sm-spinner-light" id="sm-share-spin"></span><span id="sm-share-lbl"><svg class="icn" aria-hidden="true"><use href="#ic-link"></use></svg> Share</span></button>
       </div>
     </div>
   </div>`;
@@ -9912,7 +9927,7 @@ function smPopulateCard(id) {
   const chartColor=t.outcome==='Win'?'#34d399':t.outcome==='Loss'?'#f87171':'#fbbf24';
   const cl=document.getElementById('sm-chartline'); if(cl)cl.style.stroke=chartColor;
   const stars=document.getElementById('sm-stars');
-  if(stars)stars.innerHTML=[1,2,3,4,5].map(n=>`<span style="opacity:${n<=t.rating?1:0.2}">★</span>`).join('');
+  if(stars)stars.innerHTML=[1,2,3,4,5].map(n=>`<span style="opacity:${n<=t.rating?1:0.2}">${icon('star',{cls:'icn-sm'})}</span>`).join('');
   const notesRow=document.getElementById('sm-notes-row'),notesEl=document.getElementById('sm-notes');
   if(notesEl&&t.notes&&t.notes.trim()){notesEl.textContent=t.notes.length>130?t.notes.substring(0,127)+'…':t.notes;if(notesRow)notesRow.style.display='';}
   else{if(notesRow)notesRow.style.display='none';}
@@ -9938,7 +9953,7 @@ function smRefreshPnl() {
 
 function smSetPnlMode(mode,btn){_sharePnlMode=mode;document.querySelectorAll('#sm-pnl-seg .sm-seg-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const r=document.getElementById('sm-usd-row');if(r)r.style.display=mode==='pct'?'none':'';smRefreshPnl();}
 function smSetFmt(fmt,btn){_shareFmt=fmt;document.querySelectorAll('.sm-fmt-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
-function smToggleTheme(){_shareCardTheme=_shareCardTheme==='dark'?'light':'dark';const c=document.getElementById('sm-card');if(c)c.className='sm-card '+_shareCardTheme;const b=document.getElementById('sm-theme-btn');if(b)b.textContent=_shareCardTheme==='dark'?'☀️':'🌙';}
+function smToggleTheme(){_shareCardTheme=_shareCardTheme==='dark'?'light':'dark';const c=document.getElementById('sm-card');if(c)c.className='sm-card '+_shareCardTheme;const b=document.getElementById('sm-theme-btn');if(b)b.textContent=_shareCardTheme==='dark'?'<svg class="icn" aria-hidden="true"><use href="#ic-sun"></use></svg>':'<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg>';}
 function closeShareModal(){
   const o=document.getElementById('share-modal-overlay');
   if(!o)return;
@@ -10014,21 +10029,21 @@ async function smDownload(){
   try{const t=trades.find(x=>x.id===_shareTradeId),filename=`NxTGen_${(t||{pair:'Trade'}).pair}_${(t||{date:'trade'}).date}`,canvas=await _smCapture();
     if(_shareFmt==='pdf'){const{jsPDF}=window.jspdf,pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'}),pw=pdf.internal.pageSize.getWidth(),iw=pw-30,ih=(canvas.height/canvas.width)*iw;pdf.addImage(canvas.toDataURL('image/jpeg',0.96),'JPEG',15,20,iw,ih);pdf.save(filename+'.pdf');}
     else{const link=document.createElement('a');link.download=filename+'.jpg';link.href=canvas.toDataURL('image/jpeg',0.96);link.click();}
-    showToast('Trade card saved! 🎉','success');
+    showToast('Trade card saved! <svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg>','success');
   }catch(e){console.error(e);showToast('Export failed — try again','danger');}
-  _smSetLoading('sm-dl-btn','sm-dl-spin','sm-dl-lbl',false,'⬇ Download');
+  _smSetLoading('sm-dl-btn','sm-dl-spin','sm-dl-lbl',false,'<svg class="icn" aria-hidden="true"><use href="#ic-download"></use></svg> Download');
 }
 async function smShareNative(){
   _smSetLoading('sm-share-btn','sm-share-spin','sm-share-lbl',true);
   try{const t=trades.find(x=>x.id===_shareTradeId),canvas=await _smCapture();
     canvas.toBlob(async blob=>{const file=new File([blob],`NxTGen_${(t||{pair:'Trade'}).pair}.jpg`,{type:'image/jpeg'}),shareData={files:[file],title:`NxTGen · ${(t||{}).pair}`,text:`${(t||{}).pair} ${(t||{}).pos} · ${(t||{}).pnl>=0?'+':''}${(t||{}).pnl}% — NxTGen Journal`};
-      if(navigator.canShare&&navigator.canShare(shareData)){try{await navigator.share(shareData);showToast('Shared! 🔗','success');}catch(e){if(e.name!=='AbortError')_smClipboardFallback(canvas);}}
+      if(navigator.canShare&&navigator.canShare(shareData)){try{await navigator.share(shareData);showToast('Shared! <svg class="icn" aria-hidden="true"><use href="#ic-link"></use></svg>','success');}catch(e){if(e.name!=='AbortError')_smClipboardFallback(canvas);}}
       else _smClipboardFallback(canvas);
-      _smSetLoading('sm-share-btn','sm-share-spin','sm-share-lbl',false,'🔗 Share');
+      _smSetLoading('sm-share-btn','sm-share-spin','sm-share-lbl',false,'<svg class="icn" aria-hidden="true"><use href="#ic-link"></use></svg> Share');
     },'image/jpeg',0.96);
-  }catch(e){console.error(e);showToast('Share failed','danger');_smSetLoading('sm-share-btn','sm-share-spin','sm-share-lbl',false,'🔗 Share');}
+  }catch(e){console.error(e);showToast('Share failed','danger');_smSetLoading('sm-share-btn','sm-share-spin','sm-share-lbl',false,'<svg class="icn" aria-hidden="true"><use href="#ic-link"></use></svg> Share');}
 }
-function _smClipboardFallback(canvas){canvas.toBlob(async blob=>{try{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);showToast('Copied to clipboard! 📋','success');}catch{const l=document.createElement('a');l.download='NxTGen_Trade.jpg';l.href=canvas.toDataURL('image/jpeg',0.96);l.click();showToast('Saved! 🖼','success');};},'image/png');}
+function _smClipboardFallback(canvas){canvas.toBlob(async blob=>{try{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);showToast('Copied to clipboard! <svg class="icn" aria-hidden="true"><use href="#ic-clipboard"></use></svg>','success');}catch{const l=document.createElement('a');l.download='NxTGen_Trade.jpg';l.href=canvas.toDataURL('image/jpeg',0.96);l.click();showToast('Saved! <svg class="icn" aria-hidden="true"><use href="#ic-image"></use></svg>','success');};},'image/png');}
 function _smEnsureLibs(cb){if(typeof html2canvas!=='undefined'&&typeof window.jspdf!=='undefined'){cb();return;}const h2c=document.createElement('script');h2c.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';h2c.onload=()=>{const jpdf=document.createElement('script');jpdf.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';jpdf.onload=cb;document.head.appendChild(jpdf);};document.head.appendChild(h2c);}
 
 // ════════════════════════════════════════════════════════════════════
@@ -10309,7 +10324,7 @@ function _ensureAffirmationUI() {
     <div class="affirmation-overlay" id="affirmation-overlay">
       <div class="affirmation-card">
         <div class="affirmation-head">
-          <div class="affirmation-icon">✨</div>
+          <div class="affirmation-icon"><svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg></div>
           <div>
             <div class="affirmation-label">Daily Affirmations</div>
             <div class="affirmation-count" id="affirmation-count"></div>
@@ -10322,10 +10337,10 @@ function _ensureAffirmationUI() {
     <div class="ai-float-chat-overlay" id="ai-float-chat-overlay">
       <div class="ai-float-chat-card" id="ai-float-chat-card">
         <div class="ai-float-chat-topbar">
-          <div class="ai-float-chat-title"><span>✦</span> NxTGen AI</div>
+          <div class="ai-float-chat-title"><span><svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg></span> NxTGen AI</div>
           <div class="ai-float-chat-topbar-actions">
             <button class="chat-action-btn" title="Open full AI Coach page" onclick="_openAIFullFromFloat()">⤢</button>
-            <button class="chat-action-btn" title="Close" onclick="closeFloatingChat()">✕</button>
+            <button class="chat-action-btn" title="Close" onclick="closeFloatingChat()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
           </div>
         </div>
         <div class="ai-float-chat-body" id="ai-float-chat-body"></div>
@@ -10343,7 +10358,7 @@ function _ensureAffirmationUI() {
   _renderFabIcon(document.getElementById('affirmation-fab'));
 }
 
-// ── FAB mode (two-in-one: Daily Affirmations ⇄ AI Chat) ──────────────────
+// ── FAB mode (two-in-one: Daily Affirmations <svg class="icn" aria-hidden="true"><use href="#ic-swap"></use></svg> AI Chat) ──────────────────
 const _FAB_MODE_KEY = 'affirmation_fab_mode';
 function _getFabMode() {
   try { return localStorage.getItem(_FAB_MODE_KEY) || 'affirmation'; } catch (e) { return 'affirmation'; }
@@ -10748,7 +10763,7 @@ async function profileChangePassword() {
 
 function profileSignOut() {
   openGlassModal({
-    icon:'🚪', title:'Sign Out',
+    icon:'<svg class="icn" aria-hidden="true"><use href="#ic-door-exit"></use></svg>', title:'Sign Out',
     body:'Are you sure you want to sign out of NxTGen Journal?',
     confirmLabel:'Sign Out', confirmClass:'glass-btn-danger',
     onConfirm: async () => { await sb.auth.signOut(); window.location.href = 'login.html'; }
@@ -10785,7 +10800,7 @@ function profileExportCSV() {
 
 function profileConfirmClearData() {
   openGlassModal({
-    icon:'🗑️', title:'Clear All Trades',
+    icon:'<svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg>', title:'Clear All Trades',
     body:`Permanently delete all ${trades.length} trade records? This cannot be undone.`,
     confirmLabel:'Delete All', confirmClass:'glass-btn-danger',
     onConfirm: async () => {
@@ -10801,7 +10816,7 @@ function profileConfirmClearData() {
 
 function profileConfirmDeleteAccount() {
   openGlassModal({
-    icon:'⚠️', title:'Delete Account',
+    icon:'<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg>', title:'Delete Account',
     body:'This permanently deletes your account and all data. Are you absolutely sure?',
     confirmLabel:'Delete My Account', confirmClass:'glass-btn-danger',
     onConfirm: () => showToast('Please contact support at support@nxtgen.app to delete your account.', 'restore')
@@ -10907,7 +10922,7 @@ function _mt5Step1Html() {
 
   return `
   <div class="mt5-info">
-    <span class="mt5-info-icon">☁️</span>
+    <span class="mt5-info-icon"><svg class="icn" aria-hidden="true"><use href="#ic-cloud"></use></svg></span>
     <div>Enter your MT5 broker credentials below. NxTGen connects directly to your
     broker's server via <strong>MetaApi cloud</strong> — no Expert Advisor or open
     terminal required. Your trades sync automatically 24/7.</div>
@@ -10933,7 +10948,7 @@ function _mt5Step1Html() {
   </div>
 
   <div class="mt5-warn">
-    <span class="mt5-warn-icon">🔒</span>
+    <span class="mt5-warn-icon"><svg class="icn" aria-hidden="true"><use href="#ic-lock"></use></svg></span>
     <div>Use your <strong>Investor Password</strong> for read-only access — MetaApi
     will only be able to read your trade history, not place or close trades.</div>
   </div>
@@ -11034,17 +11049,17 @@ function _mt5Step2Html() {
   const cfg = _mt5ModalState.acc?.mt5 || {};
   return `
   <div class="mt5-success-banner" style="background:rgba(96,165,250,0.08);border-color:rgba(96,165,250,0.22)">
-    <div class="mt5-success-icon">☁️</div>
+    <div class="mt5-success-icon"><svg class="icn" aria-hidden="true"><use href="#ic-cloud"></use></svg></div>
     <div class="mt5-success-title" style="color:var(--blue)">Account Registered with MetaApi</div>
     <div class="mt5-success-sub">
       Login: <strong>${cfg.login}</strong> · Server: <strong>${cfg.server}</strong><br>
       MetaApi is deploying a cloud terminal and connecting to your broker.<br>
-      <span style="color:var(--gold)">⏱ This takes 30–90 seconds on first connection.</span>
+      <span style="color:var(--gold)">${icon('clock',{cls:'icn-sm'})} This takes 30–90 seconds on first connection.</span>
     </div>
   </div>
 
   <div class="mt5-info">
-    <span class="mt5-info-icon">💡</span>
+    <span class="mt5-info-icon"><svg class="icn" aria-hidden="true"><use href="#ic-bulb"></use></svg></span>
     <div>Click <strong>Fetch My Trades</strong> when ready. If it fails on the first try,
     wait 30 seconds and try again — MetaApi needs time to establish the broker connection.
     Once connected, syncs happen automatically every
@@ -11052,7 +11067,7 @@ function _mt5Step2Html() {
   </div>
 
   <div class="mt5-actions">
-    <button class="mt5-btn-cancel" onclick="_mt5RenderStep(1)">← Back</button>
+    <button class="mt5-btn-cancel" onclick="_mt5RenderStep(1)"><svg class="icn" aria-hidden="true"><use href="#ic-arrow-left"></use></svg> Back</button>
     <button class="mt5-btn-primary" id="mt5-verify-btn" onclick="_mt5VerifyAndSync()">
       <span class="mt5-spinner" id="mt5-spin" style="display:none"></span>
       Fetch My Trades →
@@ -11171,14 +11186,14 @@ function _mt5Step3Html() {
       </div>
     </div>` : `
     <div style="color:var(--text3);font-size:12px;text-align:center;padding:24px 0">
-      <div style="font-size:28px;margin-bottom:10px">📭</div>
+      <div style="font-size:28px;margin-bottom:10px"><svg class="icn" aria-hidden="true"><use href="#ic-inbox"></use></svg></div>
       No trades synced yet.<br>
       <span style="font-size:11px">Click <strong>Sync Now</strong> to fetch your trade history.</span>
     </div>`;
 
   return `
   <div class="mt5-success-banner">
-    <div class="mt5-success-icon">🔗</div>
+    <div class="mt5-success-icon"><svg class="icn" aria-hidden="true"><use href="#ic-link"></use></svg></div>
     <div class="mt5-success-title">MT5 Connected ${statusBadge}</div>
     <div class="mt5-success-sub">
       ${acc.name} · ${cfg.server || '—'} · Login: ${cfg.login || '—'}<br>
@@ -11310,7 +11325,7 @@ function _mt5MapTrade(mt5Trade, accountName) {
     account: accountName,
     rating: 3,
     notes: [
-      '📥 MT5 Import (MetaApi)',
+      '<svg class="icn" aria-hidden="true"><use href="#ic-download"></use></svg> MT5 Import (MetaApi)',
       `Ticket: ${mt5Trade.ticket || '?'}`,
       `Lots: ${lots}`,
       `Open: ${openPrice} → Close: ${closePrice}`,
@@ -11337,7 +11352,7 @@ function _mt5GuessKillzone(date) {
 
 async function _mt5DisconnectConfirm() {
   openGlassModal({
-    icon: '🔌', title: 'Disconnect MT5?',
+    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-plug"></use></svg>', title: 'Disconnect MT5?',
     body: `Stops syncing <strong>${_mt5ModalState.accountName}</strong> and removes
            MetaApi connection. Already-imported trades are kept.`,
     confirmLabel: 'Disconnect', confirmClass: 'glass-btn-danger',
