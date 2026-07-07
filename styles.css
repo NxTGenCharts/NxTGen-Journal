@@ -5584,22 +5584,22 @@ body{
      always reaches the top AND bottom edge of whatever height
      smSyncCardHeight assigns it (square, landscape, or a very tall
      portrait/story shape). .sm-top-bar stays pinned to the top edge,
-     .sm-footer stays pinned to the bottom edge, and .sm-card-body (flex:1)
-     absorbs/distributes any extra height in between — so a tall export
-     never ends in a blank gap below the last row. */
+     and .sm-card-body (flex:1) absorbs/distributes any extra height
+     below it — so a tall export never ends in a blank gap below the
+     last row. */
   display: flex;
   flex-direction: column;
 }
-/* Flexible middle region: everything between the top bar and the footer.
-   Rather than justify-content:space-between (flex-computed gap
-   distribution, which html2canvas rasterizes unreliably — it was the
-   cause of rows drifting down and overlapping the footer in exports),
-   the extra vertical space is measured in JS (smFitCardContent) and
-   applied here as a literal --fill-gap pixel value via the CSS gap
-   property. That's just fixed spacing between block-level rows, which
-   html2canvas renders exactly like real margins — no auto-distribution
-   math for it to get wrong. min-height:0 still lets this shrink below
-   its natural content size for the existing --s shrink-to-fit path. */
+/* Flexible middle region: everything below the top bar. Rather than
+   justify-content:space-between (flex-computed gap distribution, which
+   html2canvas rasterizes unreliably — it was the cause of rows drifting
+   down and overlapping the bottom of the card in exports), the extra
+   vertical space is measured in JS (smFitCardContent) and applied here
+   as a literal --fill-gap pixel value via the CSS gap property. That's
+   just fixed spacing between block-level rows, which html2canvas renders
+   exactly like real margins — no auto-distribution math for it to get
+   wrong. min-height:0 still lets this shrink below its natural content
+   size for the existing --s shrink-to-fit path. */
 .sm-card-body {
   --fill-gap: 0px;
   display: flex;
@@ -5607,13 +5607,13 @@ body{
   flex: 1;
   min-height: 0;
   gap: var(--fill-gap);
-  /* Always-present breathing room before the footer bar. Without this,
-     short/wide shapes (Square, Landscape, Wallpaper) — where the
-     computed --fill-gap ends up tiny or zero because content already
-     nearly fills the height — leave the last row (stars) sitting flush
-     against the footer's background rectangle. Tall shapes (Portrait,
-     Phone Story) already get generous --fill-gap spacing everywhere
-     else, so this fixed amount is invisible there. */
+  /* Always-present breathing room at the bottom of the card. Without this,
+     short/wide shapes (Square, Landscape, Wallpaper) — where the computed
+     --fill-gap ends up tiny or zero because content already nearly fills
+     the height — leave the last row sitting flush against the card's
+     bottom edge. Tall shapes (Portrait, Phone Story) already get
+     generous --fill-gap spacing everywhere else, so this fixed amount
+     is invisible there. */
   padding-bottom: calc(16px*var(--s));
 }
 .sm-card.dark {
@@ -5681,17 +5681,6 @@ body{
 .sm-card.light .sm-card-logo {
   /* Light card: force entire logo to solid black — clean on white bg */
   filter: brightness(0);
-}
-/* Footer logo in share card */
-.sm-footer-logo {
-  height: calc(18px*var(--s)); width: auto;
-  object-fit: contain; display: block;
-  opacity: 0.55;
-  filter: brightness(0) invert(1); /* dark card: white */
-}
-.sm-card.light .sm-footer-logo {
-  filter: brightness(0); /* light card: black */
-  opacity: 0.35;
 }
 [data-theme="light"] .sm-brand-logo {
   filter: brightness(0);
@@ -5814,12 +5803,6 @@ body{
 .sm-notes { padding: calc(10px*var(--s)) calc(14px*var(--s)); border-radius: 0; font-size: calc(12px*var(--s)); line-height: 1.6; font-style: italic; border-left: 3px solid #fbbf24; }
 .sm-card.dark  .sm-notes { background: rgba(255,255,255,0.03); color: rgba(240,244,255,0.60); }
 .sm-card.light .sm-notes { background: rgba(0,0,0,0.03); color: rgba(15,23,42,0.60); border-left-color: #b45309; }
-
-.sm-footer { display: flex; align-items: center; justify-content: space-between; padding: calc(11px*var(--s)) calc(22px*var(--s)); flex-shrink: 0; }
-.sm-card.dark  .sm-footer { background: rgba(255,255,255,0.025); border-top: 1px solid rgba(255,255,255,0.055); }
-.sm-card.light .sm-footer { background: rgba(0,0,0,0.025); border-top: 1px solid rgba(0,0,0,0.06); }
-.sm-footer-url   { font-size: calc(10px*var(--s)); opacity: 0.30; }
-.sm-footer-brand { font-size: calc(12px*var(--s)); font-weight: 800; letter-spacing: 1px; opacity: 0.28; }
 
 /* ── Share modal controls ── */
 .sm-section { display: flex; flex-direction: column; gap: 8px; }

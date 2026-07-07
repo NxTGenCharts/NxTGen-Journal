@@ -9867,7 +9867,6 @@ function openShareModal(id) {
           <div class="sm-narrative-lbl" id="sm-narrative-lbl" style="display:none">Trade Narrative</div>
           <div class="sm-notes-row" id="sm-notes-row"><div class="sm-notes" id="sm-notes"></div></div>
           </div>
-          <div class="sm-footer"><span class="sm-footer-url">nxtgencharts.github.io/NxTGen-Journal</span><img class="sm-footer-logo" src="logo.svg" alt="NxTGen"></div>
         </div>
         </div>
       </div>
@@ -10269,7 +10268,7 @@ async function _smCapture() {
       allowTaint: true,
       imageTimeout: 5000,
       onclone: (doc) => {
-        doc.querySelectorAll('.sm-card-logo, .sm-footer-logo').forEach(el => {
+        doc.querySelectorAll('.sm-card-logo').forEach(el => {
           el.setAttribute('src', logoDataUrl);
           el.style.filter  = 'none';
           el.style.opacity = '1';
