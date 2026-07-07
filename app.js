@@ -9857,6 +9857,7 @@ function openShareModal(id) {
           </div>
           <div class="sm-rings" id="sm-rings"></div>
           <div class="sm-mini-stats" id="sm-mini-stats"></div>
+          <div class="sm-checklist-divider" id="sm-checklist-divider" style="display:none"></div>
           <div class="sm-checklist-lbl" id="sm-checklist-lbl" style="display:none">Entry Checklist</div>
           <div class="sm-checklist-grid" id="sm-checklist-grid"></div>
           <div class="sm-narrative-lbl" id="sm-narrative-lbl" style="display:none">Trade Narrative</div>
@@ -10106,10 +10107,12 @@ function buildSmMiniStats(t){
 function buildSmChecklistGrid(t){
   const grid = document.getElementById('sm-checklist-grid');
   const lbl  = document.getElementById('sm-checklist-lbl');
+  const div  = document.getElementById('sm-checklist-divider');
   if (!grid) return;
   const checkedIdx = Array.isArray(t.checklist) ? t.checklist : [];
-  if (!CHECKLIST_ITEMS.length){ grid.innerHTML=''; if(lbl) lbl.style.display='none'; return; }
+  if (!CHECKLIST_ITEMS.length){ grid.innerHTML=''; if(lbl) lbl.style.display='none'; if(div) div.style.display='none'; return; }
   if (lbl) lbl.style.display = '';
+  if (div) div.style.display = '';
   grid.innerHTML = CHECKLIST_ITEMS.map((label, i) => {
     const on = checkedIdx.includes(i);
     return `<div class="sm-check-item ${on?'checked':''}"><span class="sm-check-icon ${on?'checked':''}">${on?icon('check',{cls:'icn-sm'}):''}</span><span>${label}</span></div>`;
