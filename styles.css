@@ -5616,12 +5616,12 @@ body{
      is invisible there. */
   padding-bottom: calc(24px*var(--s));
 }
-/* Instagram Square, Twitter Landscape, and Desktop Wallpaper get a touch
-   more bottom breathing room than the default 24px — 30px brings the
-   gap between the checklist and the card's bottom edge closer in line
-   with the spacing already present at the top of the card for these
-   short/wide shapes. Other presets (Portrait, Phone Story) keep the
-   default, since their generous --fill-gap already handles spacing.
+/* Instagram Square and Twitter Landscape get a touch more bottom
+   breathing room than the default 24px — 30px brings the gap between
+   the checklist and the card's bottom edge closer in line with the
+   spacing already present at the top of the card for these short/wide
+   shapes. Portrait keeps the default, since its generous --fill-gap
+   already handles spacing.
    Deliberately NOT multiplied by var(--s) here: these are exactly the
    shapes whose content overflows the fixed export height, so
    smFitCardContent()'s binary search shrinks --s to make everything
@@ -5633,8 +5633,7 @@ body{
    gaps, rings) shrinks to make room, so this 30px always renders at
    its full size. */
 .sm-card[data-size-preset="ig_square"] .sm-card-body,
-.sm-card[data-size-preset="tw_landscape"] .sm-card-body,
-.sm-card[data-size-preset="wallpaper"] .sm-card-body {
+.sm-card[data-size-preset="tw_landscape"] .sm-card-body {
   padding-bottom: 30px;
 }
 .sm-card.dark {

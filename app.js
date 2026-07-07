@@ -9795,8 +9795,6 @@ const SM_SIZE_PRESETS = {
   ig_square:   { label: 'Instagram Square · 4096²',           w: 4096, h: 4096, ppi: 400, printIn: 10.5 },
   tw_landscape:{ label: 'Twitter Landscape · 4096×2304',      w: 4096, h: 2304, ppi: 400, printIn: 10.5 },
   portrait:    { label: 'Portrait · 3072×4096',               w: 3072, h: 4096, ppi: 400, printIn: 10.5 },
-  wallpaper:   { label: 'Desktop Wallpaper · 3840×2160',      w: 3840, h: 2160, ppi: 400, printIn: 10.5 },
-  phone_story: { label: 'Phone Story · 2160×3840',            w: 2160, h: 3840, ppi: 400, printIn: 10.5 },
 };
 
 function openShareModal(id) {
@@ -9978,7 +9976,7 @@ function smSyncCardHeight(){
 // fonts, smaller gaps, smaller rings — until it actually fits inside the
 // card's current (fixed) height. This is never a visual transform/crop:
 // the content itself gets smaller, so nothing is ever cut off, at any
-// export size from a short wide wallpaper to a tall phone story.
+// export size from a short wide landscape to a tall portrait.
 //
 // When content is instead SHORTER than the target height (tall Portrait/
 // Phone Story shapes), the leftover space is distributed between
