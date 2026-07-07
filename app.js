@@ -9818,9 +9818,7 @@ function openShareModal(id) {
     </div>
     <div class="sm-body">
       <div class="sm-card-wrap">
-        <div class="sm-frame ${_shareCardTheme}" id="sm-frame">
-          <div class="sm-frame-bg" id="sm-frame-bg"></div>
-          <div class="sm-card-scaler" id="sm-card-scaler">
+        <div class="sm-card-outer" id="sm-card-outer">
         <div class="sm-card ${_shareCardTheme}" id="sm-card">
           <div class="sm-bg-layer">
             <svg class="sm-chart-bg" viewBox="0 0 600 260" preserveAspectRatio="none" aria-hidden="true">
@@ -9837,6 +9835,7 @@ function openShareModal(id) {
             </div>
             <div class="sm-badge" id="sm-badge"></div>
           </div>
+          <div class="sm-card-body" id="sm-card-body">
           <div class="sm-trend-hero" id="sm-trend-hero" aria-hidden="true"><svg viewBox="0 0 400 46" preserveAspectRatio="none"><path id="sm-trend-path" d="" /></svg></div>
           <div class="sm-hero">
             <div class="sm-hero-left">
@@ -9863,9 +9862,9 @@ function openShareModal(id) {
           <div class="sm-narrative-lbl" id="sm-narrative-lbl" style="display:none">Trade Narrative</div>
           <div class="sm-notes-row" id="sm-notes-row"><div class="sm-notes" id="sm-notes"></div></div>
           <div class="sm-bottom-row"><div class="sm-stars" id="sm-stars"></div><div class="sm-risk-tag">${t.risk || '—'} risk</div></div>
+          </div>
           <div class="sm-footer"><span class="sm-footer-url">nxtgencharts.github.io/NxTGen-Journal</span><img class="sm-footer-logo" src="logo.svg" alt="NxTGen"></div>
         </div>
-          </div>
         </div>
       </div>
       <div class="sm-section">
@@ -9934,7 +9933,7 @@ function openShareModal(id) {
   // The "Render scale" hint is derived from the frame's live rendered
   // width, so it needs to stay accurate as the viewport (and therefore
   // the responsive frame) resizes.
-  const _smSyncDpiHint = () => updateSmDpiHint();
+  const _smSyncDpiHint = () => { updateSmDpiHint(); _smScheduleFit(); };
   window.addEventListener('resize', _smSyncDpiHint);
   overlay._smSyncDpiHint = _smSyncDpiHint;
   if (window.visualViewport) {
@@ -9952,37 +9951,74 @@ function smInitSizePresets(){
   const sel = document.getElementById('sm-size-preset');
   if (!sel) return;
   sel.innerHTML = Object.entries(SM_SIZE_PRESETS).map(([k,p]) => `<option value="${k}"${k===_shareSizePreset?' selected':''}>${p.label}</option>`).join('');
-  _smApplyFrameAspect();
-  updateSmDpiHint();
+  smApplyCardShape();
 }
 function smSetSizePreset(key){
   _shareSizePreset = SM_SIZE_PRESETS[key] ? key : 'ig_square';
-  _smApplyFrameAspect();
+  smApplyCardShape();
+}
+
+// Mirrors nxtgen-share-card.html's approach: the card's own height is set
+// explicitly, in px, to match the selected export preset's aspect ratio
+// at the card's current on-screen width. CSS aspect-ratio alone isn't
+// used because html2canvas can render a blank/empty canvas when it has
+// to resolve aspect-ratio itself inside its offscreen clone — an
+// explicit pixel height sidesteps that entirely.
+function smSyncCardHeight(){
+  const card = document.getElementById('sm-card');
+  if (!card) return;
+  const preset = SM_SIZE_PRESETS[_shareSizePreset] || SM_SIZE_PRESETS.ig_square;
+  const ratio = preset.w / preset.h;
+  const width = card.getBoundingClientRect().width;
+  if (width > 0) card.style.height = Math.round(width / ratio) + 'px';
+}
+
+// Shrink-to-fit: every spacing/font-size value inside the card is
+// expressed as calc(Npx*var(--s)) (see styles.css), so dialing --s down
+// uniformly shrinks the WHOLE layout in real content terms — smaller
+// fonts, smaller gaps, smaller rings — until it actually fits inside the
+// card's current (fixed) height. This is never a visual transform/crop:
+// the content itself gets smaller, so nothing is ever cut off, at any
+// export size from a short wide wallpaper to a tall phone story.
+function smFitCardContent(){
+  const card = document.getElementById('sm-card');
+  if (!card) return;
+  card.style.setProperty('--s', '1');
+  const targetH = card.getBoundingClientRect().height;
+  const naturalH = card.scrollHeight;
+  if (naturalH <= targetH + 0.5) return; // already fits at full size
+  let lo = 0.25, hi = 1, best = 0.25;
+  for (let i = 0; i < 16; i++) {
+    const mid = (lo + hi) / 2;
+    card.style.setProperty('--s', mid.toFixed(4));
+    if (card.scrollHeight <= targetH) { best = mid; lo = mid; } else { hi = mid; }
+  }
+  card.style.setProperty('--s', best.toFixed(4));
+}
+
+function smApplyCardShape(){
+  smSyncCardHeight();
+  smFitCardContent();
   updateSmDpiHint();
 }
-// Applies the selected preset's aspect ratio to the live preview frame
-// so the on-screen card responsively reflows into a square / landscape
-// / portrait / wallpaper / phone-story shape instead of always staying
-// the same fixed portrait block regardless of what's selected.
-function _smApplyFrameAspect(){
-  const frame = document.getElementById('sm-frame');
-  if (!frame) return;
-  const preset = SM_SIZE_PRESETS[_shareSizePreset] || SM_SIZE_PRESETS.ig_square;
-  frame.style.setProperty('--sm-ar', `${preset.w} / ${preset.h}`);
-  const wide = preset.w >= preset.h;
-  frame.classList.toggle('sm-fit-h', wide);
-  frame.classList.toggle('sm-fit-w', !wide);
+
+// Debounced so rapid-fire triggers (window resize) don't thrash layout
+// with synchronous reads on every tick.
+let _smFitRaf = null;
+function _smScheduleFit(){
+  if (_smFitRaf) cancelAnimationFrame(_smFitRaf);
+  _smFitRaf = requestAnimationFrame(() => { _smFitRaf = null; smApplyCardShape(); });
 }
 function updateSmDpiHint(){
   const hint = document.getElementById('sm-dpi-hint');
   if (!hint) return;
   const preset = SM_SIZE_PRESETS[_shareSizePreset] || SM_SIZE_PRESETS.ig_square;
-  // Render scale = how much larger the exported canvas is than the frame
+  // Render scale = how much larger the exported canvas is than the card
   // as it's actually drawn on screen right now — this is what keeps the
   // final export pixel-perfect at preset.w × preset.h regardless of the
   // viewport the person is exporting from.
-  const frame = document.getElementById('sm-frame');
-  const baseW = frame && frame.offsetWidth > 0 ? frame.offsetWidth : 480;
+  const card = document.getElementById('sm-card');
+  const baseW = card && card.getBoundingClientRect().width > 0 ? card.getBoundingClientRect().width : 480;
   const scale = Math.max(1, preset.w / baseW);
   hint.innerHTML = `Render scale: ${scale.toFixed(1)}x → <span class="sm-dpi-good">${preset.w} × ${preset.h} px</span> · ≈ ${preset.ppi} ppi @ ${preset.printIn}in print`;
 }
@@ -10109,6 +10145,7 @@ function smPopulateCard(id) {
   else{if(notesRow)notesRow.style.display='none';if(narrLbl)narrLbl.style.display='none';}
   smInitSizePresets();
   smRefreshPnl();
+  _smScheduleFit();
 }
 
 function smRefreshPnl() {
@@ -10130,7 +10167,7 @@ function smRefreshPnl() {
 
 function smSetPnlMode(mode,btn){_sharePnlMode=mode;document.querySelectorAll('#sm-pnl-seg .sm-seg-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const r=document.getElementById('sm-usd-row');if(r)r.style.display=mode==='pct'?'none':'';smRefreshPnl();}
 function smSetFmt(fmt,btn){_shareFmt=fmt;document.querySelectorAll('.sm-fmt-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
-function smToggleTheme(){_shareCardTheme=_shareCardTheme==='dark'?'light':'dark';const c=document.getElementById('sm-card');if(c)c.className='sm-card '+_shareCardTheme;const f=document.getElementById('sm-frame');if(f)f.classList.toggle('light',_shareCardTheme==='light');const b=document.getElementById('sm-theme-btn');if(b)b.innerHTML=_shareCardTheme==='dark'?'<svg class="icn" aria-hidden="true"><use href="#ic-sun"></use></svg>':'<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg>';}
+function smToggleTheme(){_shareCardTheme=_shareCardTheme==='dark'?'light':'dark';const c=document.getElementById('sm-card');if(c)c.className='sm-card '+_shareCardTheme;const b=document.getElementById('sm-theme-btn');if(b)b.innerHTML=_shareCardTheme==='dark'?'<svg class="icn" aria-hidden="true"><use href="#ic-sun"></use></svg>':'<svg class="icn" aria-hidden="true"><use href="#ic-moon"></use></svg>';_smScheduleFit();}
 function closeShareModal(){
   const o=document.getElementById('share-modal-overlay');
   if(!o)return;
@@ -10161,8 +10198,17 @@ const _LOGO_LIGHT_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAACrwAAANMC
 
 async function _smCapture() {
   const card  = document.getElementById('sm-card');
+  const fit   = document.getElementById('sm-card-fit');
   const theme = card.classList.contains('light') ? 'light' : 'dark';
   const logoDataUrl = theme === 'light' ? _LOGO_LIGHT_B64 : _LOGO_DARK_B64;
+
+  // The live preview shrinks/grows #sm-card-fit with a CSS transform so it
+  // fits inside whatever frame shape is selected. That's purely a preview
+  // convenience — the actual export must always capture the card at its
+  // real, untransformed size (cardScale below already handles resolution),
+  // so temporarily neutralize the transform for the capture.
+  const fitPrevTransform = fit ? fit.style.transform : null;
+  if (fit) fit.style.transform = 'none';
 
   // Swap all logo img srcs to the pre-baked PNG data URL
   const logoImgs   = Array.from(card.querySelectorAll('img[src*="logo"]'));
@@ -10175,53 +10221,56 @@ async function _smCapture() {
     img.style.opacity = '1';
   });
 
-  // Two frames for browser to paint
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
+  let cardCanvas;
   const preset = SM_SIZE_PRESETS[_shareSizePreset] || SM_SIZE_PRESETS.ig_square;
+  try {
+    // Two frames for browser to paint
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  // The card itself now fills its frame edge-to-edge and reflows to match
-  // the frame's own aspect ratio (see the container-query custom
-  // properties in styles.css), so the frame's aspect ratio already IS the
-  // preset's aspect ratio. Capturing the card at whatever scale hits the
-  // preset's target pixel width therefore lands EXACTLY on the preset's
-  // target pixel height too — no separate compositing step, no padding,
-  // no letterboxing, and nothing gets cropped.
-  const scale = preset.w / card.offsetWidth;
-  let out = await html2canvas(card, {
-    width: card.offsetWidth,
-    height: card.offsetHeight,
-    scale,
-    useCORS: true,
-    backgroundColor: theme === 'light' ? '#ffffff' : '#0a0f1c',
-    logging: false,
-    allowTaint: true,
-    imageTimeout: 5000,
-    onclone: (doc) => {
-      doc.querySelectorAll('.sm-card-logo, .sm-footer-logo').forEach(el => {
-        el.setAttribute('src', logoDataUrl);
-        el.style.filter  = 'none';
-        el.style.opacity = '1';
-      });
-    },
-  });
-
-  // Restore
-  logoImgs.forEach((img, i) => {
-    img.setAttribute('src', origSrcs[i]);
-    img.style.cssText = origStyles[i];
-  });
-
-  // Snap to the exact preset pixel dimensions (guards against a 1px
-  // rounding difference between the width- and height-derived scale —
-  // a sub-pixel correction, not a crop or letterbox).
-  if (out.width !== preset.w || out.height !== preset.h) {
-    const exact = document.createElement('canvas');
-    exact.width  = preset.w;
-    exact.height = preset.h;
-    exact.getContext('2d').drawImage(out, 0, 0, preset.w, preset.h);
-    out = exact;
+    // Capture the card itself at a resolution sharp enough to still look
+    // crisp once it's scaled to fit inside the target canvas below —
+    // independent of the preset's aspect ratio, since the card's own
+    // design proportions never change, only how it's composited.
+    const cardScale = Math.max(2, Math.min(4, preset.w / card.offsetWidth, preset.h / card.offsetHeight));
+    cardCanvas = await html2canvas(card, {
+      scale: cardScale,
+      useCORS: true,
+      backgroundColor: null,
+      logging: false,
+      allowTaint: true,
+      imageTimeout: 5000,
+      onclone: (doc) => {
+        doc.querySelectorAll('.sm-card-logo, .sm-footer-logo').forEach(el => {
+          el.setAttribute('src', logoDataUrl);
+          el.style.filter  = 'none';
+          el.style.opacity = '1';
+        });
+      },
+    });
+  } finally {
+    // Restore — always, even if html2canvas threw, so the live preview
+    // doesn't get stuck at its natural (untransformed, oversized) footprint.
+    logoImgs.forEach((img, i) => {
+      img.setAttribute('src', origSrcs[i]);
+      img.style.cssText = origStyles[i];
+    });
+    if (fit) fit.style.transform = fitPrevTransform || '';
   }
+
+  // Composite onto an export canvas that is EXACTLY the selected preset's
+  // pixel dimensions. smSyncCardHeight already gave #sm-card this exact
+  // same w:h ratio before capture, so cardCanvas already has (up to
+  // sub-pixel rounding) the preset's own aspect ratio — there is no
+  // mismatched shape left to "fit" inside a padded backdrop. We draw it
+  // straight to the full canvas edge-to-edge instead: no matte border, no
+  // letterboxing, and no distortion, since source and destination ratios
+  // already match — this is what actually fills the card flush to the
+  // frame for every preset, including the tall Portrait/Phone Story ones.
+  const out = document.createElement('canvas');
+  out.width  = preset.w;
+  out.height = preset.h;
+  const ctx = out.getContext('2d');
+  ctx.drawImage(cardCanvas, 0, 0, preset.w, preset.h);
 
   return out;
 }
