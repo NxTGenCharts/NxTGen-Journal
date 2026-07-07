@@ -9861,7 +9861,6 @@ function openShareModal(id) {
           <div class="sm-checklist-grid" id="sm-checklist-grid"></div>
           <div class="sm-narrative-lbl" id="sm-narrative-lbl" style="display:none">Trade Narrative</div>
           <div class="sm-notes-row" id="sm-notes-row"><div class="sm-notes" id="sm-notes"></div></div>
-          <div class="sm-bottom-row"><div class="sm-stars" id="sm-stars"></div></div>
           </div>
           <div class="sm-footer"><span class="sm-footer-url">nxtgencharts.github.io/NxTGen-Journal</span><img class="sm-footer-logo" src="logo.svg" alt="NxTGen"></div>
         </div>
@@ -10101,9 +10100,9 @@ function buildSmMiniStats(t){
   if (!el) return;
   const checked = Array.isArray(t.checklist) ? t.checklist.length : 0;
   el.innerHTML = `
-    <div class="sm-mini-stat"><div class="sm-mini-stat-val">${t.risk || '—'}</div><div class="sm-mini-stat-lbl">Risk</div></div>
-    <div class="sm-mini-stat"><div class="sm-mini-stat-val">${checked}/${CHECKLIST_ITEMS.length}</div><div class="sm-mini-stat-lbl">Checklist</div></div>
-    <div class="sm-mini-stat"><div class="sm-mini-stat-val">${t.rating || 0}/5</div><div class="sm-mini-stat-lbl">Rating</div></div>`;
+    <div class="sm-mini-stat"><div class="sm-mini-stat-icon">${icon('ruler',{cls:'icn-sm'})}</div><div class="sm-mini-stat-val">${t.risk || '—'}</div><div class="sm-mini-stat-lbl">Risk</div></div>
+    <div class="sm-mini-stat"><div class="sm-mini-stat-icon">${icon('clipboard',{cls:'icn-sm'})}</div><div class="sm-mini-stat-val">${checked}/${CHECKLIST_ITEMS.length}</div><div class="sm-mini-stat-lbl">Checklist</div></div>
+    <div class="sm-mini-stat"><div class="sm-mini-stat-icon">${icon('star',{cls:'icn-sm'})}</div><div class="sm-mini-stat-val">${t.rating || 0}/5</div><div class="sm-mini-stat-lbl">Rating</div></div>`;
 }
 function buildSmChecklistGrid(t){
   const grid = document.getElementById('sm-checklist-grid');
@@ -10159,8 +10158,6 @@ function smPopulateCard(id) {
   if(glow)glow.className='sm-glow-blob '+(t.outcome==='Win'?'glow-win':t.outcome==='Loss'?'glow-loss':'glow-be');
   const chartColor=t.outcome==='Win'?'#34d399':t.outcome==='Loss'?'#f87171':'#fbbf24';
   const cl=document.getElementById('sm-chartline'); if(cl)cl.style.stroke=chartColor;
-  const stars=document.getElementById('sm-stars');
-  if(stars)stars.innerHTML=[1,2,3,4,5].map(n=>`<span style="opacity:${n<=t.rating?1:0.2}">${icon('star',{cls:'icn-sm'})}</span>`).join('');
   drawSmTrendHero(t);
   buildSmRings(t);
   buildSmMiniStats(t);
