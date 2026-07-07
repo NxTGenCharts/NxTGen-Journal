@@ -5621,11 +5621,21 @@ body{
    gap between the checklist and the card's bottom edge closer in line
    with the spacing already present at the top of the card for these
    short/wide shapes. Other presets (Portrait, Phone Story) keep the
-   default, since their generous --fill-gap already handles spacing. */
+   default, since their generous --fill-gap already handles spacing.
+   Deliberately NOT multiplied by var(--s) here: these are exactly the
+   shapes whose content overflows the fixed export height, so
+   smFitCardContent()'s binary search shrinks --s to make everything
+   (padding included) fit. A scaled padding-bottom gets shrunk right
+   along with it — the search just picks a slightly smaller --s to
+   absorb the increase, so the extra px is diluted away and the gap
+   barely changes. Keeping this fixed carves it out of that budget:
+   the search still converges, but only the rest of the content (fonts,
+   gaps, rings) shrinks to make room, so this 30px always renders at
+   its full size. */
 .sm-card[data-size-preset="ig_square"] .sm-card-body,
 .sm-card[data-size-preset="tw_landscape"] .sm-card-body,
 .sm-card[data-size-preset="wallpaper"] .sm-card-body {
-  padding-bottom: calc(30px*var(--s));
+  padding-bottom: 30px;
 }
 .sm-card.dark {
   background: linear-gradient(145deg, #0d1424 0%, #0a0f1c 60%, #0d1530 100%);
