@@ -5499,7 +5499,7 @@ body{
   overflow: hidden;
   box-shadow: 0 40px 100px rgba(0,0,0,0.70), 0 0 0 1px rgba(255,255,255,0.04) inset;
   transform: translateY(20px);
-  transition: transform 0.26s cubic-bezier(0.22,1,0.36,1);
+  transition: transform 0.26s cubic-bezier(0.22,1,0.36,1), max-width 0.32s cubic-bezier(0.22,1,0.36,1);
   margin: auto;
   /* Own compositor layer + hard clip so nothing behind it can ever show
      through mid-repaint, regardless of what the overlay above is doing. */
@@ -5553,77 +5553,33 @@ body{
 }
 .sm-card-wrap { display: flex; justify-content: center; width: 100%; }
 
-/* ── Export-size frame ──────────────────────────────────────────────
-   Wraps the fixed-design .sm-card so the PREVIEW visually matches the
-   aspect ratio the user picked (square / landscape / portrait / etc).
-   The card itself keeps its natural design proportions and is scaled
-   to fit (never stretched/distorted); extra space is filled with a
-   soft themed backdrop so the preview looks intentional rather than
-   letterboxed-by-accident. Export (_smCapture) mirrors this exact
-   composition at the target pixel dimensions. Fully responsive: the
-   frame's aspect-ratio is set inline via --sm-ar, and its width is
-   fluid (100% up to a max), so it reflows at any viewport size. */
-.sm-frame {
-  position: relative;
-  width: 100%;
-  max-width: min(480px, 100%);
-  aspect-ratio: var(--sm-ar, 3 / 4);
-  border-radius: var(--r-lg, 14px);
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  isolation: isolate;
-  transition: aspect-ratio 0.3s cubic-bezier(0.22,1,0.36,1), max-width 0.3s ease;
-  background: #0a0f1c;
-}
-.sm-frame.light { background: #eef2fc; }
-.sm-frame-bg {
-  position: absolute;
-  inset: -15%;
-  z-index: 0;
-  pointer-events: none;
-  filter: blur(46px) saturate(1.15);
-  opacity: 0.6;
-  transition: background 0.3s ease;
-  background: linear-gradient(145deg, #0d1424 0%, #0a0f1c 60%, #0d1530 100%);
-}
-.sm-frame.light .sm-frame-bg {
-  opacity: 0.5;
-  background: linear-gradient(145deg, #ffffff 0%, #f4f7ff 60%, #eef2fc 100%);
-}
-.sm-card-scaler {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 3.5%;
-  box-sizing: border-box;
-}
-/* Wide targets (landscape / wallpaper) — card is height-limited */
-.sm-frame.sm-fit-h .sm-card-scaler .sm-card { height: 100%; width: auto; max-width: 100%; }
-/* Tall targets (square / portrait / phone story) — card is width-limited */
-.sm-frame.sm-fit-w .sm-card-scaler .sm-card { width: 100%; height: auto; max-height: 100%; }
+/* ── Card outer ──────────────────────────────────────────────────────
+   Mirrors nxtgen-share-card.html: a plain, fixed-width wrapper — no
+   separate "frame"/backdrop/letterbox concept. The card itself becomes
+   the exact aspect ratio the user picked (its height is set explicitly,
+   in px, by smSyncCardHeight — CSS aspect-ratio alone is unreliable once
+   html2canvas has to resolve it inside an offscreen clone). Whatever the
+   resulting shape, smFitCardContent() shrinks the card's own content
+   (real font-sizes/paddings, via the --s custom property below — not a
+   visual transform) until it actually fits that height, so nothing is
+   ever cropped or letterboxed, at any export size. */
+.sm-card-outer { position: relative; width: 100%; }
 
-/* ── Card ── */
+/* ── Card ──
+   --s is the shrink-to-fit factor (see smFitCardContent in app.js): every
+   spacing/font-size value on every element inside the card is expressed
+   as calc(Npx * var(--s)), so dialing --s down uniformly shrinks the
+   WHOLE layout in real content terms until it fits inside whatever
+   height the current export aspect ratio allows — never a visual
+   scale/crop, always real content that truly fits. */
 .sm-card {
-  width: 100%;
-  max-width: 480px;
+  --s: 1;
   position: relative;
-  overflow: hidden;
+  width: 100%;
   isolation: isolate;
   border-radius: 0;
   font-family: var(--font-body);
   box-shadow: 0 24px 60px rgba(0,0,0,0.35);
-}
-.sm-card-scaler .sm-card { max-width: none; box-shadow: 0 18px 44px rgba(0,0,0,0.45); }
-
-@media (max-width: 480px) {
-  .sm-frame { border-radius: var(--r, 10px); max-width: 100%; }
-  .sm-card-scaler { padding: 3%; }
 }
 .sm-card.dark {
   background: linear-gradient(145deg, #0d1424 0%, #0a0f1c 60%, #0d1530 100%);
@@ -5646,7 +5602,7 @@ body{
   z-index: 0; pointer-events: none; opacity: 0.5;
 }
 .sm-card.light .sm-card-noise { display: none; }
-.sm-glow-blob { width: 260px; height: 260px; border-radius: 50%; filter: blur(70px); pointer-events: none; opacity: 0.55; transition: background 0.3s; }
+.sm-glow-blob { width: calc(260px*var(--s)); height: calc(260px*var(--s)); border-radius: 50%; filter: blur(70px); pointer-events: none; opacity: 0.55; transition: background 0.3s; }
 .sm-card.light .sm-glow-blob { opacity: 0.22; }
 .glow-win  { background: radial-gradient(circle, rgba(52,211,153,0.45) 0%, transparent 65%); }
 .glow-loss { background: radial-gradient(circle, rgba(248,113,113,0.45) 0%, transparent 65%); }
@@ -5659,21 +5615,21 @@ body{
 .sm-bg-layer .sm-glow-blob { position: absolute; top: -60px; right: -60px; }
 .sm-card > *:not(.sm-bg-layer) { position: relative; z-index: 1; }
 
-.sm-top-bar { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 0; }
-.sm-brand { display: flex; align-items: center; gap: 9px; }
+.sm-top-bar { display: flex; align-items: center; justify-content: space-between; padding: calc(18px*var(--s)) calc(22px*var(--s)) 0; }
+.sm-brand { display: flex; align-items: center; gap: calc(9px*var(--s)); }
 .sm-brand-icon {
-  width: 32px; height: 32px; border-radius: 0;
+  width: calc(32px*var(--s)); height: calc(32px*var(--s)); border-radius: 0;
   display: flex; align-items: center; justify-content: center;
   background: transparent;
 }
 .sm-brand-logo {
-  width: 80px; height: auto;
+  width: calc(80px*var(--s)); height: auto;
   object-fit: contain;
   filter: none;
 }
 /* Logo in the share card — adapts to card theme (dark/light) */
 .sm-card-logo {
-  height: 32px; width: auto;
+  height: calc(32px*var(--s)); width: auto;
   object-fit: contain; display: block;
   /* Dark card: logo has white wordmark + white text — show as-is */
   filter: brightness(0) invert(1);
@@ -5684,7 +5640,7 @@ body{
 }
 /* Footer logo in share card */
 .sm-footer-logo {
-  height: 18px; width: auto;
+  height: calc(18px*var(--s)); width: auto;
   object-fit: contain; display: block;
   opacity: 0.55;
   filter: brightness(0) invert(1); /* dark card: white */
@@ -5697,9 +5653,9 @@ body{
   filter: brightness(0);
 }
 .sm-brand-text { display: flex; flex-direction: column; gap: 1px; }
-.sm-brand-name { font-size: 14px; font-weight: 800; letter-spacing: -0.3px; line-height: 1; }
-.sm-brand-sub  { font-size: 10px; opacity: 0.45; letter-spacing: 0.2px; }
-.sm-badge { font-size: 11px; font-weight: 800; letter-spacing: 1px; padding: 5px 14px; border-radius: 0; }
+.sm-brand-name { font-size: calc(14px*var(--s)); font-weight: 800; letter-spacing: -0.3px; line-height: 1; }
+.sm-brand-sub  { font-size: calc(10px*var(--s)); opacity: 0.45; letter-spacing: 0.2px; }
+.sm-badge { font-size: calc(11px*var(--s)); font-weight: 800; letter-spacing: 1px; padding: calc(5px*var(--s)) calc(14px*var(--s)); border-radius: 0; }
 .sm-badge-win  { background: rgba(52,211,153,0.13); color: #34d399; border: 1px solid rgba(52,211,153,0.28); }
 .sm-badge-loss { background: rgba(248,113,113,0.13); color: #f87171; border: 1px solid rgba(248,113,113,0.28); }
 .sm-badge-be   { background: rgba(251,191,36,0.13); color: #fbbf24; border: 1px solid rgba(251,191,36,0.28); }
@@ -5707,44 +5663,44 @@ body{
 .sm-card.light .sm-badge-loss { background: rgba(220,38,38,0.09); color: #dc2626; border-color: rgba(220,38,38,0.22); }
 .sm-card.light .sm-badge-be   { background: rgba(180,83,9,0.09);  color: #b45309; border-color: rgba(180,83,9,0.22); }
 
-.sm-hero { display: flex; align-items: flex-end; justify-content: space-between; padding: 14px 22px 16px; gap: 12px; }
-.sm-pair { font-size: 42px; font-weight: 900; letter-spacing: -2px; line-height: 0.95; }
-.sm-direction { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 12px; opacity: 0.5; font-weight: 600; }
-.sm-dir-arrow { font-size: 10px; }
+.sm-hero { display: flex; align-items: flex-end; justify-content: space-between; padding: calc(14px*var(--s)) calc(22px*var(--s)) calc(16px*var(--s)); gap: calc(12px*var(--s)); }
+.sm-pair { font-size: calc(42px*var(--s)); font-weight: 900; letter-spacing: -2px; line-height: 0.95; }
+.sm-direction { display: flex; align-items: center; gap: calc(6px*var(--s)); margin-top: calc(7px*var(--s)); font-size: calc(12px*var(--s)); opacity: 0.5; font-weight: 600; }
+.sm-dir-arrow { font-size: calc(10px*var(--s)); }
 .arr-buy  { color: #34d399; opacity: 1 !important; }
 .arr-sell { color: #f87171; opacity: 1 !important; }
 .sm-card.light .arr-buy  { color: #059669; }
 .sm-card.light .arr-sell { color: #dc2626; }
 .sm-hero-right { text-align: right; flex-shrink: 0; }
-.sm-pnl-block  { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-.sm-pnl-main { font-size: 38px; font-weight: 800; letter-spacing: 0.5px; line-height: 1; font-variant-numeric: tabular-nums; }
-.sm-pnl-sub  { font-size: 15px; font-weight: 700; letter-spacing: 0.2px; opacity: 0.75; }
+.sm-pnl-block  { display: flex; flex-direction: column; align-items: flex-end; gap: calc(2px*var(--s)); }
+.sm-pnl-main { font-size: calc(38px*var(--s)); font-weight: 800; letter-spacing: 0.5px; line-height: 1; font-variant-numeric: tabular-nums; }
+.sm-pnl-sub  { font-size: calc(15px*var(--s)); font-weight: 700; letter-spacing: 0.2px; opacity: 0.75; }
 .pnl-win  { color: #34d399; }
 .pnl-loss { color: #f87171; }
 .pnl-be   { color: #fbbf24; }
 .sm-card.light .pnl-win  { color: #059669; }
 .sm-card.light .pnl-loss { color: #dc2626; }
 .sm-card.light .pnl-be   { color: #b45309; }
-.sm-pnl-label { font-size: 10px; opacity: 0.4; margin-top: 3px; font-weight: 600; letter-spacing: 0.3px; }
+.sm-pnl-label { font-size: calc(10px*var(--s)); opacity: 0.4; margin-top: calc(3px*var(--s)); font-weight: 600; letter-spacing: 0.3px; }
 
-.sm-rule { height: 1px; margin: 0 22px; }
+.sm-rule { height: 1px; margin: 0 calc(22px*var(--s)); }
 .sm-card.dark  .sm-rule { background: rgba(255,255,255,0.07); }
 .sm-card.light .sm-rule { background: rgba(0,0,0,0.08); }
 
-.sm-stats { display: grid; grid-template-columns: repeat(2,1fr); padding: 0 22px; }
-.sm-stat { display: flex; flex-direction: column; gap: 5px; padding: 14px 0; }
-.sm-stat-center { border-left: 1px solid; border-right: 1px solid; padding-left: 14px; padding-right: 14px; margin-left: 4px; margin-right: 4px; }
+.sm-stats { display: grid; grid-template-columns: repeat(2,1fr); padding: 0 calc(22px*var(--s)); }
+.sm-stat { display: flex; flex-direction: column; gap: calc(5px*var(--s)); padding: calc(14px*var(--s)) 0; }
+.sm-stat-center { border-left: 1px solid; border-right: 1px solid; padding-left: calc(14px*var(--s)); padding-right: calc(14px*var(--s)); margin-left: calc(4px*var(--s)); margin-right: calc(4px*var(--s)); }
 .sm-card.dark  .sm-stat-center { border-color: rgba(255,255,255,0.07); }
 .sm-card.light .sm-stat-center { border-color: rgba(0,0,0,0.08); }
-.sm-stat-lbl { font-size: 9px; font-weight: 700; letter-spacing: 0.8px; opacity: 0.38; text-transform: uppercase; }
-.sm-stat-val { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.1; }
-.sm-stat-val-sm { font-size: 14px; letter-spacing: -0.2px; }
+.sm-stat-lbl { font-size: calc(9px*var(--s)); font-weight: 700; letter-spacing: 0.8px; opacity: 0.38; text-transform: uppercase; }
+.sm-stat-val { font-size: calc(18px*var(--s)); font-weight: 800; letter-spacing: -0.5px; line-height: 1.1; }
+.sm-stat-val-sm { font-size: calc(14px*var(--s)); letter-spacing: -0.2px; }
 
-.sm-tags { display: flex; flex-wrap: wrap; gap: 7px; padding: 12px 22px 10px; }
-.sm-tag { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 0; font-size: 11px; font-weight: 600; letter-spacing: 0.1px; }
+.sm-tags { display: flex; flex-wrap: wrap; gap: calc(7px*var(--s)); padding: calc(12px*var(--s)) calc(22px*var(--s)) calc(10px*var(--s)); }
+.sm-tag { display: flex; align-items: center; gap: calc(6px*var(--s)); padding: calc(5px*var(--s)) calc(12px*var(--s)); border-radius: 0; font-size: calc(11px*var(--s)); font-weight: 600; letter-spacing: 0.1px; }
 .sm-card.dark  .sm-tag { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); }
 .sm-card.light .sm-tag { background: rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.08); }
-.sm-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.sm-dot { width: calc(6px*var(--s)); height: calc(6px*var(--s)); border-radius: 50%; flex-shrink: 0; }
 .sm-tag-gold  .sm-dot { background: #fbbf24; }
 .sm-tag-blue  .sm-dot { background: #60a5fa; }
 .sm-tag-green .sm-dot { background: #34d399; }
@@ -5757,7 +5713,7 @@ body{
 .sm-card.light .sm-tag-dir-sell .sm-dot { background: #dc2626; }
 
 /* ── Trend hero (big backdrop line behind ticker/pnl) ── */
-.sm-trend-hero { position: relative; height: 46px; margin: 0 22px -30px; pointer-events: none; }
+.sm-trend-hero { position: relative; height: calc(46px*var(--s)); margin: 0 calc(22px*var(--s)) calc(-30px*var(--s)); pointer-events: none; }
 .sm-trend-hero svg { width: 100%; height: 100%; overflow: visible; }
 .sm-trend-hero path { fill: none; stroke-width: 2; opacity: 0.55; }
 .sm-card.dark  .sm-trend-hero path.trend-win  { stroke: #34d399; }
@@ -5768,63 +5724,63 @@ body{
 .sm-card.light .sm-trend-hero path.trend-be   { stroke: #b45309; }
 
 /* ── Score rings (execution / discipline / efficiency + edge grade) ── */
-.sm-rings { display: flex; align-items: center; justify-content: space-between; padding: 14px 22px 4px; gap: 8px; }
-.sm-ring-item { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; }
-.sm-ring-svg { width: 52px; height: 52px; transform: rotate(-90deg); }
+.sm-rings { display: flex; align-items: center; justify-content: space-between; padding: calc(14px*var(--s)) calc(22px*var(--s)) calc(4px*var(--s)); gap: calc(8px*var(--s)); }
+.sm-ring-item { display: flex; flex-direction: column; align-items: center; gap: calc(6px*var(--s)); flex: 1; }
+.sm-ring-svg { width: calc(52px*var(--s)); height: calc(52px*var(--s)); transform: rotate(-90deg); }
 .sm-ring-track { fill: none; stroke-width: 5; }
 .sm-card.dark  .sm-ring-track { stroke: rgba(255,255,255,0.08); }
 .sm-card.light .sm-ring-track { stroke: rgba(0,0,0,0.08); }
 .sm-ring-fill { fill: none; stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 0.3s; }
-.sm-ring-wrap { position: relative; width: 52px; height: 52px; }
-.sm-ring-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
-.sm-ring-label { font-size: 8.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.45; text-align: center; }
-.sm-edge-grade { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 0 0 auto; padding-left: 10px; border-left: 1px solid; }
+.sm-ring-wrap { position: relative; width: calc(52px*var(--s)); height: calc(52px*var(--s)); }
+.sm-ring-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: calc(12px*var(--s)); font-weight: 800; }
+.sm-ring-label { font-size: calc(8.5px*var(--s)); font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.45; text-align: center; }
+.sm-edge-grade { display: flex; flex-direction: column; align-items: center; gap: calc(6px*var(--s)); flex: 0 0 auto; padding-left: calc(10px*var(--s)); border-left: 1px solid; }
 .sm-card.dark  .sm-edge-grade { border-color: rgba(255,255,255,0.09); }
 .sm-card.light .sm-edge-grade { border-color: rgba(0,0,0,0.09); }
-.sm-edge-grade-val { font-size: 24px; font-weight: 900; letter-spacing: -0.5px; line-height: 1; }
-.sm-edge-grade-lbl { font-size: 8.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.45; }
+.sm-edge-grade-val { font-size: calc(24px*var(--s)); font-weight: 900; letter-spacing: -0.5px; line-height: 1; }
+.sm-edge-grade-lbl { font-size: calc(8.5px*var(--s)); font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.45; }
 
 /* ── Mini stat row (risk / checklist score / rating) ── */
-.sm-mini-stats { display: flex; padding: 10px 22px 0; gap: 0; }
-.sm-mini-stat { flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: center; padding: 8px 4px; }
+.sm-mini-stats { display: flex; padding: calc(10px*var(--s)) calc(22px*var(--s)) 0; gap: 0; }
+.sm-mini-stat { flex: 1; display: flex; flex-direction: column; gap: calc(2px*var(--s)); text-align: center; padding: calc(8px*var(--s)) calc(4px*var(--s)); }
 .sm-mini-stat + .sm-mini-stat { border-left: 1px solid; }
 .sm-card.dark  .sm-mini-stat + .sm-mini-stat { border-color: rgba(255,255,255,0.07); }
 .sm-card.light .sm-mini-stat + .sm-mini-stat { border-color: rgba(0,0,0,0.08); }
-.sm-mini-stat-val { font-size: 15px; font-weight: 800; letter-spacing: -0.3px; }
-.sm-mini-stat-lbl { font-size: 8.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.4; }
+.sm-mini-stat-val { font-size: calc(15px*var(--s)); font-weight: 800; letter-spacing: -0.3px; }
+.sm-mini-stat-lbl { font-size: calc(8.5px*var(--s)); font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.4; }
 
 /* ── Checklist grid ── */
-.sm-checklist-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.4; padding: 14px 22px 6px; }
-.sm-checklist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; padding: 0 22px 8px; }
-.sm-check-item { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; }
-.sm-check-icon { flex: 0 0 auto; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid; }
+.sm-checklist-lbl { font-size: calc(10px*var(--s)); font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.4; padding: calc(14px*var(--s)) calc(22px*var(--s)) calc(6px*var(--s)); }
+.sm-checklist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: calc(6px*var(--s)) calc(10px*var(--s)); padding: 0 calc(22px*var(--s)) calc(8px*var(--s)); }
+.sm-check-item { display: flex; align-items: center; gap: calc(7px*var(--s)); font-size: calc(11px*var(--s)); font-weight: 600; }
+.sm-check-icon { flex: 0 0 auto; width: calc(15px*var(--s)); height: calc(15px*var(--s)); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid; }
 .sm-card.dark  .sm-check-icon { border-color: rgba(255,255,255,0.18); }
 .sm-card.light .sm-check-icon { border-color: rgba(0,0,0,0.18); }
-.sm-check-icon svg { width: 9px; height: 9px; stroke: #fff; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.sm-check-icon svg { width: calc(9px*var(--s)); height: calc(9px*var(--s)); stroke: #fff; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .sm-check-icon.checked { background: #34d399; border-color: #34d399; }
 .sm-card.light .sm-check-icon.checked { background: #059669; border-color: #059669; }
 .sm-check-item:not(.checked) { opacity: 0.35; }
 
 /* ── Narrative quote (pretrade thesis / trade notes) ── */
-.sm-narrative-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.4; padding: 8px 22px 4px; }
+.sm-narrative-lbl { font-size: calc(10px*var(--s)); font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.4; padding: calc(8px*var(--s)) calc(22px*var(--s)) calc(4px*var(--s)); }
 
-.sm-notes-row { padding: 0 22px 10px; }
-.sm-notes { padding: 10px 14px; border-radius: 0; font-size: 12px; line-height: 1.6; font-style: italic; border-left: 3px solid #fbbf24; }
+.sm-notes-row { padding: 0 calc(22px*var(--s)) calc(10px*var(--s)); }
+.sm-notes { padding: calc(10px*var(--s)) calc(14px*var(--s)); border-radius: 0; font-size: calc(12px*var(--s)); line-height: 1.6; font-style: italic; border-left: 3px solid #fbbf24; }
 .sm-card.dark  .sm-notes { background: rgba(255,255,255,0.03); color: rgba(240,244,255,0.60); }
 .sm-card.light .sm-notes { background: rgba(0,0,0,0.03); color: rgba(15,23,42,0.60); border-left-color: #b45309; }
 
-.sm-bottom-row { display: flex; align-items: center; justify-content: space-between; padding: 0 22px 14px; }
-.sm-stars { font-size: 16px; letter-spacing: 1px; color: #fbbf24; }
+.sm-bottom-row { display: flex; align-items: center; justify-content: space-between; padding: 0 calc(22px*var(--s)) calc(14px*var(--s)); }
+.sm-stars { font-size: calc(16px*var(--s)); letter-spacing: 1px; color: #fbbf24; }
 .sm-card.light .sm-stars { color: #b45309; }
-.sm-risk-tag { font-size: 11px; font-weight: 700; padding: 4px 11px; border-radius: 0; }
+.sm-risk-tag { font-size: calc(11px*var(--s)); font-weight: 700; padding: calc(4px*var(--s)) calc(11px*var(--s)); border-radius: 0; }
 .sm-card.dark  .sm-risk-tag { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); opacity: 0.65; }
 .sm-card.light .sm-risk-tag { background: rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.08); opacity: 0.65; }
 
-.sm-footer { display: flex; align-items: center; justify-content: space-between; padding: 11px 22px; }
+.sm-footer { display: flex; align-items: center; justify-content: space-between; padding: calc(11px*var(--s)) calc(22px*var(--s)); }
 .sm-card.dark  .sm-footer { background: rgba(255,255,255,0.025); border-top: 1px solid rgba(255,255,255,0.055); }
 .sm-card.light .sm-footer { background: rgba(0,0,0,0.025); border-top: 1px solid rgba(0,0,0,0.06); }
-.sm-footer-url   { font-size: 10px; opacity: 0.30; }
-.sm-footer-brand { font-size: 12px; font-weight: 800; letter-spacing: 1px; opacity: 0.28; }
+.sm-footer-url   { font-size: calc(10px*var(--s)); opacity: 0.30; }
+.sm-footer-brand { font-size: calc(12px*var(--s)); font-weight: 800; letter-spacing: 1px; opacity: 0.28; }
 
 /* ── Share modal controls ── */
 .sm-section { display: flex; flex-direction: column; gap: 8px; }
