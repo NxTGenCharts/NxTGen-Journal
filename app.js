@@ -9999,7 +9999,7 @@ function smFitCardContent(){
 
   if (naturalH > targetH + 0.5) {
     // Overflow: shrink content in real terms until it fits.
-    let lo = 0.25, hi = 1, best = 0.25;
+    let lo = 0.15, hi = 1, best = 0.15;
     for (let i = 0; i < 16; i++) {
       const mid = (lo + hi) / 2;
       card.style.setProperty('--s', mid.toFixed(4));
@@ -10100,9 +10100,9 @@ function buildSmMiniStats(t){
   if (!el) return;
   const checked = Array.isArray(t.checklist) ? t.checklist.length : 0;
   el.innerHTML = `
-    <div class="sm-mini-stat"><div class="sm-mini-stat-icon">${icon('ruler',{cls:'icn-sm'})}</div><div class="sm-mini-stat-val">${t.risk || '—'}</div><div class="sm-mini-stat-lbl">Risk</div></div>
-    <div class="sm-mini-stat"><div class="sm-mini-stat-icon">${icon('clipboard',{cls:'icn-sm'})}</div><div class="sm-mini-stat-val">${checked}/${CHECKLIST_ITEMS.length}</div><div class="sm-mini-stat-lbl">Checklist</div></div>
-    <div class="sm-mini-stat"><div class="sm-mini-stat-icon">${icon('star',{cls:'icn-sm'})}</div><div class="sm-mini-stat-val">${t.rating || 0}/5</div><div class="sm-mini-stat-lbl">Rating</div></div>`;
+    <div class="sm-mini-stat"><div class="sm-mini-stat-val">${icon('ruler',{cls:'icn-sm sm-mini-stat-icon'})}${t.risk || '—'}</div><div class="sm-mini-stat-lbl">Risk</div></div>
+    <div class="sm-mini-stat"><div class="sm-mini-stat-val">${icon('clipboard',{cls:'icn-sm sm-mini-stat-icon'})}${checked}/${CHECKLIST_ITEMS.length}</div><div class="sm-mini-stat-lbl">Checklist</div></div>
+    <div class="sm-mini-stat"><div class="sm-mini-stat-val">${icon('star',{cls:'icn-sm sm-mini-stat-icon'})}${t.rating || 0}/5</div><div class="sm-mini-stat-lbl">Rating</div></div>`;
 }
 function buildSmChecklistGrid(t){
   const grid = document.getElementById('sm-checklist-grid');
