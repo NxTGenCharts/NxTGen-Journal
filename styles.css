@@ -5768,7 +5768,7 @@ body{
 /* ── Trend hero (big backdrop line behind ticker/pnl) ── */
 .sm-trend-hero { position: relative; height: calc(46px*var(--s)); margin: 0 calc(22px*var(--s)) calc(-30px*var(--s)); pointer-events: none; }
 .sm-trend-hero svg { width: 100%; height: 100%; overflow: visible; }
-.sm-trend-hero path { fill: none; stroke-width: 2; opacity: 0.55; }
+.sm-trend-hero path { fill: none; stroke-width: 2; opacity: 0.25; }
 .sm-card.dark  .sm-trend-hero path.trend-win  { stroke: #34d399; }
 .sm-card.dark  .sm-trend-hero path.trend-loss { stroke: #f87171; }
 .sm-card.dark  .sm-trend-hero path.trend-be   { stroke: #fbbf24; }
