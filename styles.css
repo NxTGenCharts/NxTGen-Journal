@@ -5821,8 +5821,7 @@ body{
 .sm-card.dark  .sm-check-icon { border-color: rgba(255,255,255,0.18); }
 .sm-card.light .sm-check-icon { border-color: rgba(0,0,0,0.18); }
 .sm-check-icon svg { width: calc(9px*var(--s)); height: calc(9px*var(--s)); stroke: #fff; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-.sm-check-icon.checked { background: #34d399; border-color: #34d399; }
-.sm-card.light .sm-check-icon.checked { background: #059669; border-color: #059669; }
+.sm-check-icon.checked { background: #059669; border-color: #059669; }
 .sm-check-item:not(.checked) { opacity: 0.35; }
 
 /* ── Narrative quote (pretrade thesis / trade notes) ── */

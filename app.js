@@ -10093,7 +10093,7 @@ function buildSmRings(t){
   const isLightCard = !!document.getElementById('sm-card')?.classList.contains('light');
   el.querySelectorAll('.sm-ring-fill').forEach(c => {
     const isGood = c.classList.contains('ring-good'), isMid = c.classList.contains('ring-mid');
-    c.style.stroke = isGood ? (isLightCard ? '#059669' : '#34d399') : isMid ? (isLightCard ? '#d97706' : '#fbbf24') : (isLightCard ? '#dc2626' : '#f87171');
+    c.style.stroke = isGood ? '#059669' : isMid ? (isLightCard ? '#d97706' : '#fbbf24') : (isLightCard ? '#dc2626' : '#f87171');
   });
 }
 function buildSmMiniStats(t){
