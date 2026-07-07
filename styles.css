@@ -5646,7 +5646,16 @@ body{
   position: absolute; inset: 0; z-index: 0;
   pointer-events: none; overflow: hidden;
 }
-.sm-bg-layer .sm-chart-bg { position: absolute; right: 0; bottom: 0; width: 65%; height: 55%; }
+/* Anchored to the TOP-right corner behind the hero/pnl area, with a
+   fixed pixel height rather than a % of the card's own height. It was
+   previously bottom:0 with height:55% of the whole card — harmless
+   while the card stayed short, but once the card is made genuinely
+   taller (to fill Square/Landscape/Wallpaper/Portrait/Story edge to
+   edge) that percentage stretched this decorative line into a long
+   diagonal streak crossing straight through the checklist/rating rows
+   below. Fixed height keeps it a subtle accent behind the hero only,
+   regardless of how tall the card becomes. */
+.sm-bg-layer .sm-chart-bg { position: absolute; right: 0; top: 0; width: 65%; height: calc(230px*var(--s)); }
 .sm-bg-layer .sm-glow-blob { position: absolute; top: -60px; right: -60px; }
 .sm-card > *:not(.sm-bg-layer) { position: relative; z-index: 1; }
 
