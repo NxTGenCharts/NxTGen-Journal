@@ -5499,7 +5499,7 @@ body{
   overflow: hidden;
   box-shadow: 0 40px 100px rgba(0,0,0,0.70), 0 0 0 1px rgba(255,255,255,0.04) inset;
   transform: translateY(20px);
-  transition: transform 0.26s cubic-bezier(0.22,1,0.36,1), max-width 0.32s cubic-bezier(0.22,1,0.36,1);
+  transition: transform 0.26s cubic-bezier(0.22,1,0.36,1);
   margin: auto;
   /* Own compositor layer + hard clip so nothing behind it can ever show
      through mid-repaint, regardless of what the overlay above is doing. */
@@ -5554,17 +5554,19 @@ body{
 .sm-card-wrap { display: flex; justify-content: center; width: 100%; }
 
 /* ── Export-size frame ──────────────────────────────────────────────
-   Wraps the card so the PREVIEW visually matches the aspect ratio the
-   user picked (square / landscape / portrait / etc). The frame's
-   aspect-ratio is set inline via --sm-ar. Its width is fluid — up to
-   whatever room the (preset-aware) .sm-modal currently gives it — so
-   wide presets (square/landscape/wallpaper) get real horizontal room
-   to reflow into a wider layout instead of being squeezed into a
-   fixed narrow shape and then just shrunk down to fit. */
+   Wraps the fixed-design .sm-card so the PREVIEW visually matches the
+   aspect ratio the user picked (square / landscape / portrait / etc).
+   The card itself keeps its natural design proportions and is scaled
+   to fit (never stretched/distorted); extra space is filled with a
+   soft themed backdrop so the preview looks intentional rather than
+   letterboxed-by-accident. Export (_smCapture) mirrors this exact
+   composition at the target pixel dimensions. Fully responsive: the
+   frame's aspect-ratio is set inline via --sm-ar, and its width is
+   fluid (100% up to a max), so it reflows at any viewport size. */
 .sm-frame {
   position: relative;
   width: 100%;
-  max-width: 100%;
+  max-width: min(480px, 100%);
   aspect-ratio: var(--sm-ar, 3 / 4);
   border-radius: var(--r-lg, 14px);
   overflow: hidden;
@@ -5572,7 +5574,7 @@ body{
   align-items: center;
   justify-content: center;
   isolation: isolate;
-  transition: aspect-ratio 0.3s cubic-bezier(0.22,1,0.36,1);
+  transition: aspect-ratio 0.3s cubic-bezier(0.22,1,0.36,1), max-width 0.3s ease;
   background: #0a0f1c;
 }
 .sm-frame.light { background: #eef2fc; }
@@ -5600,33 +5602,13 @@ body{
   justify-content: center;
   padding: 3.5%;
   box-sizing: border-box;
-  overflow: hidden;
 }
-/* .sm-card-fit is the transform host: it holds the card at its natural
-   (unscaled, fluid) rendered size and is only shrunk with a CSS transform
-   as a last-resort safety net — when the card's real content is still
-   taller than the frame can show even after it has reflowed into the
-   widest layout available (_smFitCardToFrame computes and applies this).
-   Because the card fills .sm-card-fit's full width, that safety-net
-   scale only ever needs to correct for height, so it never introduces
-   the letterboxing/cropping the old height:100%/width:auto rules did. */
-.sm-card-fit {
-  position: relative;
-  width: 100%;
-  transform-origin: center center;
-  flex-shrink: 0;
-}
-.sm-card-fit .sm-card { width: 100%; max-width: none; }
+/* Wide targets (landscape / wallpaper) — card is height-limited */
+.sm-frame.sm-fit-h .sm-card-scaler .sm-card { height: 100%; width: auto; max-width: 100%; }
+/* Tall targets (square / portrait / phone story) — card is width-limited */
+.sm-frame.sm-fit-w .sm-card-scaler .sm-card { width: 100%; height: auto; max-height: 100%; }
 
-/* ── Card ──
-   No fixed max-width inside the fit wrapper (see .sm-card-fit .sm-card
-   below) — the card is genuinely fluid, filling whatever width the
-   frame/modal gives it. Row-level layouts (.sm-stats, .sm-tags,
-   .sm-rings, etc.) are already flex/grid rows with fixed-size content,
-   so widening the card doesn't add height — it just gives those rows
-   more breathing room. That's what lets a wide export preset naturally
-   produce a wide, short card instead of the same tall card just shrunk
-   down inside a lot of empty backdrop. */
+/* ── Card ── */
 .sm-card {
   width: 100%;
   max-width: 480px;
@@ -5637,10 +5619,10 @@ body{
   font-family: var(--font-body);
   box-shadow: 0 24px 60px rgba(0,0,0,0.35);
 }
-.sm-card-fit .sm-card { box-shadow: 0 18px 44px rgba(0,0,0,0.45); }
+.sm-card-scaler .sm-card { max-width: none; box-shadow: 0 18px 44px rgba(0,0,0,0.45); }
 
 @media (max-width: 480px) {
-  .sm-frame { border-radius: var(--r, 10px); }
+  .sm-frame { border-radius: var(--r, 10px); max-width: 100%; }
   .sm-card-scaler { padding: 3%; }
 }
 .sm-card.dark {
