@@ -2786,6 +2786,9 @@ body{
 }
 .acc-chal-progress-glow{
   position:absolute;top:0;right:0;bottom:0;width:36px;
+  background:none;
+}
+[data-theme="light"] .acc-chal-progress-glow{
   background:linear-gradient(90deg,transparent,rgba(255,255,255,0.18));
   animation:chalGlowPulse 2.2s ease-in-out infinite;
 }
