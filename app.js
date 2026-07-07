@@ -203,6 +203,11 @@ const SEED_TRADES = [
 ];
 
 const CHECKLIST_ITEMS=["HTF PDA confirmed","4h Profiling","Liquidity Sweep","SMT Divergence","CISD Confirmed","R:R ≥ 1:2","Active Killzone"];
+// Compact labels used only in the share-card's checklist grid, where space
+// is tight (especially narrow shapes like Phone Story). Indices line up
+// 1:1 with CHECKLIST_ITEMS — everywhere else in the app still uses the
+// full names above.
+const CHECKLIST_ITEMS_SHORT=["HTF PDA","4H Profile","Liquidity","SMT Div","CISD","R:R ≥ 1:2","Active KZ"];
 const EMOTIONS=["Calm","Relaxed","Confident","Focused","Neutral","Anxious","Impatient","Fearful","Greedy","Revenge"];
 const CHART_LABELS=["Daily HTF","4h Structure","1h Confirm","30m Trigger","3m/5m Entry","Result"];
 const RULES=["Never trade without HTF bias confirmed","Never enter without an active killzone","Never risk more than 1% on funded accounts","Never chase price — missed entry = no entry","Never move SL before 30% of target is hit","Never trade 15 min before/after red news","Never skip the entry checklist","Never take more than 2 trades per day","Never take a 3★ or below setup","Never trade while angry, fearful or revenge-seeking"];
@@ -10113,7 +10118,8 @@ function buildSmChecklistGrid(t){
   if (lbl) lbl.style.display = '';
   grid.innerHTML = CHECKLIST_ITEMS.map((label, i) => {
     const on = checkedIdx.includes(i);
-    return `<div class="sm-check-item ${on?'checked':''}"><span class="sm-check-icon ${on?'checked':''}">${on?icon('check',{cls:'icn-sm'}):''}</span><span>${label}</span></div>`;
+    const shortLabel = CHECKLIST_ITEMS_SHORT[i] || label;
+    return `<div class="sm-check-item ${on?'checked':''}"><span class="sm-check-icon ${on?'checked':''}">${on?icon('check',{cls:'icn-sm'}):''}</span><span>${shortLabel}</span></div>`;
   }).join('');
 }
 // Deterministic seeded "random" walk so the same trade always renders the

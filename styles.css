@@ -5741,7 +5741,7 @@ body{
 .sm-stat-val-sm { font-size: calc(14px*var(--s)); letter-spacing: -0.2px; }
 
 .sm-tags { display: flex; flex-wrap: wrap; gap: calc(7px*var(--s)); padding: calc(12px*var(--s)) calc(22px*var(--s)) calc(10px*var(--s)); }
-.sm-tag { display: flex; align-items: center; gap: calc(6px*var(--s)); padding: calc(5px*var(--s)) calc(12px*var(--s)); border-radius: 0; font-size: calc(11px*var(--s)); font-weight: 600; letter-spacing: 0.1px; }
+.sm-tag { display: flex; align-items: center; gap: calc(6px*var(--s)); padding: calc(5px*var(--s)) calc(12px*var(--s)); border-radius: 0; font-size: calc(11px*var(--s)); font-weight: 600; letter-spacing: 0.1px; white-space: nowrap; }
 .sm-card.dark  .sm-tag { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); }
 .sm-card.light .sm-tag { background: rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.08); }
 .sm-dot { width: calc(6px*var(--s)); height: calc(6px*var(--s)); border-radius: 50%; flex-shrink: 0; }
@@ -5797,7 +5797,8 @@ body{
 /* ── Checklist grid ── */
 .sm-checklist-lbl { font-size: calc(10px*var(--s)); font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.4; padding: calc(14px*var(--s)) calc(22px*var(--s)) calc(6px*var(--s)); }
 .sm-checklist-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(6px*var(--s)) calc(10px*var(--s)); padding: 0 calc(22px*var(--s)) calc(8px*var(--s)); }
-.sm-check-item { display: flex; align-items: center; gap: calc(7px*var(--s)); font-size: calc(11px*var(--s)); font-weight: 600; }
+.sm-check-item { display: flex; align-items: center; gap: calc(7px*var(--s)); font-size: calc(11px*var(--s)); font-weight: 600; min-width: 0; }
+.sm-check-item span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sm-check-icon { flex: 0 0 auto; width: calc(15px*var(--s)); height: calc(15px*var(--s)); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid; }
 .sm-card.dark  .sm-check-icon { border-color: rgba(255,255,255,0.18); }
 .sm-card.light .sm-check-icon { border-color: rgba(0,0,0,0.18); }
@@ -5890,18 +5891,9 @@ body{
     margin: 0;
   }
   .sm-body { padding: 12px; gap: 12px; }
-  .sm-pair { font-size: 30px; }
-  .sm-pnl-main { font-size: 28px; letter-spacing: 0.4px; }
-  .sm-stat-val { font-size: 14px; }
   .view-stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
   .star-editor-row { gap: 6px; }
   .star-opt { min-width: 56px; padding: 8px 10px; }
-  .sm-ring-svg, .sm-ring-wrap { width: 44px; height: 44px; }
-  .sm-ring-num { font-size: 11px; }
-  .sm-edge-grade-val { font-size: 20px; }
-  .sm-rings { gap: 4px; padding: 12px 16px 4px; }
-  .sm-checklist-grid { padding: 0 16px 6px; }
-  .sm-mini-stats { padding: 8px 16px 0; }
   .sm-fmt-desc { display: none; }
   .sm-fmt-btn { padding: 10px 8px; justify-content: center; text-align: center; flex-direction: column; gap: 6px; }
 }
