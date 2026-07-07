@@ -10271,6 +10271,24 @@ async function _smCapture() {
           el.style.filter  = 'none';
           el.style.opacity = '1';
         });
+        // html2canvas can't resolve <svg><use href="#ic-x"> sprite refs, so
+        // any icon rendered via icon() (checklist ticks, star rating, etc.)
+        // came out blank in the exported image despite showing fine in the
+        // live preview. Inline each icon's real markup from the live sprite
+        // before capture so it rasterizes correctly.
+        const clonedCard = doc.getElementById('sm-card');
+        if (clonedCard) {
+          clonedCard.querySelectorAll('svg.icn use').forEach(useEl => {
+            const href  = useEl.getAttribute('href') || useEl.getAttribute('xlink:href') || '';
+            const symId = href.replace('#', '');
+            const sym   = symId ? document.getElementById(symId) : null;
+            const svg   = useEl.closest('svg');
+            if (!sym || !svg) return;
+            const vb = sym.getAttribute('viewBox');
+            if (vb) svg.setAttribute('viewBox', vb);
+            svg.innerHTML = sym.innerHTML;
+          });
+        }
       },
     });
   } finally {
