@@ -5614,7 +5614,7 @@ body{
      bottom edge. Tall shapes (Portrait, Phone Story) already get
      generous --fill-gap spacing everywhere else, so this fixed amount
      is invisible there. */
-  padding-bottom: calc(16px*var(--s));
+  padding-bottom: calc(24px*var(--s));
 }
 .sm-card.dark {
   background: linear-gradient(145deg, #0d1424 0%, #0a0f1c 60%, #0d1530 100%);
@@ -5787,7 +5787,7 @@ body{
 .sm-checklist-divider { height: 2px; margin: calc(6px*var(--s)) calc(22px*var(--s)) 0; background: #fbbf24; }
 .sm-card.light .sm-checklist-divider { background: #b45309; }
 .sm-checklist-lbl { font-size: calc(10px*var(--s)); font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.4; padding: calc(14px*var(--s)) calc(22px*var(--s)) calc(6px*var(--s)); text-align: center; }
-.sm-checklist-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(6px*var(--s)) calc(10px*var(--s)); padding: 0 calc(22px*var(--s)) calc(8px*var(--s)); }
+.sm-checklist-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(6px*var(--s)) calc(10px*var(--s)); padding: 0 calc(22px*var(--s)) calc(14px*var(--s)); }
 .sm-check-item { display: flex; align-items: center; justify-content: flex-start; gap: calc(7px*var(--s)); font-size: calc(11px*var(--s)); font-weight: 600; min-width: 0; }
 /* Vertical dividers between the 3 columns — items 2 and 3 of every row
    (nth-child(3n+2) / nth-child(3n)) get a left border, matching the gold
