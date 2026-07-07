@@ -352,7 +352,8 @@ async function loadTrades() {
     .from('journal_trades')
     .select(_TRADE_LIST_COLUMNS)
     .eq('user_id', _currentUser.id)
-    .order('trade_date', { ascending: false });
+    .order('trade_date', { ascending: false })
+    .order('id', { ascending: false });
 
   if (error) {
     console.error('loadTrades error:', error.message);
@@ -590,10 +591,20 @@ async function _cloudRestoreTrade(deletedRow) {
     .eq('user_id', _currentUser.id)
     .single();
 
-  const [ins, del] = await Promise.all([
-    sb.from('journal_trades').insert(newRow).select().single(),
-    delData ? sb.from('journal_deleted_trades').delete().eq('id', delData.id) : Promise.resolve({ error: null }),
-  ]);
+  // Try to restore with the ORIGINAL id so the trade keeps its original
+  // position in the newest-first sort order, instead of jumping to the
+  // top of its date group with a freshly generated id. If the table's id
+  // column doesn't allow explicit inserts (identity-always columns), fall
+  // back to a normal insert.
+  let ins = await sb.from('journal_trades')
+    .insert({ ...newRow, id: deletedRow.originalId })
+    .select().single();
+  if (ins.error) {
+    ins = await sb.from('journal_trades').insert(newRow).select().single();
+  }
+  const del = delData
+    ? await sb.from('journal_deleted_trades').delete().eq('id', delData.id)
+    : { error: null };
 
   if (ins.error) { console.error('Restore insert error:', ins.error.message); return null; }
   return _rowToTrade(ins.data);
@@ -3404,7 +3415,7 @@ async function saveTrade() {
 
   const t = _rowToTrade(data);
   trades.unshift(t);
-  trades.sort((a, b) => b.date.localeCompare(a.date));
+  trades.sort((a, b) => b.date.localeCompare(a.date) || (b.id - a.id));
   tradeState[t.id] = {
     notes: t.notes, pretrade: t.pretrade, emotion: t.emotion || 'Calm',
     checklist: [...(t.checklist || [])], charts: [], chartLabels: [...CHART_LABELS], mistakes: '',
@@ -8020,7 +8031,7 @@ async function _saveEdit(id) {
   t.rating = ratingVal;
   const plannedRrEdit = document.getElementById('e-planned-rr');
   if (plannedRrEdit) t.plannedRr = plannedRrEdit.value.trim();
-  trades.sort((a, b) => b.date.localeCompare(a.date));
+  trades.sort((a, b) => b.date.localeCompare(a.date) || (b.id - a.id));
 
   // Instant UI update — no waiting
   _detEditMode = false;
@@ -8864,7 +8875,7 @@ async function restoreTrade(originalId) {
   if (!restored) { showToast('Restore failed', 'danger'); return; }
   deletedTrades = deletedTrades.filter(x => (x.originalId || x.id) != originalId);
   trades.push(restored);
-  trades.sort((a, b) => b.date.localeCompare(a.date));
+  trades.sort((a, b) => b.date.localeCompare(a.date) || (b.id - a.id));
   tradeState[restored.id] = { notes: restored.notes || '', pretrade: restored.pretrade || '', emotion: restored.emotion || 'Calm', checklist: restored.checklist || [], charts: restored.charts || [], chartLabels: restored.chartLabels || [...CHART_LABELS], mistakes: restored.mistakes || '' };
 
   // If this was an MT5 trade, add the ticket back to importedTickets
@@ -11594,7 +11605,7 @@ async function _mt5ImportSelected() {
   await _saveCustomAccounts(list);
   _mt5ModalState.acc = list[idx];
   if (imported > 0) {
-    trades.sort((a, b) => b.date.localeCompare(a.date));
+    trades.sort((a, b) => b.date.localeCompare(a.date) || (b.id - a.id));
     showToast(`${imported} trade${imported !== 1 ? 's' : ''} imported ✓`, 'restore');
     _refreshAll();
     mt5CloseModal();
