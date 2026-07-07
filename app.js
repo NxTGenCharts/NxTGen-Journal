@@ -3006,8 +3006,6 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('[onclick*="openDetail"]')) return;
   const modal = document.getElementById('modal');
   if (modal && modal.classList.contains('open')) return;
-  const accDrawer = document.getElementById('acc-detail-drawer');
-  if (accDrawer && accDrawer.classList.contains('open') && accDrawer.contains(e.target)) return;
   if (e.target.closest('.mcl-item, .toast, .confirm-dialog, .dropdown-menu')) return;
   closeDetail();
 }, true);
