@@ -9834,7 +9834,7 @@ function openShareModal(id) {
             <div class="sm-badge" id="sm-badge"></div>
           </div>
           <div class="sm-card-body" id="sm-card-body">
-          <div class="sm-trend-hero" id="sm-trend-hero" aria-hidden="true"><svg viewBox="0 0 400 46" preserveAspectRatio="none"><defs><linearGradient id="smTrendFadeGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#fff" stop-opacity="1"/><stop offset="50%" stop-color="#fff" stop-opacity="1"/><stop offset="100%" stop-color="#fff" stop-opacity="0.12"/></linearGradient><mask id="smTrendFadeMask" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox"><rect x="0" y="0" width="1" height="1" fill="url(#smTrendFadeGrad)"/></mask></defs><path id="sm-trend-path" mask="url(#smTrendFadeMask)" d="" /></svg></div>
+          <div class="sm-trend-hero" id="sm-trend-hero" aria-hidden="true"><svg viewBox="0 0 400 46" preserveAspectRatio="none"><defs><linearGradient id="smTrendFadeGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#fff" stop-opacity="1"/><stop offset="50%" stop-color="#fff" stop-opacity="1"/><stop offset="100%" stop-color="#fff" stop-opacity="0.08"/></linearGradient><mask id="smTrendFadeMask" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox"><rect x="0" y="0" width="1" height="1" fill="url(#smTrendFadeGrad)"/></mask></defs><path id="sm-trend-path" mask="url(#smTrendFadeMask)" d="" /></svg></div>
           <div class="sm-hero">
             <div class="sm-hero-left">
               <div class="sm-pair" id="sm-pair">${t.pair}</div>
