@@ -2715,6 +2715,125 @@ body{
 .acc-progress-fill{height:100%;background:linear-gradient(90deg,var(--green),rgba(52,211,153,0.6));
   border-radius:var(--r-full);transition:width .9s var(--ease-out)}
 
+/* ════════ CHALLENGE PROGRESS TRACKER (Prop Firm Challenge accounts) ════════ */
+.acc-chal-card{
+  position:relative;overflow:hidden;
+  background:linear-gradient(150deg,var(--glass-2) 0%,var(--glass-0) 100%);
+  border:1px solid var(--glass-border);border-radius:var(--r-xl);
+  padding:20px 22px 22px;margin-bottom:16px;
+  animation:pageIn .35s var(--ease-out);
+}
+.acc-chal-card::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(ellipse 65% 55% at 12% 10%,rgba(52,211,153,0.08) 0%,transparent 60%);
+}
+.acc-chal-card.complete{border-color:rgba(251,191,36,0.35);box-shadow:0 0 0 1px rgba(251,191,36,0.12),0 8px 32px rgba(251,191,36,0.08)}
+.acc-chal-card.complete::before{background:radial-gradient(ellipse 65% 55% at 12% 10%,rgba(251,191,36,0.14) 0%,transparent 60%)}
+
+.acc-chal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;position:relative;z-index:1;margin-bottom:16px}
+.acc-chal-title{font-family:var(--font-head);font-size:16px;font-weight:800;letter-spacing:-.01em;color:var(--text)}
+.acc-chal-sub{font-size:11.5px;color:var(--text3);margin-top:3px;max-width:420px;line-height:1.4}
+.acc-chal-badge{
+  font-size:10px;font-weight:800;letter-spacing:.05em;padding:6px 12px;border-radius:var(--r-full);
+  background:linear-gradient(135deg,rgba(251,191,36,0.22),rgba(251,191,36,0.10));
+  border:1px solid rgba(251,191,36,0.4);color:var(--gold);white-space:nowrap;
+  box-shadow:0 0 16px rgba(251,191,36,0.18);
+}
+
+.acc-chal-target-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:relative;z-index:1;margin-bottom:16px}
+.acc-chal-target-lbl{font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:700;white-space:nowrap}
+.acc-chal-tbtns{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.acc-chal-tbtn{
+  font-family:var(--font-body);font-size:11.5px;font-weight:700;padding:6px 14px;border-radius:var(--r-full);
+  background:var(--glass-1);border:1px solid var(--glass-border);color:var(--text2);cursor:pointer;
+  transition:background .15s var(--ease-out),border-color .15s var(--ease-out),color .15s var(--ease-out),transform .15s var(--ease-out);
+}
+.acc-chal-tbtn:hover{background:var(--glass-2);border-color:var(--glass-border-h);transform:translateY(-1px)}
+.acc-chal-tbtn.active{background:var(--green-dim);border-color:rgba(52,211,153,.4);color:var(--green)}
+.acc-chal-card.complete .acc-chal-tbtn.active{background:rgba(251,191,36,0.16);border-color:rgba(251,191,36,.4);color:var(--gold)}
+.acc-chal-custom-input{
+  width:64px;font-family:var(--font-body);font-size:11.5px;font-weight:700;padding:6px 10px;border-radius:var(--r-full);
+  background:var(--glass-1);border:1px solid var(--glass-border-h);color:var(--text);text-align:center;
+}
+.acc-chal-custom-input:focus{outline:none;border-color:var(--green)}
+
+.acc-chal-complete-banner{
+  display:flex;align-items:center;gap:10px;position:relative;z-index:1;margin-bottom:14px;
+  font-family:var(--font-head);font-size:14px;font-weight:800;color:var(--gold);
+}
+.acc-chal-check{width:26px;height:26px;flex-shrink:0}
+.acc-chal-check-circle{stroke:var(--gold);stroke-width:2.5;stroke-dasharray:146;stroke-dashoffset:146;animation:chalCheckCircle .5s var(--ease-out) forwards}
+.acc-chal-check-mark{stroke:var(--gold);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:36;stroke-dashoffset:36;animation:chalCheckMark .35s var(--ease-out) .4s forwards}
+@keyframes chalCheckCircle{to{stroke-dashoffset:0}}
+@keyframes chalCheckMark{to{stroke-dashoffset:0}}
+
+.acc-chal-progress-wrap{position:relative;z-index:1;margin-bottom:34px}
+.acc-chal-progress-outer{
+  position:relative;width:100%;height:30px;border-radius:var(--r-full);
+  background:var(--glass-2);border:1px solid var(--glass-border);overflow:hidden;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,0.15);
+}
+.acc-chal-progress-fill{
+  position:relative;height:100%;border-radius:var(--r-full);min-width:30px;
+  background:linear-gradient(90deg,#059669 0%,var(--green) 55%,#6ee7b7 100%);
+  transition:width 1s var(--ease-out),background 0.5s var(--ease-out);
+  box-shadow:0 0 18px rgba(52,211,153,0.45);
+  display:flex;align-items:center;justify-content:flex-end;
+}
+.acc-chal-progress-fill.gold{
+  background:linear-gradient(90deg,#b45309 0%,var(--gold) 55%,#fde68a 100%);
+  box-shadow:0 0 22px rgba(251,191,36,0.55);
+}
+.acc-chal-progress-glow{
+  position:absolute;top:0;right:0;bottom:0;width:36px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.35));
+  animation:chalGlowPulse 2.2s ease-in-out infinite;
+}
+@keyframes chalGlowPulse{0%,100%{opacity:.5}50%{opacity:1}}
+.acc-chal-progress-pct{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-head);font-size:12.5px;font-weight:800;letter-spacing:.01em;
+  color:var(--text);text-shadow:0 1px 2px rgba(0,0,0,0.35);pointer-events:none;z-index:2;
+}
+.acc-chal-milestones{position:relative;height:20px;margin-top:6px}
+.acc-chal-ms{position:absolute;top:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:3px}
+.acc-chal-ms-dot{width:7px;height:7px;border-radius:50%;background:var(--glass-3);border:1px solid var(--glass-border-h);transition:background .3s,border-color .3s,box-shadow .3s}
+.acc-chal-ms.reached .acc-chal-ms-dot{background:var(--green);border-color:var(--green);box-shadow:0 0 8px rgba(52,211,153,0.6)}
+.acc-chal-card.complete .acc-chal-ms.reached .acc-chal-ms-dot{background:var(--gold);border-color:var(--gold);box-shadow:0 0 8px rgba(251,191,36,0.6)}
+.acc-chal-ms-lbl{font-size:9px;color:var(--text3);font-weight:600}
+.acc-chal-ms.reached .acc-chal-ms-lbl{color:var(--text2)}
+
+.acc-chal-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;position:relative;z-index:1}
+.acc-chal-stat{background:var(--glass-1);border:1px solid var(--glass-border);border-radius:var(--r-md);padding:11px 13px}
+.acc-chal-stat-lbl{font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:4px}
+.acc-chal-stat-val{font-family:var(--font-head);font-size:16px;font-weight:800;letter-spacing:-.01em;font-feature-settings:'tnum';color:var(--text)}
+.acc-chal-stat-val.green{color:var(--green)}
+.acc-chal-stat-val.red{color:var(--red)}
+.acc-chal-stat-val.gold{color:var(--gold)}
+.acc-chal-stat-val.blue{color:var(--blue)}
+
+.acc-chal-confetti{
+  position:absolute;top:-10px;width:6px;height:6px;border-radius:1px;opacity:0;z-index:0;
+  animation:chalConfettiFall 2.4s ease-in infinite;
+}
+@keyframes chalConfettiFall{
+  0%{opacity:0;transform:translateY(0) rotate(0deg)}
+  8%{opacity:.75}
+  85%{opacity:.4}
+  100%{opacity:0;transform:translateY(180px) rotate(340deg)}
+}
+
+@media(max-width:900px){ .acc-chal-stats{grid-template-columns:repeat(2,1fr)} }
+@media(max-width:640px){
+  .acc-chal-card{padding:16px 14px 18px}
+  .acc-chal-target-row{flex-direction:column;align-items:flex-start;gap:8px}
+  .acc-chal-progress-outer{height:26px}
+}
+
+[data-theme="light"] .acc-chal-progress-pct{color:#0f172a;text-shadow:0 1px 2px rgba(255,255,255,0.6)}
+[data-theme="light"] .acc-chal-progress-fill.gold .acc-chal-progress-pct,
+[data-theme="light"] .acc-chal-progress-fill:not(.gold) .acc-chal-progress-pct{color:#0f172a}
+
 /* Light theme */
 [data-theme="light"] .acc-card{background:rgba(255,255,255,0.7);border-color:rgba(0,0,0,0.08)}
 [data-theme="light"] .acc-card:hover{background:#fff;border-color:rgba(0,0,0,0.14)}

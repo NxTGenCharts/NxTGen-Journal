@@ -5586,6 +5586,120 @@ function _accDrawEquityCurve(name) {
   ctx.fillText((last.y >= 0 ? '+$' : '-$') + Math.abs(last.y).toFixed(2), Math.max(pad.left, px(series.length - 1) - 46), py(last.y) - 8);
 }
 
+// ── Challenge Progress Tracker (Prop Firm Challenge accounts only) ──────
+// Persisted on the account object as `challengeTarget` (a percent number),
+// saved through the same _saveCustomAccounts() pipeline as everything else
+// in Manage Accounts. Purely derived — no separate storage for the maths.
+function _accChallengeSectionHtml(acc, m, accSize, name) {
+  const presetTargets = [8, 10, 12];
+  const rawTarget   = acc.challengeTarget;
+  const targetPct   = (rawTarget !== undefined && rawTarget !== null && rawTarget !== '')
+                        ? parseFloat(rawTarget) : 10;
+  const isCustom    = !presetTargets.includes(targetPct);
+
+  const targetProfit  = accSize > 0 ? (accSize * targetPct / 100) : 0;
+  const currentProfit = m.netDollars;
+  const remaining     = Math.max(targetProfit - currentProfit, 0);
+  const rawPct        = targetProfit > 0 ? (currentProfit / targetProfit) * 100 : 0;
+  const completion    = Math.max(0, Math.min(100, rawPct));
+  const isComplete    = targetProfit > 0 && currentProfit >= targetProfit;
+
+  const fmt$    = v => (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2);
+  const escName = name.replace(/'/g, "\\'");
+
+  const tBtns = presetTargets.map(t => `
+      <button class="acc-chal-tbtn${!isCustom && targetPct === t ? ' active' : ''}" onclick="_accSetChallengeTarget('${escName}',${t})">${t}%</button>`
+    ).join('') + `
+      <button class="acc-chal-tbtn${isCustom ? ' active' : ''}" onclick="_accToggleCustomTarget(event)">Custom</button>
+      <input type="number" min="1" max="100" step="0.5" id="acc-chal-custom-input" class="acc-chal-custom-input"
+        value="${isCustom ? targetPct : ''}" placeholder="%"
+        style="display:${isCustom ? 'inline-flex' : 'none'}"
+        onclick="event.stopPropagation()"
+        onkeydown="if(event.key==='Enter'){_accSetChallengeTarget('${escName}',parseFloat(this.value)||10)}"
+        onblur="if(this.value)_accSetChallengeTarget('${escName}',parseFloat(this.value)||10)">`;
+
+  const milestoneHtml = [25, 50, 75, 100].map(ms => `
+      <div class="acc-chal-ms${completion >= ms ? ' reached' : ''}" style="left:${ms}%">
+        <div class="acc-chal-ms-dot"></div><div class="acc-chal-ms-lbl">${ms}%</div>
+      </div>`).join('');
+
+  const confetti = isComplete ? Array.from({ length: 10 }).map((_, i) => `
+      <span class="acc-chal-confetti" style="left:${5 + i * 9.5}%;animation-delay:${(i * 0.09).toFixed(2)}s;background:${['#fbbf24', '#34d399', '#60a5fa', '#f87171'][i % 4]}"></span>`
+    ).join('') : '';
+
+  return `
+    <div class="acc-chal-card${isComplete ? ' complete' : ''}">
+      ${confetti}
+      <div class="acc-chal-head">
+        <div>
+          <div class="acc-chal-title">🏁 Challenge Progress</div>
+          <div class="acc-chal-sub">Track your progress toward completing this Prop Firm Challenge.</div>
+        </div>
+        ${isComplete ? '<div class="acc-chal-badge">READY FOR VERIFICATION</div>' : ''}
+      </div>
+
+      <div class="acc-chal-target-row">
+        <span class="acc-chal-target-lbl">Profit Target</span>
+        <div class="acc-chal-tbtns">${tBtns}</div>
+      </div>
+
+      ${isComplete ? `
+        <div class="acc-chal-complete-banner">
+          <svg class="acc-chal-check" viewBox="0 0 52 52" aria-hidden="true">
+            <circle class="acc-chal-check-circle" cx="26" cy="26" r="23" fill="none"/>
+            <path class="acc-chal-check-mark" fill="none" d="M14 27l7 7 16-16"/>
+          </svg>
+          <span>Challenge Target Reached</span>
+        </div>` : ''}
+
+      <div class="acc-chal-progress-wrap">
+        <div class="acc-chal-progress-outer">
+          <div class="acc-chal-progress-fill${isComplete ? ' gold' : ''}" style="width:${completion}%">
+            <span class="acc-chal-progress-glow"></span>
+          </div>
+          <div class="acc-chal-progress-pct">${completion.toFixed(2)}%</div>
+        </div>
+        <div class="acc-chal-milestones">${milestoneHtml}</div>
+      </div>
+
+      <div class="acc-chal-stats">
+        <div class="acc-chal-stat">
+          <div class="acc-chal-stat-lbl">Target Profit</div>
+          <div class="acc-chal-stat-val gold">${targetProfit > 0 ? '$' + targetProfit.toFixed(2) : '—'}</div>
+        </div>
+        <div class="acc-chal-stat">
+          <div class="acc-chal-stat-lbl">Current Profit</div>
+          <div class="acc-chal-stat-val ${currentProfit >= 0 ? 'green' : 'red'}">${fmt$(currentProfit)}</div>
+        </div>
+        <div class="acc-chal-stat">
+          <div class="acc-chal-stat-lbl">Remaining</div>
+          <div class="acc-chal-stat-val">${targetProfit > 0 ? '$' + (isComplete ? '0.00' : remaining.toFixed(2)) : '—'}</div>
+        </div>
+        <div class="acc-chal-stat">
+          <div class="acc-chal-stat-lbl">Completion</div>
+          <div class="acc-chal-stat-val ${isComplete ? 'gold' : 'blue'}">${completion.toFixed(2)}%</div>
+        </div>
+      </div>
+    </div>`;
+}
+function _accToggleCustomTarget(e) {
+  if (e) e.stopPropagation();
+  const input = document.getElementById('acc-chal-custom-input');
+  if (!input) return;
+  input.style.display = 'inline-flex';
+  input.focus(); input.select();
+}
+async function _accSetChallengeTarget(name, pct) {
+  pct = parseFloat(pct);
+  if (!pct || isNaN(pct) || pct <= 0) return;
+  const list = _getCustomAccounts();
+  const idx  = list.findIndex(a => a.name === name);
+  if (idx < 0) return;
+  list[idx].challengeTarget = pct;
+  await _saveCustomAccounts(list);
+  if (_accActiveName === name) accShowDetail(name);
+}
+
 function accShowDetail(name) {
   const drawer = document.getElementById('acc-detail-drawer');
   const body   = document.getElementById('acc-detail-body');
@@ -5697,6 +5811,7 @@ function accShowDetail(name) {
   body.innerHTML = `
     <div class="acc-an">
       ${heroHtml}
+      ${acc.type === 'Challenge' ? _accChallengeSectionHtml(acc, m, accSize, name) : ''}
       <div class="acc-an-sec-head">Performance Scorecard</div>
       <div class="acc-kpi-scorecard">${kpiCards}</div>
       ${eqSection}
