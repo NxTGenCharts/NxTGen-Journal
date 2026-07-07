@@ -2775,21 +2775,21 @@ body{
 }
 .acc-chal-progress-fill{
   position:relative;height:100%;border-radius:var(--r-full);min-width:30px;
-  background:linear-gradient(90deg,#059669 0%,var(--green) 55%,#6ee7b7 100%);
+  background:linear-gradient(90deg,#065f46 0%,#059669 55%,#10b981 100%);
   transition:width 1s var(--ease-out),background 0.5s var(--ease-out);
-  box-shadow:0 0 18px rgba(52,211,153,0.45);
+  box-shadow:0 0 16px rgba(5,150,105,0.4);
   display:flex;align-items:center;justify-content:flex-end;
 }
 .acc-chal-progress-fill.gold{
-  background:linear-gradient(90deg,#b45309 0%,var(--gold) 55%,#fde68a 100%);
-  box-shadow:0 0 22px rgba(251,191,36,0.55);
+  background:linear-gradient(90deg,#92400e 0%,#b45309 55%,#d97706 100%);
+  box-shadow:0 0 20px rgba(180,83,9,0.5);
 }
 .acc-chal-progress-glow{
   position:absolute;top:0;right:0;bottom:0;width:36px;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.35));
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.18));
   animation:chalGlowPulse 2.2s ease-in-out infinite;
 }
-@keyframes chalGlowPulse{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes chalGlowPulse{0%,100%{opacity:.4}50%{opacity:.8}}
 .acc-chal-progress-pct{
   position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font-family:var(--font-head);font-size:12.5px;font-weight:800;letter-spacing:.01em;
