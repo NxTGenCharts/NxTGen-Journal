@@ -5591,18 +5591,22 @@ body{
   flex-direction: column;
 }
 /* Flexible middle region: everything between the top bar and the footer.
-   justify-content:space-between spreads any leftover vertical space
-   evenly between its rows (hero → rule → stats → tags → rings → …
-   → bottom-row) so the whole body genuinely fills the available height
-   instead of leaving unused space after the last item. min-height:0 lets
-   it shrink below its content size too, so the existing --s shrink-to-fit
-   logic in smFitCardContent still works unchanged for short/wide shapes. */
+   Rather than justify-content:space-between (flex-computed gap
+   distribution, which html2canvas rasterizes unreliably — it was the
+   cause of rows drifting down and overlapping the footer in exports),
+   the extra vertical space is measured in JS (smFitCardContent) and
+   applied here as a literal --fill-gap pixel value via the CSS gap
+   property. That's just fixed spacing between block-level rows, which
+   html2canvas renders exactly like real margins — no auto-distribution
+   math for it to get wrong. min-height:0 still lets this shrink below
+   its natural content size for the existing --s shrink-to-fit path. */
 .sm-card-body {
+  --fill-gap: 0px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   flex: 1;
   min-height: 0;
+  gap: var(--fill-gap);
 }
 .sm-card.dark {
   background: linear-gradient(145deg, #0d1424 0%, #0a0f1c 60%, #0d1530 100%);
@@ -5795,9 +5799,6 @@ body{
 .sm-bottom-row { display: flex; align-items: center; justify-content: space-between; padding: 0 calc(22px*var(--s)) calc(14px*var(--s)); }
 .sm-stars { font-size: calc(16px*var(--s)); letter-spacing: 1px; color: #fbbf24; }
 .sm-card.light .sm-stars { color: #b45309; }
-.sm-risk-tag { font-size: calc(11px*var(--s)); font-weight: 700; padding: calc(4px*var(--s)) calc(11px*var(--s)); border-radius: 0; }
-.sm-card.dark  .sm-risk-tag { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); opacity: 0.65; }
-.sm-card.light .sm-risk-tag { background: rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.08); opacity: 0.65; }
 
 .sm-footer { display: flex; align-items: center; justify-content: space-between; padding: calc(11px*var(--s)) calc(22px*var(--s)); flex-shrink: 0; }
 .sm-card.dark  .sm-footer { background: rgba(255,255,255,0.025); border-top: 1px solid rgba(255,255,255,0.055); }

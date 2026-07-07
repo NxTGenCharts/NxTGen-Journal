@@ -9861,7 +9861,7 @@ function openShareModal(id) {
           <div class="sm-checklist-grid" id="sm-checklist-grid"></div>
           <div class="sm-narrative-lbl" id="sm-narrative-lbl" style="display:none">Trade Narrative</div>
           <div class="sm-notes-row" id="sm-notes-row"><div class="sm-notes" id="sm-notes"></div></div>
-          <div class="sm-bottom-row"><div class="sm-stars" id="sm-stars"></div><div class="sm-risk-tag">${t.risk || '—'} risk</div></div>
+          <div class="sm-bottom-row"><div class="sm-stars" id="sm-stars"></div></div>
           </div>
           <div class="sm-footer"><span class="sm-footer-url">nxtgencharts.github.io/NxTGen-Journal</span><img class="sm-footer-logo" src="logo.svg" alt="NxTGen"></div>
         </div>
@@ -9973,27 +9973,53 @@ function smSyncCardHeight(){
   if (width > 0) card.style.height = Math.round(width / ratio) + 'px';
 }
 
-// Shrink-to-fit: every spacing/font-size value inside the card is
-// expressed as calc(Npx*var(--s)) (see styles.css), so dialing --s down
-// uniformly shrinks the WHOLE layout in real content terms — smaller
+// Shrink-to-fit AND grow-to-fill: every spacing/font-size value inside the
+// card is expressed as calc(Npx*var(--s)) (see styles.css), so dialing --s
+// down uniformly shrinks the WHOLE layout in real content terms — smaller
 // fonts, smaller gaps, smaller rings — until it actually fits inside the
 // card's current (fixed) height. This is never a visual transform/crop:
 // the content itself gets smaller, so nothing is ever cut off, at any
 // export size from a short wide wallpaper to a tall phone story.
+//
+// When content is instead SHORTER than the target height (tall Portrait/
+// Phone Story shapes), the leftover space is distributed between
+// #sm-card-body's rows as an explicit --fill-gap pixel value, computed
+// here in JS rather than left to a flex justify-content:space-between.
+// html2canvas rasterizes a literal, pre-computed gap correctly every
+// time; it was found to mis-layout the auto-distributed space-between
+// gap during capture, which showed up as rows drifting down and
+// overlapping the footer in exported images.
 function smFitCardContent(){
   const card = document.getElementById('sm-card');
+  const body = document.getElementById('sm-card-body');
   if (!card) return;
   card.style.setProperty('--s', '1');
+  if (body) body.style.setProperty('--fill-gap', '0px');
   const targetH = card.getBoundingClientRect().height;
   const naturalH = card.scrollHeight;
-  if (naturalH <= targetH + 0.5) return; // already fits at full size
-  let lo = 0.25, hi = 1, best = 0.25;
-  for (let i = 0; i < 16; i++) {
-    const mid = (lo + hi) / 2;
-    card.style.setProperty('--s', mid.toFixed(4));
-    if (card.scrollHeight <= targetH) { best = mid; lo = mid; } else { hi = mid; }
+
+  if (naturalH > targetH + 0.5) {
+    // Overflow: shrink content in real terms until it fits.
+    let lo = 0.25, hi = 1, best = 0.25;
+    for (let i = 0; i < 16; i++) {
+      const mid = (lo + hi) / 2;
+      card.style.setProperty('--s', mid.toFixed(4));
+      if (card.scrollHeight <= targetH) { best = mid; lo = mid; } else { hi = mid; }
+    }
+    card.style.setProperty('--s', best.toFixed(4));
+    return;
   }
-  card.style.setProperty('--s', best.toFixed(4));
+
+  // Underflow: distribute the leftover height as real gap px between
+  // the body's own rows, so the card's content reaches the bottom edge
+  // instead of leaving blank space after the last row.
+  if (body) {
+    const extra = targetH - naturalH;
+    const slots = Array.from(body.children).filter(el => getComputedStyle(el).display !== 'none').length - 1;
+    if (slots > 0 && extra > 0.5) {
+      body.style.setProperty('--fill-gap', (extra / slots).toFixed(2) + 'px');
+    }
+  }
 }
 
 function smApplyCardShape(){
