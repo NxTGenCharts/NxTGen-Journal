@@ -5855,6 +5855,16 @@ body{
 .sm-select-wrap { position: relative; }
 .sm-select { width: 100%; appearance: none; padding: 10px 34px 10px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); border-radius: 0; color: var(--text); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 [data-theme="light"] .sm-select { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.09); }
+/* The dropdown's OPTION list is rendered by the browser itself, outside
+   any element .sm-select's own styles apply to, so without this it
+   falls back to the browser default — a plain white list with dark
+   text — regardless of the card/modal's own dark theme. Setting
+   background/color directly on the <option> elements is honored by
+   Chrome/Edge/Firefox for the popup list (unlike most other select
+   styling), so this keeps the list legible on dark backgrounds instead
+   of requiring a hover to reveal each row. */
+.sm-select option { background: #12172a; color: var(--text); }
+[data-theme="light"] .sm-select option { background: #ffffff; color: var(--text); }
 .sm-select-wrap::after { content: ''; position: absolute; right: 13px; top: 50%; width: 7px; height: 7px; border-right: 1.5px solid var(--text3); border-bottom: 1.5px solid var(--text3); transform: translateY(-70%) rotate(45deg); pointer-events: none; }
 .sm-dpi-hint { font-size: 10.5px; color: var(--text3); display: flex; align-items: center; gap: 5px; }
 .sm-dpi-hint .sm-dpi-good { color: #34d399; font-weight: 700; }
