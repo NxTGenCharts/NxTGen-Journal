@@ -2985,6 +2985,21 @@ function closeDetail() {
   panel.classList.remove('open', 'fullscreen');
   _detFullscreen = false;
 }
+// Close the detail panel when clicking/tapping anywhere outside of it —
+// but not when the click is what opened it (a trade row), and not while
+// another modal/dropdown/popover is open on top of it.
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('detail-panel');
+  if (!panel || !panel.classList.contains('open')) return;
+  if (panel.contains(e.target)) return;
+  if (e.target.closest('[onclick*="openDetail"]')) return;
+  const modal = document.getElementById('modal');
+  if (modal && modal.classList.contains('open')) return;
+  const accDrawer = document.getElementById('acc-detail-drawer');
+  if (accDrawer && accDrawer.classList.contains('open') && accDrawer.contains(e.target)) return;
+  if (e.target.closest('.mcl-item, .toast, .confirm-dialog, .dropdown-menu')) return;
+  closeDetail();
+}, true);
 function toggleDetailSize(id) {
   const panel = document.getElementById('detail-panel');
   _detFullscreen = !_detFullscreen;
@@ -3391,8 +3406,8 @@ async function saveTrade() {
   trades.unshift(t);
   trades.sort((a, b) => b.date.localeCompare(a.date));
   tradeState[t.id] = {
-    notes: t.notes, pretrade: t.pretrade, emotion: 'Calm',
-    checklist: [], charts: [], chartLabels: [...CHART_LABELS], mistakes: '',
+    notes: t.notes, pretrade: t.pretrade, emotion: t.emotion || 'Calm',
+    checklist: [...(t.checklist || [])], charts: [], chartLabels: [...CHART_LABELS], mistakes: '',
   };
 
   closeModal();
