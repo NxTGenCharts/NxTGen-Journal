@@ -5806,7 +5806,9 @@ body{
 /* ── Checklist grid ── */
 .sm-checklist-divider { height: 2px; margin: calc(6px*var(--s)) calc(22px*var(--s)) 0; background: #fbbf24; }
 .sm-card.light .sm-checklist-divider { background: #b45309; }
-.sm-checklist-lbl { font-size: calc(10px*var(--s)); font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.4; padding: calc(14px*var(--s)) calc(22px*var(--s)) calc(6px*var(--s)); text-align: center; }
+.sm-checklist-lbl { font-size: calc(10px*var(--s)); font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; padding: calc(14px*var(--s)) calc(22px*var(--s)) calc(6px*var(--s)); text-align: center; }
+.sm-card.dark  .sm-checklist-lbl { color: #fbbf24; }
+.sm-card.light .sm-checklist-lbl { color: #b45309; }
 .sm-checklist-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(6px*var(--s)) calc(10px*var(--s)); padding: 0 calc(22px*var(--s)) calc(14px*var(--s)); }
 .sm-check-item { display: flex; align-items: center; justify-content: flex-start; gap: calc(7px*var(--s)); font-size: calc(11px*var(--s)); font-weight: 600; min-width: 0; }
 /* Vertical dividers between the 3 columns — items 2 and 3 of every row
