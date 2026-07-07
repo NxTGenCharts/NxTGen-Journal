@@ -5809,15 +5809,23 @@ body{
 .sm-narrative-lbl { font-size: calc(10px*var(--s)); font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.4; padding: calc(8px*var(--s)) calc(22px*var(--s)) calc(4px*var(--s)); }
 
 .sm-notes-row { padding: 0 calc(22px*var(--s)) calc(10px*var(--s)); }
+/* Faint hairline separating the last content row (e.g. checklist) from
+   the footer bar below, distinct from the footer's own background. */
+.sm-card-body { border-bottom: 1px solid rgba(255,255,255,0.055); }
+.sm-card.light .sm-card-body { border-bottom-color: rgba(0,0,0,0.06); }
 .sm-notes { padding: calc(10px*var(--s)) calc(14px*var(--s)); border-radius: 0; font-size: calc(12px*var(--s)); line-height: 1.6; font-style: italic; border-left: 3px solid #fbbf24; }
 .sm-card.dark  .sm-notes { background: rgba(255,255,255,0.03); color: rgba(240,244,255,0.60); }
 .sm-card.light .sm-notes { background: rgba(0,0,0,0.03); color: rgba(15,23,42,0.60); border-left-color: #b45309; }
 
-.sm-bottom-row { display: flex; align-items: center; justify-content: space-between; padding: 0 calc(22px*var(--s)) calc(14px*var(--s)); }
-.sm-stars { font-size: calc(16px*var(--s)); letter-spacing: 1px; color: #fbbf24; }
+.sm-stars { font-size: calc(16px*var(--s)); letter-spacing: 1px; color: #fbbf24; justify-self: center; }
 .sm-card.light .sm-stars { color: #b45309; }
 
-.sm-footer { display: flex; align-items: center; justify-content: space-between; padding: calc(11px*var(--s)) calc(22px*var(--s)); flex-shrink: 0; }
+/* Grid (not flex+space-between) so the star rating sits in a true
+   center column regardless of how wide the url/logo siblings are —
+   space-between only centers a middle child when its neighbors are
+   equal width, which the url text and logo never are. */
+.sm-footer { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; column-gap: calc(10px*var(--s)); padding: calc(11px*var(--s)) calc(22px*var(--s)); flex-shrink: 0; }
+.sm-footer-logo { justify-self: end; }
 .sm-card.dark  .sm-footer { background: rgba(255,255,255,0.025); border-top: 1px solid rgba(255,255,255,0.055); }
 .sm-card.light .sm-footer { background: rgba(0,0,0,0.025); border-top: 1px solid rgba(0,0,0,0.06); }
 .sm-footer-url   { font-size: calc(10px*var(--s)); opacity: 0.30; }

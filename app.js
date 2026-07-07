@@ -9861,9 +9861,12 @@ function openShareModal(id) {
           <div class="sm-checklist-grid" id="sm-checklist-grid"></div>
           <div class="sm-narrative-lbl" id="sm-narrative-lbl" style="display:none">Trade Narrative</div>
           <div class="sm-notes-row" id="sm-notes-row"><div class="sm-notes" id="sm-notes"></div></div>
-          <div class="sm-bottom-row"><div class="sm-stars" id="sm-stars"></div></div>
           </div>
-          <div class="sm-footer"><span class="sm-footer-url">nxtgencharts.github.io/NxTGen-Journal</span><img class="sm-footer-logo" src="logo.svg" alt="NxTGen"></div>
+          <div class="sm-footer">
+            <span class="sm-footer-url">nxtgencharts.github.io/NxTGen-Journal</span>
+            <div class="sm-stars" id="sm-stars"></div>
+            <img class="sm-footer-logo" src="logo.svg" alt="NxTGen">
+          </div>
         </div>
         </div>
       </div>
