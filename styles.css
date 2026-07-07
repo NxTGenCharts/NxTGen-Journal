@@ -5607,6 +5607,14 @@ body{
   flex: 1;
   min-height: 0;
   gap: var(--fill-gap);
+  /* Always-present breathing room before the footer bar. Without this,
+     short/wide shapes (Square, Landscape, Wallpaper) — where the
+     computed --fill-gap ends up tiny or zero because content already
+     nearly fills the height — leave the last row (stars) sitting flush
+     against the footer's background rectangle. Tall shapes (Portrait,
+     Phone Story) already get generous --fill-gap spacing everywhere
+     else, so this fixed amount is invisible there. */
+  padding-bottom: calc(16px*var(--s));
 }
 .sm-card.dark {
   background: linear-gradient(145deg, #0d1424 0%, #0a0f1c 60%, #0d1530 100%);
