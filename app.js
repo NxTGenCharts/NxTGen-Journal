@@ -9995,14 +9995,6 @@ function smFitCardContent(){
 }
 
 function smApplyCardShape(){
-  // For wide presets (landscape, wallpaper, square), widen the modal
-  // so the card has room to spread out instead of always being narrow.
-  const modal = document.getElementById('sm-modal');
-  const preset = SM_SIZE_PRESETS[_shareSizePreset] || SM_SIZE_PRESETS.ig_square;
-  const isWide = preset.w >= preset.h;
-  if (modal) {
-    modal.style.maxWidth = isWide ? 'min(960px, 94vw)' : 'min(560px, 94vw)';
-  }
   smSyncCardHeight();
   smFitCardContent();
   updateSmDpiHint();
