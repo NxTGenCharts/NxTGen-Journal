@@ -5616,6 +5616,17 @@ body{
      is invisible there. */
   padding-bottom: calc(24px*var(--s));
 }
+/* Instagram Square, Twitter Landscape, and Desktop Wallpaper get a touch
+   more bottom breathing room than the default 24px — 30px brings the
+   gap between the checklist and the card's bottom edge closer in line
+   with the spacing already present at the top of the card for these
+   short/wide shapes. Other presets (Portrait, Phone Story) keep the
+   default, since their generous --fill-gap already handles spacing. */
+.sm-card[data-size-preset="ig_square"] .sm-card-body,
+.sm-card[data-size-preset="tw_landscape"] .sm-card-body,
+.sm-card[data-size-preset="wallpaper"] .sm-card-body {
+  padding-bottom: calc(30px*var(--s));
+}
 .sm-card.dark {
   background: linear-gradient(145deg, #0d1424 0%, #0a0f1c 60%, #0d1530 100%);
   border: 1px solid rgba(255,255,255,0.08);

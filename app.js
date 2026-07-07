@@ -10022,6 +10022,8 @@ function smFitCardContent(){
 }
 
 function smApplyCardShape(){
+  const card = document.getElementById('sm-card');
+  if (card) card.dataset.sizePreset = _shareSizePreset;
   smSyncCardHeight();
   smFitCardContent();
   updateSmDpiHint();
