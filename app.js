@@ -9958,12 +9958,18 @@ function smInitSizePresets(){
   updateSmDpiHint();
   _smScheduleFit();
   const frame = document.getElementById('sm-frame');
-  // Frame shape animates (transition: aspect-ratio 0.3s), so its final
-  // clientWidth/clientHeight aren't known until that finishes — refit once
-  // more when it does so the card doesn't sit mis-scaled mid-transition.
+  const modal = document.getElementById('sm-modal');
+  // Frame shape / modal width animate (transitions on aspect-ratio and
+  // max-width), so final clientWidth/clientHeight aren't known until those
+  // finish — refit once more when they do so the card doesn't sit
+  // mis-scaled or mis-reflowed mid-transition.
   if (frame && !frame._smFitOnTransition) {
     frame._smFitOnTransition = true;
-    frame.addEventListener('transitionend', e => { if (e.propertyName === 'aspect-ratio' || e.propertyName === 'max-width') _smScheduleFit(); });
+    frame.addEventListener('transitionend', e => { if (e.propertyName === 'aspect-ratio') _smScheduleFit(); });
+  }
+  if (modal && !modal._smFitOnTransition) {
+    modal._smFitOnTransition = true;
+    modal.addEventListener('transitionend', e => { if (e.propertyName === 'max-width') _smScheduleFit(); });
   }
 }
 function smSetSizePreset(key){
@@ -9975,17 +9981,24 @@ function smSetSizePreset(key){
 // Applies the selected preset's aspect ratio to the live preview frame
 // so the on-screen card responsively reflows into a square / landscape
 // / portrait / wallpaper / phone-story shape instead of always staying
-// the same fixed portrait block regardless of what's selected. The frame
-// itself only changes shape — actually fitting the (real, variable-height)
-// card content inside that shape is handled separately by
-// _smFitCardToFrame, since a plain aspect-ratio/height:100% CSS trick
-// can't correctly contain ordinary block content and was clipping the
-// card in any non-portrait preset (square, landscape, wallpaper).
+// the same fixed portrait block regardless of what's selected. It also
+// widens the modal itself for "wide" presets (square and anything
+// landscape) — this is what actually gives the card room to spread its
+// existing rows (RR/strategy, tags, rings, checklist, etc.) out wider
+// instead of just rendering the same tall narrow design shrunk down
+// with dead space around it. Fitting the (real, variable-height) card
+// content inside the frame's shape without any cropping is then handled
+// separately by _smFitCardToFrame.
 function _smApplyFrameAspect(){
   const frame = document.getElementById('sm-frame');
+  const modal = document.getElementById('sm-modal');
   if (!frame) return;
   const preset = SM_SIZE_PRESETS[_shareSizePreset] || SM_SIZE_PRESETS.ig_square;
   frame.style.setProperty('--sm-ar', `${preset.w} / ${preset.h}`);
+  if (modal) {
+    const isWide = preset.w >= preset.h;
+    modal.style.maxWidth = isWide ? 'min(1040px, 94vw)' : 'min(560px, 94vw)';
+  }
 }
 
 // Measures the card at its natural, unscaled design size and shrinks/grows
