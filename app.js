@@ -4203,6 +4203,18 @@ function _wlNormPair(p) {
   return p;
 }
 
+const _WL_CHECKLIST_ITEMS = [
+  { k: 'htfBias',         l: 'HTF Bias' },
+  { k: 'weeklyLiquidity', l: 'Weekly Liquidity' },
+  { k: 'dailyBias',       l: 'Daily Bias' },
+  { k: 'pdArrays',        l: 'Mark PD Arrays' },
+  { k: 'newsReviewed',    l: 'Major News Reviewed' },
+  { k: 'correlatedAssets',l: 'Correlated Assets Checked' },
+  { k: 'smtChecked',      l: 'SMT Checked' },
+  { k: 'riskCalculated',  l: 'Risk Calculated' },
+  { k: 'sessionPlanReady',l: 'Session Plan Ready' },
+];
+
 /* Fill in any fields missing from legacy week rows. Mutates + returns week.meta. */
 function _wlNormWeekMeta(week) {
   if (!week.meta) week.meta = {};
@@ -4213,6 +4225,25 @@ function _wlNormWeekMeta(week) {
   if (m.dollarStrength == null) m.dollarStrength = 50;
   if (m.dollarStrengthManual == null) m.dollarStrengthManual = false;
   if (m.calendarReviewed == null) m.calendarReviewed = false;
+  if (!m.checklist) {
+    m.checklist = {};
+    _WL_CHECKLIST_ITEMS.forEach(i => m.checklist[i.k] = false);
+  } else {
+    _WL_CHECKLIST_ITEMS.forEach(i => { if (m.checklist[i.k] == null) m.checklist[i.k] = false; });
+  }
+  if (!m.focus) m.focus = { mainPair: '', secondaryPair: '', avoidPair: '', maxTrades: null, maxRisk: null, objective: '' };
+  else {
+    ['mainPair','secondaryPair','avoidPair','objective'].forEach(k => { if (m.focus[k] == null) m.focus[k] = ''; });
+    if (m.focus.maxTrades === undefined) m.focus.maxTrades = null;
+    if (m.focus.maxRisk === undefined) m.focus.maxRisk = null;
+  }
+  if (!m.reflection) m.reflection = { followedPlan: '', whatChanged: '', biasValid: '', bestTrade: '', worstTrade: '', biggestLesson: '', mistakeRepeated: '', improvement: '', confidence: 0 };
+  else {
+    ['followedPlan','whatChanged','biasValid','bestTrade','worstTrade','biggestLesson','mistakeRepeated','improvement'].forEach(k => { if (m.reflection[k] == null) m.reflection[k] = ''; });
+    if (m.reflection.confidence == null) m.reflection.confidence = 0;
+  }
+  if (m.reflectionUnlocked == null) m.reflectionUnlocked = false;
+  if (m.coachExpanded == null) m.coachExpanded = true;
   return m;
 }
 
@@ -4715,6 +4746,400 @@ function _wlBuildMarketOverview(week) {
   </div>`;
 }
 
+/* ── Weekly Checklist ── */
+function _wlBuildWeeklyChecklist(week) {
+  _wlNormWeekMeta(week);
+  const cl = week.meta.checklist;
+  const doneCount = _WL_CHECKLIST_ITEMS.reduce((s, i) => s + (cl[i.k] ? 1 : 0), 0);
+  const pct = Math.round((doneCount / _WL_CHECKLIST_ITEMS.length) * 100);
+
+  const rows = _WL_CHECKLIST_ITEMS.map(item => `
+    <button class="wl-checklist-row${cl[item.k] ? ' checked' : ''}" onclick="_wlToggleWeeklyChecklistItem('${week.id}','${item.k}')">
+      <span class="wl-checklist-box">${icon(cl[item.k] ? 'check' : 'dot-o')}</span>
+      <span>${item.l}</span>
+    </button>`).join('');
+
+  return `
+  <div class="wl-checklist-card">
+    <div class="wl-checklist-head">
+      <div class="wl-checklist-title">Weekly Preparation Checklist</div>
+      <div class="wl-checklist-pct-wrap">
+        <div class="wl-factor-bar-track" style="width:90px"><div class="wl-factor-bar-fill" style="width:${pct}%"></div></div>
+        <span class="wl-checklist-pct">${pct}%</span>
+      </div>
+    </div>
+    <div class="wl-checklist-grid">${rows}</div>
+  </div>`;
+}
+
+async function _wlToggleWeeklyChecklistItem(weekId, key) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  _wlNormWeekMeta(week);
+  week.meta.checklist[key] = !week.meta.checklist[key];
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
+}
+
+/* ── Weekly Focus ── */
+function _wlBuildWeeklyFocus(week) {
+  _wlNormWeekMeta(week);
+  const f = week.meta.focus;
+  const pairOpts = ['', ...new Set([...week.pairs.map(p => p.name), ..._WL_PAIRS_DEFAULT])];
+
+  const pairSelect = (id, field, value, placeholder) => `
+    <select class="wl-form-select" onchange="_wlSaveFocusField('${week.id}','${field}',this.value)">
+      <option value=""${!value?' selected':''}>${placeholder}</option>
+      ${pairOpts.filter(Boolean).map(p => `<option value="${p}"${value===p?' selected':''}>${p}</option>`).join('')}
+    </select>`;
+
+  return `
+  <div class="wl-focus-card">
+    <div class="wl-checklist-title" style="margin-bottom:12px">Weekly Focus</div>
+    <div class="wl-focus-grid">
+      <div class="wl-form-row">
+        <label class="wl-form-label">Main Pair</label>
+        ${pairSelect('main','mainPair',f.mainPair,'— None —')}
+      </div>
+      <div class="wl-form-row">
+        <label class="wl-form-label">Secondary Pair</label>
+        ${pairSelect('sec','secondaryPair',f.secondaryPair,'— None —')}
+      </div>
+      <div class="wl-form-row">
+        <label class="wl-form-label">Avoid Trading</label>
+        ${pairSelect('avoid','avoidPair',f.avoidPair,'— None —')}
+      </div>
+      <div class="wl-form-row">
+        <label class="wl-form-label">Maximum Trades</label>
+        <input type="number" min="0" class="wl-form-input" value="${f.maxTrades ?? ''}" placeholder="e.g. 5"
+          onblur="_wlSaveFocusField('${week.id}','maxTrades',this.value?parseInt(this.value,10):null)">
+      </div>
+      <div class="wl-form-row">
+        <label class="wl-form-label">Maximum Risk (%)</label>
+        <input type="number" min="0" max="100" step="0.5" class="wl-form-input" value="${f.maxRisk ?? ''}" placeholder="e.g. 5"
+          onblur="_wlSaveFocusField('${week.id}','maxRisk',this.value?parseFloat(this.value):null)">
+      </div>
+      <div class="wl-form-row">
+        <label class="wl-form-label">Weekly Objective</label>
+        <input type="text" class="wl-form-input" value="${f.objective || ''}" placeholder="e.g. Protect Capital"
+          onblur="_wlSaveFocusField('${week.id}','objective',this.value)">
+      </div>
+    </div>
+  </div>`;
+}
+
+async function _wlSaveFocusField(weekId, field, value) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  _wlNormWeekMeta(week);
+  week.meta.focus[field] = value;
+  await _wlSaveWeek(week);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   AI TRADING COACH — rule-based checks over the current week's data
+   (no external API call: correlation/risk/confluence rules only)
+   ══════════════════════════════════════════════════════════════════ */
+function _wlComputeCoachInsights(week) {
+  const insights = [];
+  const pairs = week.pairs.filter(p => !p.archived);
+
+  // Missing confluences
+  pairs.forEach(p => {
+    const { checked, total } = _wlLiqCount(p.liq);
+    if (checked < 3 && p.direction !== 'wait') {
+      insights.push({ sev: 'warn', text: `${p.name} has only ${checked}/${total} confluences confirmed but direction is set to ${p.direction === 'long' ? 'Long' : 'Short'} — consider waiting for more confirmation.` });
+    }
+  });
+
+  // Bias consistency vs DXY (only meaningful once DXY bias is actually set)
+  if (week.dxy !== 'neu') {
+    pairs.forEach(p => {
+      if (p.bias === 'neu') return;
+      const isUsdQuote = /USD$/.test(p.name) && p.name !== 'USDCAD' && p.name !== 'USDJPY' && p.name !== 'USDCHF';
+      const isUsdBase = /^USD/.test(p.name);
+      if (isUsdQuote) {
+        if (p.bias === 'bull' && week.dxy === 'bull') {
+          insights.push({ sev: 'warn', text: `You are bullish on ${p.name} but DXY is also marked bullish — since ${p.name} trades inverse to USD strength, review your market correlation.` });
+        } else if (p.bias === 'bear' && week.dxy === 'bear') {
+          insights.push({ sev: 'warn', text: `You are bearish on ${p.name} but DXY is also marked bearish — since ${p.name} trades inverse to USD strength, review your market correlation.` });
+        }
+      } else if (isUsdBase) {
+        if (p.bias === 'bull' && week.dxy === 'bear') {
+          insights.push({ sev: 'warn', text: `You are bullish on ${p.name} while DXY is marked bearish — since USD is the base currency here, review whether these two views are consistent.` });
+        } else if (p.bias === 'bear' && week.dxy === 'bull') {
+          insights.push({ sev: 'warn', text: `You are bearish on ${p.name} while DXY is marked bullish — since USD is the base currency here, review whether these two views are consistent.` });
+        }
+      }
+    });
+  }
+
+  // Confidence vs confluence mismatch
+  pairs.forEach(p => {
+    const { checked, total } = _wlLiqCount(p.liq);
+    if (p.confidence >= 75 && checked <= 2) {
+      insights.push({ sev: 'warn', text: `${p.name} confidence is ${p.confidence}% but only ${checked}/${total} confluences are checked off — high confidence without confirmation is a common overtrading trigger.` });
+    }
+  });
+
+  // Checklist completion
+  const clCheckedCount = _WL_CHECKLIST_ITEMS.reduce((s, i) => s + (week.meta.checklist[i.k] ? 1 : 0), 0);
+  if (clCheckedCount < _WL_CHECKLIST_ITEMS.length * 0.5) {
+    insights.push({ sev: 'info', text: `Weekly preparation checklist is only ${Math.round(clCheckedCount/_WL_CHECKLIST_ITEMS.length*100)}% complete — finish it before the week's first session for a cleaner read on the market.` });
+  }
+
+  // News warnings
+  if (!week.meta.calendarReviewed) {
+    insights.push({ sev: 'info', text: `Economic calendar hasn't been marked reviewed yet — check for high-impact releases before sizing up any positions.` });
+  }
+
+  // Risk warnings — too many pairs with a direction set relative to max trades
+  const activeDirectional = pairs.filter(p => p.direction !== 'wait').length;
+  if (week.meta.focus.maxTrades != null && activeDirectional > week.meta.focus.maxTrades) {
+    insights.push({ sev: 'warn', text: `${activeDirectional} pairs have a Long/Short direction set, which is more than your Maximum Trades limit of ${week.meta.focus.maxTrades} — decide which setups take priority.` });
+  }
+  if (week.meta.focus.avoidPair && pairs.some(p => p.name === week.meta.focus.avoidPair && p.direction !== 'wait')) {
+    insights.push({ sev: 'warn', text: `${week.meta.focus.avoidPair} has a direction set even though it's marked as this week's pair to avoid.` });
+  }
+
+  if (!insights.length) {
+    insights.push({ sev: 'good', text: 'No inconsistencies detected in this week\'s analysis — bias, confidence, and confluence levels line up so far.' });
+  }
+  return insights;
+}
+
+function _wlBuildAICoach(week) {
+  _wlNormWeekMeta(week);
+  const insights = _wlComputeCoachInsights(week);
+  const expanded = week.meta.coachExpanded;
+  const warnCount = insights.filter(i => i.sev === 'warn').length;
+
+  const rows = insights.map(i => `
+    <div class="wl-coach-row ${i.sev}">
+      <span class="wl-coach-icon">${icon(i.sev === 'warn' ? 'warning' : i.sev === 'good' ? 'check-c' : 'info')}</span>
+      <span>${i.text}</span>
+    </div>`).join('');
+
+  return `
+  <div class="wl-coach-card">
+    <div class="wl-coach-head" onclick="_wlToggleCoach('${week.id}')">
+      <div class="wl-coach-head-left">
+        <span class="wl-coach-brain">${icon('brain')}</span>
+        <span class="wl-checklist-title">AI Trading Coach</span>
+        ${warnCount ? `<span class="wl-coach-badge">${warnCount}</span>` : ''}
+      </div>
+      <span class="wl-coach-chevron ${expanded ? 'open' : ''}">${icon('chevron-right')}</span>
+    </div>
+    ${expanded ? `<div class="wl-coach-body">${rows}</div>` : ''}
+  </div>`;
+}
+
+async function _wlToggleCoach(weekId) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  _wlNormWeekMeta(week);
+  week.meta.coachExpanded = !week.meta.coachExpanded;
+  _wlRenderWeeks(); // instant UI feedback
+  await _wlSaveWeek(week);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   PERFORMANCE INSIGHTS — derived from actual trade history
+   ══════════════════════════════════════════════════════════════════ */
+function _wlComputePerformanceInsights() {
+  if (!trades || !trades.length) return null;
+
+  const byPair = {};
+  const byDay  = {};
+  const byModel = {};
+  trades.forEach(t => {
+    const pnl = _pctOfTrade(t);
+    const win = t.outcome === 'Win';
+    if (t.pair) {
+      byPair[t.pair] = byPair[t.pair] || { wins: 0, total: 0, pnl: 0 };
+      byPair[t.pair].total++; if (win) byPair[t.pair].wins++; byPair[t.pair].pnl += pnl;
+    }
+    if (t.date) {
+      const dow = new Date(t.date + 'T00:00:00').getDay();
+      const label = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dow];
+      byDay[label] = byDay[label] || { wins: 0, total: 0, pnl: 0 };
+      byDay[label].total++; if (win) byDay[label].wins++; byDay[label].pnl += pnl;
+    }
+    if (t.strategy) {
+      byModel[t.strategy] = byModel[t.strategy] || { wins: 0, total: 0, pnl: 0 };
+      byModel[t.strategy].total++; if (win) byModel[t.strategy].wins++; byModel[t.strategy].pnl += pnl;
+    }
+  });
+
+  const rank = (map, minTrades) => Object.entries(map)
+    .filter(([,v]) => v.total >= minTrades)
+    .sort((a,b) => (b[1].pnl) - (a[1].pnl));
+
+  const pairRank  = rank(byPair, 2);
+  const dayRank   = rank(byDay, 2);
+  const modelRank = rank(byModel, 2);
+
+  const bestPair  = pairRank[0];
+  const worstPair = pairRank[pairRank.length - 1];
+  const bestDay   = dayRank[0];
+  const worstDay  = dayRank[dayRank.length - 1];
+  const bestModel = modelRank[0];
+
+  // Most common "mistake": checklist item most often left unchecked on losing trades
+  const losses = trades.filter(t => t.outcome === 'Loss' && Array.isArray(t.checklist));
+  let commonMistake = null;
+  if (losses.length >= 3) {
+    const missCounts = CHECKLIST_ITEMS.map(() => 0);
+    losses.forEach(t => {
+      CHECKLIST_ITEMS.forEach((item, i) => { if (!t.checklist[i]) missCounts[i]++; });
+    });
+    const maxIdx = missCounts.reduce((best, v, i) => v > missCounts[best] ? i : best, 0);
+    if (missCounts[maxIdx] > 0) commonMistake = { item: CHECKLIST_ITEMS[maxIdx], count: missCounts[maxIdx], of: losses.length };
+  }
+
+  // Average weekly prep score across saved weeks, and a simple high-vs-low-prep pnl comparison
+  const weekScores = _wlData.map(w => ({ w, score: _wlComputeReadiness(w).score }));
+  const avgPrepScore = weekScores.length ? Math.round(weekScores.reduce((s,x) => s+x.score, 0) / weekScores.length) : null;
+
+  let prepCorrelation = null;
+  const weeksWithTrades = weekScores.map(({w, score}) => {
+    const start = w.weekDate, end = w.weekDateEnd || w.weekDate;
+    const weekTrades = trades.filter(t => t.date >= start && t.date <= end);
+    if (!weekTrades.length) return null;
+    return { score, pnl: weekTrades.reduce((s,t) => s + _pctOfTrade(t), 0) };
+  }).filter(Boolean);
+  if (weeksWithTrades.length >= 3) {
+    const high = weeksWithTrades.filter(x => x.score >= 70);
+    const low  = weeksWithTrades.filter(x => x.score < 70);
+    if (high.length && low.length) {
+      const avgHigh = high.reduce((s,x)=>s+x.pnl,0) / high.length;
+      const avgLow  = low.reduce((s,x)=>s+x.pnl,0) / low.length;
+      prepCorrelation = { avgHigh, avgLow, highCount: high.length, lowCount: low.length };
+    }
+  }
+
+  return { bestPair, worstPair, bestDay, worstDay, bestModel, commonMistake, avgPrepScore, prepCorrelation };
+}
+
+function _wlBuildPerformanceInsights() {
+  const p = _wlComputePerformanceInsights();
+  if (!p) {
+    return `
+    <div class="wl-insights-card">
+      <div class="wl-checklist-title" style="margin-bottom:6px">Performance Insights</div>
+      <div class="wl-view-no-charts">Log a few trades in your journal to unlock performance insights here.</div>
+    </div>`;
+  }
+
+  const pnlLabel = v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+  const items = [];
+  if (p.bestPair)  items.push({ label: 'Best Performing Pair', value: `${p.bestPair[0]} · ${pnlLabel(p.bestPair[1].pnl)}` });
+  if (p.worstPair && p.worstPair !== p.bestPair) items.push({ label: 'Weakest Pair', value: `${p.worstPair[0]} · ${pnlLabel(p.worstPair[1].pnl)}` });
+  if (p.bestDay)   items.push({ label: 'Best Day', value: `${p.bestDay[0]} · ${Math.round(p.bestDay[1].wins/p.bestDay[1].total*100)}% win rate` });
+  if (p.worstDay && p.worstDay !== p.bestDay) items.push({ label: 'Toughest Day', value: `${p.worstDay[0]} · ${Math.round(p.worstDay[1].wins/p.worstDay[1].total*100)}% win rate` });
+  if (p.bestModel) items.push({ label: 'Most Profitable Model', value: `${p.bestModel[0]} · ${pnlLabel(p.bestModel[1].pnl)}` });
+  if (p.commonMistake) items.push({ label: 'Most Common Mistake', value: `${p.commonMistake.item} (missing on ${p.commonMistake.count}/${p.commonMistake.of} losses)` });
+  if (p.avgPrepScore != null) items.push({ label: 'Average Weekly Prep Score', value: `${p.avgPrepScore}%` });
+
+  const rows = items.map(i => `
+    <div class="wl-insight-row">
+      <span class="wl-insight-label">${i.label}</span>
+      <span class="wl-insight-value">${i.value}</span>
+    </div>`).join('');
+
+  const corr = p.prepCorrelation ? `
+    <div class="wl-insight-corr">
+      Weeks with a readiness score of 70%+ (${p.prepCorrelation.highCount} week${p.prepCorrelation.highCount!==1?'s':''}) averaged
+      <strong style="color:${p.prepCorrelation.avgHigh>=0?'var(--green)':'var(--red)'}">${pnlLabel(p.prepCorrelation.avgHigh)}</strong>,
+      versus <strong style="color:${p.prepCorrelation.avgLow>=0?'var(--green)':'var(--red)'}">${pnlLabel(p.prepCorrelation.avgLow)}</strong>
+      in weeks below 70% (${p.prepCorrelation.lowCount} week${p.prepCorrelation.lowCount!==1?'s':''}). A small sample — treat as a directional signal, not proof.
+    </div>` : '';
+
+  return `
+  <div class="wl-insights-card">
+    <div class="wl-checklist-title" style="margin-bottom:10px">Performance Insights</div>
+    <div class="wl-insight-grid">${rows}</div>
+    ${corr}
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   WEEKLY REFLECTION — unlocks once the week's date range has passed
+   ══════════════════════════════════════════════════════════════════ */
+function _wlIsWeekOver(week) {
+  const end = week.weekDateEnd || week.weekDate;
+  return localToday() > end;
+}
+
+function _wlBuildWeeklyReflection(week) {
+  _wlNormWeekMeta(week);
+  const unlocked = _wlIsWeekOver(week) || week.meta.reflectionUnlocked;
+  const r = week.meta.reflection;
+
+  if (!unlocked) {
+    return `
+    <div class="wl-reflection-card wl-reflection-locked">
+      <div class="wl-checklist-title" style="margin-bottom:4px">Weekly Reflection</div>
+      <div class="wl-view-no-charts">${icon('lock')} Unlocks once this week's date range has passed.</div>
+      <button class="wl-btn-secondary" style="margin-top:8px" onclick="_wlUnlockReflection('${week.id}')">Unlock Early</button>
+    </div>`;
+  }
+
+  const field = (label, key, placeholder, tag) => `
+    <div class="wl-form-row">
+      <label class="wl-form-label">${label}</label>
+      ${tag === 'textarea'
+        ? `<textarea class="wl-form-textarea" rows="2" placeholder="${placeholder}" onblur="_wlSaveReflectionField('${week.id}','${key}',this.value)">${r[key] || ''}</textarea>`
+        : `<input type="text" class="wl-form-input" value="${r[key] || ''}" placeholder="${placeholder}" onblur="_wlSaveReflectionField('${week.id}','${key}',this.value)">`}
+    </div>`;
+
+  return `
+  <div class="wl-reflection-card">
+    <div class="wl-checklist-title" style="margin-bottom:10px">Weekly Reflection</div>
+    <div class="wl-reflection-grid">
+      ${field('Did you follow your plan?', 'followedPlan', 'Yes / partially / no — and why')}
+      ${field('What changed during the week?', 'whatChanged', 'News, volatility, unexpected moves…')}
+      ${field('Did your bias remain valid?', 'biasValid', 'Did price confirm or invalidate your weekly read?')}
+      ${field('Best trade', 'bestTrade', 'What made it work?')}
+      ${field('Worst trade', 'worstTrade', 'What went wrong?')}
+      ${field('Mistake repeated from a prior week?', 'mistakeRepeated', 'Be specific')}
+    </div>
+    ${field('Biggest lesson this week', 'biggestLesson', 'The one thing to remember…', 'textarea')}
+    ${field('Improvement for next week', 'improvement', 'One concrete change to make…', 'textarea')}
+    <div class="wl-form-row">
+      <label class="wl-form-label">Confidence Going Into Next Week</label>
+      <span class="wl-star-row" id="wl-reflect-conf-${week.id}">${_wlStarPicker(r.confidence, `_wlSetReflectionConfidence('${week.id}',`)}</span>
+    </div>
+  </div>`;
+}
+
+async function _wlUnlockReflection(weekId) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  _wlNormWeekMeta(week);
+  week.meta.reflectionUnlocked = true;
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
+}
+
+async function _wlSaveReflectionField(weekId, key, value) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  _wlNormWeekMeta(week);
+  week.meta.reflection[key] = value;
+  await _wlSaveWeek(week);
+}
+
+async function _wlSetReflectionConfidence(weekId, val) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  _wlNormWeekMeta(week);
+  week.meta.reflection.confidence = week.meta.reflection.confidence === val ? 0 : val;
+  await _wlSaveWeek(week);
+  const el = document.getElementById(`wl-reflect-conf-${weekId}`);
+  if (el) el.innerHTML = _wlStarPicker(week.meta.reflection.confidence, `_wlSetReflectionConfidence('${weekId}',`);
+}
+
 let _wlShowArchived = {}; // weekId → bool
 
 function _wlLiqCount(liq) {
@@ -4831,6 +5256,11 @@ function _wlRenderWeekContent(week, container) {
     </div>
     ${archivedSection}
 
+    <div class="wl-checklist-focus-row">
+      ${_wlBuildWeeklyChecklist(week)}
+      ${_wlBuildWeeklyFocus(week)}
+    </div>
+
     <!-- ── Daily Gameplan ─────────────────────────────────────────── -->
     ${_wlBuildDailyGameplan(week)}
 
@@ -4859,6 +5289,15 @@ function _wlRenderWeekContent(week, container) {
         <div class="wl-cal-loading"><span></span><span></span><span></span></div>
       </div>
     </div>
+
+    <!-- ── AI Trading Coach ───────────────────────────────────────── -->
+    ${_wlBuildAICoach(week)}
+
+    <!-- ── Performance Insights ──────────────────────────────────── -->
+    ${_wlBuildPerformanceInsights()}
+
+    <!-- ── Weekly Reflection ─────────────────────────────────────── -->
+    ${_wlBuildWeeklyReflection(week)}
   `;
 
   // Kick off calendar fetch after DOM is ready
@@ -4913,6 +5352,31 @@ async function _wlQuickDeletePair(weekId, pairIdx) {
 const _WL_DAYS = ['sun','mon','tue','wed','thu','fri','sat'];
 const _WL_DAY_LABELS = { sun:'Sunday', mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday', sat:'Saturday' };
 const _WL_DAY_SHORT  = { sun:'SUN', mon:'MON', tue:'TUE', wed:'WED', thu:'THU', fri:'FRI', sat:'SAT' };
+const _WL_JOURNAL_PROMPT = "What would invalidate today's bias?";
+
+function _wlDayPlanDefault() {
+  return {
+    note: '', pairs: [], mindset: '', charts: [],
+    sessionBias: { london: 'neu', ny: 'neu' },
+    asianRangeMarked: false,
+    liquidityTaken: '',
+    sessionGoal: '', maxTrades: null, entryModel: '', tradeReminder: '',
+    confidence: 0, energy: 0, sleepHours: null,
+    journalPrompt: '',
+  };
+}
+
+/* Fill in any fields missing from a legacy day-plan object. Mutates + returns it. */
+function _wlNormDayPlan(plan) {
+  const d = _wlDayPlanDefault();
+  Object.keys(d).forEach(k => {
+    if (plan[k] == null) plan[k] = d[k];
+  });
+  if (!plan.sessionBias) plan.sessionBias = { london: 'neu', ny: 'neu' };
+  if (plan.sessionBias.london == null) plan.sessionBias.london = 'neu';
+  if (plan.sessionBias.ny == null) plan.sessionBias.ny = 'neu';
+  return plan;
+}
 
 // Derive actual dates for each day of the week from weekDate (YYYY-MM-DD)
 // Week runs Sun–Sat. weekDate can be any day within the week (we normalise to Sunday).
@@ -4968,7 +5432,7 @@ function _wlBuildDailyGameplan(week) {
     </button>`;
   }).join('');
 
-  const plan = (week.dailyPlans || {})[activeDay] || {};
+  const plan = _wlNormDayPlan((week.dailyPlans || {})[activeDay] || {});
   const pairPlans = week.pairs.map((p, pi) => {
     const pp = (plan.pairs || []).find(x => x.name === p.name) || {};
     const bias = pp.bias || p.bias || 'neu';
@@ -5034,6 +5498,36 @@ function _wlBuildDailyGameplan(week) {
             rows="3">${plan.note || ''}</textarea>
         </div>
 
+        <!-- Session Bias + Killzones -->
+        <div class="wl-day-session-row">
+          <div class="wl-day-session-item">
+            <span class="wl-overview-label">London Bias</span>
+            <button class="wl-badge ${plan.sessionBias.london==='bull'?'bull':plan.sessionBias.london==='bear'?'bear':'neu'}"
+              onclick="_wlCycleSessionBias('${week.id}','${activeDay}','london')">
+              ${plan.sessionBias.london==='bull'?`${icon('arrow-up')} Bullish`:plan.sessionBias.london==='bear'?`${icon('arrow-down')} Bearish`:'→ Neutral'}
+            </button>
+          </div>
+          <div class="wl-day-session-item">
+            <span class="wl-overview-label">New York Bias</span>
+            <button class="wl-badge ${plan.sessionBias.ny==='bull'?'bull':plan.sessionBias.ny==='bear'?'bear':'neu'}"
+              onclick="_wlCycleSessionBias('${week.id}','${activeDay}','ny')">
+              ${plan.sessionBias.ny==='bull'?`${icon('arrow-up')} Bullish`:plan.sessionBias.ny==='bear'?`${icon('arrow-down')} Bearish`:'→ Neutral'}
+            </button>
+          </div>
+          <div class="wl-day-session-item">
+            <span class="wl-overview-label">Asian Range</span>
+            <button class="wl-badge ${plan.asianRangeMarked?'bull':'neu'}" onclick="_wlToggleAsianRange('${week.id}','${activeDay}')">
+              ${icon(plan.asianRangeMarked?'check':'dot-o')} ${plan.asianRangeMarked?'Marked':'Not Marked'}
+            </button>
+          </div>
+          <div class="wl-day-session-item">
+            <span class="wl-overview-label">Liquidity Taken</span>
+            <button class="wl-badge ${plan.liquidityTaken==='yes'?'bull':plan.liquidityTaken==='no'?'bear':'neu'}" onclick="_wlCycleLiquidityTaken('${week.id}','${activeDay}')">
+              ${plan.liquidityTaken==='yes'?'Yes':plan.liquidityTaken==='no'?'No':'—'}
+            </button>
+          </div>
+        </div>
+
         ${week.pairs.length > 0 ? `
         <div class="wl-day-pairs-section">
           <div class="wl-day-pairs-label">
@@ -5048,6 +5542,33 @@ function _wlBuildDailyGameplan(week) {
           Add pairs to your weekly watchlist first to log daily expectations per pair.
         </div>`}
 
+        <!-- Session Goal / Max Trades / Entry Model / Reminders -->
+        <div class="wl-day-pairs-label" style="margin-top:16px"><span>Session Goal</span></div>
+        <div class="wl-day-session-setup">
+          <div class="wl-form-row">
+            <label class="wl-form-label">Session Goal</label>
+            <input type="text" class="wl-form-input" value="${plan.sessionGoal || ''}" placeholder="e.g. Protect capital, one A+ setup only"
+              onblur="_wlSaveDayField('${week.id}','${activeDay}','sessionGoal',this.value)">
+          </div>
+          <div class="wl-form-row">
+            <label class="wl-form-label">Maximum Trades</label>
+            <input type="number" min="0" class="wl-form-input" value="${plan.maxTrades ?? ''}" placeholder="e.g. 2"
+              onblur="_wlSaveDayField('${week.id}','${activeDay}','maxTrades',this.value?parseInt(this.value,10):null)">
+          </div>
+          <div class="wl-form-row">
+            <label class="wl-form-label">Expected Entry Model</label>
+            <select class="wl-form-select" onchange="_wlSaveDayField('${week.id}','${activeDay}','entryModel',this.value)">
+              <option value=""${!plan.entryModel?' selected':''}>— Select —</option>
+              ${_WL_MODELS.map(m => `<option value="${m}"${plan.entryModel===m?' selected':''}>${m}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="wl-form-row" style="margin-top:8px">
+          <label class="wl-form-label">Trade Reminder / Things To Avoid</label>
+          <textarea class="wl-form-textarea" rows="2" placeholder="Don't chase, wait for sweep + MSS, avoid news minute…"
+            onblur="_wlSaveDayField('${week.id}','${activeDay}','tradeReminder',this.value)">${plan.tradeReminder || ''}</textarea>
+        </div>
+
         <!-- ── Daily chart images ── -->
         <div class="wl-day-charts-section">
           <div class="wl-day-pairs-label" style="margin-top:16px">
@@ -5056,17 +5577,18 @@ function _wlBuildDailyGameplan(week) {
           </div>
           ${(() => {
             const imgs = plan.charts || [];
-            const thumbs = imgs.map((c, ci) => `
-              <div class="wl-day-chart-thumb-wrap">
-                <img class="wl-day-chart-thumb" src="${c.url}" alt="chart ${ci+1}"
-                  onclick="_wlOpenLightbox('${c.url}')">
-                <div class="wl-day-chart-label">${c.label || ''}</div>
-                <button class="wl-day-chart-del" onclick="_wlDeleteDayChart('${week.id}','${activeDay}',${ci})" title="Remove"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
-              </div>`).join('');
+            const thumbs = imgs.map((c, ci) => _wlDayChartThumbHtml(week.id, activeDay, c, ci)).join('');
             return `
             ${imgs.length > 0 ? `<div class="wl-day-chart-grid" id="wl-day-chart-grid-${week.id}-${activeDay}">${thumbs}</div>` : `<div class="wl-day-chart-grid wl-day-chart-grid--empty" id="wl-day-chart-grid-${week.id}-${activeDay}"></div>`}
             <div class="wl-day-upload-zone" id="wl-day-upload-zone-${week.id}-${activeDay}"></div>`;
           })()}
+        </div>
+
+        <!-- Journal Prompt -->
+        <div class="wl-form-row" style="margin-top:14px">
+          <label class="wl-form-label">${_WL_JOURNAL_PROMPT}</label>
+          <textarea class="wl-form-textarea" rows="2" placeholder="Write your answer before the session starts…"
+            onblur="_wlSaveDayField('${week.id}','${activeDay}','journalPrompt',this.value)">${plan.journalPrompt || ''}</textarea>
         </div>
 
         <div class="wl-day-footer">
@@ -5080,6 +5602,22 @@ function _wlBuildDailyGameplan(week) {
                 return `<button class="wl-day-mindset-btn${isSelected ? ' selected' : ''}"
                   onclick="_wlSetDayMindset('${week.id}','${activeDay}','${mKey}',this)">${icon(ic)} ${mKey}</button>`;
               }).join('')}
+            </div>
+            <div class="wl-day-vitals-row">
+              <div class="wl-day-vital">
+                <span class="wl-overview-label">Confidence</span>
+                <span class="wl-star-row" id="wl-day-conf-${week.id}-${activeDay}">${_wlStarPicker(plan.confidence, `_wlSetDayConfidence('${week.id}','${activeDay}',`)}</span>
+              </div>
+              <div class="wl-day-vital">
+                <span class="wl-overview-label">Energy</span>
+                <span class="wl-star-row" id="wl-day-energy-${week.id}-${activeDay}">${_wlStarPicker(plan.energy, `_wlSetDayEnergy('${week.id}','${activeDay}',`)}</span>
+              </div>
+              <div class="wl-day-vital">
+                <span class="wl-overview-label">Sleep (hrs)</span>
+                <input type="number" min="0" max="14" step="0.5" class="wl-form-input wl-day-sleep-input"
+                  value="${plan.sleepHours ?? ''}" placeholder="7.5"
+                  onblur="_wlSaveDayField('${week.id}','${activeDay}','sleepHours',this.value?parseFloat(this.value):null)">
+              </div>
             </div>
           </div>
           <div class="wl-day-action-btns">
@@ -5115,7 +5653,7 @@ async function _wlSaveDayNote(weekId, day, note) {
   const week = _wlData.find(w => w.id === weekId);
   if (!week) return;
   if (!week.dailyPlans) week.dailyPlans = {};
-  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '', charts: [] };
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
   week.dailyPlans[day].note = note;
   await _wlSaveWeek(week);
 }
@@ -5125,7 +5663,7 @@ async function _wlSaveDayPairNote(weekId, day, pairName, note) {
   const week = _wlData.find(w => w.id === weekId);
   if (!week) return;
   if (!week.dailyPlans) week.dailyPlans = {};
-  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '', charts: [] };
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
   const pairs = week.dailyPlans[day].pairs || [];
   const existing = pairs.find(p => p.name === pairName);
   if (existing) existing.note = note;
@@ -5139,7 +5677,7 @@ async function _wlCycleDayPairBias(weekId, day, pairName, btn) {
   const week = _wlData.find(w => w.id === weekId);
   if (!week) return;
   if (!week.dailyPlans) week.dailyPlans = {};
-  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '', charts: [] };
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
   const pairs = week.dailyPlans[day].pairs || [];
   const existing = pairs.find(p => p.name === pairName);
   const cycle = { neu: 'bull', bull: 'bear', bear: 'neu' };
@@ -5160,12 +5698,154 @@ async function _wlSetDayMindset(weekId, day, mindset, btn) {
   const week = _wlData.find(w => w.id === weekId);
   if (!week) return;
   if (!week.dailyPlans) week.dailyPlans = {};
-  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '', charts: [] };
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
   week.dailyPlans[day].mindset = mindset;
   // Update buttons instantly
   const container = document.getElementById(`wl-day-mindset-${weekId}-${day}`);
   if (container) container.querySelectorAll('.wl-day-mindset-btn').forEach(b => b.classList.remove('selected'));
   if (btn) btn.classList.add('selected');
+  await _wlSaveWeek(week);
+}
+
+/* ── Session bias (London / New York) cycling ── */
+async function _wlCycleSessionBias(weekId, day, session) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
+  const plan = _wlNormDayPlan(week.dailyPlans[day]);
+  const opts = ['bull','bear','neu'];
+  plan.sessionBias[session] = opts[(opts.indexOf(plan.sessionBias[session]) + 1) % opts.length];
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
+}
+
+async function _wlToggleAsianRange(weekId, day) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
+  const plan = _wlNormDayPlan(week.dailyPlans[day]);
+  plan.asianRangeMarked = !plan.asianRangeMarked;
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
+}
+
+async function _wlCycleLiquidityTaken(weekId, day) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
+  const plan = _wlNormDayPlan(week.dailyPlans[day]);
+  const opts = ['', 'yes', 'no'];
+  plan.liquidityTaken = opts[(opts.indexOf(plan.liquidityTaken) + 1) % opts.length];
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
+}
+
+/* ── Generic autosave for simple day-plan fields (session goal, max trades, entry model, reminders, sleep hours, journal prompt) ── */
+async function _wlSaveDayField(weekId, day, field, value) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
+  const plan = _wlNormDayPlan(week.dailyPlans[day]);
+  plan[field] = value;
+  await _wlSaveWeek(week);
+}
+
+async function _wlSetDayConfidence(weekId, day, val) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
+  const plan = _wlNormDayPlan(week.dailyPlans[day]);
+  plan.confidence = plan.confidence === val ? 0 : val;
+  await _wlSaveWeek(week);
+  const el = document.getElementById(`wl-day-conf-${weekId}-${day}`);
+  if (el) el.innerHTML = _wlStarPicker(plan.confidence, `_wlSetDayConfidence('${weekId}','${day}',`);
+}
+
+async function _wlSetDayEnergy(weekId, day, val) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
+  const plan = _wlNormDayPlan(week.dailyPlans[day]);
+  plan.energy = plan.energy === val ? 0 : val;
+  await _wlSaveWeek(week);
+  const el = document.getElementById(`wl-day-energy-${weekId}-${day}`);
+  if (el) el.innerHTML = _wlStarPicker(plan.energy, `_wlSetDayEnergy('${weekId}','${day}',`);
+}
+
+/* ── Session bias (London / New York) cycle ── */
+async function _wlCycleSessionBias(weekId, day, session) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
+  const plan = _wlNormDayPlan(week.dailyPlans[day]);
+  const opts = ['bull','bear','neu'];
+  plan.sessionBias[session] = opts[(opts.indexOf(plan.sessionBias[session]) + 1) % opts.length];
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
+}
+
+async function _wlToggleAsianRange(weekId, day) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
+  const plan = _wlNormDayPlan(week.dailyPlans[day]);
+  plan.asianRangeMarked = !plan.asianRangeMarked;
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
+}
+
+async function _wlCycleLiquidityTaken(weekId, day) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
+  const plan = _wlNormDayPlan(week.dailyPlans[day]);
+  const opts = ['', 'yes', 'no'];
+  plan.liquidityTaken = opts[(opts.indexOf(plan.liquidityTaken) + 1) % opts.length];
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
+}
+
+/* ── Generic autosave for simple day-plan fields (text/number/select) ── */
+async function _wlSaveDayField(weekId, day, field, value) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
+  const plan = _wlNormDayPlan(week.dailyPlans[day]);
+  plan[field] = value;
+  await _wlSaveWeek(week);
+}
+
+async function _wlSetDayConfidence(weekId, day, val) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
+  const plan = _wlNormDayPlan(week.dailyPlans[day]);
+  plan.confidence = plan.confidence === val ? 0 : val;
+  const el = document.getElementById(`wl-day-conf-${weekId}-${day}`);
+  if (el) el.innerHTML = _wlStarPicker(plan.confidence, `_wlSetDayConfidence('${weekId}','${day}',`);
+  await _wlSaveWeek(week);
+}
+
+async function _wlSetDayEnergy(weekId, day, val) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  if (!week.dailyPlans) week.dailyPlans = {};
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
+  const plan = _wlNormDayPlan(week.dailyPlans[day]);
+  plan.energy = plan.energy === val ? 0 : val;
+  const el = document.getElementById(`wl-day-energy-${weekId}-${day}`);
+  if (el) el.innerHTML = _wlStarPicker(plan.energy, `_wlSetDayEnergy('${weekId}','${day}',`);
   await _wlSaveWeek(week);
 }
 
@@ -5209,7 +5889,8 @@ async function _wlClearDayPlan(weekId, day) {
   if (!week.dailyPlans) week.dailyPlans = {};
   // Preserve charts when clearing text content
   const existingCharts = (week.dailyPlans[day] || {}).charts || [];
-  week.dailyPlans[day] = { note: '', pairs: [], mindset: '', charts: existingCharts };
+  week.dailyPlans[day] = _wlDayPlanDefault();
+  week.dailyPlans[day].charts = existingCharts;
   await _wlSaveWeek(week);
   _wlRenderWeeks();
 }
@@ -5241,7 +5922,7 @@ async function _wlProcessDayFiles(files, weekId, day) {
   if (!week) return;
 
   if (!week.dailyPlans) week.dailyPlans = {};
-  if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '', charts: [] };
+  if (!week.dailyPlans[day]) week.dailyPlans[day] = _wlDayPlanDefault();
   if (!week.dailyPlans[day].charts) week.dailyPlans[day].charts = [];
 
   let fellBackToBase64 = false;
@@ -5277,17 +5958,38 @@ async function _wlDeleteDayChart(weekId, day, idx) {
   _wlRefreshDayChartGrid(weekId, day, week.dailyPlans[day].charts);
 }
 
-/* ── Re-render just the chart grid without a full page re-render ── */
-function _wlRefreshDayChartGrid(weekId, day, charts) {
-  const grid = document.getElementById(`wl-day-chart-grid-${weekId}-${day}`);
-  if (!grid) return;
-  grid.innerHTML = (charts || []).map((c, ci) => `
-    <div class="wl-day-chart-thumb-wrap">
+/* ── Day chart thumbnail with drag-reorder support ── */
+function _wlDayChartThumbHtml(weekId, day, c, ci) {
+  return `
+    <div class="wl-day-chart-thumb-wrap" draggable="true"
+      ondragstart="_wlDayChartDragStart(event,${ci})" ondragover="_wlChartDragOver(event)"
+      ondrop="_wlDayChartDrop(event,'${weekId}','${day}',${ci})" ondragend="_wlChartDragEnd(event)">
+      <span class="wl-chart-thumb-drag" title="Drag to reorder">${icon('sort')}</span>
       <img class="wl-day-chart-thumb" src="${c.url}" alt="chart ${ci+1}"
         onclick="_wlOpenLightbox('${c.url}')">
       <div class="wl-day-chart-label">${c.label || ''}</div>
       <button class="wl-day-chart-del" onclick="_wlDeleteDayChart('${weekId}','${day}',${ci})" title="Remove"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
-    </div>`).join('');
+    </div>`;
+}
+function _wlDayChartDragStart(ev, idx) { _wlChartDragFromIdx = idx; ev.currentTarget.classList.add('dragging'); }
+function _wlDayChartDrop(ev, weekId, day, toIdx) {
+  ev.preventDefault();
+  if (_wlChartDragFromIdx === null || _wlChartDragFromIdx === toIdx) return;
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week || !week.dailyPlans || !week.dailyPlans[day]) return;
+  const arr = week.dailyPlans[day].charts;
+  const [moved] = arr.splice(_wlChartDragFromIdx, 1);
+  arr.splice(toIdx, 0, moved);
+  _wlChartDragFromIdx = null;
+  _wlSaveWeek(week);
+  _wlRefreshDayChartGrid(weekId, day, arr);
+}
+
+/* ── Re-render just the chart grid without a full page re-render ── */
+function _wlRefreshDayChartGrid(weekId, day, charts) {
+  const grid = document.getElementById(`wl-day-chart-grid-${weekId}-${day}`);
+  if (!grid) return;
+  grid.innerHTML = (charts || []).map((c, ci) => _wlDayChartThumbHtml(weekId, day, c, ci)).join('');
   // Re-mount the dropzone in its idle state (a mounted dropzone doesn't
   // need a hint text swap any more — its own "Processing…" state handles that)
   _wlMountDayDropzone(weekId, day);
@@ -6043,11 +6745,15 @@ function _wlShowPairViewModal(weekId, pairIdx, p) {
     <div class="wl-stage-timeline">${timelineHtml}</div>
 
     <div class="wl-view-charts-section">
-      <div class="wl-view-section-label">ALL SCREENSHOTS · ${charts.length} image${charts.length !== 1 ? 's' : ''}</div>
+      <div class="wl-view-section-label">
+        ALL SCREENSHOTS · ${charts.length} image${charts.length !== 1 ? 's' : ''}
+        <button id="wl-compare-btn" class="wl-btn-secondary" style="display:none;margin-left:10px;padding:3px 10px;font-size:11px" onclick="_wlOpenCompare()">${icon('swap')} Compare</button>
+      </div>
       ${charts.length > 0
         ? `<div class="wl-view-chart-grid">${charts.map((c, ci) =>
-            `<div class="wl-view-chart-item" onclick="_wlOpenLightbox('${c.url}')">
-              <img src="${c.url}" alt="chart ${ci+1}" loading="lazy">
+            `<div class="wl-view-chart-item">
+              <input type="checkbox" class="wl-compare-check" onclick="event.stopPropagation();_wlToggleCompareSelect('${c.url}',this)">
+              <img src="${c.url}" alt="chart ${ci+1}" loading="lazy" onclick="_wlOpenLightbox('${c.url}')">
               <div class="wl-view-chart-label">${c.tag ? `[${c.tag}] ` : ''}${c.label || 'Chart ' + (ci+1)}</div>
             </div>`
           ).join('')}</div>`
@@ -6060,6 +6766,7 @@ function _wlShowPairViewModal(weekId, pairIdx, p) {
     </div>
   `;
 
+  _wlCompareSelection = [];
   document.getElementById('wl-pair-modal-overlay').classList.add('open');
   document.getElementById('wl-pair-modal').classList.add('open');
   _wlAnimateRings(document.getElementById('wl-pair-modal-body'));
@@ -6124,8 +6831,11 @@ function _wlEditPairDirect(weekId, pairIdx) {
 
 function _wlChartThumbHtml(c, ci) {
   return `
-    <div class="wl-chart-thumb-wrap">
-      <img class="wl-chart-thumb" src="${c.url}" alt="chart">
+    <div class="wl-chart-thumb-wrap" draggable="true"
+      ondragstart="_wlChartDragStart(event,${ci})" ondragover="_wlChartDragOver(event)"
+      ondrop="_wlChartDrop(event,${ci})" ondragend="_wlChartDragEnd(event)">
+      <span class="wl-chart-thumb-drag" title="Drag to reorder">${icon('sort')}</span>
+      <img class="wl-chart-thumb" src="${c.url}" alt="chart" onclick="_wlOpenLightbox('${c.url}')">
       <select class="wl-chart-thumb-tag" onchange="_wlSetPendingChartTag(${ci},this.value)">
         <option value=""${!c.tag ? ' selected' : ''}>Untagged</option>
         ${_WL_CHART_TAGS.map(t => `<option value="${t}"${c.tag===t?' selected':''}>${t}</option>`).join('')}
@@ -6133,6 +6843,20 @@ function _wlChartThumbHtml(c, ci) {
       <div class="wl-chart-thumb-label">${c.label || 'Chart ' + (ci+1)}</div>
       <button class="wl-chart-thumb-del" onclick="_wlRemovePendingChart(${ci})">${icon('close')}</button>
     </div>`;
+}
+
+let _wlChartDragFromIdx = null;
+function _wlChartDragStart(ev, idx) { _wlChartDragFromIdx = idx; ev.currentTarget.classList.add('dragging'); }
+function _wlChartDragOver(ev) { ev.preventDefault(); }
+function _wlChartDragEnd(ev) { ev.currentTarget.classList.remove('dragging'); }
+function _wlChartDrop(ev, toIdx) {
+  ev.preventDefault();
+  if (_wlChartDragFromIdx === null || _wlChartDragFromIdx === toIdx) return;
+  const [moved] = _wlPendingCharts.splice(_wlChartDragFromIdx, 1);
+  _wlPendingCharts.splice(toIdx, 0, moved);
+  _wlChartDragFromIdx = null;
+  const gallery = document.getElementById('wl-chart-gallery');
+  if (gallery) gallery.innerHTML = _wlPendingCharts.map((c, ci) => _wlChartThumbHtml(c, ci)).join('');
 }
 
 function _wlSetPendingChartTag(idx, tag) {
@@ -6407,23 +7131,309 @@ function wlClosePairModal() {
 }
 
 /* ── Lightbox ── */
+/* ══════════════════════════════════════════════════════════════════
+   LIGHTBOX v2 — zoom/pan, fullscreen, and a lightweight annotation tool
+   ══════════════════════════════════════════════════════════════════ */
+let _wlLb = { url: '', scale: 1, tx: 0, ty: 0, panning: false, lastX: 0, lastY: 0 };
+
+/* ── Paste-to-upload: Ctrl+V a copied screenshot straight into the watchlist ── */
+if (typeof document !== 'undefined') {
+  document.addEventListener('paste', (e) => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    const imgFiles = Array.from(items)
+      .filter(it => it.kind === 'file' && it.type.startsWith('image/'))
+      .map(it => it.getAsFile())
+      .filter(Boolean);
+    if (!imgFiles.length) return;
+
+    // Priority 1: the pair add/edit modal, if it's open
+    const pairModal = document.getElementById('wl-pair-modal');
+    if (pairModal && pairModal.classList.contains('open')) {
+      e.preventDefault();
+      _wlProcessChartFiles(imgFiles);
+      return;
+    }
+
+    // Priority 2: the Watchlist page's active day gameplan, if visible
+    const wlPage = document.getElementById('page-watchlist');
+    if (wlPage && wlPage.classList.contains('active') && _wlActiveWeekId) {
+      const day = _wlActiveDayTab[_wlActiveWeekId];
+      if (day) {
+        e.preventDefault();
+        _wlProcessDayFiles(imgFiles, _wlActiveWeekId, day);
+      }
+    }
+  });
+}
+
 function _wlOpenLightbox(url) {
   let lb = document.getElementById('wl-lightbox');
   if (!lb) {
     lb = document.createElement('div');
     lb.id = 'wl-lightbox';
     lb.className = 'wl-lightbox';
-    lb.innerHTML = `<button class="wl-lightbox-close" onclick="_wlCloseLightbox()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button><img id="wl-lb-img" src="" alt="chart">`;
-    lb.addEventListener('click', e => { if (e.target === lb) _wlCloseLightbox(); });
+    lb.innerHTML = `
+      <div class="wl-lb-toolbar" onclick="event.stopPropagation()">
+        <button onclick="_wlLbZoom(-0.25)" title="Zoom out">${icon('minus')}</button>
+        <button onclick="_wlLbZoom(0.25)" title="Zoom in">${icon('plus')}</button>
+        <button onclick="_wlLbResetZoom()" title="Reset zoom">${icon('refresh')}</button>
+        <button onclick="_wlLbFullscreen()" title="Fullscreen">${icon('monitor')}</button>
+        <button onclick="_wlOpenAnnotate()" title="Annotate">${icon('edit')}</button>
+        <button class="wl-lightbox-close" onclick="_wlCloseLightbox()" title="Close">${icon('close')}</button>
+      </div>
+      <div class="wl-lb-stage" id="wl-lb-stage">
+        <img id="wl-lb-img" src="" alt="chart" draggable="false">
+      </div>`;
+    lb.addEventListener('click', e => { if (e.target === lb || e.target.id === 'wl-lb-stage') _wlCloseLightbox(); });
     document.body.appendChild(lb);
+    _wlWireLightboxPanZoom();
   }
   document.getElementById('wl-lb-img').src = url;
+  _wlLb = { url, scale: 1, tx: 0, ty: 0, panning: false, lastX: 0, lastY: 0 };
+  _wlLbApplyTransform();
   lb.classList.add('open');
 }
 
 function _wlCloseLightbox() {
   const lb = document.getElementById('wl-lightbox');
   if (lb) lb.classList.remove('open');
+}
+
+function _wlLbApplyTransform() {
+  const img = document.getElementById('wl-lb-img');
+  if (img) img.style.transform = `translate(${_wlLb.tx}px,${_wlLb.ty}px) scale(${_wlLb.scale})`;
+}
+
+function _wlLbZoom(delta) {
+  _wlLb.scale = Math.max(1, Math.min(5, _wlLb.scale + delta));
+  if (_wlLb.scale === 1) { _wlLb.tx = 0; _wlLb.ty = 0; }
+  _wlLbApplyTransform();
+}
+
+function _wlLbResetZoom() {
+  _wlLb.scale = 1; _wlLb.tx = 0; _wlLb.ty = 0;
+  _wlLbApplyTransform();
+}
+
+function _wlLbFullscreen() {
+  const lb = document.getElementById('wl-lightbox');
+  if (!lb) return;
+  if (document.fullscreenElement) document.exitFullscreen();
+  else lb.requestFullscreen && lb.requestFullscreen();
+}
+
+function _wlWireLightboxPanZoom() {
+  const stage = document.getElementById('wl-lb-stage');
+  if (!stage) return;
+  stage.addEventListener('wheel', e => {
+    e.preventDefault();
+    _wlLbZoom(e.deltaY < 0 ? 0.25 : -0.25);
+  }, { passive: false });
+  stage.addEventListener('mousedown', e => {
+    if (_wlLb.scale <= 1) return;
+    _wlLb.panning = true; _wlLb.lastX = e.clientX; _wlLb.lastY = e.clientY;
+  });
+  window.addEventListener('mousemove', e => {
+    if (!_wlLb.panning) return;
+    _wlLb.tx += e.clientX - _wlLb.lastX;
+    _wlLb.ty += e.clientY - _wlLb.lastY;
+    _wlLb.lastX = e.clientX; _wlLb.lastY = e.clientY;
+    _wlLbApplyTransform();
+  });
+  window.addEventListener('mouseup', () => { _wlLb.panning = false; });
+  window.addEventListener('keydown', e => { if (e.key === 'Escape') _wlCloseLightbox(); });
+}
+
+/* ── Annotation tool: arrows, boxes, text over the currently-open lightbox image ── */
+let _wlAnnState = { tool: 'arrow', color: '#f97316', shapes: [], drawing: false, start: null };
+
+function _wlOpenAnnotate() {
+  const srcUrl = _wlLb.url;
+  if (!srcUrl) return;
+  let modal = document.getElementById('wl-annotate-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'wl-annotate-modal';
+    modal.className = 'wl-lightbox wl-annotate-modal';
+    document.body.appendChild(modal);
+  }
+  _wlAnnState = { tool: 'arrow', color: '#f97316', shapes: [], drawing: false, start: null };
+
+  modal.innerHTML = `
+    <div class="wl-ann-toolbar" onclick="event.stopPropagation()">
+      <button class="wl-ann-tool active" data-tool="arrow" onclick="_wlAnnSetTool('arrow',this)">${icon('trend-up')} Arrow</button>
+      <button class="wl-ann-tool" data-tool="box" onclick="_wlAnnSetTool('box',this)">${icon('box')} Box</button>
+      <button class="wl-ann-tool" data-tool="text" onclick="_wlAnnSetTool('text',this)">${icon('edit')} Text</button>
+      <input type="color" value="#f97316" onchange="_wlAnnState.color=this.value">
+      <button onclick="_wlAnnUndo()">${icon('history')} Undo</button>
+      <button onclick="_wlAnnClear()">${icon('trash')} Clear</button>
+      <button class="wl-btn-primary" style="margin-left:auto" onclick="_wlAnnDownload()">${icon('download')} Download</button>
+      <button class="wl-lightbox-close" onclick="_wlCloseAnnotate()">${icon('close')}</button>
+    </div>
+    <div class="wl-ann-stage">
+      <img id="wl-ann-img" src="${srcUrl}" alt="annotate">
+      <canvas id="wl-ann-canvas"></canvas>
+    </div>`;
+  modal.classList.add('open');
+
+  const img = document.getElementById('wl-ann-img');
+  const canvas = document.getElementById('wl-ann-canvas');
+  const setup = () => {
+    canvas.width = img.clientWidth; canvas.height = img.clientHeight;
+    canvas.style.width = img.clientWidth + 'px'; canvas.style.height = img.clientHeight + 'px';
+    _wlAnnRedraw();
+  };
+  if (img.complete) setup(); else img.onload = setup;
+
+  canvas.onmousedown = e => {
+    const r = canvas.getBoundingClientRect();
+    const pt = { x: e.clientX - r.left, y: e.clientY - r.top };
+    if (_wlAnnState.tool === 'text') {
+      const txt = prompt('Label text:');
+      if (txt) _wlAnnState.shapes.push({ type: 'text', x: pt.x, y: pt.y, text: txt, color: _wlAnnState.color });
+      _wlAnnRedraw();
+      return;
+    }
+    _wlAnnState.drawing = true;
+    _wlAnnState.start = pt;
+  };
+  canvas.onmousemove = e => {
+    if (!_wlAnnState.drawing) return;
+    const r = canvas.getBoundingClientRect();
+    const pt = { x: e.clientX - r.left, y: e.clientY - r.top };
+    _wlAnnRedraw();
+    _wlAnnDrawShape({ type: _wlAnnState.tool, x1: _wlAnnState.start.x, y1: _wlAnnState.start.y, x2: pt.x, y2: pt.y, color: _wlAnnState.color });
+  };
+  canvas.onmouseup = e => {
+    if (!_wlAnnState.drawing) return;
+    const r = canvas.getBoundingClientRect();
+    const pt = { x: e.clientX - r.left, y: e.clientY - r.top };
+    _wlAnnState.shapes.push({ type: _wlAnnState.tool, x1: _wlAnnState.start.x, y1: _wlAnnState.start.y, x2: pt.x, y2: pt.y, color: _wlAnnState.color });
+    _wlAnnState.drawing = false;
+    _wlAnnRedraw();
+  };
+}
+
+function _wlAnnSetTool(tool, btn) {
+  _wlAnnState.tool = tool;
+  document.querySelectorAll('.wl-ann-tool').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+function _wlAnnDrawShape(s) {
+  const canvas = document.getElementById('wl-ann-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = s.color; ctx.fillStyle = s.color; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  if (s.type === 'box') {
+    ctx.strokeRect(Math.min(s.x1,s.x2), Math.min(s.y1,s.y2), Math.abs(s.x2-s.x1), Math.abs(s.y2-s.y1));
+  } else if (s.type === 'arrow') {
+    const angle = Math.atan2(s.y2 - s.y1, s.x2 - s.x1);
+    ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke();
+    const headLen = 14;
+    ctx.beginPath();
+    ctx.moveTo(s.x2, s.y2);
+    ctx.lineTo(s.x2 - headLen*Math.cos(angle-Math.PI/6), s.y2 - headLen*Math.sin(angle-Math.PI/6));
+    ctx.lineTo(s.x2 - headLen*Math.cos(angle+Math.PI/6), s.y2 - headLen*Math.sin(angle+Math.PI/6));
+    ctx.closePath(); ctx.fill();
+  } else if (s.type === 'text') {
+    ctx.font = '600 16px sans-serif';
+    ctx.fillText(s.text, s.x, s.y);
+  }
+}
+
+function _wlAnnRedraw() {
+  const canvas = document.getElementById('wl-ann-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  _wlAnnState.shapes.forEach(_wlAnnDrawShape);
+}
+
+function _wlAnnUndo() { _wlAnnState.shapes.pop(); _wlAnnRedraw(); }
+function _wlAnnClear() { _wlAnnState.shapes = []; _wlAnnRedraw(); }
+
+function _wlAnnDownload() {
+  const img = document.getElementById('wl-ann-img');
+  const out = document.createElement('canvas');
+  out.width = img.naturalWidth; out.height = img.naturalHeight;
+  const ctx = out.getContext('2d');
+  ctx.drawImage(img, 0, 0, out.width, out.height);
+  const scaleX = out.width / img.clientWidth, scaleY = out.height / img.clientHeight;
+  _wlAnnState.shapes.forEach(s => {
+    const scaled = s.type === 'text'
+      ? { ...s, x: s.x * scaleX, y: s.y * scaleY }
+      : { ...s, x1: s.x1 * scaleX, y1: s.y1 * scaleY, x2: s.x2 * scaleX, y2: s.y2 * scaleY };
+    _wlAnnDrawShapeOnCtx(ctx, scaled, Math.max(scaleX, scaleY));
+  });
+  const link = document.createElement('a');
+  link.download = 'chart-annotated.png';
+  link.href = out.toDataURL('image/png');
+  link.click();
+}
+
+function _wlAnnDrawShapeOnCtx(ctx, s, scale) {
+  scale = scale || 1;
+  ctx.strokeStyle = s.color; ctx.fillStyle = s.color; ctx.lineWidth = 3 * scale; ctx.lineCap = 'round';
+  if (s.type === 'box') {
+    ctx.strokeRect(Math.min(s.x1,s.x2), Math.min(s.y1,s.y2), Math.abs(s.x2-s.x1), Math.abs(s.y2-s.y1));
+  } else if (s.type === 'arrow') {
+    const angle = Math.atan2(s.y2 - s.y1, s.x2 - s.x1);
+    ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke();
+    const headLen = 14 * scale;
+    ctx.beginPath();
+    ctx.moveTo(s.x2, s.y2);
+    ctx.lineTo(s.x2 - headLen*Math.cos(angle-Math.PI/6), s.y2 - headLen*Math.sin(angle-Math.PI/6));
+    ctx.lineTo(s.x2 - headLen*Math.cos(angle+Math.PI/6), s.y2 - headLen*Math.sin(angle+Math.PI/6));
+    ctx.closePath(); ctx.fill();
+  } else if (s.type === 'text') {
+    ctx.font = `600 ${16*scale}px sans-serif`;
+    ctx.fillText(s.text, s.x, s.y);
+  }
+}
+
+function _wlCloseAnnotate() {
+  const modal = document.getElementById('wl-annotate-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+/* ── Side-by-side compare viewer ── */
+let _wlCompareSelection = [];
+
+function _wlToggleCompareSelect(url, cbEl) {
+  if (cbEl.checked) {
+    if (_wlCompareSelection.length >= 2) { cbEl.checked = false; return; }
+    _wlCompareSelection.push(url);
+  } else {
+    _wlCompareSelection = _wlCompareSelection.filter(u => u !== url);
+  }
+  const btn = document.getElementById('wl-compare-btn');
+  if (btn) btn.style.display = _wlCompareSelection.length === 2 ? 'inline-flex' : 'none';
+}
+
+function _wlOpenCompare() {
+  if (_wlCompareSelection.length !== 2) return;
+  let modal = document.getElementById('wl-compare-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'wl-compare-modal';
+    modal.className = 'wl-lightbox wl-compare-modal';
+    modal.addEventListener('click', e => { if (e.target === modal) _wlCloseCompare(); });
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <button class="wl-lightbox-close" onclick="_wlCloseCompare()">${icon('close')}</button>
+    <div class="wl-compare-grid">
+      <img src="${_wlCompareSelection[0]}" alt="compare 1">
+      <img src="${_wlCompareSelection[1]}" alt="compare 2">
+    </div>`;
+  modal.classList.add('open');
+}
+
+function _wlCloseCompare() {
+  const modal = document.getElementById('wl-compare-modal');
+  if (modal) modal.classList.remove('open');
 }
 
 
