@@ -4191,7 +4191,11 @@ body{
   .detail-panel{
     width:100% !important;left:0;right:0;border-left:none;
     border-top:1px solid var(--glass-border);
-    top:auto;height:91vh;bottom:0;
+    top:auto;
+    height: 62vh;
+    max-height: calc(100dvh - var(--topbar) - 62px - env(safe-area-inset-bottom,0px) - 8px);
+    min-height: 340px;
+    bottom: calc(62px + env(safe-area-inset-bottom,0px));
     border-radius:var(--r-2xl) var(--r-2xl) 0 0;z-index:500;
   }
   .detail-panel::before{

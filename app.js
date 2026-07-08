@@ -3015,6 +3015,49 @@ function toggleDetailSize(id) {
   panel.classList.toggle('fullscreen', _detFullscreen);
   _renderDetail(id);
 }
+// Drag-to-dismiss on the mobile bottom-sheet's grab handle (the small pill
+// drawn via ::before at the top of the panel). The handle itself is a
+// pseudo-element so it can't hold its own listeners — instead we watch for
+// drags starting within that same top band of the panel.
+(function initDetailPanelSwipeToClose() {
+  const panel = document.getElementById('detail-panel');
+  if (!panel) return;
+  const HANDLE_ZONE = 32;      // px from the panel's top counted as the grab band
+  const DISMISS_THRESHOLD = 90; // px of downward drag needed to trigger close
+  let startY = 0, lastY = 0, dragging = false;
+
+  function isMobileSheet() {
+    return window.matchMedia('(max-width: 768px)').matches
+      && panel.classList.contains('open')
+      && !panel.classList.contains('fullscreen');
+  }
+
+  panel.addEventListener('pointerdown', (e) => {
+    if (!isMobileSheet()) return;
+    const rect = panel.getBoundingClientRect();
+    if (e.clientY - rect.top > HANDLE_ZONE) return;
+    dragging = true;
+    startY = lastY = e.clientY;
+    panel.style.transition = 'none';
+    panel.setPointerCapture?.(e.pointerId);
+  });
+  panel.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    lastY = e.clientY;
+    const dy = Math.max(0, lastY - startY);
+    panel.style.transform = `translateX(0) translateY(${dy}px)`;
+  });
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    const dy = Math.max(0, lastY - startY);
+    panel.style.transition = '';
+    panel.style.transform = '';
+    if (dy > DISMISS_THRESHOLD) closeDetail();
+  }
+  panel.addEventListener('pointerup', endDrag);
+  panel.addEventListener('pointercancel', endDrag);
+})();
 function toggleCheck(id, idx) {
   const s = getTS(id);
   if (!s.checklist) s.checklist = [];
@@ -3274,6 +3317,12 @@ function openModal(prefill) {
   if (!prefill) _restoreDraftIfAny();
 }
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
+// Close the New Trade modal when tapping/clicking the backdrop behind it —
+// e.target === e.currentTarget means the click landed on the overlay itself,
+// not on the sheet or any of its form fields/buttons.
+document.getElementById('modal')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeModal();
+});
 function _toggleModalCheck(i) {
   const idx = _modalChecklist.indexOf(i);
   if (idx >= 0) _modalChecklist.splice(idx, 1); else _modalChecklist.push(i);
