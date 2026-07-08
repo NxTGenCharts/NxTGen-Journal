@@ -4148,6 +4148,74 @@ const _WL_PAIRS_DEFAULT = ['GBPUSD','XAUUSD','EURUSD','GBPJPY','USDCAD','NASDAQ'
 const _WL_TFS = ['Weekly','Daily','4H','1H','30m','15m'];
 const _WL_BIAS_OPTS = ['bull','bear','neu'];
 
+/* ══════════════════════════════════════════════════════════════════
+   WATCHLIST v2 — Institutional Prep Workspace
+   Liquidity checklist items, models, stage timeline, chart tags.
+   All of this lives inside the existing `pairs` / `checklist` JSONB
+   columns already on journal_watchlist — no schema changes needed.
+   ══════════════════════════════════════════════════════════════════ */
+const _WL_LIQ_ITEMS = [
+  { k: 'eqHighs',  l: 'Equal Highs' },
+  { k: 'eqLows',   l: 'Equal Lows' },
+  { k: 'sweep',    l: 'Liquidity Sweep' },
+  { k: 'fvg',      l: 'FVG' },
+  { k: 'ob',       l: 'Order Block' },
+  { k: 'breaker',  l: 'Breaker' },
+  { k: 'mss',      l: 'MSS' },
+  { k: 'bos',      l: 'BOS' },
+  { k: 'pdArray',  l: 'PD Array' },
+];
+const _WL_MODELS = ['ICT','Silver Bullet','Power of Three','AMD','Breaker','Forever Model','Custom'];
+const _WL_DIRECTIONS = ['long','short','wait'];
+const _WL_STAGES = ['Weekly','Daily','4H','1H','Execution'];
+const _WL_CHART_TAGS = ['Weekly','Daily','4H','1H','Entry','Results'];
+
+function _wlEmptyLiq() {
+  const o = {};
+  _WL_LIQ_ITEMS.forEach(i => o[i.k] = false);
+  return o;
+}
+
+/* Fill in any fields missing from legacy pair rows. Mutates + returns p. */
+function _wlNormPair(p) {
+  if (p.confidence == null) p.confidence = 50;
+  if (!p.direction) p.direction = 'wait';
+  if (p.expectedMove == null) p.expectedMove = '';
+  if (p.risk == null) p.risk = 0;
+  if (!p.model) p.model = '';
+  if (!p.liq) p.liq = _wlEmptyLiq();
+  if (!p.charts) p.charts = [];
+  p.charts.forEach(c => { if (!c.tag) c.tag = ''; });
+  if (!p.stages) {
+    p.stages = {};
+    _WL_STAGES.forEach(s => {
+      const tfBias = (p.tfs || []).find(t => t.tf === s);
+      p.stages[s] = { bias: (tfBias && tfBias.bias) || 'neu', expectations: '', liquidityTargets: '', risk: 0, liq: _wlEmptyLiq() };
+    });
+  } else {
+    _WL_STAGES.forEach(s => {
+      if (!p.stages[s]) p.stages[s] = { bias: 'neu', expectations: '', liquidityTargets: '', risk: 0, liq: _wlEmptyLiq() };
+      if (!p.stages[s].liq) p.stages[s].liq = _wlEmptyLiq();
+      if (p.stages[s].risk == null) p.stages[s].risk = 0;
+    });
+  }
+  if (p.archived == null) p.archived = false;
+  return p;
+}
+
+/* Fill in any fields missing from legacy week rows. Mutates + returns week.meta. */
+function _wlNormWeekMeta(week) {
+  if (!week.meta) week.meta = {};
+  const m = week.meta;
+  if (!m.volatility) m.volatility = 'med';
+  if (!m.weekStatus) m.weekStatus = 'waiting';
+  if (m.weekStatusManual == null) m.weekStatusManual = false;
+  if (m.dollarStrength == null) m.dollarStrength = 50;
+  if (m.dollarStrengthManual == null) m.dollarStrengthManual = false;
+  if (m.calendarReviewed == null) m.calendarReviewed = false;
+  return m;
+}
+
 /* ── Load from Supabase ── */
 async function _wlLoad() {
   if (!_currentUser) return;
@@ -4157,18 +4225,28 @@ async function _wlLoad() {
     .eq('user_id', _currentUser.id)
     .order('week_date', { ascending: false });
   if (error) { console.error('wlLoad error:', error.message); return; }
-  _wlData = (data || []).map(r => ({
-    id:          r.id,
-    quarter:     r.quarter,
-    weekLabel:   r.week_label,
-    weekDate:    r.week_date,
-    weekDateEnd: r.week_date_end || null,
-    dxy:         r.dxy_bias || 'neu',
-    market:      r.market_bias || 'neu',
-    pairs:       r.pairs || [],
-    checklist:   r.checklist || [],
-    dailyPlans:  r.daily_plans || {},
-  }));
+  _wlData = (data || []).map(r => {
+    // The `checklist` column was left unused after the old weekly checklist
+    // was removed — we repurpose it to carry week-level v2 metadata
+    // (volatility, week status, dollar strength, calendar-reviewed flag)
+    // as an object, so no DB schema change is needed. Legacy rows still
+    // holding the old array format are simply ignored.
+    const meta = (r.checklist && typeof r.checklist === 'object' && !Array.isArray(r.checklist)) ? r.checklist : {};
+    const week = {
+      id:          r.id,
+      quarter:     r.quarter,
+      weekLabel:   r.week_label,
+      weekDate:    r.week_date,
+      weekDateEnd: r.week_date_end || null,
+      dxy:         r.dxy_bias || 'neu',
+      market:      r.market_bias || 'neu',
+      pairs:       (r.pairs || []).map(_wlNormPair),
+      meta,
+      dailyPlans:  r.daily_plans || {},
+    };
+    _wlNormWeekMeta(week);
+    return week;
+  });
 
   // Fire-and-forget: clean up any legacy base64 charts in the background
   // so they don't keep bloating this query on every future load.
@@ -4185,7 +4263,7 @@ async function _wlSaveWeek(week) {
     dxy_bias:     week.dxy,
     market_bias:  week.market,
     pairs:        week.pairs,
-    checklist:    week.checklist,
+    checklist:    week.meta || {},
     daily_plans:  week.dailyPlans || {},
   };
   if (week.id) {
@@ -4308,6 +4386,109 @@ function _wlQLabel(qKey) {
   return `${q} ${y} · ${Q_MONTHS[parseInt(q.slice(1))]}`;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   WEEKLY READINESS SCORE — 6 equally-weighted prep factors, 0–100
+   ══════════════════════════════════════════════════════════════════ */
+function _wlComputeReadiness(week) {
+  _wlNormWeekMeta(week);
+  const pairs = week.pairs || [];
+
+  // 1) Weekly bias set (DXY + market read)
+  const biasDone = (week.dxy !== 'neu' ? 0.5 : 0) + (week.market !== 'neu' ? 0.5 : 0);
+
+  // 2) Economic calendar reviewed (manual ack — we can't infer "read")
+  const calDone = week.meta.calendarReviewed ? 1 : 0;
+
+  // 3) All selected pairs analyzed — note + chart + at least one confluence checked
+  const pairsDone = pairs.length ? pairs.reduce((sum, p) => {
+    let s = 0;
+    if (p.note && p.note.trim()) s += 0.34;
+    if (p.charts && p.charts.length) s += 0.33;
+    if (p.liq && Object.values(p.liq).some(Boolean)) s += 0.33;
+    return sum + Math.min(1, s);
+  }, 0) / pairs.length : 0;
+
+  // 4) Daily gameplan completed — fraction of Mon–Fri with a note or mindset logged
+  const weekdays = ['mon','tue','wed','thu','fri'];
+  const plans = week.dailyPlans || {};
+  const gameplanDone = weekdays.reduce((s, d) => {
+    const p = plans[d];
+    return s + ((p && ((p.note && p.note.trim()) || p.mindset)) ? 1 : 0);
+  }, 0) / weekdays.length;
+
+  // 5) Screenshots uploaded — any pair chart or daily chart present
+  const hasPairShots  = pairs.some(p => p.charts && p.charts.length);
+  const hasDayShots   = Object.values(plans).some(p => p && p.charts && p.charts.length);
+  const shotsDone = (hasPairShots || hasDayShots) ? 1 : 0;
+
+  // 6) Mindset check completed — any day this week has a mindset logged
+  const mindsetDone = Object.values(plans).some(p => p && p.mindset) ? 1 : 0;
+
+  const factors = [
+    { key: 'bias',     label: 'Weekly Bias',        pct: biasDone },
+    { key: 'cal',      label: 'Economic Calendar',  pct: calDone },
+    { key: 'pairs',    label: 'Pairs Analyzed',     pct: pairsDone },
+    { key: 'gameplan', label: 'Daily Gameplan',     pct: gameplanDone },
+    { key: 'shots',    label: 'Screenshots',        pct: shotsDone },
+    { key: 'mindset',  label: 'Mindset Check',      pct: mindsetDone },
+  ];
+  const score = Math.round(factors.reduce((s, f) => s + f.pct, 0) / factors.length * 100);
+
+  let sessionMsg;
+  if (score >= 85)      sessionMsg = 'Ready for London Session';
+  else if (score >= 60) sessionMsg = 'Nearly Ready — Finish Prep';
+  else if (score >= 30) sessionMsg = 'Preparation In Progress';
+  else                  sessionMsg = 'Needs Weekly Preparation';
+
+  return { score, factors, sessionMsg };
+}
+
+/* Generic click-to-cycle for week-level quick-glance fields. */
+async function _wlCycleWeekField(weekId, field, opts) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  _wlNormWeekMeta(week);
+  if (field === 'dxy' || field === 'market') {
+    const i = opts.indexOf(week[field]);
+    week[field] = opts[(i + 1) % opts.length];
+  } else {
+    const i = opts.indexOf(week.meta[field]);
+    week.meta[field] = opts[(i + 1) % opts.length];
+    if (field === 'weekStatus') week.meta.weekStatusManual = true;
+  }
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
+}
+
+async function _wlCycleDollarStrength(weekId) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  _wlNormWeekMeta(week);
+  const steps = [10, 30, 50, 70, 90];
+  const cur = week.meta.dollarStrength;
+  const idx = steps.reduce((closest, v, i) => Math.abs(v - cur) < Math.abs(steps[closest] - cur) ? i : closest, 0);
+  week.meta.dollarStrength = steps[(idx + 1) % steps.length];
+  week.meta.dollarStrengthManual = true;
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
+}
+
+async function _wlToggleCalendarReviewed(weekId) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  _wlNormWeekMeta(week);
+  week.meta.calendarReviewed = !week.meta.calendarReviewed;
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
+}
+
+/* Auto week-status suggestion (used unless the person has manually overridden it) */
+function _wlAutoWeekStatus(readinessScore) {
+  if (readinessScore >= 90) return 'completed';
+  if (readinessScore >= 15) return 'in-progress';
+  return 'waiting';
+}
+
 /* ── Render ── */
 function buildWatchlist() {
   const qs = _wlQuarters();
@@ -4415,31 +4596,169 @@ function _wlSetWeek(id) {
   _wlRenderWeeks();
 }
 
-function _wlRenderWeekContent(week, container) {
-  const dxyClass    = week.dxy === 'bull' ? 'bull' : week.dxy === 'bear' ? 'bear' : 'neu';
-  const marketClass = week.market === 'risk-on' ? 'risk-on' : week.market === 'risk-off' ? 'risk-off' : 'neu';
-  const dxyLabel    = week.dxy === 'bull' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg> Bullish' : week.dxy === 'bear' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg> Bearish' : '→ Neutral';
-  const mktLabel    = week.market === 'risk-on' ? '<svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg> Risk-On' : week.market === 'risk-off' ? '<svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg> Risk-Off' : '→ Neutral';
+/* ── SVG ring helper (reused by readiness card + pair confidence rings) ── */
+function _wlRingSvg(pct, opts) {
+  opts = opts || {};
+  const size = opts.size || 88, sw = opts.stroke || 8;
+  const r = (size - sw) / 2, c = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(100, pct));
+  const off = c - (clamped / 100) * c;
+  const colorClass = opts.colorClass || (clamped >= 70 ? 'wl-ring-good' : clamped >= 40 ? 'wl-ring-mid' : 'wl-ring-low');
+  return `<div class="wl-ring-wrap" style="width:${size}px;height:${size}px">
+    <svg class="wl-ring-svg" viewBox="0 0 ${size} ${size}">
+      <circle class="wl-ring-track" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${sw}"></circle>
+      <circle class="wl-ring-fill ${colorClass}" cx="${size/2}" cy="${size/2}" r="${r}" stroke-width="${sw}"
+        stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${c.toFixed(1)}" data-target-offset="${off.toFixed(1)}"></circle>
+    </svg>
+    ${opts.centerHtml ? `<div class="wl-ring-center">${opts.centerHtml}</div>` : ''}
+  </div>`;
+}
 
-  // Pair cards HTML
-  const pairCards = week.pairs.map((p, pi) => {
-    const priClass = p.priority === 'high' ? 'high' : p.priority === 'med' ? 'med' : 'low';
-    const biasClass = p.bias === 'bull' ? 'bull' : 'bear';
-    const biasLabel = p.bias === 'bull' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg> Bullish' : '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg> Bearish';
-    const firstChart = (p.charts && p.charts.length > 0) ? p.charts[0].url : null;
-    const tfHtml = (p.tfs || []).map(tf => {
-      const tc = tf.bias === 'bull' ? 'tf-bull' : tf.bias === 'bear' ? 'tf-bear' : 'tf-neu';
-      const arrow = tf.bias === 'bull' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg>' : tf.bias === 'bear' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg>' : '→';
-      return `<span class="tf-chip ${tc}">${tf.tf} ${arrow}</span>`;
-    }).join('');
+/* Animate all rings marked with data-target-offset from full → target (called after DOM insert) */
+function _wlAnimateRings(root) {
+  const rings = (root || document).querySelectorAll('.wl-ring-fill[data-target-offset]');
+  requestAnimationFrame(() => {
+    rings.forEach(r => { r.style.strokeDashoffset = r.getAttribute('data-target-offset'); });
+  });
+}
 
+/* ── Weekly Readiness Score card (top of page) ── */
+function _wlBuildReadinessCard(week) {
+  const { score, factors, sessionMsg } = _wlComputeReadiness(week);
+  const ring = _wlRingSvg(score, {
+    size: 104, stroke: 9,
+    centerHtml: `<div class="wl-readiness-num">${score}<span class="wl-readiness-pct">%</span></div>`,
+  });
+  const factorRows = factors.map(f => {
+    const pct = Math.round(f.pct * 100);
     return `
-    <div class="wl-pair-card-v2 ${priClass}" onclick="_wlOpenPairDetail('${week.id}',${pi})">
+    <div class="wl-factor-row">
+      <div class="wl-factor-label">
+        <span class="wl-factor-dot ${pct >= 100 ? 'done' : pct > 0 ? 'part' : ''}"></span>
+        ${f.label}
+      </div>
+      <div class="wl-factor-bar-track"><div class="wl-factor-bar-fill" style="width:${pct}%"></div></div>
+      <div class="wl-factor-pct">${pct}%</div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="wl-readiness-card">
+    <div class="wl-readiness-ring-col">
+      ${ring}
+      <div class="wl-readiness-status">${sessionMsg}</div>
+    </div>
+    <div class="wl-readiness-divider"></div>
+    <div class="wl-readiness-factors">
+      <div class="wl-readiness-title">Weekly Readiness</div>
+      ${factorRows}
+    </div>
+  </div>`;
+}
+
+/* ── Market Overview panel (quick-glance widgets) ── */
+function _wlBuildMarketOverview(week) {
+  _wlNormWeekMeta(week);
+  const { score } = _wlComputeReadiness(week);
+  const m = week.meta;
+
+  const dxyClass  = week.dxy === 'bull' ? 'bull' : week.dxy === 'bear' ? 'bear' : 'neu';
+  const dxyLabel  = week.dxy === 'bull' ? `${icon('arrow-up')} Bullish` : week.dxy === 'bear' ? `${icon('arrow-down')} Bearish` : '→ Neutral';
+
+  const mktClass  = week.market === 'risk-on' ? 'risk-on' : week.market === 'risk-off' ? 'risk-off' : 'neu';
+  const mktLabel  = week.market === 'risk-on' ? `${icon('sparkle')} Risk-On` : week.market === 'risk-off' ? `${icon('sparkle')} Risk-Off` : '→ Neutral';
+
+  const volClass  = m.volatility === 'high' ? 'bear' : m.volatility === 'low' ? 'bull' : 'neu';
+  const volLabel  = m.volatility.charAt(0).toUpperCase() + m.volatility.slice(1);
+
+  const statusVal = m.weekStatusManual ? m.weekStatus : _wlAutoWeekStatus(score);
+  const statusClass = statusVal === 'completed' ? 'bull' : statusVal === 'in-progress' ? '' : 'neu';
+  const statusLabel = statusVal === 'completed' ? 'Completed' : statusVal === 'in-progress' ? 'In Progress' : 'Waiting';
+
+  const dsPct = m.dollarStrength;
+  const dsLabel = dsPct >= 75 ? 'Strong' : dsPct >= 55 ? 'Firm' : dsPct >= 45 ? 'Neutral' : dsPct >= 25 ? 'Soft' : 'Weak';
+
+  return `
+  <div class="wl-overview-row">
+    <div class="wl-overview-widget" onclick="_wlCycleWeekField('${week.id}','dxy',['bull','bear','neu'])" title="Click to cycle">
+      <div class="wl-overview-label">DXY Bias</div>
+      <span class="wl-badge ${dxyClass}">${dxyLabel}</span>
+    </div>
+
+    <div class="wl-overview-widget wl-overview-gauge" onclick="_wlCycleDollarStrength('${week.id}')" title="Click to cycle">
+      <div class="wl-overview-label">Dollar Strength</div>
+      <div class="wl-gauge-wrap">
+        <svg class="wl-gauge-svg" viewBox="0 0 100 54">
+          <path class="wl-gauge-track" d="M6,50 A44,44 0 0,1 94,50"></path>
+          <path class="wl-gauge-fill" d="M6,50 A44,44 0 0,1 94,50"
+            style="stroke-dasharray:138; stroke-dashoffset:${(138 - (dsPct/100)*138).toFixed(1)}"></path>
+          <circle class="wl-gauge-needle-base" cx="50" cy="50" r="3"></circle>
+        </svg>
+        <div class="wl-gauge-readout">${dsLabel}</div>
+      </div>
+    </div>
+
+    <div class="wl-overview-widget" onclick="_wlCycleWeekField('${week.id}','market',['risk-on','risk-off','neu'])" title="Click to cycle">
+      <div class="wl-overview-label">Market Sentiment</div>
+      <span class="wl-badge ${mktClass}">${mktLabel}</span>
+    </div>
+
+    <div class="wl-overview-widget" onclick="_wlCycleWeekField('${week.id}','volatility',['low','med','high'])" title="Click to cycle">
+      <div class="wl-overview-label">Volatility</div>
+      <span class="wl-badge ${volClass}">${volLabel}</span>
+    </div>
+
+    <div class="wl-overview-widget" onclick="_wlCycleWeekField('${week.id}','weekStatus',['waiting','in-progress','completed'])" title="Click to cycle · auto-suggested until set">
+      <div class="wl-overview-label">Week Status</div>
+      <span class="wl-badge ${statusClass}">${statusLabel}</span>
+    </div>
+  </div>`;
+}
+
+let _wlShowArchived = {}; // weekId → bool
+
+function _wlLiqCount(liq) {
+  const total = _WL_LIQ_ITEMS.length;
+  const checked = liq ? _WL_LIQ_ITEMS.reduce((s, i) => s + (liq[i.k] ? 1 : 0), 0) : 0;
+  return { checked, total };
+}
+
+function _wlPairCardHtml(week, p, pi) {
+  const priClass = p.priority === 'high' ? 'high' : p.priority === 'med' ? 'med' : 'low';
+  const biasClass = p.bias === 'bull' ? 'bull' : 'bear';
+  const biasLabel = p.bias === 'bull' ? `${icon('arrow-up')} Bullish` : `${icon('arrow-down')} Bearish`;
+  const firstChart = (p.charts && p.charts.length > 0) ? p.charts[0].url : null;
+  const tfHtml = (p.tfs || []).map(tf => {
+    const tc = tf.bias === 'bull' ? 'tf-bull' : tf.bias === 'bear' ? 'tf-bear' : 'tf-neu';
+    const arrow = tf.bias === 'bull' ? icon('arrow-up') : tf.bias === 'bear' ? icon('arrow-down') : '→';
+    const analyzed = tf.bias !== 'neu';
+    return `<span class="tf-chip ${tc}${analyzed ? ' tf-analyzed' : ''}">${tf.tf} ${arrow}</span>`;
+  }).join('');
+
+  const dirClass = p.direction === 'long' ? 'bull' : p.direction === 'short' ? 'bear' : 'neu';
+  const dirLabel = p.direction === 'long' ? `${icon('trend-up')} Long` : p.direction === 'short' ? `${icon('trend-down')} Short` : `${icon('clock')} Wait`;
+
+  const { checked, total } = _wlLiqCount(p.liq);
+
+  const stars = Array.from({length: 5}, (_, i) => icon(i < p.risk ? 'star' : 'star-o', {cls: i < p.risk ? 'icn-gold' : ''})).join('');
+
+  return `
+    <div class="wl-pair-card-v2 ${priClass}${p.archived ? ' wl-pair-archived' : ''}" onclick="_wlOpenPairDetail('${week.id}',${pi})">
       <div class="wl-card-chart">
         ${firstChart
           ? `<img class="wl-card-chart-img" src="${firstChart}" alt="${p.name} chart" loading="lazy">
              ${p.charts.length > 1 ? `<div class="wl-card-chart-count">+${p.charts.length} charts</div>` : ''}`
-          : `<div class="wl-card-chart-placeholder"><span><svg class="icn" aria-hidden="true"><use href="#ic-trend-up"></use></svg></span><p>Tap to add charts</p></div>`}
+          : `<div class="wl-card-chart-placeholder"><span>${icon('trend-up')}</span><p>Tap to add charts</p></div>`}
+        <div class="wl-card-confidence-ring">
+          ${_wlRingSvg(p.confidence, { size: 40, stroke: 4, centerHtml: `<span class="wl-mini-ring-num">${p.confidence}</span>` })}
+        </div>
+        <div class="wl-card-quick-actions" onclick="event.stopPropagation()">
+          <button title="Edit" onclick="_wlEditPairDirect('${week.id}',${pi})">${icon('edit')}</button>
+          <button title="Duplicate" onclick="_wlDuplicatePair('${week.id}',${pi})">${icon('copy')}</button>
+          <button title="${p.archived ? 'Unarchive' : 'Archive'}" onclick="_wlToggleArchivePair('${week.id}',${pi})">${icon('archive')}</button>
+          <button title="Expand" onclick="_wlOpenPairDetail('${week.id}',${pi})">${icon('eye')}</button>
+          <button title="Delete" class="wl-qa-danger" onclick="_wlQuickDeletePair('${week.id}',${pi})">${icon('trash')}</button>
+        </div>
       </div>
       <div class="wl-card-body">
         <div class="wl-card-pair-row">
@@ -4449,30 +4768,56 @@ function _wlRenderWeekContent(week, container) {
           </div>
         </div>
         <div class="wl-card-tfs">${tfHtml}</div>
+
+        <div class="wl-card-meta-row">
+          <span class="wl-badge ${dirClass}" style="font-size:10px;padding:3px 9px">${dirLabel}</span>
+          ${p.model ? `<span class="wl-model-chip">${p.model}</span>` : ''}
+          <span class="wl-confluence-chip">${checked}/${total} confirmations</span>
+        </div>
+
+        <div class="wl-card-stars-row">
+          <span class="wl-card-stars">${stars}</span>
+          <span class="wl-card-stars-label">Risk</span>
+        </div>
+
+        ${p.expectedMove ? `<div class="wl-card-expected"><strong>Expected:</strong> ${p.expectedMove}</div>` : ''}
         <div class="wl-card-note">${p.note || '<span style="color:var(--text3);font-style:italic">No analysis yet…</span>'}</div>
       </div>
     </div>`;
-  }).join('');
+}
 
-  // Checklist removed per user request
-  const clHtml = '';
+function _wlRenderWeekContent(week, container) {
+  _wlNormWeekMeta(week);
+  week.pairs.forEach(_wlNormPair);
+
+  const activePairs   = week.pairs.filter(p => !p.archived);
+  const archivedPairs = week.pairs.filter(p => p.archived);
+
+  // Pair cards HTML (index refers to position in the *full* week.pairs array
+  // so edit/duplicate/archive/delete handlers stay correct after filtering)
+  const pairCards = week.pairs.map((p, pi) => p.archived ? '' : _wlPairCardHtml(week, p, pi)).join('');
+
+  const archivedSection = archivedPairs.length ? `
+    <div class="wl-archived-toggle" onclick="_wlToggleShowArchived('${week.id}')">
+      ${icon('archive')} ${_wlShowArchived[week.id] ? 'Hide' : 'Show'} Archived (${archivedPairs.length})
+    </div>
+    ${_wlShowArchived[week.id] ? `<div class="wl-pairs-grid wl-pairs-grid--archived">${
+      week.pairs.map((p, pi) => p.archived ? _wlPairCardHtml(week, p, pi) : '').join('')
+    }</div>` : ''}` : '';
 
   container.innerHTML = `
+    ${_wlBuildReadinessCard(week)}
+    ${_wlBuildMarketOverview(week)}
+
     <div class="wl-week-header">
       <div class="wl-week-meta">
         <div class="wl-week-title">${week.weekLabel}</div>
         <div class="wl-week-date">${week.weekDate}${week.weekDateEnd ? ' → ' + week.weekDateEnd : ''}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
-        <div class="wl-week-badges">
-          <span style="font-size:11px;color:var(--text2)">DXY</span>
-          <span class="wl-badge ${dxyClass}">${dxyLabel}</span>
-          <span style="font-size:11px;color:var(--text2)">Market</span>
-          <span class="wl-badge ${marketClass}">${mktLabel}</span>
-        </div>
         <div class="wl-week-actions">
-          <button class="wl-week-btn" onclick="_wlEditWeek('${week.id}');event.stopPropagation()"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Edit</button>
-          <button class="wl-week-btn danger" onclick="_wlConfirmDeleteWeek('${week.id}');event.stopPropagation()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg> Delete</button>
+          <button class="wl-week-btn" onclick="_wlEditWeek('${week.id}');event.stopPropagation()">${icon('edit')} Edit</button>
+          <button class="wl-week-btn danger" onclick="_wlConfirmDeleteWeek('${week.id}');event.stopPropagation()">${icon('close')} Delete</button>
         </div>
       </div>
     </div>
@@ -4484,6 +4829,7 @@ function _wlRenderWeekContent(week, container) {
         <p>Add Pair Analysis</p>
       </div>
     </div>
+    ${archivedSection}
 
     <!-- ── Daily Gameplan ─────────────────────────────────────────── -->
     ${_wlBuildDailyGameplan(week)}
@@ -4492,16 +4838,19 @@ function _wlRenderWeekContent(week, container) {
     <div class="wl-cal-section">
       <div class="wl-cal-header">
         <div class="wl-cal-title">
-          <span class="wl-cal-icon"><svg class="icn" aria-hidden="true"><use href="#ic-calendar"></use></svg></span>
+          <span class="wl-cal-icon">${icon('calendar')}</span>
           Economic Calendar
           <span class="wl-cal-week-range">${week.weekDate}${week.weekDateEnd ? ' – ' + week.weekDateEnd : ''}</span>
         </div>
         <div class="wl-cal-controls">
+          <button class="wl-cal-reviewed-btn${week.meta.calendarReviewed ? ' active' : ''}" onclick="_wlToggleCalendarReviewed('${week.id}')" title="Mark as reviewed">
+            ${icon(week.meta.calendarReviewed ? 'check-c' : 'dot-o')} ${week.meta.calendarReviewed ? 'Reviewed' : 'Mark Reviewed'}
+          </button>
           <div class="wl-cal-filter-wrap" id="wl-cal-filter-wrap-${week.id}"></div>
           <button class="wl-cal-cur-btn" onclick="_wlCalOpenCurrencyPicker('${week.id}')" title="Filter currencies">
             <span id="wl-cal-cur-label-${week.id}">…</span> ▾
           </button>
-          <button class="wl-cal-refresh-btn" onclick="_wlCalLoad('${week.id}','${week.weekDate}','${week.weekDateEnd||week.weekDate}',true)" title="Refresh"><svg class="icn" aria-hidden="true"><use href="#ic-refresh"></use></svg></button>
+          <button class="wl-cal-refresh-btn" onclick="_wlCalLoad('${week.id}','${week.weekDate}','${week.weekDateEnd||week.weekDate}',true)" title="Refresh">${icon('refresh')}</button>
         </div>
       </div>
       <!-- Currency picker dropdown (hidden by default) -->
@@ -4517,6 +4866,45 @@ function _wlRenderWeekContent(week, container) {
   setTimeout(() => _wlCalAutoLoad(), 0);
 
   _wlMountDayDropzone(week.id, _wlActiveDayTab[week.id]);
+  _wlAnimateRings(container);
+}
+
+function _wlToggleShowArchived(weekId) {
+  _wlShowArchived[weekId] = !_wlShowArchived[weekId];
+  _wlRenderWeeks();
+}
+
+async function _wlDuplicatePair(weekId, pairIdx) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  const src = week.pairs[pairIdx];
+  if (!src) return;
+  const copy = JSON.parse(JSON.stringify(src));
+  copy.archived = false;
+  week.pairs.splice(pairIdx + 1, 0, copy);
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
+}
+
+async function _wlToggleArchivePair(weekId, pairIdx) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  const p = week.pairs[pairIdx];
+  if (!p) return;
+  p.archived = !p.archived;
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
+}
+
+async function _wlQuickDeletePair(weekId, pairIdx) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  const p = week.pairs[pairIdx];
+  if (!p) return;
+  if (!confirm(`Remove ${p.name} from this week's watchlist?`)) return;
+  week.pairs.splice(pairIdx, 1);
+  await _wlSaveWeek(week);
+  _wlRenderWeeks();
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -5411,16 +5799,6 @@ function _wlCalRender(weekId, events, startDate, endDate) {
   body.innerHTML = daysHtml;
 }
 
-/* ── Checklist toggle ── */
-async function _wlToggleCheck(weekId, idx) {
-  const week = _wlData.find(w => w.id === weekId);
-  if (!week) return;
-  if (week.checklist.includes(idx)) week.checklist = week.checklist.filter(i => i !== idx);
-  else week.checklist.push(idx);
-  _wlRenderWeeks();
-  await _wlSaveWeek(week);
-}
-
 /* ═════════════ ADD / EDIT WEEK MODAL ═════════════ */
 function wlAddWeek() {
   const today = new Date();
@@ -5525,7 +5903,8 @@ async function _wlSaveWeekForm(existingId) {
       await _wlSaveWeek(week);
     }
   } else {
-    const week = { id: null, quarter: qKey, weekLabel: label, weekDate: dateStart, weekDateEnd: dateEnd, dxy, market: mkt, pairs: [], checklist: [] };
+    const week = { id: null, quarter: qKey, weekLabel: label, weekDate: dateStart, weekDateEnd: dateEnd, dxy, market: mkt, pairs: [], meta: {} };
+    _wlNormWeekMeta(week);
     await _wlSaveWeek(week);
     _wlActiveQ      = qKey;
     _wlActiveWeekId = week.id;
@@ -5570,55 +5949,166 @@ function _wlOpenPairDetail(weekId, pairIdx) {
   _wlShowPairViewModal(weekId, pairIdx, p);
 }
 
-/* ── VIEW modal: read-only with charts + Edit button ── */
+/* ── Small star-rating control builder (click to set 0-5) ── */
+function _wlStarPicker(value, onClickFn) {
+  return Array.from({length: 5}, (_, i) => {
+    const filled = i < value;
+    return `<span class="wl-star-btn" onclick="${onClickFn}(${i+1})">${icon(filled ? 'star' : 'star-o', {cls: filled ? 'icn-gold' : ''})}</span>`;
+  }).join('');
+}
+
+/* ── EXPANDABLE PAIR ANALYSIS modal — Weekly → Daily → 4H → 1H → Execution timeline ── */
 function _wlShowPairViewModal(weekId, pairIdx, p) {
+  _wlNormPair(p);
   const priClass  = p.priority === 'high' ? 'high' : p.priority === 'med' ? 'med' : 'low';
   const biasClass = p.bias === 'bull' ? 'bull' : 'bear';
-  const biasLabel = p.bias === 'bull' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg> Bullish' : '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg> Bearish';
-
-  const tfHtml = (p.tfs || []).map(tf => {
-    const tc    = tf.bias === 'bull' ? 'tf-bull' : tf.bias === 'bear' ? 'tf-bear' : 'tf-neu';
-    const arrow = tf.bias === 'bull' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-up"></use></svg>' : tf.bias === 'bear' ? '<svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg>' : '→';
-    return `<span class="tf-chip ${tc}">${tf.tf} ${arrow}</span>`;
-  }).join('');
-
+  const biasLabel = p.bias === 'bull' ? `${icon('arrow-up')} Bullish` : `${icon('arrow-down')} Bearish`;
+  const dirClass  = p.direction === 'long' ? 'bull' : p.direction === 'short' ? 'bear' : 'neu';
+  const dirLabel  = p.direction === 'long' ? `${icon('trend-up')} Long` : p.direction === 'short' ? `${icon('trend-down')} Short` : `${icon('clock')} Wait`;
+  const { checked, total } = _wlLiqCount(p.liq);
   const charts = p.charts || [];
-  const chartGridHtml = charts.length > 0
-    ? `<div class="wl-view-chart-grid">${charts.map((c, ci) =>
-        `<div class="wl-view-chart-item" onclick="_wlOpenLightbox('${c.url}')">
-          <img src="${c.url}" alt="chart ${ci+1}" loading="lazy">
-          <div class="wl-view-chart-label">${c.label || 'Chart ' + (ci+1)}</div>
-        </div>`
-      ).join('')}</div>`
-    : `<div class="wl-view-no-charts">No charts uploaded yet</div>`;
+
+  const stageKeyToTags = {
+    Weekly: ['Weekly'], Daily: ['Daily'], '4H': ['4H'], '1H': ['1H'], Execution: ['Entry','Results'],
+  };
+
+  const timelineHtml = _WL_STAGES.map((stage, si) => {
+    const sd = p.stages[stage];
+    const bClass = sd.bias === 'bull' ? 'bull' : sd.bias === 'bear' ? 'bear' : 'neu';
+    const bLabel = sd.bias === 'bull' ? `${icon('arrow-up')} Bull` : sd.bias === 'bear' ? `${icon('arrow-down')} Bear` : '→ Neu';
+    const stageCharts = charts.filter(c => stageKeyToTags[stage].includes(c.tag));
+    const liqGrid = _WL_LIQ_ITEMS.map(item => `
+      <button class="wl-stage-liq-chip${sd.liq[item.k] ? ' checked' : ''}"
+        onclick="_wlToggleStageLiq('${weekId}',${pairIdx},'${stage}','${item.k}')">
+        ${icon(sd.liq[item.k] ? 'check' : 'dot-o')} ${item.l}
+      </button>`).join('');
+
+    return `
+    <div class="wl-stage-block">
+      <div class="wl-stage-connector${si === 0 ? ' first' : ''}"></div>
+      <div class="wl-stage-head">
+        <div class="wl-stage-name">${stage}</div>
+        <button class="wl-badge ${bClass}" style="cursor:pointer" onclick="_wlCycleStageBias('${weekId}',${pairIdx},'${stage}')">${bLabel}</button>
+      </div>
+      <div class="wl-stage-body">
+        <div class="wl-stage-charts">
+          ${stageCharts.length
+            ? stageCharts.map(c => `<img class="wl-stage-chart-thumb" src="${c.url}" alt="${stage} chart" onclick="_wlOpenLightbox('${c.url}')" loading="lazy">`).join('')
+            : `<div class="wl-stage-no-chart">No ${stage.toLowerCase()} screenshots yet</div>`}
+        </div>
+        <div class="wl-stage-field">
+          <label>Expectations</label>
+          <textarea rows="2" placeholder="What are you expecting to see at ${stage}?"
+            onblur="_wlSaveStageField('${weekId}',${pairIdx},'${stage}','expectations',this.value)">${sd.expectations || ''}</textarea>
+        </div>
+        <div class="wl-stage-field">
+          <label>Liquidity Targets</label>
+          <textarea rows="2" placeholder="Key liquidity levels / targets at this stage…"
+            onblur="_wlSaveStageField('${weekId}',${pairIdx},'${stage}','liquidityTargets',this.value)">${sd.liquidityTargets || ''}</textarea>
+        </div>
+        <div class="wl-stage-field">
+          <label>Confluences</label>
+          <div class="wl-stage-liq-grid">${liqGrid}</div>
+        </div>
+        <div class="wl-stage-field wl-stage-risk-row">
+          <label>Risk</label>
+          <span class="wl-star-row">${_wlStarPicker(sd.risk, `_wlSetStageRisk('${weekId}',${pairIdx},'${stage}',`)}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 
   document.getElementById('wl-pair-modal-title').textContent = p.name;
   document.getElementById('wl-pair-modal-body').innerHTML = `
     <div class="wl-view-header">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <span class="wl-badge ${biasClass}">${biasLabel}</span>
+        <span class="wl-badge ${dirClass}">${dirLabel}</span>
         <span class="wl-badge ${priClass === 'high' ? 'bear' : priClass === 'med' ? '' : 'bull'}"
           style="${priClass==='med'?'background:rgba(251,191,36,0.12);color:var(--gold);border-color:rgba(251,191,36,0.3)':''}">
-          ${p.priority === 'high' ? '<svg class="icn icn-red" aria-hidden="true"><use href="#ic-dot"></use></svg> High' : p.priority === 'med' ? '<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-dot"></use></svg> Medium' : '<svg class="icn icn-green" aria-hidden="true"><use href="#ic-dot"></use></svg> Low'}
+          ${p.priority === 'high' ? `${icon('dot',{cls:'icn-red'})} High` : p.priority === 'med' ? `${icon('dot',{cls:'icn-gold'})} Medium` : `${icon('dot',{cls:'icn-green'})} Low`}
         </span>
+        ${p.model ? `<span class="wl-model-chip">${p.model}</span>` : ''}
+        <span class="wl-confluence-chip">${checked}/${total} confirmations</span>
       </div>
-      <div class="wl-card-tfs" style="margin-top:10px">${tfHtml}</div>
+      <div class="wl-view-header-row2">
+        ${_wlRingSvg(p.confidence, {size:48, stroke:5, centerHtml:`<span class="wl-mini-ring-num">${p.confidence}</span>`})}
+        <span class="wl-star-row">${Array.from({length:5},(_,i)=>icon(i<p.risk?'star':'star-o',{cls:i<p.risk?'icn-gold':''})).join('')}</span>
+      </div>
+      ${p.expectedMove ? `<div class="wl-view-note"><strong>Expected move:</strong> ${p.expectedMove}</div>` : ''}
       ${p.note ? `<div class="wl-view-note">${p.note}</div>` : ''}
     </div>
 
+    <div class="wl-view-section-label" style="margin-top:16px">ANALYSIS TIMELINE</div>
+    <div class="wl-stage-timeline">${timelineHtml}</div>
+
     <div class="wl-view-charts-section">
-      <div class="wl-view-section-label">CHART ANALYSIS · ${charts.length} image${charts.length !== 1 ? 's' : ''}</div>
-      ${chartGridHtml}
+      <div class="wl-view-section-label">ALL SCREENSHOTS · ${charts.length} image${charts.length !== 1 ? 's' : ''}</div>
+      ${charts.length > 0
+        ? `<div class="wl-view-chart-grid">${charts.map((c, ci) =>
+            `<div class="wl-view-chart-item" onclick="_wlOpenLightbox('${c.url}')">
+              <img src="${c.url}" alt="chart ${ci+1}" loading="lazy">
+              <div class="wl-view-chart-label">${c.tag ? `[${c.tag}] ` : ''}${c.label || 'Chart ' + (ci+1)}</div>
+            </div>`
+          ).join('')}</div>`
+        : `<div class="wl-view-no-charts">No charts uploaded yet</div>`}
     </div>
 
     <div class="wl-form-actions" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--glass-border)">
       <button class="wl-btn-secondary" onclick="wlClosePairModal()">Close</button>
-      <button class="wl-btn-primary" onclick="wlClosePairModal();_wlEditPairDirect('${weekId}',${pairIdx})"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Edit</button>
+      <button class="wl-btn-primary" onclick="wlClosePairModal();_wlEditPairDirect('${weekId}',${pairIdx})">${icon('edit')} Edit</button>
     </div>
   `;
 
   document.getElementById('wl-pair-modal-overlay').classList.add('open');
   document.getElementById('wl-pair-modal').classList.add('open');
+  _wlAnimateRings(document.getElementById('wl-pair-modal-body'));
+}
+
+async function _wlCycleStageBias(weekId, pairIdx, stage) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  const p = week.pairs[pairIdx];
+  if (!p) return;
+  _wlNormPair(p);
+  const opts = ['bull','bear','neu'];
+  p.stages[stage].bias = opts[(opts.indexOf(p.stages[stage].bias) + 1) % opts.length];
+  await _wlSaveWeek(week);
+  _wlShowPairViewModal(weekId, pairIdx, p);
+  _wlRenderWeeks();
+}
+
+async function _wlSaveStageField(weekId, pairIdx, stage, field, value) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  const p = week.pairs[pairIdx];
+  if (!p) return;
+  _wlNormPair(p);
+  p.stages[stage][field] = value;
+  await _wlSaveWeek(week);
+}
+
+async function _wlToggleStageLiq(weekId, pairIdx, stage, key) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  const p = week.pairs[pairIdx];
+  if (!p) return;
+  _wlNormPair(p);
+  p.stages[stage].liq[key] = !p.stages[stage].liq[key];
+  await _wlSaveWeek(week);
+  _wlShowPairViewModal(weekId, pairIdx, p);
+  _wlRenderWeeks();
+}
+
+async function _wlSetStageRisk(weekId, pairIdx, stage, val) {
+  const week = _wlData.find(w => w.id === weekId);
+  if (!week) return;
+  const p = week.pairs[pairIdx];
+  if (!p) return;
+  _wlNormPair(p);
+  p.stages[stage].risk = p.stages[stage].risk === val ? 0 : val; // click same star again to clear
+  await _wlSaveWeek(week);
+  _wlShowPairViewModal(weekId, pairIdx, p);
 }
 
 function _wlEditPairDirect(weekId, pairIdx) {
@@ -5632,21 +6122,33 @@ function _wlEditPairDirect(weekId, pairIdx) {
   _wlShowPairModal(p);
 }
 
+function _wlChartThumbHtml(c, ci) {
+  return `
+    <div class="wl-chart-thumb-wrap">
+      <img class="wl-chart-thumb" src="${c.url}" alt="chart">
+      <select class="wl-chart-thumb-tag" onchange="_wlSetPendingChartTag(${ci},this.value)">
+        <option value=""${!c.tag ? ' selected' : ''}>Untagged</option>
+        ${_WL_CHART_TAGS.map(t => `<option value="${t}"${c.tag===t?' selected':''}>${t}</option>`).join('')}
+      </select>
+      <div class="wl-chart-thumb-label">${c.label || 'Chart ' + (ci+1)}</div>
+      <button class="wl-chart-thumb-del" onclick="_wlRemovePendingChart(${ci})">${icon('close')}</button>
+    </div>`;
+}
+
+function _wlSetPendingChartTag(idx, tag) {
+  if (_wlPendingCharts[idx]) _wlPendingCharts[idx].tag = tag;
+}
+
 function _wlShowPairModal(pair) {
   const isEdit = pair !== null && _wlEditingPairIdx !== null;
+  if (pair) _wlNormPair(pair);
   const tfDefaults = ['Weekly','Daily','4H','1H'].map(tf => ({
     tf, bias: (pair && pair.tfs && pair.tfs.find(t => t.tf === tf)?.bias) || 'neu'
   }));
 
   document.getElementById('wl-pair-modal-title').textContent = isEdit ? `Edit: ${pair.name}` : 'Add Pair Analysis';
 
-  const chartGallery = _wlPendingCharts.map((c, ci) => `
-    <div class="wl-chart-thumb-wrap">
-      <img class="wl-chart-thumb" src="${c.url}" alt="chart">
-      <div class="wl-chart-thumb-label">${c.label || 'Chart ' + (ci+1)}</div>
-      <button class="wl-chart-thumb-del" onclick="_wlRemovePendingChart(${ci})"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
-    </div>
-  `).join('');
+  const chartGallery = _wlPendingCharts.map((c, ci) => _wlChartThumbHtml(c, ci)).join('');
 
   const tfRows = tfDefaults.map((tf, ti) => `
     <div class="wl-tf-opt">
@@ -5656,6 +6158,16 @@ function _wlShowPairModal(pair) {
       </select>
     </div>
   `).join('');
+
+  window._wlFormConfidence = pair ? pair.confidence : 50;
+  window._wlFormRisk       = pair ? pair.risk : 0;
+  window._wlFormLiq        = pair ? {...pair.liq} : _wlEmptyLiq();
+
+  const liqCheckboxes = _WL_LIQ_ITEMS.map(item => `
+    <button type="button" class="wl-stage-liq-chip${window._wlFormLiq[item.k] ? ' checked' : ''}" id="wl-p-liq-${item.k}"
+      onclick="_wlFormToggleLiq('${item.k}')">
+      ${icon(window._wlFormLiq[item.k] ? 'check' : 'dot-o')} ${item.l}
+    </button>`).join('');
 
   document.getElementById('wl-pair-modal-body').innerHTML = `
     <div class="wl-form-2col">
@@ -5683,18 +6195,51 @@ function _wlShowPairModal(pair) {
           <option value="bear"${pair&&pair.bias==='bear'?' selected':''}><svg class="icn" aria-hidden="true"><use href="#ic-arrow-down"></use></svg> Bearish</option>
         </select>
       </div>
-
+      <div class="wl-form-row">
+        <label class="wl-form-label">Trade Direction</label>
+        <select class="wl-form-select" id="wl-p-direction">
+          ${_WL_DIRECTIONS.map(d => `<option value="${d}"${pair&&pair.direction===d?' selected':''}>${d==='long'?'Long':d==='short'?'Short':'Wait'}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="wl-form-2col">
+      <div class="wl-form-row">
+        <label class="wl-form-label">Model Used</label>
+        <select class="wl-form-select" id="wl-p-model">
+          <option value=""${!pair||!pair.model?' selected':''}>— Select —</option>
+          ${_WL_MODELS.map(m => `<option value="${m}"${pair&&pair.model===m?' selected':''}>${m}</option>`).join('')}
+        </select>
+      </div>
+      <div class="wl-form-row">
+        <label class="wl-form-label">Confidence — <span id="wl-p-conf-readout">${window._wlFormConfidence}</span>%</label>
+        <input type="range" min="0" max="100" step="5" id="wl-p-confidence" value="${window._wlFormConfidence}"
+          oninput="document.getElementById('wl-p-conf-readout').textContent=this.value">
+      </div>
     </div>
     <div class="wl-form-row">
       <label class="wl-form-label">Timeframe Alignment</label>
       <div class="wl-tf-selector" id="wl-tf-selector">${tfRows}</div>
     </div>
     <div class="wl-form-row">
+      <label class="wl-form-label">Liquidity Checklist</label>
+      <div class="wl-stage-liq-grid">${liqCheckboxes}</div>
+    </div>
+    <div class="wl-form-2col">
+      <div class="wl-form-row">
+        <label class="wl-form-label">Risk Rating</label>
+        <span class="wl-star-row" id="wl-p-risk-stars">${_wlStarPicker(window._wlFormRisk, '_wlFormSetRisk')}</span>
+      </div>
+      <div class="wl-form-row">
+        <label class="wl-form-label">Expected Move</label>
+        <input type="text" class="wl-form-input" id="wl-p-expected" placeholder="e.g. Weekly bullish continuation into external liquidity" value="${pair&&pair.expectedMove||''}">
+      </div>
+    </div>
+    <div class="wl-form-row">
       <label class="wl-form-label">Key Levels / Setup Notes</label>
       <textarea class="wl-form-textarea" id="wl-p-note" placeholder="Setup, key OB/FVG levels, strategy, killzone…" rows="3">${pair&&pair.note||''}</textarea>
     </div>
     <div class="wl-form-row">
-      <label class="wl-form-label">Chart Images</label>
+      <label class="wl-form-label">Chart Images <span style="font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0">— tag each by timeframe/stage</span></label>
       ${_wlPendingCharts.length > 0 ? `<div class="wl-chart-gallery" id="wl-chart-gallery">${chartGallery}</div>` : ''}
       <div id="wl-chart-dropzone"></div>
     </div>
@@ -5725,6 +6270,22 @@ function _wlTfChange(idx, val) {
   window._wlTfBiases[idx] = val;
 }
 
+function _wlFormSetRisk(val) {
+  window._wlFormRisk = window._wlFormRisk === val ? 0 : val;
+  const el = document.getElementById('wl-p-risk-stars');
+  if (el) el.innerHTML = _wlStarPicker(window._wlFormRisk, '_wlFormSetRisk');
+}
+
+function _wlFormToggleLiq(key) {
+  window._wlFormLiq[key] = !window._wlFormLiq[key];
+  const btn = document.getElementById(`wl-p-liq-${key}`);
+  if (btn) {
+    btn.classList.toggle('checked', window._wlFormLiq[key]);
+    const item = _WL_LIQ_ITEMS.find(i => i.k === key);
+    btn.innerHTML = `${icon(window._wlFormLiq[key] ? 'check' : 'dot-o')} ${item.l}`;
+  }
+}
+
 // Legacy entry point (kept in case any old markup/input still calls it directly)
 async function _wlHandleChartUpload(input) {
   const files = Array.from(input.files);
@@ -5750,20 +6311,14 @@ async function _wlProcessChartFiles(files) {
         r.readAsDataURL(file);
       });
     }
-    _wlPendingCharts.push({ url: finalUrl, label: file.name.replace(/\.[^.]+$/, '') });
+    _wlPendingCharts.push({ url: finalUrl, label: file.name.replace(/\.[^.]+$/, ''), tag: '' });
   }
   if (fellBackToBase64) showToast('Chart upload to cloud storage failed — saved locally instead', 'danger');
   if (btn) { btn.textContent = _wlEditingPairIdx !== null ? 'Save Changes' : 'Add to Watchlist'; btn.disabled = false; }
 
   // Refresh gallery in modal
   const gallery = document.getElementById('wl-chart-gallery');
-  const galleryHtml = _wlPendingCharts.map((c, ci) => `
-    <div class="wl-chart-thumb-wrap">
-      <img class="wl-chart-thumb" src="${c.url}" alt="chart">
-      <div class="wl-chart-thumb-label">${c.label || 'Chart ' + (ci+1)}</div>
-      <button class="wl-chart-thumb-del" onclick="_wlRemovePendingChart(${ci})"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
-    </div>
-  `).join('');
+  const galleryHtml = _wlPendingCharts.map((c, ci) => _wlChartThumbHtml(c, ci)).join('');
   if (gallery) {
     gallery.innerHTML = galleryHtml;
   } else {
@@ -5783,13 +6338,7 @@ function _wlRemovePendingChart(idx) {
   _wlPendingCharts.splice(idx, 1);
   const gallery = document.getElementById('wl-chart-gallery');
   if (gallery) {
-    gallery.innerHTML = _wlPendingCharts.map((c, ci) => `
-      <div class="wl-chart-thumb-wrap">
-        <img class="wl-chart-thumb" src="${c.url}" alt="chart">
-        <div class="wl-chart-thumb-label">${c.label || 'Chart ' + (ci+1)}</div>
-        <button class="wl-chart-thumb-del" onclick="_wlRemovePendingChart(${ci})"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
-      </div>
-    `).join('');
+    gallery.innerHTML = _wlPendingCharts.map((c, ci) => _wlChartThumbHtml(c, ci)).join('');
   }
 }
 
@@ -5805,14 +6354,28 @@ async function _wlSavePair() {
   }
   if (!name) return;
 
-  const priority = document.getElementById('wl-p-priority').value;
-  const bias     = document.getElementById('wl-p-bias').value;
-  const note     = document.getElementById('wl-p-note').value;
+  const priority     = document.getElementById('wl-p-priority').value;
+  const bias         = document.getElementById('wl-p-bias').value;
+  const direction    = document.getElementById('wl-p-direction').value;
+  const model        = document.getElementById('wl-p-model').value;
+  const confidence   = parseInt(document.getElementById('wl-p-confidence').value, 10) || 0;
+  const expectedMove = document.getElementById('wl-p-expected').value;
+  const note         = document.getElementById('wl-p-note').value;
   const tfs      = ['Weekly','Daily','4H','1H'].map((tf, i) => ({
     tf, bias: (window._wlTfBiases && window._wlTfBiases[i]) || 'neu'
   }));
 
-  const pairData = { name: name.toUpperCase(), priority, bias, note, tfs, charts: [..._wlPendingCharts] };
+  const existing = _wlEditingPairIdx !== null ? week.pairs[_wlEditingPairIdx] : null;
+
+  const pairData = {
+    name: name.toUpperCase(), priority, bias, direction, model, confidence,
+    risk: window._wlFormRisk || 0, expectedMove, note, tfs,
+    liq: {...window._wlFormLiq},
+    charts: [..._wlPendingCharts],
+    stages: existing ? existing.stages : undefined,
+    archived: existing ? existing.archived : false,
+  };
+  _wlNormPair(pairData);
 
   if (_wlEditingPairIdx !== null) {
     week.pairs[_wlEditingPairIdx] = pairData;
