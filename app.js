@@ -3760,7 +3760,7 @@ function openLightbox(imagesOrSrc, labelOrStartPos) {
       <span id="lb-label">${images[startPos].label}</span>
       ${multi ? `<span id="lb-counter" style="opacity:.6;letter-spacing:normal;text-transform:none">${startPos+1} / ${images.length}</span>` : ''}
     </div>
-    <div id="lb-viewport" style="position:relative;width:100%;max-width:1300px;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:0;touch-action:pan-y pinch-zoom">
+    <div id="lb-viewport" style="position:relative;width:100%;max-width:1300px;flex:1;display:flex;align-items:center;overflow:hidden;min-height:0;touch-action:pan-y pinch-zoom">
       ${multi ? `<button id="lb-prev" style="position:absolute;left:4px;top:50%;transform:translateY(-50%);z-index:2;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1">‹</button>` : ''}
       <div id="lb-track" style="display:flex;flex:0 0 auto;width:${images.length*100}%;height:100%;transform:translateX(-${startPos*(100/images.length)}%);user-select:none;-webkit-user-select:none">
         ${images.map(im => `
