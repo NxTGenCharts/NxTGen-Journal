@@ -33,6 +33,303 @@ function icon(name, opts) {
   return '<svg class="' + cls + '" ' + a11y + '><use href="#ic-' + name + '"></use></svg>';
 }
 
+// ══════════════════════════════════════════════════════
+// NxDropzone — universal drag & drop image upload component
+// One reusable component powers every image upload field in the app
+// (trade chart slots, weekly-log uploads, AI chart reader, avatar…).
+// It only handles the *front door* of an upload — picking a valid
+// file via click / drag-drop / paste, previewing it, and validating
+// it — then hands the raw File off to whatever upload logic already
+// exists for that field (compression, Supabase storage, etc). None
+// of that existing logic is touched.
+//
+// Usage:
+//   mountDropzone('my-container-id', {
+//     multiple: true,
+//     onFiles: async (files) => { ...your existing upload code... },
+//   });
+// ══════════════════════════════════════════════════════
+const NX_DROPZONE_DEFAULTS = {
+  accept: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'],
+  acceptLabel: 'PNG, JPG, JPEG, WEBP, SVG',
+  maxSizeMB: 10,
+  multiple: false,
+  allowPaste: true,
+  compact: false,
+  showPreview: true,
+  primaryText: 'Drag & drop an image here',
+  secondaryText: 'or click to browse your files',
+  onFiles: null,     // async (File[]) => void — hand off to existing upload logic
+  onError: null,     // (message) => void — optional extra error hook
+};
+
+const NX_UPLOAD_ICON = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M7 18a4.5 4.5 0 0 1-.4-8.98A5.5 5.5 0 0 1 17.4 8.06 4 4 0 0 1 17 16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M12 20v-8m0 0-3 3m3-3 3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+const NX_ERROR_ICON = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>
+  <path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+</svg>`;
+const NX_REPLACE_ICON = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M17.5 10a5.5 5.5 0 1 0-1.6 3.87M17.5 6v4h-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+const NX_REMOVE_ICON = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+</svg>`;
+const NX_VIEW_ICON = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+  <circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.6"/>
+</svg>`;
+
+function nxFormatBytes(bytes) {
+  if (!bytes && bytes !== 0) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+function nxGetImageDimensions(file) {
+  return new Promise(resolve => {
+    if (file.type === 'image/svg+xml') { resolve(null); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve({ w: img.naturalWidth, h: img.naturalHeight }); };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
+class NxDropzone {
+  constructor(container, opts) {
+    this.el = typeof container === 'string' ? document.getElementById(container) : container;
+    if (!this.el) return;
+    this.opts = Object.assign({}, NX_DROPZONE_DEFAULTS, opts || {});
+    this._dragDepth = 0;
+    this._build();
+    this._bind();
+  }
+
+  _build() {
+    const o = this.opts;
+    this.el.classList.add('nx-dropzone');
+    if (o.compact) this.el.classList.add('nx-compact');
+    this.el.setAttribute('tabindex', '0');
+    this.el.setAttribute('role', 'button');
+    this.el.setAttribute('aria-label', o.ariaLabel || `${o.primaryText}. ${o.secondaryText}. Accepts ${o.acceptLabel}, max ${o.maxSizeMB} MB.`);
+
+    this.input = document.createElement('input');
+    this.input.type = 'file';
+    this.input.className = 'nx-dropzone-input';
+    this.input.accept = o.accept.join(',');
+    this.input.multiple = !!o.multiple;
+    this.input.tabIndex = -1;
+    this.input.setAttribute('aria-hidden', 'true');
+
+    this.body = document.createElement('div');
+    this.body.className = 'nx-dropzone-body';
+    this._renderIdle();
+
+    this.el.innerHTML = '';
+    this.el.appendChild(this.input);
+    this.el.appendChild(this.body);
+  }
+
+  _renderIdle() {
+    const o = this.opts;
+    this.body.innerHTML = `
+      <div class="nx-dropzone-icon">${NX_UPLOAD_ICON}</div>
+      <div class="nx-dropzone-text-primary">${o.primaryText}</div>
+      <div class="nx-dropzone-text-secondary">${o.secondaryText}</div>
+      <div class="nx-dropzone-meta">${o.acceptLabel} · Max ${o.maxSizeMB}MB</div>
+    `;
+  }
+
+  _renderLoading() {
+    this.body.innerHTML = `
+      <div class="nx-dropzone-loading">
+        <div class="nx-dropzone-spinner" role="status" aria-live="polite"></div>
+        <span>Processing…</span>
+      </div>`;
+  }
+
+  async _renderPreview(file) {
+    if (!this.opts.showPreview) { this._renderIdle(); return; }
+    const dims = await nxGetImageDimensions(file);
+    const url = URL.createObjectURL(file);
+    this.body.innerHTML = `
+      <div class="nx-dropzone-preview">
+        <div class="nx-dropzone-preview-thumb"><img src="${url}" alt="${file.name}"></div>
+        <div class="nx-dropzone-preview-info">
+          <div class="nx-dropzone-preview-name" title="${file.name}">${file.name}</div>
+          <div class="nx-dropzone-preview-meta">${nxFormatBytes(file.size)}${dims ? ` · ${dims.w}×${dims.h}px` : ''}</div>
+        </div>
+        <div class="nx-dropzone-preview-actions">
+          <button type="button" class="nx-replace" aria-label="Replace image" title="Replace image">${NX_REPLACE_ICON}</button>
+          <button type="button" class="nx-view" aria-label="View full size" title="View full size">${NX_VIEW_ICON}</button>
+          <button type="button" class="nx-remove" aria-label="Remove image" title="Remove image">${NX_REMOVE_ICON}</button>
+        </div>
+      </div>`;
+    this.body.querySelector('.nx-replace').onclick = (e) => { e.stopPropagation(); this.open(); };
+    this.body.querySelector('.nx-view').onclick = (e) => { e.stopPropagation(); window.open(url, '_blank', 'noopener'); };
+    this.body.querySelector('.nx-remove').onclick = (e) => {
+      e.stopPropagation();
+      this.reset();
+      if (typeof this.opts.onRemove === 'function') this.opts.onRemove();
+    };
+  }
+
+  _showError(msg) {
+    this.el.classList.add('nx-has-error');
+    let banner = this.body.querySelector('.nx-dropzone-error');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.className = 'nx-dropzone-error';
+      this.body.appendChild(banner);
+    }
+    banner.innerHTML = `${NX_ERROR_ICON}<span>${msg}</span>`;
+    if (typeof showToast === 'function') showToast(msg, 'danger');
+    if (typeof this.opts.onError === 'function') this.opts.onError(msg);
+    clearTimeout(this._errTimer);
+    this._errTimer = setTimeout(() => {
+      this.el.classList.remove('nx-has-error');
+      banner.remove();
+    }, 4000);
+  }
+
+  _validate(file) {
+    const o = this.opts;
+    if (!file || !file.type || !file.type.startsWith('image/')) {
+      return `"${file?.name || 'File'}" isn't a supported image type.`;
+    }
+    if (o.accept.length && !o.accept.includes(file.type)) {
+      return `"${file.name}" must be one of: ${o.acceptLabel}.`;
+    }
+    if (file.size > o.maxSizeMB * 1024 * 1024) {
+      return `"${file.name}" is ${nxFormatBytes(file.size)} — max is ${o.maxSizeMB}MB.`;
+    }
+    return null;
+  }
+
+  async _process(fileList) {
+    const files = Array.from(fileList || []).filter(Boolean);
+    if (!files.length) return;
+    const picked = this.opts.multiple ? files : [files[0]];
+
+    for (const f of picked) {
+      const err = this._validate(f);
+      if (err) { this._showError(err); return; }
+    }
+
+    // Confirm each file actually decodes as an image (guards against
+    // corrupted / unreadable files slipping through the type check).
+    for (const f of picked) {
+      const dims = await nxGetImageDimensions(f).catch(() => null);
+      if (f.type !== 'image/svg+xml' && dims === null) {
+        this._showError(`"${f.name}" looks corrupted or couldn't be read.`);
+        return;
+      }
+    }
+
+    this._renderLoading();
+    const loadingSince = Date.now();
+    try {
+      if (typeof this.opts.onFiles === 'function') {
+        await this.opts.onFiles(picked);
+      }
+      // Keep the spinner visible for a beat if processing was instant,
+      // so it doesn't flash — otherwise go straight to the preview.
+      const elapsed = Date.now() - loadingSince;
+      if (elapsed < 150) await new Promise(r => setTimeout(r, 150 - elapsed));
+      this.lastFile = picked[picked.length - 1];
+      await this._renderPreview(this.lastFile);
+      this.el.classList.remove('nx-has-error');
+    } catch (err) {
+      console.error('NxDropzone upload failed:', err);
+      this._renderIdle();
+      this._showError('Upload failed — please try again.');
+    }
+  }
+
+  _bind() {
+    const el = this.el;
+
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.nx-dropzone-preview-actions')) return;
+      this.open();
+    });
+    el.addEventListener('keydown', (e) => {
+      if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.nx-dropzone-preview-actions')) {
+        e.preventDefault();
+        this.open();
+      }
+    });
+
+    this.input.addEventListener('change', (e) => {
+      this._process(e.target.files);
+      e.target.value = '';
+    });
+
+    el.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      if (!e.dataTransfer || !e.dataTransfer.types.includes('Files')) return;
+      this._dragDepth++;
+      el.classList.add('nx-drag-over');
+    });
+    el.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    });
+    el.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      this._dragDepth = Math.max(0, this._dragDepth - 1);
+      if (this._dragDepth === 0) el.classList.remove('nx-drag-over');
+    });
+    el.addEventListener('drop', (e) => {
+      e.preventDefault();
+      this._dragDepth = 0;
+      el.classList.remove('nx-drag-over');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+        this._process(e.dataTransfer.files);
+      }
+    });
+
+    if (this.opts.allowPaste) {
+      el.addEventListener('paste', (e) => {
+        const items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+        const imgFiles = Array.from(items)
+          .filter(it => it.kind === 'file' && it.type.startsWith('image/'))
+          .map(it => it.getAsFile());
+        if (imgFiles.length) { e.preventDefault(); this._process(imgFiles); }
+      });
+    }
+  }
+
+  open() { if (this.input) this.input.click(); }
+
+  reset() {
+    this.el.classList.remove('nx-has-error');
+    this.lastFile = null;
+    this._renderIdle();
+  }
+
+  destroy() {
+    this.el.classList.remove('nx-dropzone', 'nx-compact', 'nx-drag-over', 'nx-has-error');
+    this.el.innerHTML = '';
+  }
+}
+
+/** Mount (or re-mount) a NxDropzone on a container element or id. */
+function mountDropzone(container, opts) {
+  const el = typeof container === 'string' ? document.getElementById(container) : container;
+  if (!el) return null;
+  if (el._nxDropzone) el._nxDropzone.destroy();
+  const dz = new NxDropzone(el, opts);
+  el._nxDropzone = dz;
+  return dz;
+}
+
 // ── PnL formatting helper ─────────────────────────────────────────────────
 // Every trade has t.pnl (number) and t.pnlUnit ('$' or '%').
 // MT5 imported trades: pnlUnit='$', pnl is real dollar P/L.
@@ -860,6 +1157,20 @@ function aiSetMode(mode) {
   const chartWrap = document.getElementById('ai-chart-upload-wrap');
   if (chartWrap) chartWrap.style.display = mode === 'chart' ? '' : 'none';
 
+  // Progressive enhancement: if the surrounding markup opts in with
+  // <div id="ai-chart-dropzone"></div>, give it the full drag & drop
+  // dropzone experience. The legacy click/drag zone (aiChartDrop etc.)
+  // keeps working either way.
+  if (mode === 'chart' && document.getElementById('ai-chart-dropzone')) {
+    mountDropzone('ai-chart-dropzone', {
+      multiple: true,
+      showPreview: false,
+      primaryText: 'Drag & drop chart screenshots here',
+      secondaryText: 'or click to browse — you can select several at once',
+      onFiles: files => _aiIngestChartFiles(files),
+    });
+  }
+
   // Update placeholder
   const inp = document.getElementById('ai-prompt-input');
   if (inp) inp.placeholder = mode === 'chart'
@@ -894,32 +1205,82 @@ async function aiHandleChartUpload(input) {
   input.value = '';
 }
 
+const NX_AI_CHART_ACCEPT = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
+const NX_AI_CHART_MAX_MB = 10;
+
 async function _aiIngestChartFiles(fileList) {
-  const files = Array.from(fileList || []).filter(f => f.type.startsWith('image/'));
-  for (const file of files) {
+  const all = Array.from(fileList || []);
+  for (const file of all) {
+    if (!file.type || !file.type.startsWith('image/') || !NX_AI_CHART_ACCEPT.includes(file.type)) {
+      showToast(`"${file.name}" must be PNG, JPG, JPEG, WEBP or SVG.`, 'danger');
+      continue;
+    }
+    if (file.size > NX_AI_CHART_MAX_MB * 1024 * 1024) {
+      showToast(`"${file.name}" is ${nxFormatBytes(file.size)} — max is ${NX_AI_CHART_MAX_MB}MB.`, 'danger');
+      continue;
+    }
+    if (file.type !== 'image/svg+xml') {
+      const dims = await nxGetImageDimensions(file).catch(() => null);
+      if (dims === null) {
+        showToast(`"${file.name}" looks corrupted or couldn't be read.`, 'danger');
+        continue;
+      }
+    }
     const dataUrl = await new Promise(resolve => {
       const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(file);
     });
     const mimeType = file.type || 'image/jpeg';
-    _aiChartImages.push({ dataUrl, mimeType, name: file.name });
+    _aiChartImages.push({ dataUrl, mimeType, name: file.name, size: file.size });
   }
   _aiRenderChartThumbs();
 }
 
 // Drag-and-drop support for the Chart Read upload zone (was previously
 // click-to-upload only — the zone had no ondragover/ondrop wired up).
+// The .drag-over class is now styled with the same glow+scale language
+// as the rest of the app's dropzones (see .ai-chart-upload-wrap.drag-over
+// in styles.css) so this zone matches everywhere else visually.
+let _aiChartDragDepth = 0;
 function aiChartDragOver(e) {
   e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  // Idempotent — safe to call on every dragover tick even if ondragenter
+  // isn't wired in the surrounding markup.
+  e.currentTarget.classList.add('drag-over');
+}
+function aiChartDragEnter(e) {
+  e.preventDefault();
+  if (!e.dataTransfer || !e.dataTransfer.types.includes('Files')) return;
+  _aiChartDragDepth++;
   e.currentTarget.classList.add('drag-over');
 }
 function aiChartDragLeave(e) {
+  _aiChartDragDepth = Math.max(0, _aiChartDragDepth - 1);
   e.currentTarget.classList.remove('drag-over');
 }
 function aiChartDrop(e) {
   e.preventDefault();
+  _aiChartDragDepth = 0;
   e.currentTarget.classList.remove('drag-over');
   const files = e.dataTransfer?.files;
   if (files && files.length) _aiIngestChartFiles(files);
+}
+
+// Paste-to-upload: click into the AI Chart Reader panel, then Ctrl/Cmd+V
+// a copied screenshot to add it straight to the chart queue.
+function aiChartPaste(e) {
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  const imgFiles = Array.from(items)
+    .filter(it => it.kind === 'file' && it.type.startsWith('image/'))
+    .map(it => it.getAsFile());
+  if (imgFiles.length) { e.preventDefault(); _aiIngestChartFiles(imgFiles); }
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('paste', (e) => {
+    const wrap = document.getElementById('ai-chart-upload-wrap');
+    if (wrap && wrap.offsetParent !== null && _aiMode === 'chart') aiChartPaste(e);
+  });
 }
 
 function _aiRenderChartThumbs() {
@@ -928,8 +1289,8 @@ function _aiRenderChartThumbs() {
   wrap.innerHTML = _aiChartImages.map((img, i) => `
     <div class="ai-chart-thumb">
       <img src="${img.dataUrl}" alt="${img.name}">
-      <button class="ai-chart-thumb-del" onclick="aiRemoveChart(${i})"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
-      <div class="ai-chart-thumb-name">${img.name.replace(/\.[^.]+$/,'').slice(0,18)}</div>
+      <button class="ai-chart-thumb-del" onclick="aiRemoveChart(${i})" aria-label="Remove ${img.name}"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
+      <div class="ai-chart-thumb-name">${img.name.replace(/\.[^.]+$/,'').slice(0,18)}${img.size ? ` · ${nxFormatBytes(img.size)}` : ''}</div>
     </div>`).join('');
 }
 
@@ -1783,27 +2144,41 @@ function cssDragStart(e, tradeId) {
 
 function cssDragOver(e) {
   e.preventDefault();
+  if (e.dataTransfer.types.includes('Files')) { e.dataTransfer.dropEffect = 'copy'; return false; }
   e.dataTransfer.dropEffect = 'move';
   return false;
 }
 
 function cssDragEnter(e) {
   const item = e.currentTarget;
+  if (e.dataTransfer.types.includes('Files')) {
+    item.classList.add('nx-drag-over');
+    return;
+  }
   if (parseInt(item.dataset.index) !== _csDragSrcIdx) {
     item.classList.add('drag-over');
   }
 }
 
 function cssDragLeave(e) {
-  e.currentTarget.classList.remove('drag-over');
+  e.currentTarget.classList.remove('drag-over', 'nx-drag-over');
 }
 
 function cssDrop(e, tradeId) {
   e.preventDefault();
   e.stopPropagation();
-  const item    = e.currentTarget;
+  const item = e.currentTarget;
+  item.classList.remove('drag-over', 'nx-drag-over');
+
+  // An image dragged in from the OS/desktop — upload it into this slot
+  // instead of running the internal slot-reorder logic.
+  if (e.dataTransfer.files && e.dataTransfer.files.length) {
+    const slot = parseInt(item.dataset.index);
+    _handleChartSlotFile(tradeId, slot, e.dataTransfer.files[0]);
+    return false;
+  }
+
   const destIdx = parseInt(item.dataset.index);
-  item.classList.remove('drag-over');
   if (destIdx !== _csDragSrcIdx) {
     _csSwap(tradeId, _csDragSrcIdx, destIdx);
   }
@@ -2847,11 +3222,14 @@ function _renderDetail(id) {
                  ontouchmove="cssTouchMove(event)"
                  ontouchend="cssTouchEnd(event,${id})">
               <div class="chart-sort-thumb${_detEditMode ? ' edit-mode' : ''}"
-                   onclick="${hasImg && !_detEditMode ? `openLightboxById(${id},${i})` : (_detEditMode ? `triggerImg(${id},${i})` : '')}">
+                   ${_detEditMode ? `tabindex="0" role="button" aria-label="${hasImg ? `Replace ${lbl} chart image` : `Add ${lbl} chart image`}"` : (hasImg ? `tabindex="0" role="button" aria-label="View ${lbl} chart image full size"` : '')}
+                   onclick="${hasImg && !_detEditMode ? `openLightboxById(${id},${i})` : (_detEditMode ? `triggerImg(${id},${i})` : '')}"
+                   onkeydown="if((event.key==='Enter'||event.key===' ')){event.preventDefault();${hasImg && !_detEditMode ? `openLightboxById(${id},${i})` : (_detEditMode ? `triggerImg(${id},${i})` : '')}}"
+                   ${_detEditMode ? `onpaste="_chartSlotPaste(event,${id},${i})"` : ''}>
                 ${hasImg
                   ? `<img src="${s.charts[i]}" alt="${lbl}" draggable="false">
                      <div class="chart-sort-overlay">${_detEditMode ? '<span class="drag-handle">⠿</span><svg class="icn" aria-hidden="true"><use href="#ic-refresh"></use></svg>' : '<svg class="icn" aria-hidden="true"><use href="#ic-search"></use></svg> View'}</div>`
-                  : `<div class="chart-sort-empty"><span><svg class="icn" aria-hidden="true"><use href="#ic-camera"></use></svg></span><span>Add chart</span></div>`}
+                  : `<div class="chart-sort-empty"><span><svg class="icn" aria-hidden="true"><use href="#ic-camera"></use></svg></span><span>Add chart</span><span class="chart-sort-empty-hint">or drag &amp; drop</span></div>`}
               </div>
               <div class="chart-sort-footer">
                 <input type="text" class="chart-sort-label" value="${lbl}"
@@ -3190,6 +3568,42 @@ async function handleImg(e) {
   const f = e.target.files[0];
   if (!f || !currentUploadSlot) return;
   const { id, slot } = currentUploadSlot;
+  await _handleChartSlotFile(id, slot, f);
+}
+
+/* Paste-to-upload: focus a slot in edit mode and hit Ctrl/Cmd+V to drop
+   a clipboard screenshot straight into it. */
+function _chartSlotPaste(e, id, slot) {
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  const item = Array.from(items).find(it => it.kind === 'file' && it.type.startsWith('image/'));
+  if (!item) return;
+  e.preventDefault();
+  _handleChartSlotFile(id, slot, item.getAsFile());
+}
+
+const NX_CHART_SLOT_ACCEPT = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
+const NX_CHART_SLOT_MAX_MB = 10;
+
+async function _handleChartSlotFile(id, slot, f) {
+  if (!f) return;
+
+  // Validate before touching the UI — friendly inline errors, no alert().
+  if (!f.type || !f.type.startsWith('image/') || !NX_CHART_SLOT_ACCEPT.includes(f.type)) {
+    showToast(`"${f.name}" must be PNG, JPG, JPEG, WEBP or SVG.`, 'danger');
+    return;
+  }
+  if (f.size > NX_CHART_SLOT_MAX_MB * 1024 * 1024) {
+    showToast(`"${f.name}" is ${nxFormatBytes(f.size)} — max is ${NX_CHART_SLOT_MAX_MB}MB.`, 'danger');
+    return;
+  }
+  if (f.type !== 'image/svg+xml') {
+    const dims = await nxGetImageDimensions(f).catch(() => null);
+    if (dims === null) {
+      showToast(`"${f.name}" looks corrupted or couldn't be read.`, 'danger');
+      return;
+    }
+  }
 
   // Show upload progress in the slot immediately
   const grid = document.getElementById(`chart-sort-grid-${id}`);
@@ -3952,6 +4366,8 @@ function _wlRenderWeekContent(week, container) {
   // Kick off calendar fetch after DOM is ready
   // Use setTimeout so the DOM is painted before fetch starts
   setTimeout(() => _wlCalAutoLoad(), 0);
+
+  _wlMountDayDropzone(week.id, _wlActiveDayTab[week.id]);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -4112,13 +4528,7 @@ function _wlBuildDailyGameplan(week) {
               </div>`).join('');
             return `
             ${imgs.length > 0 ? `<div class="wl-day-chart-grid" id="wl-day-chart-grid-${week.id}-${activeDay}">${thumbs}</div>` : `<div class="wl-day-chart-grid wl-day-chart-grid--empty" id="wl-day-chart-grid-${week.id}-${activeDay}"></div>`}
-            <label class="wl-day-upload-zone" id="wl-day-upload-zone-${week.id}-${activeDay}">
-              <input type="file" accept="image/*" multiple style="display:none"
-                onchange="_wlHandleDayChartUpload(this,'${week.id}','${activeDay}')">
-              <span class="wl-day-upload-icon"><svg class="icn" aria-hidden="true"><use href="#ic-camera"></use></svg></span>
-              <span class="wl-day-upload-text">Upload screenshots — PNG, JPG, WebP</span>
-              <span class="wl-day-upload-hint">Charts sync automatically across all devices</span>
-            </label>`;
+            <div class="wl-day-upload-zone" id="wl-day-upload-zone-${week.id}-${activeDay}"></div>`;
           })()}
         </div>
 
@@ -4267,17 +4677,31 @@ async function _wlClearDayPlan(weekId, day) {
   _wlRenderWeeks();
 }
 
-/* ── Upload chart images for a specific day ── */
+/* ── Mount the reusable dropzone for a specific day's screenshot zone ── */
+function _wlMountDayDropzone(weekId, day) {
+  const zoneId = `wl-day-upload-zone-${weekId}-${day}`;
+  if (!document.getElementById(zoneId)) return;
+  mountDropzone(zoneId, {
+    multiple: true,
+    showPreview: false, // uploaded files land in the grid above instead
+    primaryText: 'Drag & drop screenshots here',
+    secondaryText: 'or click to browse',
+    onFiles: files => _wlProcessDayFiles(files, weekId, day),
+  });
+}
+
+// Legacy entry point (kept in case any old markup/input still calls it directly)
 async function _wlHandleDayChartUpload(input, weekId, day) {
   const files = Array.from(input.files);
+  input.value = '';
+  return _wlProcessDayFiles(files, weekId, day);
+}
+
+/* ── Upload chart images for a specific day ── */
+async function _wlProcessDayFiles(files, weekId, day) {
   if (!files.length) return;
   const week = _wlData.find(w => w.id === weekId);
   if (!week) return;
-
-  // Show uploading state on the zone
-  const zone = document.getElementById(`wl-day-upload-zone-${weekId}-${day}`);
-  const hint = zone && zone.querySelector('.wl-day-upload-hint');
-  if (hint) hint.textContent = `Uploading ${files.length} image${files.length > 1 ? 's' : ''}…`;
 
   if (!week.dailyPlans) week.dailyPlans = {};
   if (!week.dailyPlans[day]) week.dailyPlans[day] = { note: '', pairs: [], mindset: '', charts: [] };
@@ -4301,7 +4725,6 @@ async function _wlHandleDayChartUpload(input, weekId, day) {
     week.dailyPlans[day].charts.push({ url: finalUrl, label });
   }
   if (fellBackToBase64) showToast('Chart upload to cloud storage failed — saved locally instead', 'danger');
-  input.value = '';
   await _wlSaveWeek(week);
 
   // Re-render only the chart grid + zone (no full re-render = no tab switch)
@@ -4328,9 +4751,9 @@ function _wlRefreshDayChartGrid(weekId, day, charts) {
       <div class="wl-day-chart-label">${c.label || ''}</div>
       <button class="wl-day-chart-del" onclick="_wlDeleteDayChart('${weekId}','${day}',${ci})" title="Remove"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
     </div>`).join('');
-  // Restore hint text on the zone
-  const hint = document.querySelector(`#wl-day-upload-zone-${weekId}-${day} .wl-day-upload-hint`);
-  if (hint) hint.textContent = 'Charts sync automatically across all devices';
+  // Re-mount the dropzone in its idle state (a mounted dropzone doesn't
+  // need a hint text swap any more — its own "Processing…" state handles that)
+  _wlMountDayDropzone(weekId, day);
 }
 
 function _wlCalAutoLoad() {
@@ -5124,11 +5547,7 @@ function _wlShowPairModal(pair) {
     <div class="wl-form-row">
       <label class="wl-form-label">Chart Images</label>
       ${_wlPendingCharts.length > 0 ? `<div class="wl-chart-gallery" id="wl-chart-gallery">${chartGallery}</div>` : ''}
-      <div class="wl-chart-upload-zone" onclick="document.getElementById('wl-chart-file-input').click()">
-        <span style="font-size:26px"><svg class="icn" aria-hidden="true"><use href="#ic-camera"></use></svg></span>
-        <p>Click to upload chart screenshots (PNG, JPG, WebP)</p>
-      </div>
-      <input type="file" id="wl-chart-file-input" accept="image/*" multiple style="display:none" onchange="_wlHandleChartUpload(this)">
+      <div id="wl-chart-dropzone"></div>
     </div>
     <div class="wl-form-actions">
       ${isEdit ? `<button class="wl-btn-danger" onclick="_wlDeletePair()">Remove Pair</button>` : ''}
@@ -5140,6 +5559,14 @@ function _wlShowPairModal(pair) {
   // Store TF biases in memory for later read
   window._wlTfBiases = tfDefaults.map(t => t.bias);
 
+  mountDropzone('wl-chart-dropzone', {
+    multiple: true,
+    showPreview: false, // this zone already has its own thumbnail gallery above
+    primaryText: 'Drag & drop chart screenshots here',
+    secondaryText: 'or click to browse — you can select several at once',
+    onFiles: files => _wlProcessChartFiles(files),
+  });
+
   document.getElementById('wl-pair-modal-overlay').classList.add('open');
   document.getElementById('wl-pair-modal').classList.add('open');
 }
@@ -5149,8 +5576,14 @@ function _wlTfChange(idx, val) {
   window._wlTfBiases[idx] = val;
 }
 
+// Legacy entry point (kept in case any old markup/input still calls it directly)
 async function _wlHandleChartUpload(input) {
   const files = Array.from(input.files);
+  input.value = '';
+  return _wlProcessChartFiles(files);
+}
+
+async function _wlProcessChartFiles(files) {
   if (!files.length) return;
   const btn = document.getElementById('wl-p-save-btn');
   if (btn) { btn.textContent = 'Uploading…'; btn.disabled = true; }
@@ -5171,7 +5604,6 @@ async function _wlHandleChartUpload(input) {
     _wlPendingCharts.push({ url: finalUrl, label: file.name.replace(/\.[^.]+$/, '') });
   }
   if (fellBackToBase64) showToast('Chart upload to cloud storage failed — saved locally instead', 'danger');
-  input.value = '';
   if (btn) { btn.textContent = _wlEditingPairIdx !== null ? 'Save Changes' : 'Add to Watchlist'; btn.disabled = false; }
 
   // Refresh gallery in modal
@@ -5186,8 +5618,8 @@ async function _wlHandleChartUpload(input) {
   if (gallery) {
     gallery.innerHTML = galleryHtml;
   } else {
-    // Insert gallery above upload zone
-    const zone = document.querySelector('.wl-chart-upload-zone');
+    // Insert gallery above the dropzone
+    const zone = document.getElementById('wl-chart-dropzone');
     if (zone) {
       const div = document.createElement('div');
       div.className = 'wl-chart-gallery';
@@ -11184,6 +11616,7 @@ function buildProfile() {
 
   _profileRefreshHero();
   _profileRefreshAvatar();
+  _profileMountAvatarDropzone();
   _profileSessionMeta();
 }
 
@@ -11224,6 +11657,29 @@ function _profileRefreshInitials(fname, lname, display) {
 
 async function profileHandleAvatar(e) {
   const file = e.target.files[0]; if (!file) return;
+  await _processAvatarFile(file);
+}
+
+const NX_AVATAR_ACCEPT = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
+const NX_AVATAR_MAX_MB = 8;
+
+async function _processAvatarFile(file) {
+  if (!file) return;
+  if (!file.type || !file.type.startsWith('image/') || !NX_AVATAR_ACCEPT.includes(file.type)) {
+    showToast(`"${file.name}" must be PNG, JPG, JPEG, WEBP or SVG.`, 'danger');
+    return;
+  }
+  if (file.size > NX_AVATAR_MAX_MB * 1024 * 1024) {
+    showToast(`"${file.name}" is ${nxFormatBytes(file.size)} — max is ${NX_AVATAR_MAX_MB}MB.`, 'danger');
+    return;
+  }
+  if (file.type !== 'image/svg+xml') {
+    const dims = await nxGetImageDimensions(file).catch(() => null);
+    if (dims === null) {
+      showToast(`"${file.name}" looks corrupted or couldn't be read.`, 'danger');
+      return;
+    }
+  }
 
   // Compress (avatars only need to be small — 400px is plenty) and try
   // Supabase storage upload first. Base64 is a last-resort fallback only,
@@ -11247,6 +11703,23 @@ async function profileHandleAvatar(e) {
   await _profileSave();
   _profileApplyAvatar(_profileData.avatar_url);
   showToast('Avatar updated ✓', 'success');
+}
+
+/* Mount a full NxDropzone on the profile avatar upload zone, if present.
+   Add <div id="profile-avatar-dropzone"></div> anywhere on the Profile
+   page markup to opt in — this call is a no-op otherwise. */
+function _profileMountAvatarDropzone() {
+  if (!document.getElementById('profile-avatar-dropzone')) return;
+  mountDropzone('profile-avatar-dropzone', {
+    multiple: false,
+    compact: false,
+    accept: NX_AVATAR_ACCEPT,
+    acceptLabel: 'PNG, JPG, JPEG, WEBP, SVG',
+    maxSizeMB: NX_AVATAR_MAX_MB,
+    primaryText: 'Drag & drop a profile photo here',
+    secondaryText: 'or click to browse your files',
+    onFiles: files => _processAvatarFile(files[0]),
+  });
 }
 
 function _profileRefreshAvatar() {

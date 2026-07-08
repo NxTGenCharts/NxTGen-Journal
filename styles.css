@@ -2462,7 +2462,26 @@ body.detail-resizing *{user-select:none!important}
   padding: 14px 8px;
 }
 .chart-sort-empty span:first-child { font-size: 22px; opacity: .35; }
-.chart-sort-empty span:last-child  { font-size: 10px; color: var(--text3); }
+.chart-sort-empty span:nth-child(2)  { font-size: 10px; color: var(--text3); }
+.chart-sort-empty-hint { font-size: 9px; color: var(--text3); opacity: .6; }
+
+/* Editable empty slots read as mini dropzones — dashed border, glow on
+   drag-over, focus ring for keyboard users */
+.chart-sort-item:not(.has-img) .chart-sort-thumb.edit-mode {
+  border: 1.5px dashed var(--glass-border-h);
+  border-radius: inherit;
+  transition: border-color .2s var(--ease-out), background .2s var(--ease-out),
+              transform .2s var(--ease-out), box-shadow .2s var(--ease-out);
+}
+.chart-sort-item:not(.has-img) .chart-sort-thumb.edit-mode:hover {
+  border-color: var(--blue);
+  background: var(--blue-dim);
+}
+.chart-sort-thumb.edit-mode:focus-visible,
+.chart-sort-thumb[tabindex]:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
 
 /* Footer row: label input + delete */
 .chart-sort-footer {
@@ -11091,3 +11110,213 @@ body {
 /* Sidebar year disclosure chevron (rotates instead of swapping glyphs) */
 .yr-arrow-icon{display:inline-flex;color:var(--text3);transition:transform .15s ease}
 .yr-arrow-icon.open{transform:rotate(90deg)}
+
+/* ═══════════════════════════════════════════════════════════════════
+   NxDropzone — universal drag & drop image upload component
+   Single reusable visual language for every image upload field in
+   the app. Respects light/dark theme automatically via CSS vars.
+   Motion timings match the app's own scale (150–250ms, --ease-out).
+═══════════════════════════════════════════════════════════════════ */
+
+.nx-dropzone{
+  position:relative;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:6px;
+  text-align:center;
+  padding:28px 20px;
+  border-radius:14px;
+  border:1.5px dashed var(--glass-border-h);
+  background:var(--glass-1);
+  cursor:pointer;
+  transition:border-color .2s var(--ease-out),background .2s var(--ease-out),
+             transform .2s var(--ease-out),box-shadow .2s var(--ease-out);
+  outline:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.nx-dropzone:hover{
+  border-color:var(--blue);
+  background:var(--blue-dim);
+}
+.nx-dropzone:focus-visible{
+  border-color:var(--blue);
+  box-shadow:0 0 0 3px var(--blue-glow);
+}
+.nx-dropzone.nx-drag-over{
+  border-color:var(--blue);
+  border-style:solid;
+  background:var(--blue-dim);
+  transform:scale(1.02);
+  box-shadow:0 0 0 4px var(--blue-glow),0 8px 28px var(--blue-glow);
+}
+.nx-dropzone.nx-has-error{
+  border-color:rgba(248,113,113,0.55);
+  background:rgba(248,113,113,0.06);
+}
+.nx-dropzone.nx-disabled{
+  opacity:.5;pointer-events:none;
+}
+
+.nx-dropzone-icon{
+  width:34px;height:34px;
+  color:var(--blue);
+  opacity:.85;
+  transition:transform .2s var(--ease-spring);
+}
+.nx-dropzone.nx-drag-over .nx-dropzone-icon{ transform:translateY(-3px) scale(1.08); }
+.nx-dropzone-icon svg{ width:100%;height:100%; }
+
+.nx-dropzone-text-primary{
+  font-size:13.5px;font-weight:600;color:var(--text);
+  margin-top:4px;
+}
+.nx-dropzone-text-secondary{
+  font-size:12px;color:var(--text2);
+}
+.nx-dropzone-meta{
+  margin-top:6px;
+  font-size:10.5px;color:var(--text3);
+  letter-spacing:.02em;
+}
+
+/* Compact variant — used inside small grid slots (e.g. trade chart slots)
+   where the full copy would overflow */
+.nx-dropzone.nx-compact{
+  padding:10px 8px;gap:3px;border-radius:10px;
+}
+.nx-dropzone.nx-compact .nx-dropzone-icon{ width:20px;height:20px; }
+.nx-dropzone.nx-compact .nx-dropzone-text-primary{ font-size:10.5px; }
+.nx-dropzone.nx-compact .nx-dropzone-text-secondary,
+.nx-dropzone.nx-compact .nx-dropzone-meta{ display:none; }
+
+.nx-dropzone-input{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
+}
+
+/* ── Loading state ───────────────────────────────────────────────── */
+.nx-dropzone-loading{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  color:var(--text2);font-size:12px;
+}
+.nx-dropzone-spinner{
+  width:22px;height:22px;border-radius:50%;
+  border:2.5px solid var(--glass-border-h);
+  border-top-color:var(--blue);
+  animation:nx-spin .7s linear infinite;
+}
+@keyframes nx-spin{ to{ transform:rotate(360deg); } }
+
+/* ── Inline error banner ─────────────────────────────────────────── */
+.nx-dropzone-error{
+  display:flex;align-items:center;gap:6px;
+  margin-top:8px;padding:6px 10px;
+  border-radius:8px;
+  background:rgba(248,113,113,0.12);
+  border:1px solid rgba(248,113,113,0.3);
+  color:var(--red,#f87171);
+  font-size:11.5px;font-weight:500;
+  text-align:left;
+  animation:nx-shake .32s var(--ease-out);
+}
+.nx-dropzone-error svg{ width:14px;height:14px;flex-shrink:0; }
+@keyframes nx-shake{
+  0%,100%{ transform:translateX(0); }
+  25%{ transform:translateX(-3px); }
+  75%{ transform:translateX(3px); }
+}
+
+/* ── Preview card (shown once a file is selected/dropped) ──────────── */
+.nx-dropzone-preview{
+  display:flex;align-items:center;gap:12px;
+  width:100%;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid var(--glass-border);
+  background:var(--glass-2);
+  text-align:left;
+  animation:nx-fade-in .2s var(--ease-out);
+}
+@keyframes nx-fade-in{
+  from{ opacity:0; transform:translateY(4px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+.nx-dropzone-preview-thumb{
+  width:52px;height:52px;flex-shrink:0;
+  border-radius:8px;overflow:hidden;
+  background:var(--glass-1);
+  border:1px solid var(--glass-border);
+  display:flex;align-items:center;justify-content:center;
+}
+.nx-dropzone-preview-thumb img{
+  width:100%;height:100%;object-fit:cover;display:block;
+}
+.nx-dropzone-preview-info{
+  flex:1;min-width:0;
+  display:flex;flex-direction:column;gap:2px;
+}
+.nx-dropzone-preview-name{
+  font-size:12.5px;font-weight:600;color:var(--text);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.nx-dropzone-preview-meta{
+  font-size:11px;color:var(--text3);
+}
+.nx-dropzone-preview-actions{
+  display:flex;gap:6px;flex-shrink:0;
+}
+.nx-dropzone-preview-actions button{
+  display:flex;align-items:center;justify-content:center;
+  width:28px;height:28px;
+  border-radius:7px;
+  border:1px solid var(--glass-border);
+  background:var(--glass-1);
+  color:var(--text2);
+  cursor:pointer;
+  transition:all .15s var(--ease-out);
+}
+.nx-dropzone-preview-actions button:hover{
+  background:var(--glass-3);color:var(--text);
+  border-color:var(--glass-border-h);
+  transform:translateY(-1px);
+}
+.nx-dropzone-preview-actions button.nx-remove:hover{
+  background:rgba(248,113,113,0.14);color:var(--red,#f87171);
+  border-color:rgba(248,113,113,0.35);
+}
+.nx-dropzone-preview-actions button svg{ width:14px;height:14px; }
+
+@media (max-width:640px){
+  .nx-dropzone{ padding:20px 14px; }
+  .nx-dropzone-icon{ width:28px;height:28px; }
+  .nx-dropzone-text-primary{ font-size:12.5px; }
+  .nx-dropzone-text-secondary,.nx-dropzone-meta{ font-size:11px; }
+}
+
+/* Reduced motion respect */
+@media (prefers-reduced-motion:reduce){
+  .nx-dropzone,.nx-dropzone-icon,.nx-dropzone-preview{ transition:none;animation:none; }
+}
+
+/* ── Progressive enhancement for existing legacy zones ──────────────
+   These already have dragover/drop wired in JS (see aiChartDragOver /
+   aiChartDrop in app.js) and toggle a `.drag-over` class — we simply
+   give that state the same glow + scale language as .nx-dropzone so
+   the whole app feels consistent even where the exact DOM predates
+   this component. */
+.ai-chart-upload-wrap.drag-over,
+.wl-chart-upload-zone.drag-over,
+.wl-day-upload-zone.drag-over{
+  border-color:var(--blue) !important;
+  border-style:solid !important;
+  background:var(--blue-dim) !important;
+  transform:scale(1.015);
+  box-shadow:0 0 0 4px var(--blue-glow),0 8px 24px var(--blue-glow);
+  transition:all .2s var(--ease-out);
+}
+.chart-sort-thumb.nx-drag-over{
+  outline:2px solid var(--blue);
+  outline-offset:-2px;
+  background:var(--blue-dim);
+  transform:scale(1.02);
+  box-shadow:0 0 0 4px var(--blue-glow);
+}
