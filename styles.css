@@ -759,6 +759,25 @@ body{
 }
 [data-theme="light"] .detail-panel{background:rgba(255,255,255,0.9);box-shadow:-6px 0 30px rgba(0,0,0,0.10)}
 .detail-panel.open{transform:translateX(0)}
+.detail-panel.resizing{transition:none!important}
+/* Resize handle — lets desktop users drag the panel's left edge to widen/narrow it */
+.detail-panel-resize-handle{
+  position:absolute;top:0;left:-4px;bottom:0;width:8px;
+  cursor:ew-resize;z-index:20;background:transparent;touch-action:none;
+}
+.detail-panel-resize-handle::after{
+  content:'';position:absolute;top:0;bottom:0;left:3px;width:2px;
+  border-radius:2px;background:transparent;transition:background .15s ease;
+}
+.detail-panel-resize-handle:hover::after,
+.detail-panel.resizing .detail-panel-resize-handle::after{background:var(--blue)}
+body.detail-resizing{cursor:ew-resize!important;user-select:none!important}
+body.detail-resizing *{user-select:none!important}
+/* Mobile is a bottom-sheet, not a resizable side panel — and fullscreen is a fixed 100vw state */
+@media(max-width:768px){
+  .detail-panel-resize-handle{display:none}
+}
+.detail-panel.fullscreen .detail-panel-resize-handle{display:none}
 .det-panel-header{
   display:flex;align-items:center;justify-content:space-between;
   margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--glass-border);

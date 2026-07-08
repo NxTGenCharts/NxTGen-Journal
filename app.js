@@ -3066,6 +3066,81 @@ function toggleDetailSize(id) {
   panel.addEventListener('pointerup', endDrag);
   panel.addEventListener('pointercancel', endDrag);
 })();
+
+// Drag-to-resize the detail panel's left edge — desktop only. Mobile uses the
+// full-width bottom sheet above, and fullscreen mode is a fixed 100vw state,
+// so both are excluded here rather than fighting over inline width.
+(function initDetailPanelResize() {
+  const panel = document.getElementById('detail-panel');
+  if (!panel) return;
+
+  const MIN_WIDTH = 360;
+  const DEFAULT_WIDTH = 420;
+  const STORAGE_KEY = 'detailPanelWidth';
+
+  function isDesktop() {
+    return window.matchMedia('(min-width: 769px)').matches;
+  }
+  function maxWidth() {
+    // Leave room for the rest of the app so the panel can't swallow the whole viewport
+    return Math.max(MIN_WIDTH, Math.min(900, window.innerWidth - 320));
+  }
+  function clamp(w) {
+    return Math.max(MIN_WIDTH, Math.min(w, maxWidth()));
+  }
+
+  function applySavedWidth() {
+    if (!isDesktop()) { panel.style.width = ''; return; }
+    const saved = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+    if (saved) panel.style.width = clamp(saved) + 'px';
+  }
+  applySavedWidth();
+
+  window.addEventListener('resize', () => {
+    if (!isDesktop()) { panel.style.width = ''; return; }
+    const current = parseInt(panel.style.width, 10);
+    if (current) panel.style.width = clamp(current) + 'px';
+  });
+
+  let handle = panel.querySelector('.detail-panel-resize-handle');
+  if (!handle) {
+    handle = document.createElement('div');
+    handle.className = 'detail-panel-resize-handle';
+    handle.title = 'Drag to resize · double-click to reset';
+    panel.prepend(handle);
+  }
+
+  let dragging = false, startX = 0, startWidth = 0;
+
+  handle.addEventListener('pointerdown', (e) => {
+    if (!isDesktop() || panel.classList.contains('fullscreen')) return;
+    dragging = true;
+    startX = e.clientX;
+    startWidth = panel.getBoundingClientRect().width;
+    panel.classList.add('resizing');
+    document.body.classList.add('detail-resizing');
+    handle.setPointerCapture?.(e.pointerId);
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = startX - e.clientX; // dragging left widens the panel (it's anchored on the right)
+    panel.style.width = clamp(startWidth + dx) + 'px';
+  });
+  function endResize() {
+    if (!dragging) return;
+    dragging = false;
+    panel.classList.remove('resizing');
+    document.body.classList.remove('detail-resizing');
+    localStorage.setItem(STORAGE_KEY, Math.round(panel.getBoundingClientRect().width));
+  }
+  handle.addEventListener('pointerup', endResize);
+  handle.addEventListener('pointercancel', endResize);
+  handle.addEventListener('dblclick', () => {
+    panel.style.width = DEFAULT_WIDTH + 'px';
+    localStorage.setItem(STORAGE_KEY, DEFAULT_WIDTH);
+  });
+})();
 function toggleCheck(id, idx) {
   const s = getTS(id);
   if (!s.checklist) s.checklist = [];
