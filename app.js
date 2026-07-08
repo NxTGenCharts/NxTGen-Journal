@@ -3697,11 +3697,30 @@ async function detSave(id) {
   }
 }
 
-// ── CHART LIGHTBOX ────────────────────────────────────
-function openLightbox(src, label) {
-  // Remove any existing lightbox
+// ── CHART LIGHTBOX (gallery — swipe left/right through every chart on a trade) ──
+let _lbKeyHandler = null;
+
+/* openLightbox accepts either the old single-image signature
+   openLightbox(src, label) or a gallery: openLightbox(images, startPos)
+   where images = [{src, label}, ...]. Both are supported so nothing else
+   calling this needs to change. */
+function openLightbox(imagesOrSrc, labelOrStartPos) {
+  let images, startPos;
+  if (typeof imagesOrSrc === 'string') {
+    images = [{ src: imagesOrSrc, label: labelOrStartPos || '' }];
+    startPos = 0;
+  } else {
+    images = imagesOrSrc || [];
+    startPos = labelOrStartPos || 0;
+  }
+  if (!images.length) return;
+  startPos = Math.max(0, Math.min(startPos, images.length - 1));
+  const multi = images.length > 1;
+
+  // Remove any existing lightbox + listeners first
   const existing = document.getElementById('chart-lightbox');
   if (existing) existing.remove();
+  if (_lbKeyHandler) { document.removeEventListener('keydown', _lbKeyHandler); _lbKeyHandler = null; }
 
   const lb = document.createElement('div');
   lb.id = 'chart-lightbox';
@@ -3714,46 +3733,168 @@ function openLightbox(src, label) {
   `;
 
   lb.innerHTML = `
-    <div style="position:absolute;top:16px;right:16px;display:flex;gap:10px;z-index:1">
-      <a href="${src}" download="chart-${label.replace(/\s+/g,'-')}.png"
+    <div style="position:absolute;top:16px;right:16px;display:flex;gap:10px;z-index:3">
+      <a id="lb-download" href="${images[startPos].src}" download="chart-${(images[startPos].label||'chart').replace(/\s+/g,'-')}.png"
         style="padding:7px 14px;border-radius:8px;background:rgba(255,255,255,0.1);
         border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:12px;
-        text-decoration:none;font-family:sans-serif"
-        onclick="event.stopPropagation()"><svg class="icn" aria-hidden="true"><use href="#ic-download"></use></svg> Download</a>
-      <button onclick="document.getElementById('chart-lightbox').remove()"
-        style="padding:7px 14px;border-radius:8px;background:rgba(255,255,255,0.1);
+        text-decoration:none;font-family:sans-serif"><svg class="icn" aria-hidden="true"><use href="#ic-download"></use></svg> Download</a>
+      <button id="lb-close" style="padding:7px 14px;border-radius:8px;background:rgba(255,255,255,0.1);
         border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:16px;cursor:pointer"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
     </div>
     <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px;
-      text-transform:uppercase;letter-spacing:0.1em">${label}</div>
-    <img src="${src}" alt="${label}"
-      style="max-width:100%;max-height:calc(100vh - 120px);
-      object-fit:contain;border-radius:8px;
-      box-shadow:0 8px 40px rgba(0,0,0,0.8);">
+      text-transform:uppercase;letter-spacing:0.1em;display:flex;align-items:center;gap:8px">
+      <span id="lb-label">${images[startPos].label}</span>
+      ${multi ? `<span id="lb-counter" style="opacity:.6;letter-spacing:normal;text-transform:none">${startPos+1} / ${images.length}</span>` : ''}
+    </div>
+    <div id="lb-viewport" style="position:relative;width:100%;max-width:1100px;flex:1;display:flex;align-items:center;overflow:hidden;min-height:0;touch-action:pan-y pinch-zoom">
+      ${multi ? `<button id="lb-prev" style="position:absolute;left:4px;top:50%;transform:translateY(-50%);z-index:2;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1">‹</button>` : ''}
+      <div id="lb-track" style="display:flex;width:${images.length*100}%;height:100%;transform:translateX(-${startPos*(100/images.length)}%);user-select:none;-webkit-user-select:none">
+        ${images.map(im => `
+          <div style="width:${100/images.length}%;flex-shrink:0;display:flex;align-items:center;justify-content:center;height:100%;padding:0 8px">
+            <img src="${im.src}" alt="${im.label}" draggable="false"
+              style="max-width:100%;max-height:calc(100vh - 160px);
+              object-fit:contain;border-radius:8px;pointer-events:none;
+              box-shadow:0 8px 40px rgba(0,0,0,0.8);">
+          </div>`).join('')}
+      </div>
+      ${multi ? `<button id="lb-next" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);z-index:2;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1">›</button>` : ''}
+    </div>
     <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:12px">
-      Tap anywhere or press Esc to close
+      ${multi ? 'Swipe or use ‹ › to browse this trade\u2019s charts · ' : ''}Tap outside to close
     </div>
   `;
 
+  document.body.appendChild(lb);
+
+  const track    = lb.querySelector('#lb-track');
+  const viewport = lb.querySelector('#lb-viewport');
+  const state = { pos: startPos, dragging: false, isSwipe: false, dx: 0, startX: 0, startY: 0 };
+
+  // While the page is pinch-zoomed in ("maximized"), a tap or drag no
+  // longer corresponds to what our layout-coordinate math assumes — so we
+  // back off entirely (no swipe-nav, no tap-to-close) and let the browser's
+  // native pan/zoom own the gesture until the user zooms back out.
+  function isZoomed() {
+    return !!(window.visualViewport && window.visualViewport.scale > 1.02);
+  }
+
+  function updateTrack(animate) {
+    track.style.transition = animate ? 'transform .28s cubic-bezier(.2,.8,.2,1)' : 'none';
+    track.style.transform = `translateX(-${state.pos * (100 / images.length)}%)`;
+  }
+
+  function syncUI() {
+    const im = images[state.pos];
+    const labelEl = lb.querySelector('#lb-label'); if (labelEl) labelEl.textContent = im.label;
+    const counterEl = lb.querySelector('#lb-counter'); if (counterEl) counterEl.textContent = `${state.pos+1} / ${images.length}`;
+    const dl = lb.querySelector('#lb-download');
+    if (dl) { dl.href = im.src; dl.setAttribute('download', `chart-${(im.label||'chart').replace(/\s+/g,'-')}.png`); }
+    const prevBtn = lb.querySelector('#lb-prev'); if (prevBtn) prevBtn.style.opacity = state.pos === 0 ? '.35' : '1';
+    const nextBtn = lb.querySelector('#lb-next'); if (nextBtn) nextBtn.style.opacity = state.pos === images.length - 1 ? '.35' : '1';
+  }
+
+  function nav(dir) {
+    if (!multi) return;
+    state.pos = Math.max(0, Math.min(state.pos + dir, images.length - 1));
+    updateTrack(true);
+    syncUI();
+  }
+
+  lb.querySelector('#lb-close').addEventListener('click', (e) => { e.stopPropagation(); lb.remove(); });
+  lb.querySelector('#lb-download').addEventListener('click', (e) => e.stopPropagation());
+  if (multi) {
+    lb.querySelector('#lb-prev').addEventListener('click', (e) => { e.stopPropagation(); nav(-1); });
+    lb.querySelector('#lb-next').addEventListener('click', (e) => { e.stopPropagation(); nav(1); });
+
+    // Seamless drag-to-swipe (mouse + touch, unified via Pointer Events).
+    // Follows the finger in real time, then either snaps to the next/prev
+    // chart or springs back, instead of forcing a tap on each thumbnail.
+    viewport.addEventListener('pointerdown', (e) => {
+      if (isZoomed() || e.target.closest('#lb-prev,#lb-next')) return;
+      state.dragging = true;
+      state.isSwipe = false;
+      state.startX = e.clientX;
+      state.startY = e.clientY;
+      state.dx = 0;
+    });
+    viewport.addEventListener('pointermove', (e) => {
+      if (!state.dragging || isZoomed()) return;
+      const dx = e.clientX - state.startX;
+      const dy = e.clientY - state.startY;
+      if (!state.isSwipe) {
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+        if (Math.abs(dx) <= Math.abs(dy)) { state.dragging = false; return; } // vertical → leave it to the page
+        state.isSwipe = true;
+      }
+      e.preventDefault();
+      state.dx = dx;
+      track.style.transition = 'none';
+      track.style.transform = `translateX(calc(-${state.pos * (100/images.length)}% + ${dx}px))`;
+    });
+    const endDrag = () => {
+      if (!state.dragging) return;
+      state.dragging = false;
+      if (state.isSwipe) {
+        const threshold = viewport.offsetWidth * 0.18;
+        if (state.dx <= -threshold && state.pos < images.length - 1) state.pos++;
+        else if (state.dx >= threshold && state.pos > 0) state.pos--;
+        updateTrack(true);
+        syncUI();
+      }
+      // isSwipe is read by the click handler below to suppress a
+      // close-on-tap right after a drag; reset it just after that check.
+      setTimeout(() => { state.isSwipe = false; state.dx = 0; }, 0);
+    };
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+  }
+
+  // Tap-outside-to-close — suppressed while pinch-zoomed ("maximized") so
+  // viewing a zoomed chart doesn't get interrupted, and suppressed right
+  // after a swipe so browsing charts can't misfire a close.
   lb.addEventListener('click', function(e) {
-    if (e.target === lb || e.target.tagName === 'IMG') lb.remove();
+    if (isZoomed()) return;
+    if (state.isSwipe || Math.abs(state.dx) > 6) return;
+    if (e.target.closest('#lb-prev,#lb-next,#lb-download,#lb-close')) return;
+    if (e.target === lb || e.target.tagName === 'IMG' || e.target === viewport || e.target === track) lb.remove();
   });
 
-  document.addEventListener('keydown', function escClose(e) {
-    if (e.key === 'Escape') { lb.remove(); document.removeEventListener('keydown', escClose); }
-  }, { once: true });
+  _lbKeyHandler = function(e) {
+    if (e.key === 'Escape') lb.remove();
+    else if (multi && e.key === 'ArrowLeft') nav(-1);
+    else if (multi && e.key === 'ArrowRight') nav(1);
+  };
+  document.addEventListener('keydown', _lbKeyHandler);
 
-  document.body.appendChild(lb);
+  // However the lightbox gets closed (× button, Esc, backdrop tap), drop
+  // the keydown listener so it doesn't linger on the page.
+  new MutationObserver((_muts, obs) => {
+    if (!document.getElementById('chart-lightbox')) {
+      if (_lbKeyHandler) { document.removeEventListener('keydown', _lbKeyHandler); _lbKeyHandler = null; }
+      obs.disconnect();
+    }
+  }).observe(document.body, { childList: true });
+
+  syncUI();
 }
 
-/* Opens lightbox by trade id + slot index — reads from in-memory tradeState */
+/* Opens lightbox by trade id + slot index — reads from in-memory tradeState.
+   Collects every filled chart slot on this trade into one gallery so the
+   user can swipe left/right through all of them seamlessly instead of
+   closing and re-opening the lightbox per thumbnail. */
 function openLightboxById(tradeId, slot) {
   const s = getTS(tradeId);
-  const src = (s.charts || [])[slot];
-  if (!src) return;
+  const charts = s.charts || [];
   const labels = s.chartLabels && s.chartLabels.length ? s.chartLabels : [...CHART_LABELS];
-  const label = labels[slot] || ('Chart ' + (slot + 1));
-  openLightbox(src, label);
+  const images = [];
+  let startPos = 0;
+  charts.forEach((src, i) => {
+    if (!src) return;
+    if (i === slot) startPos = images.length;
+    images.push({ src, label: labels[i] || ('Chart ' + (i + 1)) });
+  });
+  if (!images.length) return;
+  openLightbox(images, startPos);
 }
 
 

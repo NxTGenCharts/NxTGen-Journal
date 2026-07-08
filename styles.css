@@ -11320,3 +11320,21 @@ body {
   transform:scale(1.02);
   box-shadow:0 0 0 4px var(--blue-glow);
 }
+/* The dragenter/dragleave listeners actually live on `.chart-sort-item`
+   (the outer slot), not `.chart-sort-thumb` — so the hover feedback needs
+   its own rule on that element too, or nothing lights up while an OS file
+   is being dragged across the grid (only the drop itself was visible). */
+.chart-sort-item.nx-drag-over{
+  transform:scale(1.04);
+  z-index:2;
+}
+.chart-sort-item.nx-drag-over .chart-sort-thumb{
+  outline:2px solid var(--blue);
+  outline-offset:-2px;
+  background:var(--blue-dim);
+  box-shadow:0 0 0 4px var(--blue-glow);
+  transition:outline-color .12s var(--ease-out), background .12s var(--ease-out), box-shadow .12s var(--ease-out);
+}
+.chart-sort-item.nx-drag-over .chart-sort-empty span:first-child{
+  opacity:.7;
+}
