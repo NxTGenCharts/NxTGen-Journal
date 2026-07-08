@@ -3738,7 +3738,16 @@ function openLightbox(imagesOrSrc, labelOrStartPos) {
   `;
 
   lb.innerHTML = `
-    <div style="position:absolute;top:16px;right:16px;display:flex;gap:10px;z-index:3">
+    <div style="position:absolute;top:16px;right:16px;display:flex;gap:10px;z-index:3;align-items:center">
+      <div id="lb-zoom-controls" style="display:flex;align-items:center;gap:1px;background:rgba(255,255,255,0.1);
+        border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:2px">
+        <button id="lb-zoom-out" title="Zoom out" style="width:28px;height:26px;border:none;background:transparent;color:#fff;
+          cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px"><svg class="icn" aria-hidden="true"><use href="#ic-minus"></use></svg></button>
+        <button id="lb-zoom-reset" title="Reset zoom" style="min-width:42px;padding:0 2px;height:26px;border:none;background:transparent;
+          color:#fff;font-size:11px;cursor:pointer;font-family:sans-serif">100%</button>
+        <button id="lb-zoom-in" title="Zoom in" style="width:28px;height:26px;border:none;background:transparent;color:#fff;
+          cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px"><svg class="icn" aria-hidden="true"><use href="#ic-plus"></use></svg></button>
+      </div>
       <a id="lb-download" href="${images[startPos].src}" download="chart-${(images[startPos].label||'chart').replace(/\s+/g,'-')}.png"
         style="padding:7px 14px;border-radius:8px;background:rgba(255,255,255,0.1);
         border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:12px;
@@ -3751,21 +3760,22 @@ function openLightbox(imagesOrSrc, labelOrStartPos) {
       <span id="lb-label">${images[startPos].label}</span>
       ${multi ? `<span id="lb-counter" style="opacity:.6;letter-spacing:normal;text-transform:none">${startPos+1} / ${images.length}</span>` : ''}
     </div>
-    <div id="lb-viewport" style="position:relative;width:100%;max-width:1300px;flex:1;display:flex;align-items:center;overflow:hidden;min-height:0;touch-action:pan-y pinch-zoom">
+    <div id="lb-viewport" style="position:relative;width:100%;max-width:1300px;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:0;touch-action:pan-y pinch-zoom">
       ${multi ? `<button id="lb-prev" style="position:absolute;left:4px;top:50%;transform:translateY(-50%);z-index:2;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1">‹</button>` : ''}
       <div id="lb-track" style="display:flex;flex:0 0 auto;width:${images.length*100}%;height:100%;transform:translateX(-${startPos*(100/images.length)}%);user-select:none;-webkit-user-select:none">
         ${images.map(im => `
-          <div style="width:${100/images.length}%;flex-shrink:0;display:flex;align-items:center;justify-content:center;height:100%;padding:0 8px;box-sizing:border-box">
+          <div style="width:${100/images.length}%;flex-shrink:0;display:flex;align-items:center;justify-content:center;height:100%;padding:0 8px;box-sizing:border-box;overflow:hidden">
             <img src="${im.src}" alt="${im.label}" draggable="false"
               style="max-width:100%;max-height:calc(100vh - 130px);
-              object-fit:contain;border-radius:8px;pointer-events:none;
-              box-shadow:0 8px 40px rgba(0,0,0,0.8);">
+              object-fit:contain;border-radius:8px;
+              box-shadow:0 8px 40px rgba(0,0,0,0.8);transform-origin:center center;
+              -webkit-user-drag:none;user-select:none;-webkit-user-select:none">
           </div>`).join('')}
       </div>
       ${multi ? `<button id="lb-next" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);z-index:2;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1">›</button>` : ''}
     </div>
     <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:10px">
-      ${multi ? 'Swipe or use ‹ › to browse this trade\u2019s charts · ' : ''}Tap outside to close
+      ${multi ? 'Swipe or use ‹ › to browse this trade\u2019s charts · ' : ''}Scroll or double-click to zoom · Tap outside to close
     </div>
   `;
 
@@ -3773,14 +3783,124 @@ function openLightbox(imagesOrSrc, labelOrStartPos) {
 
   const track    = lb.querySelector('#lb-track');
   const viewport = lb.querySelector('#lb-viewport');
-  const state = { pos: startPos, dragging: false, isSwipe: false, dx: 0, startX: 0, startY: 0 };
+  const state = { pos: startPos, dragging: false, isSwipe: false, dx: 0, startX: 0, startY: 0, panning: false, panStartX: 0, panStartY: 0, panOrigX: 0, panOrigY: 0 };
 
-  // While the page is pinch-zoomed in ("maximized"), a tap or drag no
-  // longer corresponds to what our layout-coordinate math assumes — so we
-  // back off entirely (no swipe-nav, no tap-to-close) and let the browser's
-  // native pan/zoom own the gesture until the user zooms back out.
+  // ── Zoom (buttons, wheel, double-click, drag-to-pan) ──
+  // Independent of the browser's own native pinch-zoom (still handled via
+  // isZoomed()'s visualViewport check below) — this gives desktop/mouse
+  // users, who have no pinch gesture, an explicit way to zoom in on chart
+  // detail, while touch users can keep using native pinch as before.
+  const ZOOM_MIN = 1, ZOOM_MAX = 4, ZOOM_STEP = 1.5, ZOOM_DBLCLICK = 2.4;
+  let zoom = { scale: 1, x: 0, y: 0 };
+
+  function currentImgEl() {
+    const cell = track.children[state.pos];
+    return cell ? cell.querySelector('img') : null;
+  }
+
+  function clampPan() {
+    const img = currentImgEl();
+    if (!img) return;
+    const vpRect = viewport.getBoundingClientRect();
+    const scaledW = img.offsetWidth * zoom.scale;
+    const scaledH = img.offsetHeight * zoom.scale;
+    const maxX = Math.max(0, (scaledW - vpRect.width) / 2);
+    const maxY = Math.max(0, (scaledH - vpRect.height) / 2);
+    zoom.x = Math.max(-maxX, Math.min(maxX, zoom.x));
+    zoom.y = Math.max(-maxY, Math.min(maxY, zoom.y));
+  }
+
+  function syncZoomUI() {
+    const pctBtn = lb.querySelector('#lb-zoom-reset'); if (pctBtn) pctBtn.textContent = Math.round(zoom.scale * 100) + '%';
+    const outBtn = lb.querySelector('#lb-zoom-out'); if (outBtn) outBtn.style.opacity = zoom.scale <= ZOOM_MIN + 0.001 ? '.35' : '1';
+    const inBtn  = lb.querySelector('#lb-zoom-in');  if (inBtn)  inBtn.style.opacity  = zoom.scale >= ZOOM_MAX - 0.001 ? '.35' : '1';
+    viewport.style.cursor = zoom.scale > 1.02 ? (state.panning ? 'grabbing' : 'grab') : 'zoom-out';
+  }
+
+  function applyZoomTransform(animate) {
+    const img = currentImgEl();
+    if (!img) return;
+    img.style.transition = animate ? 'transform .18s ease' : 'none';
+    img.style.transform = zoom.scale <= 1.001 ? '' : `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})`;
+    syncZoomUI();
+  }
+
+  // originX/originY are the zoom-focus point relative to the viewport's
+  // center — e.g. a mouse or dblclick position — so zooming feels anchored
+  // under the cursor rather than always snapping back to dead-center.
+  function zoomTo(newScale, originX, originY, animate) {
+    newScale = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newScale));
+    const oldScale = zoom.scale;
+    if (newScale === oldScale && newScale <= 1.001) return;
+    const ratio = newScale / oldScale;
+    zoom.x = originX - (originX - zoom.x) * ratio;
+    zoom.y = originY - (originY - zoom.y) * ratio;
+    zoom.scale = newScale;
+    if (zoom.scale <= 1.001) { zoom.x = 0; zoom.y = 0; } else clampPan();
+    applyZoomTransform(animate);
+  }
+
+  function resetZoom() {
+    zoom = { scale: 1, x: 0, y: 0 };
+    const img = currentImgEl();
+    if (img) { img.style.transition = 'none'; img.style.transform = ''; }
+    syncZoomUI();
+  }
+
+  lb.querySelector('#lb-zoom-in').addEventListener('click', (e) => { e.stopPropagation(); zoomTo(zoom.scale * ZOOM_STEP, 0, 0, true); });
+  lb.querySelector('#lb-zoom-out').addEventListener('click', (e) => { e.stopPropagation(); zoomTo(zoom.scale / ZOOM_STEP, 0, 0, true); });
+  lb.querySelector('#lb-zoom-reset').addEventListener('click', (e) => { e.stopPropagation(); zoomTo(1, 0, 0, true); });
+
+  viewport.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = viewport.getBoundingClientRect();
+    const originX = e.clientX - rect.left - rect.width / 2;
+    const originY = e.clientY - rect.top - rect.height / 2;
+    zoomTo(zoom.scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15), originX, originY, false);
+  }, { passive: false });
+
+  viewport.addEventListener('dblclick', (e) => {
+    if (e.target.closest('#lb-prev,#lb-next')) return;
+    e.stopPropagation();
+    if (zoom.scale > 1.02) { resetZoom(); return; }
+    const rect = viewport.getBoundingClientRect();
+    const originX = e.clientX - rect.left - rect.width / 2;
+    const originY = e.clientY - rect.top - rect.height / 2;
+    zoomTo(ZOOM_DBLCLICK, originX, originY, true);
+  });
+
+  // Drag-to-pan once zoomed in. Gated on zoom.scale so it never fights the
+  // swipe-nav / tap-to-close handlers below (those bail out via isZoomed()).
+  viewport.addEventListener('pointerdown', (e) => {
+    if (zoom.scale <= 1.02 || e.target.closest('#lb-prev,#lb-next')) return;
+    state.panning = true;
+    state.panStartX = e.clientX; state.panStartY = e.clientY;
+    state.panOrigX = zoom.x; state.panOrigY = zoom.y;
+    syncZoomUI();
+    e.preventDefault();
+  });
+  viewport.addEventListener('pointermove', (e) => {
+    if (!state.panning) return;
+    zoom.x = state.panOrigX + (e.clientX - state.panStartX);
+    zoom.y = state.panOrigY + (e.clientY - state.panStartY);
+    clampPan();
+    applyZoomTransform(false);
+  });
+  function endPan() {
+    if (!state.panning) return;
+    state.panning = false;
+    syncZoomUI();
+  }
+  viewport.addEventListener('pointerup', endPan);
+  viewport.addEventListener('pointercancel', endPan);
+
+  // While the page is pinch-zoomed in ("maximized") or our own zoomTo()
+  // has scaled the image, a tap or drag no longer corresponds to what our
+  // layout-coordinate math assumes — so we back off entirely (no swipe-nav,
+  // no tap-to-close) and let panning/the browser's native zoom own the
+  // gesture until the user zooms back out.
   function isZoomed() {
-    return !!(window.visualViewport && window.visualViewport.scale > 1.02);
+    return zoom.scale > 1.02 || !!(window.visualViewport && window.visualViewport.scale > 1.02);
   }
 
   function updateTrack(animate) {
@@ -3796,11 +3916,13 @@ function openLightbox(imagesOrSrc, labelOrStartPos) {
     if (dl) { dl.href = im.src; dl.setAttribute('download', `chart-${(im.label||'chart').replace(/\s+/g,'-')}.png`); }
     const prevBtn = lb.querySelector('#lb-prev'); if (prevBtn) prevBtn.style.opacity = state.pos === 0 ? '.35' : '1';
     const nextBtn = lb.querySelector('#lb-next'); if (nextBtn) nextBtn.style.opacity = state.pos === images.length - 1 ? '.35' : '1';
+    syncZoomUI();
   }
 
   function nav(dir) {
     if (!multi) return;
     state.pos = Math.max(0, Math.min(state.pos + dir, images.length - 1));
+    resetZoom();
     updateTrack(true);
     syncUI();
   }
@@ -3854,14 +3976,17 @@ function openLightbox(imagesOrSrc, labelOrStartPos) {
     viewport.addEventListener('pointercancel', endDrag);
   }
 
-  // Tap-outside-to-close — suppressed while pinch-zoomed ("maximized") so
-  // viewing a zoomed chart doesn't get interrupted, and suppressed right
-  // after a swipe so browsing charts can't misfire a close.
+  // Tap-outside-to-close — suppressed while zoomed (custom or native
+  // pinch-"maximized") so viewing a zoomed chart doesn't get interrupted,
+  // and suppressed right after a swipe so browsing charts can't misfire a
+  // close. Note: taps that land directly on the image itself (not the
+  // surrounding letterbox) are handled by dblclick/pan/wheel above instead
+  // of closing, so the image stays fully interactive for zooming.
   lb.addEventListener('click', function(e) {
     if (isZoomed()) return;
     if (state.isSwipe || Math.abs(state.dx) > 6) return;
-    if (e.target.closest('#lb-prev,#lb-next,#lb-download,#lb-close')) return;
-    if (e.target === lb || e.target.tagName === 'IMG' || e.target === viewport || e.target === track) {
+    if (e.target.closest('#lb-prev,#lb-next,#lb-download,#lb-close,#lb-zoom-controls')) return;
+    if (e.target === lb || e.target === viewport || e.target === track) {
       e.stopPropagation();
       lb.remove();
     }
@@ -3869,8 +3994,11 @@ function openLightbox(imagesOrSrc, labelOrStartPos) {
 
   _lbKeyHandler = function(e) {
     if (e.key === 'Escape') { e.stopPropagation(); lb.remove(); }
-    else if (multi && e.key === 'ArrowLeft') { e.stopPropagation(); nav(-1); }
-    else if (multi && e.key === 'ArrowRight') { e.stopPropagation(); nav(1); }
+    else if (multi && e.key === 'ArrowLeft' && !isZoomed()) { e.stopPropagation(); nav(-1); }
+    else if (multi && e.key === 'ArrowRight' && !isZoomed()) { e.stopPropagation(); nav(1); }
+    else if (e.key === '+' || e.key === '=') { e.stopPropagation(); zoomTo(zoom.scale * ZOOM_STEP, 0, 0, true); }
+    else if (e.key === '-' || e.key === '_') { e.stopPropagation(); zoomTo(zoom.scale / ZOOM_STEP, 0, 0, true); }
+    else if (e.key === '0') { e.stopPropagation(); zoomTo(1, 0, 0, true); }
   };
   document.addEventListener('keydown', _lbKeyHandler);
 
