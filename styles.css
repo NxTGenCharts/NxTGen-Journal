@@ -6041,14 +6041,9 @@ body{
   .sm-fmt-btn { padding: 10px 8px; justify-content: center; text-align: center; flex-direction: column; gap: 6px; }
 }
 @media (max-width: 380px) {
-  .sm-hero { flex-direction: column; align-items: flex-start; gap: 8px; }
-  .sm-hero-right { text-align: left; }
   .sm-actions { grid-template-columns: 1fr; }
   .sm-fmt-row  { grid-template-columns: 1fr; }
   .view-stats-grid { grid-template-columns: 1fr; }
-  .sm-checklist-grid { grid-template-columns: 1fr; }
-  .sm-rings { flex-wrap: wrap; justify-content: center; }
-  .sm-edge-grade { border-left: none; border-top: 1px solid rgba(255,255,255,0.09); padding-left: 0; padding-top: 10px; flex-basis: 100%; }
 }
 
 /* ══════════════════════════════════════════════════════
