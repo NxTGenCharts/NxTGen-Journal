@@ -3375,8 +3375,13 @@ function closeDetail() {
   _detFullscreen = false;
 }
 // Close the detail panel when clicking/tapping anywhere outside of it —
-// but not when the click is what opened it (a trade row), and not while
-// another modal/dropdown/popover is open on top of it.
+// but not when the click is what opened it (a trade row), not while
+// another modal/dropdown/popover is open on top of it, and not on the
+// chart lightbox — that overlay lives outside #detail-panel in the DOM
+// (it's appended to <body>) even though it visually sits "on top of" the
+// panel, so without this check every click inside the lightbox — including
+// its own tap-to-close — was caught here first and closed the whole
+// maximized panel underneath it instead of just the lightbox.
 document.addEventListener('click', (e) => {
   const panel = document.getElementById('detail-panel');
   if (!panel || !panel.classList.contains('open')) return;
@@ -3384,7 +3389,7 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('[onclick*="openDetail"]')) return;
   const modal = document.getElementById('modal');
   if (modal && modal.classList.contains('open')) return;
-  if (e.target.closest('.mcl-item, .toast, .confirm-dialog, .dropdown-menu')) return;
+  if (e.target.closest('.mcl-item, .toast, .confirm-dialog, .dropdown-menu, #chart-lightbox')) return;
   closeDetail();
 }, true);
 function toggleDetailSize(id) {
@@ -3741,25 +3746,25 @@ function openLightbox(imagesOrSrc, labelOrStartPos) {
       <button id="lb-close" style="padding:7px 14px;border-radius:8px;background:rgba(255,255,255,0.1);
         border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:16px;cursor:pointer"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
     </div>
-    <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px;
+    <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px;
       text-transform:uppercase;letter-spacing:0.1em;display:flex;align-items:center;gap:8px">
       <span id="lb-label">${images[startPos].label}</span>
       ${multi ? `<span id="lb-counter" style="opacity:.6;letter-spacing:normal;text-transform:none">${startPos+1} / ${images.length}</span>` : ''}
     </div>
-    <div id="lb-viewport" style="position:relative;width:100%;max-width:1100px;flex:1;display:flex;align-items:center;overflow:hidden;min-height:0;touch-action:pan-y pinch-zoom">
+    <div id="lb-viewport" style="position:relative;width:100%;max-width:1300px;flex:1;display:flex;align-items:center;overflow:hidden;min-height:0;touch-action:pan-y pinch-zoom">
       ${multi ? `<button id="lb-prev" style="position:absolute;left:4px;top:50%;transform:translateY(-50%);z-index:2;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1">‹</button>` : ''}
-      <div id="lb-track" style="display:flex;width:${images.length*100}%;height:100%;transform:translateX(-${startPos*(100/images.length)}%);user-select:none;-webkit-user-select:none">
+      <div id="lb-track" style="display:flex;flex:0 0 auto;width:${images.length*100}%;height:100%;transform:translateX(-${startPos*(100/images.length)}%);user-select:none;-webkit-user-select:none">
         ${images.map(im => `
-          <div style="width:${100/images.length}%;flex-shrink:0;display:flex;align-items:center;justify-content:center;height:100%;padding:0 8px">
+          <div style="width:${100/images.length}%;flex-shrink:0;display:flex;align-items:center;justify-content:center;height:100%;padding:0 8px;box-sizing:border-box">
             <img src="${im.src}" alt="${im.label}" draggable="false"
-              style="max-width:100%;max-height:calc(100vh - 160px);
+              style="max-width:100%;max-height:calc(100vh - 130px);
               object-fit:contain;border-radius:8px;pointer-events:none;
               box-shadow:0 8px 40px rgba(0,0,0,0.8);">
           </div>`).join('')}
       </div>
       ${multi ? `<button id="lb-next" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);z-index:2;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1">›</button>` : ''}
     </div>
-    <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:12px">
+    <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:10px">
       ${multi ? 'Swipe or use ‹ › to browse this trade\u2019s charts · ' : ''}Tap outside to close
     </div>
   `;
@@ -3856,13 +3861,16 @@ function openLightbox(imagesOrSrc, labelOrStartPos) {
     if (isZoomed()) return;
     if (state.isSwipe || Math.abs(state.dx) > 6) return;
     if (e.target.closest('#lb-prev,#lb-next,#lb-download,#lb-close')) return;
-    if (e.target === lb || e.target.tagName === 'IMG' || e.target === viewport || e.target === track) lb.remove();
+    if (e.target === lb || e.target.tagName === 'IMG' || e.target === viewport || e.target === track) {
+      e.stopPropagation();
+      lb.remove();
+    }
   });
 
   _lbKeyHandler = function(e) {
-    if (e.key === 'Escape') lb.remove();
-    else if (multi && e.key === 'ArrowLeft') nav(-1);
-    else if (multi && e.key === 'ArrowRight') nav(1);
+    if (e.key === 'Escape') { e.stopPropagation(); lb.remove(); }
+    else if (multi && e.key === 'ArrowLeft') { e.stopPropagation(); nav(-1); }
+    else if (multi && e.key === 'ArrowRight') { e.stopPropagation(); nav(1); }
   };
   document.addEventListener('keydown', _lbKeyHandler);
 
