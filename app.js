@@ -3022,7 +3022,7 @@ function toggleDetailSize(id) {
 (function initDetailPanelSwipeToClose() {
   const panel = document.getElementById('detail-panel');
   if (!panel) return;
-  const HANDLE_ZONE = 32;      // px from the panel's top counted as the grab band
+  const HANDLE_ZONE = 40;       // px from the panel's top counted as the grab band
   const DISMISS_THRESHOLD = 90; // px of downward drag needed to trigger close
   let startY = 0, lastY = 0, dragging = false;
 
@@ -3039,6 +3039,7 @@ function toggleDetailSize(id) {
     dragging = true;
     startY = lastY = e.clientY;
     panel.style.transition = 'none';
+    panel.style.touchAction = 'none'; // stop the panel's own scroll from stealing the gesture
     panel.setPointerCapture?.(e.pointerId);
   });
   panel.addEventListener('pointermove', (e) => {
@@ -3047,12 +3048,19 @@ function toggleDetailSize(id) {
     const dy = Math.max(0, lastY - startY);
     panel.style.transform = `translateX(0) translateY(${dy}px)`;
   });
+  // Backup for Android Chrome, where touch-action isn't always honored
+  // mid-gesture once a scroll/overscroll bounce has already begun —
+  // explicitly block the native touchmove while a drag is active.
+  panel.addEventListener('touchmove', (e) => {
+    if (dragging) e.preventDefault();
+  }, { passive: false });
   function endDrag() {
     if (!dragging) return;
     dragging = false;
     const dy = Math.max(0, lastY - startY);
     panel.style.transition = '';
     panel.style.transform = '';
+    panel.style.touchAction = '';
     if (dy > DISMISS_THRESHOLD) closeDetail();
   }
   panel.addEventListener('pointerup', endDrag);
