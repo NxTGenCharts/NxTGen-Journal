@@ -2968,6 +2968,7 @@ function renderTradeTable(list) {
       <td class="stars">${starsHTML(t.rating)}</td>
       <td class="row-actions" id="ra-${t.id}" style="white-space:nowrap;opacity:0;transition:opacity .15s">
         <button onclick="event.stopPropagation();openDetail(${t.id},true)" style="background:rgba(58,134,255,.15);border:1px solid rgba(58,134,255,.3);color:var(--blue);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;margin-right:4px"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg></button>
+        <button onclick="event.stopPropagation();duplicateTrade(${t.id})" title="Duplicate trade" style="background:rgba(58,134,255,.12);border:1px solid rgba(58,134,255,.25);color:var(--blue);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;margin-right:4px"><svg class="icn" aria-hidden="true"><use href="#ic-copy"></use></svg></button>
         <button onclick="event.stopPropagation();quickDelete(${t.id})" style="background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.25);color:var(--red);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg></button>
       </td>
     </tr>`;
@@ -3031,6 +3032,79 @@ async function bulkDeleteSelected() {
   _playChime('delete');
   showToast(`${n} trade${n!==1?'s':''} moved to trash`, 'danger');
 }
+
+/* Duplicate a single trade: clones every field (except id/timestamps) into a
+   new row. Chart images are intentionally NOT copied since they live in
+   per-trade storage paths — the duplicate starts with a clean charts slot. */
+async function duplicateTrade(id) {
+  const orig = trades.find(x => x.id === id);
+  if (!orig) return;
+
+  const dupRow = {
+    user_id:       _currentUser.id,
+    trade_date:    orig.date,
+    pair:          orig.pair,
+    pos:           orig.pos,
+    rr:            orig.rr,
+    pnl:           orig.pnl,
+    pnl_unit:      orig.pnlUnit || '%',
+    outcome:       orig.outcome,
+    kz:            orig.kz,
+    strategy:      orig.strategy || '',
+    tf:            orig.tf || '',
+    account:       orig.account,
+    rating:        orig.rating,
+    risk:          orig.risk,
+    notes:         orig.notes || '',
+    pretrade:      orig.pretrade || '',
+    planned_rr:    orig.plannedRr || '',
+    emotion:       orig.emotion || 'Focused',
+    loss_reason:   orig.lossReason || '',
+    followed_plan: orig.followedPlan || 'Yes',
+    checklist:     [...(orig.checklist || [])],
+    charts:        [],
+    chart_labels:  [...CHART_LABELS],
+    mistakes:      '',
+  };
+
+  const { data, error } = await sb.from('journal_trades').insert(dupRow).select().single();
+  if (error) {
+    showToast('Error duplicating trade: ' + error.message, 'danger');
+    return;
+  }
+
+  const t = _rowToTrade(data);
+  trades.unshift(t);
+  trades.sort((a, b) => b.date.localeCompare(a.date) || (b.id - a.id));
+  tradeState[t.id] = {
+    notes: t.notes, pretrade: t.pretrade, emotion: t.emotion || 'Calm',
+    checklist: [...(t.checklist || [])], charts: [], chartLabels: [...CHART_LABELS], mistakes: '',
+  };
+
+  _refreshAll();
+  renderTradeTable(trades);
+  _playChime('save');
+  showToast(t.pair + ' trade duplicated ✓', 'restore');
+  return t;
+}
+
+/* Duplicate every currently checkbox-selected trade in the Trade Log. */
+async function bulkDuplicateSelected() {
+  const n = _bulkSelected.size;
+  if (!n) return;
+  const ids = [..._bulkSelected];
+  let copied = 0;
+  for (const id of ids) {
+    const t = await duplicateTrade(id);
+    if (t) copied++;
+  }
+  _bulkSelected.clear();
+  _updateBulkBar();
+  document.querySelectorAll('.bulk-chk').forEach(c => c.checked = false);
+  document.querySelectorAll('.bulk-selected').forEach(r => r.classList.remove('bulk-selected'));
+  showToast(`${copied} trade${copied !== 1 ? 's' : ''} duplicated`, 'restore');
+}
+
 function showRowActions(id, row) { const el = document.getElementById('ra-' + id); if (el) el.style.opacity = '1'; }
 function hideRowActions(id) { const el = document.getElementById('ra-' + id); if (el) el.style.opacity = '0'; }
 let _lastFilteredList = [];
