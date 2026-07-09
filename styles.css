@@ -3050,6 +3050,9 @@ body.detail-resizing *{user-select:none!important}
 }
 .acc-chal-card.complete{border-color:rgba(251,191,36,0.35);box-shadow:0 0 0 1px rgba(251,191,36,0.12),0 8px 32px rgba(251,191,36,0.08)}
 .acc-chal-card.complete::before{background:radial-gradient(ellipse 65% 55% at 12% 10%,rgba(251,191,36,0.14) 0%,transparent 60%)}
+/* Phase 1 complete uses a blue theme so it reads distinctly from Phase 2's gold "ready for verification" state */
+.acc-chal-card.complete.phase1{border-color:rgba(96,165,250,0.35);box-shadow:0 0 0 1px rgba(96,165,250,0.12),0 8px 32px rgba(96,165,250,0.08)}
+.acc-chal-card.complete.phase1::before{background:radial-gradient(ellipse 65% 55% at 12% 10%,rgba(96,165,250,0.14) 0%,transparent 60%)}
 
 .acc-chal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;position:relative;z-index:1;margin-bottom:16px}
 .acc-chal-title{font-family:var(--font-head);font-size:16px;font-weight:800;letter-spacing:-.01em;color:var(--text)}
@@ -3072,6 +3075,7 @@ body.detail-resizing *{user-select:none!important}
 .acc-chal-tbtn:hover{background:var(--glass-2);border-color:var(--glass-border-h);transform:translateY(-1px)}
 .acc-chal-tbtn.active{background:var(--green-dim);border-color:rgba(52,211,153,.4);color:var(--green)}
 .acc-chal-card.complete .acc-chal-tbtn.active{background:rgba(251,191,36,0.16);border-color:rgba(251,191,36,.4);color:var(--gold)}
+.acc-chal-card.complete.phase1 .acc-chal-tbtn.active{background:rgba(96,165,250,0.16);border-color:rgba(96,165,250,.4);color:var(--blue)}
 .acc-chal-custom-input{
   width:64px;font-family:var(--font-body);font-size:11.5px;font-weight:700;padding:6px 10px;border-radius:var(--r-full);
   background:var(--glass-1);border:1px solid var(--glass-border-h);color:var(--text);text-align:center;
@@ -3082,9 +3086,12 @@ body.detail-resizing *{user-select:none!important}
   display:flex;align-items:center;gap:10px;position:relative;z-index:1;margin-bottom:14px;
   font-family:var(--font-head);font-size:14px;font-weight:800;color:var(--gold);
 }
+.acc-chal-card.phase1 .acc-chal-complete-banner{color:var(--blue)}
 .acc-chal-check{width:26px;height:26px;flex-shrink:0}
 .acc-chal-check-circle{stroke:var(--gold);stroke-width:2.5;stroke-dasharray:146;stroke-dashoffset:146;animation:chalCheckCircle .5s var(--ease-out) forwards}
 .acc-chal-check-mark{stroke:var(--gold);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:36;stroke-dashoffset:36;animation:chalCheckMark .35s var(--ease-out) .4s forwards}
+.acc-chal-card.phase1 .acc-chal-check-circle{stroke:var(--blue)}
+.acc-chal-card.phase1 .acc-chal-check-mark{stroke:var(--blue)}
 @keyframes chalCheckCircle{to{stroke-dashoffset:0}}
 @keyframes chalCheckMark{to{stroke-dashoffset:0}}
 
@@ -3105,6 +3112,10 @@ body.detail-resizing *{user-select:none!important}
   background:linear-gradient(90deg,#92400e 0%,#b45309 55%,#d97706 100%);
   box-shadow:0 0 20px rgba(180,83,9,0.5);
 }
+.acc-chal-card.phase1 .acc-chal-progress-fill.gold{
+  background:linear-gradient(90deg,#1e3a8a 0%,#2563eb 55%,#3b82f6 100%);
+  box-shadow:0 0 20px rgba(37,99,235,0.5);
+}
 .acc-chal-progress-glow{
   position:absolute;top:0;right:0;bottom:0;width:36px;
   background:none;
@@ -3124,6 +3135,7 @@ body.detail-resizing *{user-select:none!important}
 .acc-chal-ms-dot{width:7px;height:7px;border-radius:50%;background:var(--glass-3);border:1px solid var(--glass-border-h);transition:background .3s,border-color .3s,box-shadow .3s}
 .acc-chal-ms.reached .acc-chal-ms-dot{background:var(--green);border-color:var(--green);box-shadow:0 0 8px rgba(52,211,153,0.6)}
 .acc-chal-card.complete .acc-chal-ms.reached .acc-chal-ms-dot{background:var(--gold);border-color:var(--gold);box-shadow:0 0 8px rgba(251,191,36,0.6)}
+.acc-chal-card.complete.phase1 .acc-chal-ms.reached .acc-chal-ms-dot{background:var(--blue);border-color:var(--blue);box-shadow:0 0 8px rgba(96,165,250,0.6)}
 .acc-chal-ms-lbl{font-size:9px;color:var(--text3);font-weight:600}
 .acc-chal-ms.reached .acc-chal-ms-lbl{color:var(--text2)}
 
@@ -3135,6 +3147,7 @@ body.detail-resizing *{user-select:none!important}
 .acc-chal-stat-val.red{color:var(--red)}
 .acc-chal-stat-val.gold{color:var(--gold)}
 .acc-chal-stat-val.blue{color:var(--blue)}
+.acc-chal-card.complete.phase1 .acc-chal-stat-val.gold{color:var(--blue)}
 
 .acc-chal-confetti{
   position:absolute;top:-10px;width:6px;height:6px;border-radius:1px;opacity:0;z-index:0;
