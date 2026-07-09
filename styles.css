@@ -3063,6 +3063,12 @@ body.detail-resizing *{user-select:none!important}
   border:1px solid rgba(251,191,36,0.4);color:var(--gold);white-space:nowrap;
   box-shadow:0 0 16px rgba(251,191,36,0.18);
 }
+/* Phase 1 complete uses the blue theme, matching the border/progress-bar/checkmark above */
+.acc-chal-card.complete.phase1 .acc-chal-badge{
+  background:linear-gradient(135deg,rgba(96,165,250,0.22),rgba(96,165,250,0.10));
+  border:1px solid rgba(96,165,250,0.4);color:var(--blue);
+  box-shadow:0 0 16px rgba(96,165,250,0.18);
+}
 
 .acc-chal-target-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:relative;z-index:1;margin-bottom:16px}
 .acc-chal-target-lbl{font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:700;white-space:nowrap}
