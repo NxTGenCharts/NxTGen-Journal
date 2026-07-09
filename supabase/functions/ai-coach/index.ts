@@ -11,6 +11,11 @@
 // Internally this function now talks to Google's Gemini API
 // (generativelanguage.googleapis.com) instead of Anthropic, and
 // translates between the two formats so nothing else has to change.
+//
+// UPDATE: Added automatic retry with exponential backoff when Gemini
+// returns 503 ("model overloaded / high demand"). This is a transient
+// error on Google's side, not a bug in this function — retrying a
+// couple of times with a short delay usually succeeds.
 // ─────────────────────────────────────────────────────────────────
 
 // deno-lint-ignore-file no-explicit-any
@@ -20,12 +25,18 @@ const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 // Any current Gemini model that supports vision (images) works here.
 // gemini-flash-latest always points at Google's current recommended
 // Flash model, so you don't have to update this when they rev versions.
-// Pin an exact version (e.g. "gemini-3.5-flash") instead if you want
-// stable, predictable behaviour.
+// Pin an exact version (e.g. "gemini-2.5-flash") instead if you want
+// stable, predictable behaviour and to avoid congestion on the alias.
 const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-flash-latest';
 
 const GEMINI_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+// Retry configuration for transient Gemini errors (503 = overloaded,
+// 429 = rate limited). Exponential backoff: 500ms, 1s, 2s.
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 500;
+const RETRYABLE_STATUS_CODES = new Set([429, 503]);
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -67,16 +78,25 @@ Deno.serve(async (req: Request) => {
       geminiBody.systemInstruction = { parts: [{ text: system }] };
     }
 
-    const geminiRes = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(geminiBody),
-    });
-
+    const geminiRes = await callGeminiWithRetry(geminiBody);
     const geminiData = await geminiRes.json();
 
     if (!geminiRes.ok) {
       const msg = geminiData?.error?.message || `Gemini API error ${geminiRes.status}`;
+
+      // Give the frontend a clearer signal for transient overload errors
+      // so it can show a friendlier message instead of the raw Gemini text.
+      if (RETRYABLE_STATUS_CODES.has(geminiRes.status)) {
+        return json(
+          {
+            error: 'AI Coach is experiencing high demand right now. Please try again in a few seconds.',
+            transient: true,
+            rawError: msg,
+          },
+          geminiRes.status,
+        );
+      }
+
       return json({ error: msg }, geminiRes.status);
     }
 
@@ -110,6 +130,39 @@ Deno.serve(async (req: Request) => {
     return json({ error: (err as Error).message || 'Unknown server error' }, 500);
   }
 });
+
+/**
+ * Calls the Gemini API, automatically retrying with exponential backoff
+ * if Gemini responds with a transient error (503 overloaded, 429 rate
+ * limited). Returns the final Response object (success or failure) —
+ * the caller reads geminiRes.ok / geminiRes.status as normal.
+ */
+async function callGeminiWithRetry(body: Record<string, any>): Promise<Response> {
+  let lastRes: Response | null = null;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (res.ok || !RETRYABLE_STATUS_CODES.has(res.status)) {
+      return res;
+    }
+
+    lastRes = res;
+
+    if (attempt < MAX_RETRIES) {
+      const delay = BASE_DELAY_MS * Math.pow(2, attempt); // 500ms, 1s, 2s
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  // Exhausted all retries — return the last (failing) response so the
+  // caller can surface Gemini's error message to the client.
+  return lastRes as Response;
+}
 
 /**
  * Convert one Anthropic-style message ({role, content}) into a
