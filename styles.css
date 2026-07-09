@@ -11640,3 +11640,141 @@ body {
 .chart-sort-item.nx-drag-over .chart-sort-empty span:first-child{
   opacity:.7;
 }
+
+/* ═══════════════════════════════════════════════════════
+   CALENDAR 2.0 — smarter stats, insights, score, heatmap,
+   filters, view modes, weekly reports, richer day cells
+   ═══════════════════════════════════════════════════════ */
+
+/* sub-metric chip rows inside analytics cards */
+.cal2-sub-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.cal2-sub-chip{
+  font-size:10px;font-weight:600;padding:3px 7px;border-radius:6px;
+  background:var(--glass-2);border:1px solid var(--glass-border);color:var(--text2);
+  display:inline-flex;align-items:center;gap:4px;white-space:nowrap;
+}
+.cal2-sub-chip.green{color:var(--green);border-color:rgba(52,211,153,.25);background:rgba(52,211,153,.08)}
+.cal2-sub-chip.red{color:var(--red);border-color:rgba(248,113,113,.25);background:rgba(248,113,113,.08)}
+.cal2-sub-chip.muted{color:var(--text3)}
+.cal2-sub-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.cal2-sub-dot.green{background:var(--green);box-shadow:0 0 5px var(--green-glow)}
+.cal2-sub-dot.red{background:var(--red);box-shadow:0 0 5px var(--red-glow)}
+.cal2-sub-dot.blue{background:var(--blue);box-shadow:0 0 5px var(--blue-glow)}
+
+/* Trading Score + Monthly Intelligence row */
+.cal2-top-row{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:14px;margin-top:2px}
+@container (max-width: 700px){ .cal2-top-row{grid-template-columns:1fr} }
+.cal2-score-card,.cal2-insights-card{
+  background:var(--glass-1);border:1px solid var(--glass-border);border-radius:var(--r-xl);
+  padding:16px 18px;box-shadow:var(--shadow-sm);min-width:0;
+}
+[data-theme="light"] .cal2-score-card,[data-theme="light"] .cal2-insights-card{background:var(--glass-2);box-shadow:var(--shadow-xs)}
+.cal2-score-card{display:flex;align-items:center;gap:16px}
+.cal2-score-card:empty,.cal2-insights-card:empty{display:none}
+.cal2-score-ring{position:relative;flex:0 0 auto}
+.cal2-score-ring-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.cal2-score-num{font-family:var(--font-mono,monospace);font-size:22px;font-weight:700;color:var(--text)}
+.cal2-score-grade{font-size:11px;font-weight:800;letter-spacing:.03em}
+.cal2-score-body{flex:1;min-width:0}
+.cal2-score-title{font-size:12px;color:var(--text2);font-weight:600;display:flex;align-items:center;gap:5px}
+.cal2-score-trend{font-size:10.5px;margin:3px 0 10px;font-weight:600}
+.cal2-score-trend.green{color:var(--green)} .cal2-score-trend.red{color:var(--red)} .cal2-score-trend.muted{color:var(--text3)}
+.cal2-score-bars{display:flex;flex-direction:column;gap:6px}
+.cal2-score-bar-row{display:flex;align-items:center;gap:8px}
+.cal2-score-bar-label{font-size:9.5px;color:var(--text3);width:66px;flex:0 0 auto}
+.cal2-score-bar-track{flex:1;height:5px;border-radius:3px;background:var(--glass-3);overflow:hidden}
+.cal2-score-bar-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:3px;transition:width .4s var(--ease-out)}
+
+.cal2-section-head{font-size:12px;font-weight:700;color:var(--text2);display:flex;align-items:center;gap:6px;margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em}
+.cal2-insight-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.cal2-insight-card{
+  display:flex;gap:9px;align-items:flex-start;padding:9px 10px;border-radius:10px;
+  background:var(--glass-2);border:1px solid var(--glass-border);
+}
+.cal2-insight-card.green{border-color:rgba(52,211,153,.22)}
+.cal2-insight-card.red{border-color:rgba(248,113,113,.22)}
+.cal2-insight-card.blue{border-color:rgba(96,165,250,.22)}
+.cal2-insight-card.amber{border-color:rgba(251,191,36,.25)}
+.cal2-insight-icon{flex:0 0 auto;width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center}
+.cal2-insight-card.green .cal2-insight-icon{background:rgba(52,211,153,.14);color:var(--green)}
+.cal2-insight-card.red .cal2-insight-icon{background:rgba(248,113,113,.14);color:var(--red)}
+.cal2-insight-card.blue .cal2-insight-icon{background:rgba(96,165,250,.14);color:var(--blue)}
+.cal2-insight-card.amber .cal2-insight-icon{background:rgba(251,191,36,.16);color:#fbbf24}
+.cal2-insight-icon svg{width:13px;height:13px}
+.cal2-insight-text{font-size:11.5px;line-height:1.45;color:var(--text2)}
+
+/* Filter bar */
+.cal2-filter-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cal2-filter-sel{font-size:11px;padding:5px 8px;height:30px;min-width:110px}
+.cal2-filter-clear{
+  display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text3);
+  background:transparent;border:1px solid var(--glass-border);border-radius:6px;padding:5px 9px;cursor:pointer;
+}
+.cal2-filter-clear:hover{color:var(--red);border-color:rgba(248,113,113,.3)}
+
+/* View mode / heatmap tabs */
+.cal2-mode-tabs{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:0 2px 12px}
+.cal2-tab-group{display:flex;align-items:center;gap:4px}
+.cal2-heat-label{font-size:10.5px;color:var(--text3);display:flex;align-items:center;gap:4px;margin-right:2px}
+.cal2-heat-label svg{width:12px;height:12px}
+.cal2-tab{
+  font-size:11px;font-weight:600;padding:5px 12px;border-radius:7px;cursor:pointer;
+  background:transparent;border:1px solid transparent;color:var(--text3);transition:all .12s var(--ease-out);
+}
+.cal2-tab.sm{font-size:10px;padding:4px 9px}
+.cal2-tab:hover{color:var(--text2);background:var(--glass-2)}
+.cal2-tab.active{color:var(--bg);background:var(--blue);font-weight:700}
+
+/* Richer day cells */
+.cal2-day-meta{display:flex;align-items:center;gap:4px;margin-top:3px;flex-wrap:wrap}
+.cal2-day-meta-2{margin-top:2px}
+.cal2-day-sess{font-size:7.5px;font-weight:800;padding:1px 4px;border-radius:4px;letter-spacing:.02em;background:var(--glass-3);color:var(--text3)}
+.cal2-day-sess.london{color:var(--kz-london);background:rgba(34,211,238,.14)}
+.cal2-day-sess.ny{color:var(--kz-ny);background:rgba(251,191,36,.14)}
+.cal2-day-sess.asian{color:var(--kz-asian);background:rgba(167,139,250,.14)}
+.cal2-day-rr{font-size:7.5px;font-weight:700;color:var(--text3)}
+.cal2-day-rule{display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;border-radius:50%}
+.cal2-day-rule svg{width:8px;height:8px}
+.cal2-day-rule.ok{color:var(--green)}
+.cal2-day-rule.warn{color:#fbbf24}
+.cal2-day-mistake{
+  font-size:7px;color:var(--red);background:rgba(248,113,113,.12);border-radius:4px;
+  padding:1px 4px;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+/* Weekly report cards */
+.cal2-week-report{align-items:stretch !important;flex-direction:column;gap:4px}
+.cal2-week-top{display:flex;align-items:center;justify-content:space-between}
+.cal2-week-grade{font-size:12px;font-weight:800}
+.cal2-week-stats{display:flex;flex-direction:column;gap:3px;margin-top:6px;padding-top:6px;border-top:1px solid var(--glass-border)}
+.cal2-week-stat{display:flex;align-items:center;justify-content:space-between;font-size:10px}
+.cal2-week-stat .k{color:var(--text3)}
+.cal2-week-stat .v{color:var(--text2);font-weight:600}
+.cal2-week-stat .v.green{color:var(--green)}
+.cal-week-card.empty{opacity:.55}
+
+/* Agenda view */
+.cal2-agenda-wrap{margin-top:4px}
+.cal2-agenda{display:flex;flex-direction:column;gap:6px}
+.cal2-agenda-empty{padding:32px;text-align:center;color:var(--text3);font-size:12px}
+.cal2-agenda-row{
+  display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-radius:10px;
+  background:var(--glass-1);border:1px solid var(--glass-border);cursor:pointer;transition:all .12s var(--ease-out);
+}
+.cal2-agenda-row:hover{border-color:var(--glass-border-h);transform:translateX(2px)}
+.cal2-agenda-row.win{box-shadow:inset 3px 0 0 var(--green)}
+.cal2-agenda-row.loss{box-shadow:inset 3px 0 0 var(--red)}
+.cal2-agenda-row.breakeven{box-shadow:inset 3px 0 0 var(--blue)}
+.cal2-agenda-dow{font-size:12.5px;font-weight:600;color:var(--text)}
+.cal2-agenda-sub{font-size:10.5px;color:var(--text3);margin-top:2px}
+.cal2-agenda-pnl{font-size:14px;font-weight:700;font-family:var(--font-mono,monospace)}
+.cal2-agenda-pnl.green{color:var(--green)} .cal2-agenda-pnl.red{color:var(--red)} .cal2-agenda-pnl.zero{color:var(--text3)}
+
+/* Mobile tightening */
+@media(max-width:640px){
+  .cal2-insight-grid{grid-template-columns:1fr}
+  .cal2-score-card{flex-direction:row;padding:14px}
+  .cal2-mode-tabs{gap:8px}
+  .cal2-tab{padding:5px 9px;font-size:10.5px}
+  .cal2-filter-sel{min-width:0;flex:1 1 45%}
+}

@@ -479,6 +479,7 @@
         <div id="bulk-action-bar" style="display:none;align-items:center;gap:10px;padding:8px 12px;margin-top:8px;background:rgba(230,57,70,.08);border:1px solid rgba(230,57,70,.2);border-radius:8px">
           <span id="bulk-count-lbl" style="font-size:13px;color:var(--red);font-weight:500"></span>
           <button onclick="bulkDeleteSelected()" style="background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.3);color:var(--red);border-radius:6px;padding:4px 14px;font-size:12px;cursor:pointer"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg> Move to Trash</button>
+          <button onclick="bulkDuplicateSelected()" style="background:rgba(58,134,255,.12);border:1px solid rgba(58,134,255,.25);color:var(--blue);border-radius:6px;padding:4px 14px;font-size:12px;cursor:pointer"><svg class="icn" aria-hidden="true"><use href="#ic-copy"></use></svg> Duplicate</button>
           <button onclick="_bulkSelected.clear();_updateBulkBar();document.querySelectorAll('.bulk-chk').forEach(c=>c.checked=false);document.querySelectorAll('.bulk-selected').forEach(r=>r.classList.remove('bulk-selected'))" style="background:var(--glass-1);border:1px solid var(--glass-border);color:var(--text2);border-radius:6px;padding:4px 14px;font-size:12px;cursor:pointer"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg> Cancel</button>
           <div style="flex:1"></div>
           <button onclick="exportTradesToCSV()" style="background:rgba(58,134,255,.12);border:1px solid rgba(58,134,255,.25);color:var(--blue);border-radius:6px;padding:4px 14px;font-size:12px;cursor:pointer"><svg class="icn" aria-hidden="true"><use href="#ic-download"></use></svg> Export CSV</button>
@@ -792,7 +793,18 @@
         <!-- Analytics cards — Day win% / Avg win-loss trade -->
         <div class="cal-an-grid row2" id="cal-an-row2"></div>
 
+        <!-- Trading Score + Monthly Intelligence -->
+        <div class="cal2-top-row">
+          <div class="cal2-score-card" id="cal2-score"></div>
+          <div class="cal2-insights-card" id="cal2-insights"></div>
+        </div>
+
+        <!-- Filters -->
+        <div class="cal2-filter-bar" id="cal2-filter-bar"></div>
+
         <div class="cal-wrap">
+          <!-- View mode / heatmap tabs -->
+          <div class="cal2-mode-tabs" id="cal2-mode-tabs"></div>
           <div class="cal-page-header">
             <div class="cal-nav" onclick="calNav(-1)">‹</div>
             <div class="cal-month-label" id="cal-month-label-2">May 2026</div>
@@ -824,6 +836,9 @@
               <div class="cal-week-col-heading">Weekly P&amp;L</div>
               <div class="cal-week-col" id="cal-week-col-2"></div>
             </div>
+          </div>
+          <div class="cal2-agenda-wrap" id="cal2-agenda-wrap" style="display:none">
+            <div class="cal2-agenda" id="cal2-agenda"></div>
           </div>
         </div>
       </div>

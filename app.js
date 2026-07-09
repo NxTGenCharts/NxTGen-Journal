@@ -10754,6 +10754,10 @@ function removeChart(id, slot) {
 const MONTH_NAMES_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 let calYear = new Date().getFullYear();
 let calMonth = new Date().getMonth();
+// ── Calendar 2.0 state: filters / heatmap mode / view mode ──
+let calFilters = { strategy: '', session: '', pair: '', outcome: '' };
+let calHeatMode = 'off';   // 'off' | 'profit' | 'trades' | 'rules' | 'psych'
+let calViewMode = 'month'; // 'month' | 'agenda'
 function calNav(dir) { calMonth += dir; if (calMonth > 11) { calMonth = 0; calYear++; } if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); }
 function getAccSize() {
   // Try desktop first, fall back to mobile
@@ -10805,6 +10809,334 @@ function calculateCalendarWinrate(dayMap) { const days = Object.values(dayMap); 
 function showCalTooltip(e, dayData, dateStr, accSize) { const tip = document.getElementById('cal-tooltip'); if (!tip || !dayData) return; const dt = new Date(dateStr + 'T12:00:00'); const dateLabel = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); const usd = dayData.totalPnlUSD !== undefined ? dayData.totalPnlUSD : dayData.trades.reduce((a, t) => a + toPnlDollars(t, accSize), 0); const outcome = calculateDailyOutcome(usd); const outLabel = outcome === 'win' ? '<svg class="icn icn-green" aria-hidden="true"><use href="#ic-dot"></use></svg> Winning Day' : outcome === 'loss' ? '<svg class="icn icn-red" aria-hidden="true"><use href="#ic-dot"></use></svg> Losing Day' : '<svg class="icn icn-muted" aria-hidden="true"><use href="#ic-dot-o"></use></svg> Breakeven Day'; const outColor = outcome === 'win' ? 'var(--green)' : outcome === 'loss' ? 'var(--red)' : 'var(--text3)'; tip.innerHTML = `<div class="cal-tooltip-date">${dateLabel}</div><div class="cal-tooltip-row"><span class="k">Net PnL</span><span class="v" style="color:${usd >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtUSD(usd)}</span></div><div class="cal-tooltip-row"><span class="k">Total trades</span><span class="v">${dayData.trades.length}</span></div><div class="cal-tooltip-row"><span class="k">Wins</span><span class="v" style="color:var(--green)">${dayData.wins}</span></div><div class="cal-tooltip-row"><span class="k">Losses</span><span class="v" style="color:var(--red)">${dayData.losses}</span></div>${dayData.bes ? `<div class="cal-tooltip-row"><span class="k">Break evens</span><span class="v" style="color:var(--blue)">${dayData.bes}</span></div>` : ''}<hr class="cal-tooltip-divider"><div class="cal-tooltip-outcome" style="color:${outColor}">${outLabel}</div>`; const x = Math.min(e.clientX + 14, window.innerWidth - 224); const y = Math.min(e.clientY + 14, window.innerHeight - 200); tip.style.left = x + 'px'; tip.style.top = y + 'px'; tip.style.display = 'block'; }
 function hideCalTooltip() { const tip = document.getElementById('cal-tooltip'); if (tip) tip.style.display = 'none'; }
 
+// ═══════════════════════════════════════════════════════
+// CALENDAR 2.0 — shared stats engine (Phases 1-3)
+// ═══════════════════════════════════════════════════════
+function _calParseRR(rrStr) {
+  // "1:3" -> 3 ; "1:4.5" -> 4.5 ; returns null if unparseable
+  if (!rrStr) return null;
+  const m = String(rrStr).match(/([\d.]+)\s*$/);
+  return m ? parseFloat(m[1]) : null;
+}
+// Approximate realized R-multiple: full planned R on a Win, -1R on a Loss, 0 on B.E.
+function _calAchievedR(t) {
+  const r = _calParseRR(t.rr);
+  if (r === null) return null;
+  if (t.outcome === 'Win') return r;
+  if (t.outcome === 'Loss') return -1;
+  return 0;
+}
+function _calFollowed(t) { return String(t.followedPlan || 'Yes').toLowerCase() === 'yes'; }
+function _calWeekday(dateStr) { return new Date(dateStr + 'T12:00:00').getDay(); }
+const _CAL_WD_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function _calGrade(score) {
+  if (score >= 93) return 'A+'; if (score >= 87) return 'A'; if (score >= 80) return 'A-';
+  if (score >= 73) return 'B+'; if (score >= 67) return 'B'; if (score >= 60) return 'B-';
+  if (score >= 53) return 'C+'; if (score >= 45) return 'C'; if (score >= 35) return 'D';
+  return 'F';
+}
+function _calGradeColor(g) {
+  if (g.startsWith('A')) return 'var(--green)';
+  if (g.startsWith('B')) return '#a3e635';
+  if (g.startsWith('C')) return 'var(--blue)';
+  return 'var(--red)';
+}
+
+// Central metrics computation — used by analytics cards, insights, score, and weekly reports.
+function computeCalMonthStats(monthTrades, dayMap, accSize) {
+  const wins = monthTrades.filter(t => t.outcome === 'Win');
+  const losses = monthTrades.filter(t => t.outcome === 'Loss');
+  const bes = monthTrades.filter(t => t.outcome !== 'Win' && t.outcome !== 'Loss');
+  const denom = wins.length + losses.length;
+  const tradeWR = denom > 0 ? (wins.length / denom) * 100 : 0;
+
+  const longs = monthTrades.filter(t => t.pos === 'Buy');
+  const shorts = monthTrades.filter(t => t.pos === 'Sell');
+  const longWins = longs.filter(t => t.outcome === 'Win').length;
+  const longDenom = longs.filter(t => t.outcome === 'Win' || t.outcome === 'Loss').length;
+  const shortWins = shorts.filter(t => t.outcome === 'Win').length;
+  const shortDenom = shorts.filter(t => t.outcome === 'Win' || t.outcome === 'Loss').length;
+  const longWR = longDenom > 0 ? (longWins / longDenom) * 100 : null;
+  const shortWR = shortDenom > 0 ? (shortWins / shortDenom) * 100 : null;
+
+  let grossProfit = 0, grossLoss = 0, winSum = 0, lossSum = 0;
+  let largestWin = 0, largestLoss = 0;
+  monthTrades.forEach(t => {
+    const usd = toPnlDollars(t, accSize);
+    if (usd > 0) { grossProfit += usd; winSum += usd; if (usd > largestWin) largestWin = usd; }
+    else if (usd < 0) { grossLoss += Math.abs(usd); lossSum += Math.abs(usd); if (usd < largestLoss) largestLoss = usd; }
+  });
+  const profitFactor = grossLoss > 0 ? (grossProfit / grossLoss) : (grossProfit > 0 ? grossProfit : 0);
+  const avgWin = wins.length > 0 ? winSum / wins.length : 0;
+  const avgLoss = losses.length > 0 ? lossSum / losses.length : 0;
+  const avgRatio = losses.length > 0 ? (avgWin / avgLoss) : null;
+  const expectancy = monthTrades.length > 0 ? ((winSum - lossSum) / monthTrades.length) : 0;
+  const recoveryFactor = grossLoss > 0 ? ((grossProfit - grossLoss) / grossLoss) : null;
+
+  const rrVals = monthTrades.map(_calAchievedR).filter(v => v !== null);
+  const avgRR = rrVals.length ? rrVals.reduce((a, b) => a + b, 0) / rrVals.length : null;
+  const largestRR = rrVals.length ? Math.max(...rrVals) : null;
+  const sortedRR = [...rrVals].sort((a, b) => a - b);
+  const medianRR = sortedRR.length ? (sortedRR.length % 2 ? sortedRR[(sortedRR.length - 1) / 2] : (sortedRR[sortedRR.length / 2 - 1] + sortedRR[sortedRR.length / 2]) / 2) : null;
+
+  // Day-level metrics + streaks (chronological)
+  const dayEntries = Object.entries(dayMap).sort((a, b) => a[0].localeCompare(b[0]));
+  let winDays = 0, lossDays = 0, beDays = 0;
+  let curStreakType = null, curStreakLen = 0, longestWinStreak = 0, longestLossStreak = 0, runWin = 0, runLoss = 0;
+  dayEntries.forEach(([date, d]) => {
+    const o = calculateDailyOutcome(d.totalPnlUSD);
+    if (o === 'win') { winDays++; runWin++; runLoss = 0; if (runWin > longestWinStreak) longestWinStreak = runWin; }
+    else if (o === 'loss') { lossDays++; runLoss++; runWin = 0; if (runLoss > longestLossStreak) longestLossStreak = runLoss; }
+    else { beDays++; runWin = 0; runLoss = 0; }
+  });
+  if (dayEntries.length) {
+    const lastO = calculateDailyOutcome(dayEntries[dayEntries.length - 1][1].totalPnlUSD);
+    let i = dayEntries.length - 1, len = 0;
+    while (i >= 0 && calculateDailyOutcome(dayEntries[i][1].totalPnlUSD) === lastO) { len++; i--; }
+    curStreakType = lastO; curStreakLen = len;
+  }
+  const dayDenom = winDays + lossDays;
+  const dayWR = dayDenom > 0 ? (winDays / dayDenom) * 100 : 0;
+  const consistency = dayEntries.length ? Math.round((winDays / dayEntries.length) * 100) : 0;
+
+  // Rule adherence
+  const followedCount = monthTrades.filter(_calFollowed).length;
+  const ruleAdherence = monthTrades.length ? (followedCount / monthTrades.length) * 100 : 100;
+
+  // Session (kz) breakdown
+  const sessionMap = {};
+  monthTrades.forEach(t => {
+    const k = t.kz || 'Unspecified';
+    if (!sessionMap[k]) sessionMap[k] = { count: 0, usd: 0, wins: 0, denom: 0 };
+    sessionMap[k].count++; sessionMap[k].usd += toPnlDollars(t, accSize);
+    if (t.outcome === 'Win' || t.outcome === 'Loss') { sessionMap[k].denom++; if (t.outcome === 'Win') sessionMap[k].wins++; }
+  });
+  let bestSession = null;
+  Object.entries(sessionMap).forEach(([k, v]) => { if (!bestSession || v.usd > sessionMap[bestSession].usd) bestSession = k; });
+
+  // Pair breakdown (expectancy per pair)
+  const pairMap = {};
+  monthTrades.forEach(t => {
+    const k = t.pair || 'Unknown';
+    if (!pairMap[k]) pairMap[k] = { count: 0, usd: 0 };
+    pairMap[k].count++; pairMap[k].usd += toPnlDollars(t, accSize);
+  });
+  let bestPair = null, worstPair = null;
+  Object.entries(pairMap).forEach(([k, v]) => {
+    if (!bestPair || v.usd > pairMap[bestPair].usd) bestPair = k;
+    if (!worstPair || v.usd < pairMap[worstPair].usd) worstPair = k;
+  });
+
+  // Weekday breakdown
+  const wdMap = {};
+  monthTrades.forEach(t => {
+    const wd = _calWeekday(t.date);
+    if (!wdMap[wd]) wdMap[wd] = { count: 0, usd: 0 };
+    wdMap[wd].count++; wdMap[wd].usd += toPnlDollars(t, accSize);
+  });
+  let bestWd = null;
+  Object.entries(wdMap).forEach(([wd, v]) => { if (!bestWd || v.usd > wdMap[bestWd].usd) bestWd = wd; });
+
+  // Mistake tally (loss reasons on losing trades)
+  const mistakeTally = {};
+  losses.forEach(t => { const r = (t.lossReason || '').trim(); if (r) mistakeTally[r] = (mistakeTally[r] || 0) + 1; });
+  const topMistake = Object.entries(mistakeTally).sort((a, b) => b[1] - a[1])[0] || null;
+
+  // Overtrading after big wins: flag days with >=3 trades that followed a winning day
+  let overtradeAfterWinDays = 0;
+  for (let i = 1; i < dayEntries.length; i++) {
+    const prevO = calculateDailyOutcome(dayEntries[i - 1][1].totalPnlUSD);
+    if (prevO === 'win' && dayEntries[i][1].trades.length >= 3) overtradeAfterWinDays++;
+  }
+
+  // Avg rating (proxy for psychology/execution quality, 1-5 stars)
+  const avgRating = monthTrades.length ? monthTrades.reduce((a, t) => a + (t.rating || 0), 0) / monthTrades.length : 0;
+
+  return {
+    totalTrades: monthTrades.length, wins: wins.length, losses: losses.length, bes: bes.length, tradeWR,
+    longWR, shortWR, longCount: longs.length, shortCount: shorts.length,
+    grossProfit, grossLoss, profitFactor, avgWin, avgLoss, avgRatio, expectancy, recoveryFactor,
+    largestWin, largestLoss, avgRR, largestRR, medianRR,
+    winDays, lossDays, beDays, dayWR, longestWinStreak, longestLossStreak, curStreakType, curStreakLen,
+    consistency, tradingDays: dayEntries.length,
+    ruleAdherence, bestSession, sessionMap, bestPair, worstPair, pairMap,
+    bestWd, wdMap, topMistake, mistakeTally, overtradeAfterWinDays, avgRating,
+  };
+}
+
+// Trading Score 0-100: profitability, consistency, rule adherence, risk mgmt(RR), win rate — weighted blend
+function computeCalScore(stats) {
+  if (stats.totalTrades === 0) return { score: 0, grade: 'N/A', parts: {} };
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const profitability = clamp((stats.profitFactor / 3) * 100, 0, 100);        // PF of 3+ = full marks
+  const consistency = clamp(stats.consistency, 0, 100);
+  const discipline = clamp(stats.ruleAdherence, 0, 100);
+  const riskMgmt = stats.avgRR !== null ? clamp(((stats.avgRR + 1) / 4) * 100, 0, 100) : 50;
+  const winRate = clamp(stats.tradeWR, 0, 100);
+  const score = Math.round(profitability * 0.30 + consistency * 0.20 + discipline * 0.20 + riskMgmt * 0.15 + winRate * 0.15);
+  return { score, grade: _calGrade(score), parts: { profitability, consistency, discipline, riskMgmt, winRate } };
+}
+
+// Auto-generated Monthly Intelligence insight cards, grounded entirely in real trade data.
+function computeCalInsights(stats, monthTrades) {
+  const insights = [];
+  if (!stats.totalTrades) return insights;
+
+  if (stats.bestWd !== null && stats.wdMap[stats.bestWd].count >= 2) {
+    insights.push({ icon: 'ic-trend-up', tone: 'green', text: `${_CAL_WD_NAMES[stats.bestWd]}s are your strongest day — ${fmtUSD(stats.wdMap[stats.bestWd].usd)} across ${stats.wdMap[stats.bestWd].count} trades.` });
+  }
+  if (stats.bestSession && stats.grossProfit > 0) {
+    const sessShare = Math.round((Math.max(0, stats.sessionMap[stats.bestSession].usd) / stats.grossProfit) * 100);
+    if (sessShare > 0) insights.push({ icon: 'ic-globe', tone: 'blue', text: `${stats.bestSession} session generated ${clampPct(sessShare)}% of this month's gross profit.` });
+  }
+  if (stats.bestPair && stats.pairMap[stats.bestPair].count >= 2) {
+    insights.push({ icon: 'ic-star', tone: 'green', text: `${stats.bestPair} is your highest-expectancy pair this month at ${fmtUSD(stats.pairMap[stats.bestPair].usd)} net.` });
+  }
+  if (stats.worstPair && stats.pairMap[stats.worstPair].usd < 0 && stats.worstPair !== stats.bestPair) {
+    insights.push({ icon: 'ic-trend-down', tone: 'red', text: `${stats.worstPair} has been unprofitable this month (${fmtUSD(stats.pairMap[stats.worstPair].usd)}).` });
+  }
+  if (stats.longestLossStreak >= 2) {
+    insights.push({ icon: 'ic-warning', tone: 'red', text: `Longest losing streak this month: ${stats.longestLossStreak} day${stats.longestLossStreak > 1 ? 's' : ''} in a row.` });
+  }
+  if (stats.curStreakType === 'win' && stats.curStreakLen >= 2) {
+    insights.push({ icon: 'ic-fire', tone: 'green', text: `You're on a ${stats.curStreakLen}-day winning streak — keep risk consistent, don't size up.` });
+  }
+  if (stats.overtradeAfterWinDays > 0) {
+    insights.push({ icon: 'ic-warning', tone: 'amber', text: `You took 3+ trades on ${stats.overtradeAfterWinDays} day${stats.overtradeAfterWinDays > 1 ? 's' : ''} right after a winning day — watch for overtrading after wins.` });
+  }
+  insights.push({ icon: 'ic-shield', tone: stats.ruleAdherence >= 80 ? 'green' : stats.ruleAdherence >= 60 ? 'amber' : 'red', text: `You followed your trading plan on ${Math.round(stats.ruleAdherence)}% of trades this month.` });
+  if (stats.topMistake) {
+    insights.push({ icon: 'ic-warning', tone: 'red', text: `"${stats.topMistake[0]}" is your most common loss reason — logged on ${stats.topMistake[1]} losing trade${stats.topMistake[1] > 1 ? 's' : ''}.` });
+  }
+  if (stats.longWR !== null && stats.shortWR !== null && stats.longCount >= 2 && stats.shortCount >= 2) {
+    if (Math.abs(stats.longWR - stats.shortWR) >= 15) {
+      const better = stats.longWR > stats.shortWR ? 'longs' : 'shorts';
+      insights.push({ icon: 'ic-target', tone: 'blue', text: `Your ${better} are performing notably better this month (${stats.longWR.toFixed(0)}% long vs ${stats.shortWR.toFixed(0)}% short win rate).` });
+    }
+  }
+  if (stats.avgRR !== null && stats.avgRR < 1 && stats.losses > 0) {
+    insights.push({ icon: 'ic-warning', tone: 'amber', text: `Average realized R is below 1 — consider tightening entries or letting winners run further.` });
+  }
+  return insights.slice(0, 8);
+}
+function clampPct(v) { return Math.max(0, Math.min(100, v)); }
+
+function renderCalInsights(stats, monthTrades) {
+  const el = document.getElementById('cal2-insights');
+  if (!el) return;
+  if (!monthTrades.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  const insights = computeCalInsights(stats, monthTrades);
+  if (!insights.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML = `<div class="cal2-section-head"><svg class="icn" aria-hidden="true"><use href="#ic-bulb"></use></svg> Monthly Intelligence</div>
+    <div class="cal2-insight-grid">${insights.map(i => `
+      <div class="cal2-insight-card ${i.tone}">
+        <div class="cal2-insight-icon"><svg class="icn" aria-hidden="true"><use href="#${i.icon}"></use></svg></div>
+        <div class="cal2-insight-text">${i.text}</div>
+      </div>`).join('')}</div>`;
+}
+
+function renderCalScore(stats, prevStats) {
+  const el = document.getElementById('cal2-score');
+  if (!el) return;
+  if (!stats.totalTrades) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  el.style.display = '';
+  const { score, grade, parts } = computeCalScore(stats);
+  const cGreen = _calCssVar('--green', '#34d399'), cTrack = _calCssVar('--glass-3', 'rgba(255,255,255,0.12)');
+  const gradeColor = _calGradeColor(grade);
+  let trendHTML = '';
+  if (prevStats && prevStats.totalTrades) {
+    const prevScore = computeCalScore(prevStats).score;
+    const diff = score - prevScore;
+    trendHTML = `<div class="cal2-score-trend ${diff >= 0 ? 'green' : 'red'}">${diff >= 0 ? '▲' : '▼'} ${Math.abs(diff)} pts vs last month</div>`;
+  } else {
+    trendHTML = `<div class="cal2-score-trend muted">No prior month to compare</div>`;
+  }
+  const rows = [
+    ['Profitability', parts.profitability], ['Consistency', parts.consistency],
+    ['Discipline', parts.discipline], ['Risk mgmt', parts.riskMgmt], ['Win rate', parts.winRate],
+  ];
+  el.innerHTML = `
+    <div class="cal2-score-ring">${_calRingGauge(score / 100, cGreen, cTrack, 96)}
+      <div class="cal2-score-ring-label"><div class="cal2-score-num">${score}</div><div class="cal2-score-grade" style="color:${gradeColor}">${grade}</div></div>
+    </div>
+    <div class="cal2-score-body">
+      <div class="cal2-score-title">Trading Score <span class="info-dot">i</span></div>
+      ${trendHTML}
+      <div class="cal2-score-bars">${rows.map(([label, val]) => `
+        <div class="cal2-score-bar-row"><span class="cal2-score-bar-label">${label}</span>
+          <div class="cal2-score-bar-track"><div class="cal2-score-bar-fill" style="width:${clampPct(val).toFixed(0)}%"></div></div>
+        </div>`).join('')}</div>
+    </div>`;
+}
+
+function renderCalFilterBar() {
+  const el = document.getElementById('cal2-filter-bar');
+  if (!el) return;
+  const strategies = [...new Set(trades.map(t => t.strategy).filter(Boolean))].sort();
+  const sessions = [...new Set(trades.map(t => t.kz).filter(Boolean))].sort();
+  const pairs = [...new Set(trades.map(t => t.pair).filter(Boolean))].sort();
+  const mkOpts = (arr, cur) => `<option value="">All</option>` + arr.map(v => `<option value="${v}"${v === cur ? ' selected' : ''}>${v}</option>`).join('');
+  el.innerHTML = `
+    <select class="form-select cal2-filter-sel" onchange="calFilters.strategy=this.value;renderCalendar()">${mkOpts(strategies, calFilters.strategy).replace('All', 'All models')}</select>
+    <select class="form-select cal2-filter-sel" onchange="calFilters.session=this.value;renderCalendar()">${mkOpts(sessions, calFilters.session).replace('All', 'All sessions')}</select>
+    <select class="form-select cal2-filter-sel" onchange="calFilters.pair=this.value;renderCalendar()">${mkOpts(pairs, calFilters.pair).replace('All', 'All pairs')}</select>
+    <select class="form-select cal2-filter-sel" onchange="calFilters.outcome=this.value;renderCalendar()">
+      <option value=""${calFilters.outcome === '' ? ' selected' : ''}>All outcomes</option>
+      <option value="Win"${calFilters.outcome === 'Win' ? ' selected' : ''}>Wins</option>
+      <option value="Loss"${calFilters.outcome === 'Loss' ? ' selected' : ''}>Losses</option>
+      <option value="BE"${calFilters.outcome === 'BE' ? ' selected' : ''}>Break-even</option>
+    </select>
+    ${(calFilters.strategy || calFilters.session || calFilters.pair || calFilters.outcome) ? `<button class="cal2-filter-clear" onclick="calFilters={strategy:'',session:'',pair:'',outcome:''};renderCalendar()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg> Clear</button>` : ''}`;
+}
+
+function calSetHeatMode(mode) { calHeatMode = (calHeatMode === mode) ? 'off' : mode; renderCalendar(); }
+function calSetViewMode(mode) { calViewMode = mode; renderCalendar(); }
+
+function renderCalModeTabs() {
+  const el = document.getElementById('cal2-mode-tabs');
+  if (!el) return;
+  const viewTabs = [['month', 'Month'], ['agenda', 'Agenda']];
+  const heatTabs = [['profit', 'Profit'], ['trades', 'Trades'], ['rules', 'Rules'], ['psych', 'Psychology']];
+  el.innerHTML = `
+    <div class="cal2-tab-group">${viewTabs.map(([v, l]) => `<button class="cal2-tab ${calViewMode === v ? 'active' : ''}" onclick="calSetViewMode('${v}')">${l}</button>`).join('')}</div>
+    <div class="cal2-tab-group">
+      <span class="cal2-heat-label"><svg class="icn" aria-hidden="true"><use href="#ic-chart-bar"></use></svg> Heatmap</span>
+      ${heatTabs.map(([v, l]) => `<button class="cal2-tab sm ${calHeatMode === v ? 'active' : ''}" onclick="calSetHeatMode('${v}')">${l}</button>`).join('')}
+    </div>`;
+}
+
+function _calHeatColor(intensity, tone) {
+  // intensity 0..1 -> 5-step color scale
+  const steps = tone === 'red'
+    ? ['rgba(248,113,113,0.06)', 'rgba(248,113,113,0.16)', 'rgba(248,113,113,0.30)', 'rgba(248,113,113,0.48)', 'rgba(248,113,113,0.70)']
+    : tone === 'blue'
+    ? ['rgba(96,165,250,0.06)', 'rgba(96,165,250,0.16)', 'rgba(96,165,250,0.30)', 'rgba(96,165,250,0.48)', 'rgba(96,165,250,0.70)']
+    : ['rgba(52,211,153,0.06)', 'rgba(52,211,153,0.16)', 'rgba(52,211,153,0.30)', 'rgba(52,211,153,0.48)', 'rgba(52,211,153,0.70)'];
+  const idx = Math.min(4, Math.floor(intensity * 5));
+  return steps[idx];
+}
+
+function renderCalAgendaView(monthTrades, dayMap, accSize) {
+  const el = document.getElementById('cal2-agenda');
+  if (!el) return;
+  const dayEntries = Object.entries(dayMap).sort((a, b) => b[0].localeCompare(a[0]));
+  if (!dayEntries.length) { el.innerHTML = `<div class="cal2-agenda-empty">No trades logged this month yet.</div>`; return; }
+  el.innerHTML = dayEntries.map(([date, d]) => {
+    const o = calculateDailyOutcome(d.totalPnlUSD);
+    const dt = new Date(date + 'T12:00:00');
+    const label = dt.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    const followedN = d.trades.filter(_calFollowed).length;
+    return `<div class="cal2-agenda-row ${o}" onclick="openCalPopup(event,'${date}')">
+      <div class="cal2-agenda-date">
+        <div class="cal2-agenda-dow">${label}</div>
+        <div class="cal2-agenda-sub">${d.trades.length} trade${d.trades.length > 1 ? 's' : ''} · ${followedN}/${d.trades.length} followed plan</div>
+      </div>
+      <div class="cal2-agenda-pnl ${o === 'win' ? 'green' : o === 'loss' ? 'red' : 'zero'}">${fmtUSD(d.totalPnlUSD)}</div>
+    </div>`;
+  }).join('');
+}
+
 function renderCalendar() {
   const accSize = getAccSize(); const accFilter = getCalFilter();
   // Update both the dashboard inline calendar label and the standalone calendar page label
@@ -10813,7 +11145,15 @@ function renderCalendar() {
   });
   const label = document.getElementById('cal-month-label');
   const ym = calYear + '-' + String(calMonth + 1).padStart(2, '0');
-  const monthTrades = trades.filter(t => t.date.startsWith(ym) && (!accFilter || t.account === accFilter));
+  const _calMatchesFilters = t => {
+    if (calFilters.strategy && t.strategy !== calFilters.strategy) return false;
+    if (calFilters.session && t.kz !== calFilters.session) return false;
+    if (calFilters.pair && t.pair !== calFilters.pair) return false;
+    if (calFilters.outcome === 'BE' && (t.outcome === 'Win' || t.outcome === 'Loss')) return false;
+    if ((calFilters.outcome === 'Win' || calFilters.outcome === 'Loss') && t.outcome !== calFilters.outcome) return false;
+    return true;
+  };
+  const monthTrades = trades.filter(t => t.date.startsWith(ym) && (!accFilter || t.account === accFilter) && _calMatchesFilters(t));
   const dayMap = groupTradesByDay(monthTrades, accSize);
   const { winDays, lossDays, beDays, wr } = calculateCalendarWinrate(dayMap);
   const tradingDays = Object.keys(dayMap);
@@ -10833,8 +11173,30 @@ function renderCalendar() {
     if (kpiEl2) kpiEl2.innerHTML = _kpiHtml;
   }
 
+  // ── Calendar 2.0: central stats (used by analytics cards, insights, score) ──
+  const calStats = computeCalMonthStats(monthTrades, dayMap, accSize);
+  let prevM = calMonth - 1, prevY = calYear; if (prevM < 0) { prevM = 11; prevY--; }
+  const prevYm = prevY + '-' + String(prevM + 1).padStart(2, '0');
+  const prevMonthTrades = trades.filter(t => t.date.startsWith(prevYm) && (!accFilter || t.account === accFilter));
+  const prevDayMap = groupTradesByDay(prevMonthTrades, accSize);
+  const prevStats = computeCalMonthStats(prevMonthTrades, prevDayMap, accSize);
+  window._calStats = calStats; window._calPrevStats = prevStats;
+
   // ── Standalone Calendar page: analytics cards + monthly stats pill ──
-  renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDays, beDays, wr, tradingDays.length, accSize);
+  renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDays, beDays, wr, tradingDays.length, accSize, calStats, prevStats);
+
+  // ── Calendar 2.0: filter bar, view/heatmap tabs, monthly intelligence, trading score ──
+  if (document.getElementById('cal2-insights') || document.getElementById('cal2-score')) {
+    renderCalFilterBar();
+    renderCalModeTabs();
+    renderCalInsights(calStats, monthTrades);
+    renderCalScore(calStats, prevStats);
+    renderCalAgendaView(monthTrades, dayMap, accSize);
+    const gridWrap = document.querySelector('#page-calendar .cal-grid-with-weeks');
+    const agendaWrap = document.getElementById('cal2-agenda-wrap');
+    if (gridWrap) gridWrap.style.display = calViewMode === 'agenda' ? 'none' : '';
+    if (agendaWrap) agendaWrap.style.display = calViewMode === 'agenda' ? '' : 'none';
+  }
 
   const daysEl = document.getElementById('cal-days');
   const daysEl2 = document.getElementById('cal-days-2');
@@ -10853,7 +11215,15 @@ function renderCalendar() {
   const rowsNeeded = Math.ceil((startDow + daysInMonth) / 7);
   const targetCells = rowsNeeded * 7;
   while (cells.length < targetCells) { const nextMonth = calMonth === 11 ? 1 : calMonth + 2; const nextYear = calMonth === 11 ? calYear + 1 : calYear; cells.push({ day: nextD++, month: nextMonth, year: nextYear, current: false }); }
+  // Normalization maxima for heatmap modes (full calendar page only)
+  const _dayVals = Object.values(dayMap);
+  const _maxAbsUSD = _dayVals.length ? Math.max(...(_dayVals.map(d => Math.abs(d.totalPnlUSD))), 1) : 1;
+  const _maxTradeCount = _dayVals.length ? Math.max(...(_dayVals.map(d => d.trades.length)), 1) : 1;
+  const _kzTag = kz => kz === 'London' ? 'LDN' : kz === 'New York' ? 'NY' : kz === 'Asian' ? 'ASN' : (kz || '').slice(0, 3).toUpperCase();
+  const _kzCls = kz => kz === 'London' ? 'london' : kz === 'New York' ? 'ny' : kz === 'Asian' ? 'asian' : '';
+
   const _calDaysHTML_fn = (daysEl_target) => { if (!daysEl_target) return;
+  const isFullPage = daysEl_target.id === 'cal-days-2';
   daysEl_target.innerHTML = cells.map(c => {
     const dateStr = c.year + '-' + String(c.month).padStart(2, '0') + '-' + String(c.day).padStart(2, '0');
     const isToday = dateStr === today; const dayData = dayMap[dateStr]; const hasTrades = !!dayData;
@@ -10861,35 +11231,97 @@ function renderCalendar() {
     let cls = 'cal-day'; if (!c.current) cls += ' other-month'; if (isToday) cls += ' today';
     if (hasTrades) { cls += ' has-trades'; if (outcome === 'win') cls += ' win-day'; else if (outcome === 'loss') cls += ' loss-day'; else cls += ' mixed-day'; }
     const dayNumHTML = isToday ? `<div class="cal-day-num"><span class="cal-today-badge">${c.day}</span></div>` : `<div class="cal-day-num">${String(c.day).padStart(2, '0')}</div>`;
-    let dotHTML = '', pnlHTML = '', countHTML = '', pairsHTML = '';
-    if (hasTrades) { const dotColor = outcome === 'win' ? 'green' : outcome === 'loss' ? 'red' : 'blue'; dotHTML = `<div class="cal-day-dot ${dotColor}"></div>`; const usd = dayData.totalPnlUSD; const _calShowDollar = _pnlToggleMode === '$'; let _calPnlStr; if (_calShowDollar) { _calPnlStr = fmtUSD(usd); } else { const _calPct = dayData.trades.reduce((a,t)=>a+_pctOfTrade(t),0); _calPnlStr = (_calPct >= 0 ? '+' : '') + _calPct.toFixed(1) + '%'; } pnlHTML = `<div class="cal-day-pnl ${usd > 0 ? 'green' : usd < 0 ? 'red' : 'zero'}">${_calPnlStr}</div>`; countHTML = `<div class="cal-day-count">${dayData.trades.length} trade${dayData.trades.length > 1 ? 's' : ''}</div>`; const pairs = [...new Set(dayData.trades.map(t => t.pair))].join(', '); pairsHTML = `<div class="cal-day-pairs">${pairs}</div>`; }
+    let dotHTML = '', pnlHTML = '', countHTML = '', pairsHTML = '', metaHTML = '', heatStyle = '';
+    if (hasTrades) {
+      const dotColor = outcome === 'win' ? 'green' : outcome === 'loss' ? 'red' : 'blue'; dotHTML = `<div class="cal-day-dot ${dotColor}"></div>`;
+      const usd = dayData.totalPnlUSD; const _calShowDollar = _pnlToggleMode === '$'; let _calPnlStr;
+      if (_calShowDollar) { _calPnlStr = fmtUSD(usd); } else { const _calPct = dayData.trades.reduce((a,t)=>a+_pctOfTrade(t),0); _calPnlStr = (_calPct >= 0 ? '+' : '') + _calPct.toFixed(1) + '%'; }
+      pnlHTML = `<div class="cal-day-pnl ${usd > 0 ? 'green' : usd < 0 ? 'red' : 'zero'}">${_calPnlStr}</div>`;
+      countHTML = `<div class="cal-day-count">${dayData.trades.length} trade${dayData.trades.length > 1 ? 's' : ''}</div>`;
+      const pairs = [...new Set(dayData.trades.map(t => t.pair))].join(', '); pairsHTML = `<div class="cal-day-pairs">${pairs}</div>`;
+
+      if (isFullPage) {
+        // Rich meta row: dominant session, avg R, rule-adherence check, mistake tag on loss days
+        const sessCounts = {}; dayData.trades.forEach(t => { const k = t.kz || ''; sessCounts[k] = (sessCounts[k] || 0) + 1; });
+        const domSess = Object.entries(sessCounts).sort((a, b) => b[1] - a[1])[0];
+        const sessBadge = (domSess && domSess[0]) ? `<span class="cal2-day-sess ${_kzCls(domSess[0])}">${_kzTag(domSess[0])}</span>` : '';
+        const rVals = dayData.trades.map(_calAchievedR).filter(v => v !== null);
+        const avgDayR = rVals.length ? (rVals.reduce((a, b) => a + b, 0) / rVals.length) : null;
+        const rBadge = avgDayR !== null ? `<span class="cal2-day-rr">${avgDayR >= 0 ? '+' : ''}${avgDayR.toFixed(1)}R</span>` : '';
+        const followedN = dayData.trades.filter(_calFollowed).length;
+        const ruleOk = followedN === dayData.trades.length;
+        const ruleBadge = `<span class="cal2-day-rule ${ruleOk ? 'ok' : 'warn'}" title="${followedN}/${dayData.trades.length} followed plan"><svg class="icn" aria-hidden="true"><use href="#${ruleOk ? 'ic-check' : 'ic-warning'}"></use></svg></span>`;
+        let mistakeBadge = '';
+        if (outcome === 'loss') {
+          const reasons = dayData.trades.filter(t => t.outcome === 'Loss' && t.lossReason).map(t => t.lossReason);
+          if (reasons.length) mistakeBadge = `<span class="cal2-day-mistake" title="${reasons[0]}">${reasons[0]}</span>`;
+        }
+        metaHTML = `<div class="cal2-day-meta">${sessBadge}${rBadge}${ruleBadge}</div>${mistakeBadge ? `<div class="cal2-day-meta-2">${mistakeBadge}</div>` : ''}`;
+      }
+
+      if (isFullPage && calHeatMode !== 'off') {
+        if (calHeatMode === 'profit') { const tone = usd >= 0 ? 'green' : 'red'; heatStyle = `background:${_calHeatColor(Math.abs(usd) / _maxAbsUSD, tone)} !important`; }
+        else if (calHeatMode === 'trades') { heatStyle = `background:${_calHeatColor(dayData.trades.length / _maxTradeCount, 'blue')} !important`; }
+        else if (calHeatMode === 'rules') { const frac = followedN_safe(dayData); const tone = frac >= 0.5 ? 'green' : 'red'; heatStyle = `background:${_calHeatColor(frac >= 0.5 ? frac : (1 - frac), tone)} !important`; }
+        else if (calHeatMode === 'psych') { const avgR = dayData.trades.reduce((a, t) => a + (t.rating || 0), 0) / dayData.trades.length; heatStyle = `background:${_calHeatColor(avgR / 5, 'green')} !important`; }
+      }
+    }
     let clickAttr = '', hoverAttr = '';
     if (c.current) { if (hasTrades) { clickAttr = `onclick="openCalPopup(event,'${dateStr}')"`;  hoverAttr = `onmouseenter="showCalTooltip(event,window._dayMap&&window._dayMap['${dateStr}'],'${dateStr}',${accSize})" onmouseleave="hideCalTooltip()"`; } else { clickAttr = `onclick="closeCalPopup();openModal({date:'${dateStr}'})"` ; } }
-    return `<div class="${cls}" ${clickAttr} ${hoverAttr}>${dotHTML}${dayNumHTML}${pnlHTML}${countHTML}${pairsHTML}</div>`;
+    const styleAttr = heatStyle ? ` style="${heatStyle}"` : '';
+    return `<div class="${cls}" ${clickAttr} ${hoverAttr}${styleAttr}>${dotHTML}${dayNumHTML}${pnlHTML}${countHTML}${pairsHTML}${metaHTML}</div>`;
   }).join(''); };
+  function followedN_safe(dayData) { return dayData.trades.filter(_calFollowed).length / dayData.trades.length; }
   _calDaysHTML_fn(daysEl); _calDaysHTML_fn(daysEl2);
-  renderCalWeekSidebar(cells, dayMap);
+  renderCalWeekSidebar(cells, dayMap, accSize);
   window._dayMap = dayMap;
 }
 
-// ── Weekly summary sidebar (standalone Calendar page only) ──
-function renderCalWeekSidebar(cells, dayMap) {
+// ── Weekly summary sidebar (standalone Calendar page only) — full weekly performance reports ──
+function renderCalWeekSidebar(cells, dayMap, accSize) {
   const col = document.getElementById('cal-week-col-2');
   if (!col) return;
   let html = '';
   for (let row = 0; row < cells.length; row += 7) {
     const weekCells = cells.slice(row, row + 7);
-    let total = 0, totalPct = 0, activeDays = 0;
+    let total = 0, totalPct = 0, activeDays = 0, weekTrades = [];
+    let bestDay = null, worstDay = null;
     weekCells.forEach(c => {
       const dateStr = c.year + '-' + String(c.month).padStart(2, '0') + '-' + String(c.day).padStart(2, '0');
       const d = dayMap[dateStr];
-      if (d) { total += d.totalPnlUSD; totalPct += d.trades.reduce((a, t) => a + _pctOfTrade(t), 0); activeDays++; }
+      if (d) {
+        total += d.totalPnlUSD; totalPct += d.trades.reduce((a, t) => a + _pctOfTrade(t), 0); activeDays++;
+        weekTrades = weekTrades.concat(d.trades);
+        if (!bestDay || d.totalPnlUSD > dayMap[bestDay].totalPnlUSD) bestDay = dateStr;
+        if (!worstDay || d.totalPnlUSD < dayMap[worstDay].totalPnlUSD) worstDay = dateStr;
+      }
     });
     const _weekIsDollar = (_pnlToggleMode === '$');
     const _weekVal = _weekIsDollar ? total : totalPct;
     const _weekDisplay = _weekIsDollar ? fmtUSD(total) : ((totalPct >= 0 ? '+' : '') + totalPct.toFixed(1) + '%');
     const cls = _weekVal > 0 ? 'green' : _weekVal < 0 ? 'red' : 'zero';
-    html += `<div class="cal-week-card"><div class="cal-week-label">Week ${(row / 7) + 1}</div><div class="cal-week-pnl ${cls}">${_weekDisplay}</div><div class="cal-week-days">${activeDays} day${activeDays === 1 ? '' : 's'}</div></div>`;
+
+    if (!weekTrades.length) {
+      html += `<div class="cal-week-card empty"><div class="cal-week-label">Week ${(row / 7) + 1}</div><div class="cal-week-pnl zero">+0.0%</div><div class="cal-week-days">0 days</div></div>`;
+      continue;
+    }
+    const wStats = computeCalMonthStats(weekTrades, groupTradesByDay(weekTrades, accSize), accSize);
+    const wGrade = computeCalScore(wStats).grade;
+    const dayName = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' });
+    html += `<div class="cal-week-card cal2-week-report">
+      <div class="cal2-week-top">
+        <div class="cal-week-label">Week ${(row / 7) + 1}</div>
+        <div class="cal2-week-grade" style="color:${_calGradeColor(wGrade)}">${wGrade}</div>
+      </div>
+      <div class="cal-week-pnl ${cls}">${_weekDisplay}</div>
+      <div class="cal-week-days">${activeDays} day${activeDays === 1 ? '' : 's'} · ${weekTrades.length} trade${weekTrades.length === 1 ? '' : 's'}</div>
+      <div class="cal2-week-stats">
+        <div class="cal2-week-stat"><span class="k">Win rate</span><span class="v">${wStats.tradeWR.toFixed(0)}%</span></div>
+        <div class="cal2-week-stat"><span class="k">Profit factor</span><span class="v">${wStats.profitFactor.toFixed(2)}</span></div>
+        <div class="cal2-week-stat"><span class="k">Avg RR</span><span class="v">${wStats.avgRR !== null ? wStats.avgRR.toFixed(1) + 'R' : '—'}</span></div>
+        ${bestDay ? `<div class="cal2-week-stat"><span class="k">Best day</span><span class="v green">${dayName(bestDay)}</span></div>` : ''}
+      </div>
+    </div>`;
   }
   col.innerHTML = html;
 }
@@ -10940,7 +11372,7 @@ function _calRingGauge(fraction, colorMain, colorRest, size) {
 }
 
 // ── Analytics cards (standalone Calendar page) ──────
-function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDays, beDays, dayWR, tradingDaysCount, accSize) {
+function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDays, beDays, dayWR, tradingDaysCount, accSize, calStats, prevStats) {
   const row1 = document.getElementById('cal-an-row1');
   const row2 = document.getElementById('cal-an-row2');
   const pillRow = document.getElementById('cal-stats-pill-2');
@@ -10982,11 +11414,25 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
   const _calNetDisplay = _calIsDollar ? fmtUSD(totalUSD) : ((_calTotalPct >= 0 ? '+' : '') + _calTotalPct.toFixed(1) + '%');
 
   if (row1) {
+    const prevTotalUSD = prevStats ? (prevStats.grossProfit - prevStats.grossLoss) : 0;
+    const momDelta = prevStats && prevStats.totalTrades ? (totalUSD - prevTotalUSD) : null;
+    const momPct = (momDelta !== null && Math.abs(prevTotalUSD) > 0.001) ? (momDelta / Math.abs(prevTotalUSD)) * 100 : null;
+    const avgPerDay = tradingDaysCount ? totalUSD / tradingDaysCount : 0;
+    const streakTxt = calStats && calStats.curStreakType
+      ? `${calStats.curStreakLen} ${calStats.curStreakType === 'win' ? 'winning' : calStats.curStreakType === 'loss' ? 'losing' : 'breakeven'} day${calStats.curStreakLen === 1 ? '' : 's'}`
+      : '—';
+    const streakDot = calStats && calStats.curStreakType === 'win' ? 'green' : calStats && calStats.curStreakType === 'loss' ? 'red' : 'blue';
+
     row1.innerHTML = `
       <div class="cal-an-card cal-an-card--toggle" onclick="toggleNetPnl()" title="Tap to toggle $ / %">
         <div class="cal-an-left">
           <div class="cal-an-label">Net P&amp;L <span class="info-dot">i</span> <span class="cal-an-toggle-hint">tap to toggle</span></div>
           <div class="cal-an-value ${_calNetVal >= 0 ? 'green' : 'red'}">${_calNetDisplay}</div>
+          <div class="cal2-sub-row">
+            ${momPct !== null ? `<span class="cal2-sub-chip ${momPct >= 0 ? 'green' : 'red'}">${momPct >= 0 ? '▲' : '▼'} ${Math.abs(momPct).toFixed(1)}% vs last mo.</span>` : `<span class="cal2-sub-chip muted">No prior month</span>`}
+            <span class="cal2-sub-chip ${streakDot}"><span class="cal2-sub-dot ${streakDot}"></span>${streakTxt}</span>
+            <span class="cal2-sub-chip muted">Avg/day ${fmtUSD(avgPerDay)}</span>
+          </div>
         </div>
         <div class="cal-an-badge">${monthTrades.length}</div>
       </div>
@@ -10994,6 +11440,11 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
         <div class="cal-an-left">
           <div class="cal-an-label">Trade win % <span class="info-dot">i</span></div>
           <div class="cal-an-value">${tradeWR.toFixed(2)}%</div>
+          <div class="cal2-sub-row">
+            <span class="cal2-sub-chip muted">Long ${calStats.longWR !== null ? calStats.longWR.toFixed(0) + '%' : '—'}</span>
+            <span class="cal2-sub-chip muted">Short ${calStats.shortWR !== null ? calStats.shortWR.toFixed(0) + '%' : '—'}</span>
+            <span class="cal2-sub-chip muted">Avg RR ${calStats.avgRR !== null ? calStats.avgRR.toFixed(1) + 'R' : '—'}</span>
+          </div>
         </div>
         <div class="cal-an-gauge-col">
           ${_calSemiGauge([{ value: wins, color: cGreen }, { value: bes, color: cBlue }, { value: losses, color: cRed }])}
@@ -11008,6 +11459,11 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
         <div class="cal-an-left">
           <div class="cal-an-label">Profit factor <span class="info-dot">i</span></div>
           <div class="cal-an-value">${profitFactor.toFixed(2)}</div>
+          <div class="cal2-sub-row">
+            <span class="cal2-sub-chip green">GP ${fmtUSD(grossProfit)}</span>
+            <span class="cal2-sub-chip red">GL ${fmtUSD(-grossLoss)}</span>
+            <span class="cal2-sub-chip muted">Expectancy ${fmtUSD(calStats.expectancy)}</span>
+          </div>
         </div>
         <div class="cal-an-ring-col">${_calRingGauge(pfFraction, cGreen, cRed)}</div>
       </div>`;
@@ -11019,6 +11475,11 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
         <div class="cal-an-left">
           <div class="cal-an-label">Day win % <span class="info-dot">i</span></div>
           <div class="cal-an-value">${dayWR.toFixed(2)}%</div>
+          <div class="cal2-sub-row">
+            <span class="cal2-sub-chip green">Best streak ${calStats.longestWinStreak}d</span>
+            <span class="cal2-sub-chip red">Worst streak ${calStats.longestLossStreak}d</span>
+            <span class="cal2-sub-chip muted">Consistency ${calStats.consistency}%</span>
+          </div>
         </div>
         <div class="cal-an-gauge-col">
           ${_calSemiGauge([{ value: winDays, color: cGreen }, { value: beDays, color: cBlue }, { value: lossDays, color: cRed }])}
@@ -11048,6 +11509,11 @@ function renderCalAnalyticsCards(monthTrades, dayMap, totalUSD, winDays, lossDay
               <span class="cal-an-bar-main red">-${avgLossPct.toFixed(2)}%</span>
               <span class="cal-an-bar-sub">${fmtUSD(-avgLoss)}</span>
             </span>
+          </div>
+          <div class="cal2-sub-row">
+            <span class="cal2-sub-chip muted">Avg RR ${calStats.avgRR !== null ? calStats.avgRR.toFixed(1) + 'R' : '—'}</span>
+            <span class="cal2-sub-chip muted">Largest RR ${calStats.largestRR !== null ? calStats.largestRR.toFixed(1) + 'R' : '—'}</span>
+            <span class="cal2-sub-chip muted">Median RR ${calStats.medianRR !== null ? calStats.medianRR.toFixed(1) + 'R' : '—'}</span>
           </div>
         </div>
       </div>`;
