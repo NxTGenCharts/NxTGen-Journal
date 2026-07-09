@@ -8002,15 +8002,17 @@ function _accDrawEquityCurve(name) {
 }
 
 // ── Challenge Progress Tracker (Prop Firm Challenge accounts only) ──────
-// Persisted on the account object as `challengeTarget` (a percent number),
-// saved through the same _saveCustomAccounts() pipeline as everything else
-// in Manage Accounts. Purely derived — no separate storage for the maths.
+// Persisted on the account object as `challengeTarget` (a percent number)
+// and `challengePhase` ('Phase 1' | 'Phase 2'), saved through the same
+// _saveCustomAccounts() pipeline as everything else in Manage Accounts.
+// Purely derived — no separate storage for the maths.
 function _accChallengeSectionHtml(acc, m, accSize, name) {
-  const presetTargets = [8, 10, 12];
-  const rawTarget   = acc.challengeTarget;
-  const targetPct   = (rawTarget !== undefined && rawTarget !== null && rawTarget !== '')
-                        ? parseFloat(rawTarget) : 10;
-  const isCustom    = !presetTargets.includes(targetPct);
+  const phase          = acc.challengePhase === 'Phase 2' ? 'Phase 2' : 'Phase 1';
+  const presetTargets  = phase === 'Phase 2' ? [4, 5, 6] : [8, 10];
+  const rawTarget      = acc.challengeTarget;
+  const targetPct      = (rawTarget !== undefined && rawTarget !== null && rawTarget !== '')
+                        ? parseFloat(rawTarget) : presetTargets[0];
+  const isCustom       = !presetTargets.includes(targetPct);
 
   const targetProfit  = accSize > 0 ? (accSize * targetPct / 100) : 0;
   const currentProfit = m.netDollars;
@@ -8018,9 +8020,15 @@ function _accChallengeSectionHtml(acc, m, accSize, name) {
   const rawPct        = targetProfit > 0 ? (currentProfit / targetProfit) * 100 : 0;
   const completion    = Math.max(0, Math.min(100, rawPct));
   const isComplete    = targetProfit > 0 && currentProfit >= targetProfit;
+  const badgeText     = phase === 'Phase 1' ? 'ADVANCE TO NEXT PHASE' : 'READY FOR VERIFICATION';
+  const completeMsg   = phase === 'Phase 1' ? 'Advance to the Next Phase' : 'Ready for Verification';
 
   const fmt$    = v => (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2);
   const escName = name.replace(/'/g, "\\'");
+
+  const phaseBtns = ['Phase 1', 'Phase 2'].map(p => `
+      <button class="acc-chal-tbtn${phase === p ? ' active' : ''}" onclick="_accSetChallengePhase('${escName}','${p}')">${p}</button>`
+    ).join('');
 
   const tBtns = presetTargets.map(t => `
       <button class="acc-chal-tbtn${!isCustom && targetPct === t ? ' active' : ''}" onclick="_accSetChallengeTarget('${escName}',${t})">${t}%</button>`
@@ -8030,8 +8038,8 @@ function _accChallengeSectionHtml(acc, m, accSize, name) {
         value="${isCustom ? targetPct : ''}" placeholder="%"
         style="display:${isCustom ? 'inline-flex' : 'none'}"
         onclick="event.stopPropagation()"
-        onkeydown="if(event.key==='Enter'){_accSetChallengeTarget('${escName}',parseFloat(this.value)||10)}"
-        onblur="if(this.value)_accSetChallengeTarget('${escName}',parseFloat(this.value)||10)">`;
+        onkeydown="if(event.key==='Enter'){_accSetChallengeTarget('${escName}',parseFloat(this.value)||${presetTargets[0]})}"
+        onblur="if(this.value)_accSetChallengeTarget('${escName}',parseFloat(this.value)||${presetTargets[0]})">`;
 
   const milestoneHtml = [25, 50, 75, 100].map(ms => `
       <div class="acc-chal-ms${completion >= ms ? ' reached' : ''}" style="left:${ms}%">
@@ -8050,7 +8058,12 @@ function _accChallengeSectionHtml(acc, m, accSize, name) {
           <div class="acc-chal-title">🏁 Challenge Progress</div>
           <div class="acc-chal-sub">Track your progress toward completing this Prop Firm Challenge.</div>
         </div>
-        ${isComplete ? '<div class="acc-chal-badge">READY FOR VERIFICATION</div>' : ''}
+        ${isComplete ? `<div class="acc-chal-badge">${badgeText}</div>` : ''}
+      </div>
+
+      <div class="acc-chal-target-row">
+        <span class="acc-chal-target-lbl">Challenge Phase</span>
+        <div class="acc-chal-tbtns">${phaseBtns}</div>
       </div>
 
       <div class="acc-chal-target-row">
@@ -8064,7 +8077,7 @@ function _accChallengeSectionHtml(acc, m, accSize, name) {
             <circle class="acc-chal-check-circle" cx="26" cy="26" r="23" fill="none"/>
             <path class="acc-chal-check-mark" fill="none" d="M14 27l7 7 16-16"/>
           </svg>
-          <span>Challenge Target Reached</span>
+          <span>${completeMsg}</span>
         </div>` : ''}
 
       <div class="acc-chal-progress-wrap">
@@ -8111,6 +8124,15 @@ async function _accSetChallengeTarget(name, pct) {
   const idx  = list.findIndex(a => a.name === name);
   if (idx < 0) return;
   list[idx].challengeTarget = pct;
+  await _saveCustomAccounts(list);
+  if (_accActiveName === name) accShowDetail(name);
+}
+async function _accSetChallengePhase(name, phase) {
+  if (phase !== 'Phase 1' && phase !== 'Phase 2') return;
+  const list = _getCustomAccounts();
+  const idx  = list.findIndex(a => a.name === name);
+  if (idx < 0) return;
+  list[idx].challengePhase = phase;
   await _saveCustomAccounts(list);
   if (_accActiveName === name) accShowDetail(name);
 }
