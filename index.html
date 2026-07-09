@@ -333,7 +333,13 @@
           </div>
 
           <!-- Trading Calendar (moved inline, no longer a sliding side panel) -->
-          <div class="sec-head"><svg class="icn" aria-hidden="true"><use href="#ic-calendar"></use></svg> Trading Calendar</div>
+          <div class="cal2-sec-head-row">
+            <div class="sec-head" style="margin:0;flex:1"><svg class="icn" aria-hidden="true"><use href="#ic-calendar"></use></svg> Trading Calendar</div>
+            <button class="cal2-max-btn" onclick="calMaximizeToPage()" title="Open full Calendar page">
+              <svg class="icn" aria-hidden="true" viewBox="0 0 24 24"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>Full calendar</span>
+            </button>
+          </div>
           <div class="dash-cal-panel" id="dash-cal-panel">
             <div class="dash-cal-top">
               <div class="dash-cal-controls">
@@ -782,6 +788,10 @@
           <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
             <span style="font-size:11px;color:var(--text3);white-space:nowrap"><svg class="icn" aria-hidden="true"><use href="#ic-calendar"></use></svg> Trading Calendar</span>
           </div>
+          <button class="cal2-min-btn" onclick="calMinimizeToDashboard()" title="Back to Dashboard">
+            <svg class="icn" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Minimize</span>
+          </button>
           <select class="form-select" id="cal-acc-filter-2" onchange="_onCalAccFilterChange2()" style="font-size:11px;padding:4px 8px;height:30px;flex:1;min-width:120px;max-width:200px">
             <option value="">All accounts</option>
           </select>

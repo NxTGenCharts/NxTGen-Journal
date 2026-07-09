@@ -10754,6 +10754,9 @@ function removeChart(id, slot) {
 const MONTH_NAMES_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 let calYear = new Date().getFullYear();
 let calMonth = new Date().getMonth();
+// Dashboard <-> full Calendar page shortcuts
+function calMaximizeToPage() { nav('calendar', document.getElementById('sb-calendar'), 'Calendar'); }
+function calMinimizeToDashboard() { const sbDash = document.querySelector('.sb-item[onclick*="dashboard"]'); nav('dashboard', sbDash, 'Dashboard'); }
 // ── Calendar 2.0 state: filters / heatmap mode / view mode ──
 let calFilters = { strategy: '', session: '', pair: '', outcome: '' };
 let calHeatMode = 'off';   // 'off' | 'profit' | 'trades' | 'rules' | 'psych'
