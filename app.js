@@ -1014,7 +1014,7 @@ function _aiSystemPrompt() {
 
   // Recent 10 trades summary
   const recent = [...trades].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).map(t =>
-    `${t.date} ${t.pair} ${t.pos} ${t.outcome} PnL:${_pnlLabel(t)} Emotion:${t.emotion||'?'} Strategy:${t.strategy||'?'} Notes:"${(t.notes||'').slice(0,80)}"`
+    `${t.date} ${t.pair} ${t.pos} ${t.outcome} PnL:${_pnlLabel(t)} Emotion:${t.emotion||'?'} Model:${t.strategy||'?'} Notes:"${(t.notes||'').slice(0,80)}"`
   ).join('\n');
 
   // Today's and this week's trades
@@ -1121,7 +1121,7 @@ Cover: (1) Week performance grade and summary, (2) Best trade and why, (3) Worst
       return `Give me a deep monthly review for ${monthKey}.
 Month stats: ${monthTrades.length} trades, WR=${monthTrades.length?((mWins/monthTrades.length)*100).toFixed(0):0}%, Net PnL=${mPnl>0?'+':''}${mPnl}%
 Full trade list: ${monthTrades.map(t=>`${t.date} ${t.pair} ${t.pos} ${t.outcome} PnL:${_pnlLabel(t)} strategy:${t.strategy} emotion:${t.emotion} notes:"${(t.notes||'').slice(0,60)}"`).join('\n')}
-Cover: (1) Month grade and verdict, (2) Strategy performance breakdown, (3) Session breakdown, (4) Psychology and emotional analysis, (5) Loss audit — root causes, (6) Plan adjustments for next month, (7) Progress toward quarterly goals.`;
+Cover: (1) Month grade and verdict, (2) Model performance breakdown, (3) Session breakdown, (4) Psychology and emotional analysis, (5) Loss audit — root causes, (6) Plan adjustments for next month, (7) Progress toward quarterly goals.`;
 
     case 'pattern':
       return `Perform a deep pattern analysis across ALL my ${trades.length} trades.
@@ -2825,7 +2825,7 @@ function buildStrategyTable(sortCol) {
     return (av - bv) * _sortStrategy.dir;
   });
   if (thead) thead.innerHTML = `<tr>
-    <th class="sortable-th" onclick="buildStrategyTable('strategy')">Strategy ${_sortIndicator('strategy',_sortStrategy)}</th>
+    <th class="sortable-th" onclick="buildStrategyTable('strategy')">Model ${_sortIndicator('strategy',_sortStrategy)}</th>
     <th class="sortable-th" onclick="buildStrategyTable('trades')">Trades ${_sortIndicator('trades',_sortStrategy)}</th>
     <th class="sortable-th" onclick="buildStrategyTable('wr')">Win% ${_sortIndicator('wr',_sortStrategy)}</th>
     <th class="sortable-th" onclick="buildStrategyTable('pnl')">Avg PnL ${_sortIndicator('pnl',_sortStrategy)}</th></tr>`;
@@ -3052,7 +3052,7 @@ function filterTable() {
 function exportTradesToCSV() {
   const list = _lastFilteredList.length ? _lastFilteredList : trades;
   if (!list.length) { showToast('No trades to export', 'danger'); return; }
-  const headers = ['Date','Pair','Position','R:R','PnL','Outcome','Killzone','Strategy','Account','Rating','Notes','Emotion'];
+  const headers = ['Date','Pair','Position','R:R','PnL','Outcome','Killzone','Model','Account','Rating','Notes','Emotion'];
   const rows = list.map(t => [
     t.date, t.pair, t.pos, t.rr,
     _pnlLabel(t),
@@ -3166,7 +3166,7 @@ function _renderDetail(id) {
       <div class="form-field"><label class="form-label">Killzone</label><select class="form-select" id="e-kz"><option${t.kz === 'London' ? ' selected' : ''}>London</option><option${t.kz === 'New York' ? ' selected' : ''}>New York</option><option${t.kz === 'Asian' ? ' selected' : ''}>Asian</option></select></div>
       <div class="form-field"><label class="form-label">Risk per Trade</label><input type="text" class="form-input" id="e-risk" value="${t.risk || ''}" placeholder="e.g. 0.5%"></div>
       <div class="form-field" style="grid-column:span 2"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Account <button type="button" onclick="_openManageAccounts()" style="font-size:10px;padding:2px 8px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);color:var(--blue);border-radius:4px;cursor:pointer;font-family:inherit"><svg class="icn" aria-hidden="true"><use href="#ic-settings"></use></svg> Manage</button></label><select class="form-select" id="e-acc">${_buildAccountOptions(t.account)}</select></div>
-      <div class="form-field"><label class="form-label">Model</label><select class="form-select" id="e-strat" onchange="_handleCustomSelect(this,'e-strat-custom')">${_buildStrategyOptions(t.strategy)}</select><input type="text" class="form-input" id="e-strat-custom" placeholder="Enter strategy name…" style="display:none;margin-top:6px" value="${_getActiveStrategies().find(m=>(m.strategyName||m.title)===t.strategy) ? '' : (t.strategy||'')}"></div>
+      <div class="form-field"><label class="form-label">Model</label><select class="form-select" id="e-strat" onchange="_handleCustomSelect(this,'e-strat-custom')">${_buildStrategyOptions(t.strategy)}</select><input type="text" class="form-input" id="e-strat-custom" placeholder="Enter model name…" style="display:none;margin-top:6px" value="${_getActiveStrategies().find(m=>(m.strategyName||m.title)===t.strategy) ? '' : (t.strategy||'')}"></div>
       <div class="form-field"><label class="form-label">TF Alignment</label><select class="form-select" id="e-tf" onchange="_handleCustomSelect(this,'e-tf-custom')"><option${t.tf === '30m > 3m' ? ' selected' : ''}>30m > 3m</option><option${t.tf === '1h > 5m' ? ' selected' : ''}>1h > 5m</option><option${t.tf === '1h > 3m' ? ' selected' : ''}>1h > 3m</option><option${t.tf === '4h > 15m' ? ' selected' : ''}>4h > 15m</option><option${t.tf === 'D1 > 1h' ? ' selected' : ''}>D1 > 1h</option><option${t.tf === '15m > 1m' ? ' selected' : ''}>15m > 1m</option><option${t.tf === '15m > 3m' ? ' selected' : ''}>15m > 3m</option><option value="__custom__">＋ Custom…</option></select><input type="text" class="form-input" id="e-tf-custom" placeholder="e.g. 2h > 5m" style="display:none;margin-top:6px" value="${['30m > 3m','1h > 5m','1h > 3m','4h > 15m','D1 > 1h','15m > 1m','15m > 3m'].includes(t.tf) ? '' : t.tf}"></div>
     </div>
     <div class="form-field" style="margin-bottom:10px"><label class="form-label">Rating <span style="font-size:10px;color:var(--text3);font-weight:400;text-transform:none">(tap a star)</span></label>
@@ -8260,7 +8260,7 @@ function accShowDetail(name) {
               <thead>
                 <tr>
                   <th>Date</th><th>Pair</th><th>Pos</th><th>Outcome</th>
-                  <th>P/L</th><th>R:R</th><th>Strategy</th><th style="width:72px"></th>
+                  <th>P/L</th><th>R:R</th><th>Model</th><th style="width:72px"></th>
                 </tr>
               </thead>
               <tbody>
@@ -8724,7 +8724,7 @@ function _openManageStrategies() {
   overlay.innerHTML = `
   <div class="acc-manager-modal">
     <div class="acc-manager-header">
-      <span><svg class="icn" aria-hidden="true"><use href="#ic-settings"></use></svg> Manage Strategies</span>
+      <span><svg class="icn" aria-hidden="true"><use href="#ic-settings"></use></svg> Manage Models</span>
       <button onclick="document.getElementById('strat-manager-overlay').remove()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
     </div>
     <div class="acc-manager-body">
@@ -8735,7 +8735,7 @@ function _openManageStrategies() {
       <div id="strat-mgr-list-active" class="acc-mgr-list"></div>
       <div id="strat-mgr-list-archived" class="acc-mgr-list" style="display:none"></div>
       <div class="acc-mgr-add-row" id="strat-mgr-add-row">
-        <input type="text" id="strat-mgr-input" class="acc-mgr-input" placeholder="Strategy name (e.g. IRL > ERL)…" onkeydown="if(event.key==='Enter')_addStrategyFromModal()">
+        <input type="text" id="strat-mgr-input" class="acc-mgr-input" placeholder="Model name (e.g. IRL > ERL)…" onkeydown="if(event.key==='Enter')_addStrategyFromModal()">
         <button onclick="_addStrategyFromModal()" class="acc-mgr-add-btn">＋ Add</button>
       </div>
     </div>
@@ -8809,14 +8809,14 @@ async function _addStrategyFromModal() {
   const inp = document.getElementById('strat-mgr-input'); if (!inp) return;
   const name = inp.value.trim(); if (!name) return;
   const existing = (_pbData.models || []).find(m => (m.strategyName || m.title) === name);
-  if (existing) { showToast('Strategy already exists', 'danger'); return; }
+  if (existing) { showToast('Model already exists', 'danger'); return; }
   _pbData.models.push({ title: name, strategyName: name, sub: '', steps: [], status: 'active' });
   inp.value = '';
   await _pbSave();
   buildPlaybook();
   _rebuildStratMgrList();
   _refreshStrategyDropdowns();
-  showToast('Strategy added ✓', 'restore');
+  showToast('Model added ✓', 'restore');
 }
 
 async function _toggleArchiveStrategy(mi) {
@@ -8826,14 +8826,14 @@ async function _toggleArchiveStrategy(mi) {
   buildPlaybook();
   _rebuildStratMgrList();
   _refreshStrategyDropdowns();
-  showToast(m.status === 'archived' ? 'Strategy archived' : 'Strategy restored ✓', 'restore');
+  showToast(m.status === 'archived' ? 'Model archived' : 'Model restored ✓', 'restore');
 }
 
 async function _deleteStrategy(mi) {
   const m = _pbData.models[mi]; if (!m) return;
   openGlassModal({
     icon: '<svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg>',
-    title: 'Delete Strategy?',
+    title: 'Delete Model?',
     body: `<strong>${m.title}</strong> will be permanently removed.<br><small style="color:var(--text3)">Past trades using this strategy tag are not affected.</small>`,
     confirmLabel: 'Delete',
     confirmClass: 'glass-btn-danger',
@@ -8843,7 +8843,7 @@ async function _deleteStrategy(mi) {
       buildPlaybook();
       _rebuildStratMgrList();
       _refreshStrategyDropdowns();
-      showToast('Strategy deleted', 'danger');
+      showToast('Model deleted', 'danger');
     }
   });
 }
@@ -8864,7 +8864,7 @@ function buildPlaybook() {
               ${isArchived ? '<span class="acc-mgr-type-badge" style="background:rgba(148,163,184,.12);color:var(--text3)">Archived</span>' : ''}
             </div>
             <div class="model-sub" style="margin-top:2px">${m.sub}</div>
-            ${sName !== m.title ? `<div style="margin-top:4px;font-size:10px;color:var(--gold);opacity:.7">Strategy tag: <strong>${sName}</strong></div>` : ''}
+            ${sName !== m.title ? `<div style="margin-top:4px;font-size:10px;color:var(--gold);opacity:.7">Model tag: <strong>${sName}</strong></div>` : ''}
           </div>
           <div style="display:flex;gap:5px;flex-shrink:0">
             <button class="wl-week-btn" style="font-size:10px;padding:3px 9px" onclick="pbEditModelModal(${mi})"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Edit</button>
@@ -8916,7 +8916,7 @@ function _openModelEditModal(mi) {
         <input type="text" id="pb-edit-title" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="e.g. IRL > ERL" value="${m.title}">
       </div>
       <div>
-        <label style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Strategy Tag <span style="font-weight:400;text-transform:none;color:var(--gold)">(used in trade log)</span></label>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Model Tag <span style="font-weight:400;text-transform:none;color:var(--gold)">(used in trade log)</span></label>
         <input type="text" id="pb-edit-stratname" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="e.g. IRL > ERL" value="${m.strategyName || ''}">
       </div>
       <div>
@@ -10469,7 +10469,7 @@ function renderQuarterPage(year, q) {
     <div class="sec-head">Month Breakdown</div>
     <div class="data-table-wrap"><table class="data-table" style="margin-bottom:20px"><thead><tr><th>Month</th><th>Trades</th><th>Win%</th><th>Net PnL</th><th>W/L/BE</th></tr></thead><tbody>${monthRows}</tbody></table></div>
     <div class="sec-head" style="display:flex;align-items:center;justify-content:space-between"><span>All Trades — Q${q} ${year}</span><button class="btn" onclick="openModal()" style="font-size:11px;padding:4px 10px">+ Add Trade</button></div>
-    <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Pair</th><th>Pos</th><th>R:R</th><th>PnL</th><th>Outcome</th><th>Killzone</th><th>Strategy</th><th>${icon('star',{label:'Rating'})}</th></tr></thead><tbody>${tradeRows}</tbody></table></div>
+    <div class="data-table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Pair</th><th>Pos</th><th>R:R</th><th>PnL</th><th>Outcome</th><th>Killzone</th><th>Model</th><th>${icon('star',{label:'Rating'})}</th></tr></thead><tbody>${tradeRows}</tbody></table></div>
     <div style="margin-top:10px;font-size:12px;color:var(--text3)">${qt.length} trades · Click any row to view details</div>
     `}`;
 }
@@ -12423,7 +12423,7 @@ function openShareModal(id) {
           <div class="sm-rule"></div>
           <div class="sm-stats">
             <div class="sm-stat"><div class="sm-stat-lbl">RISK : REWARD</div><div class="sm-stat-val" id="sm-rr">${t.rr}</div></div>
-            <div class="sm-stat sm-stat-center"><div class="sm-stat-lbl">STRATEGY</div><div class="sm-stat-val sm-stat-val-sm" id="sm-strategy">${t.strategy || '—'}</div></div>
+            <div class="sm-stat sm-stat-center"><div class="sm-stat-lbl">MODEL</div><div class="sm-stat-val sm-stat-val-sm" id="sm-strategy">${t.strategy || '—'}</div></div>
           </div>
           <div class="sm-rule"></div>
           <div class="sm-tags">
@@ -13698,7 +13698,7 @@ function profileExportJSON() {
 
 function profileExportCSV() {
   if (!trades.length) { showToast('No trades to export', 'danger'); return; }
-  const hdr  = ['Date','Pair','Position','R:R','PnL','Outcome','Killzone','Strategy','TF','Account','Rating','Risk','Notes'];
+  const hdr  = ['Date','Pair','Position','R:R','PnL','Outcome','Killzone','Model','TF','Account','Rating','Risk','Notes'];
   const rows = trades.map(t => [
     t.date,t.pair,t.pos,t.rr,_pnlLabel(t),t.outcome,t.kz,
     t.strategy||'',t.tf||'',t.account||'',t.rating||'',t.risk||'',

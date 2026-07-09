@@ -400,10 +400,10 @@
           </div>
 
           <!-- Strategy -->
-          <div class="sec-head">Strategy Performance</div>
+          <div class="sec-head">Model Performance</div>
           <div class="data-table-wrap">
             <table class="data-table">
-              <thead id="strategy-table-head"><tr><th class="sortable-th" onclick="buildStrategyTable('strategy')">Strategy ⇅</th><th class="sortable-th" onclick="buildStrategyTable('trades')">Trades ⇅</th><th class="sortable-th" onclick="buildStrategyTable('wr')">Win% ⇅</th><th class="sortable-th" onclick="buildStrategyTable('pnl')">Avg PnL ⇅</th></tr></thead>
+              <thead id="strategy-table-head"><tr><th class="sortable-th" onclick="buildStrategyTable('strategy')">Model ⇅</th><th class="sortable-th" onclick="buildStrategyTable('trades')">Trades ⇅</th><th class="sortable-th" onclick="buildStrategyTable('wr')">Win% ⇅</th><th class="sortable-th" onclick="buildStrategyTable('pnl')">Avg PnL ⇅</th></tr></thead>
               <tbody id="strategy-table-body"></tbody>
             </table>
           </div>
@@ -471,7 +471,7 @@
         </div>
         <div class="data-table-wrap">
         <table class="data-table" id="trade-table">
-          <thead><tr><th id="tl-select-all-th" style="width:32px"></th><th>Date</th><th>Pair</th><th>Pos</th><th>R:R</th><th>PnL</th><th>Outcome</th><th>Killzone</th><th>Strategy</th><th>Account</th><th>Trade Rating</th><th></th></tr></thead>
+          <thead><tr><th id="tl-select-all-th" style="width:32px"></th><th>Date</th><th>Pair</th><th>Pos</th><th>R:R</th><th>PnL</th><th>Outcome</th><th>Killzone</th><th>Model</th><th>Account</th><th>Trade Rating</th><th></th></tr></thead>
           <tbody id="trade-table-body"></tbody>
         </table>
         </div>
@@ -735,7 +735,7 @@
         <div class="sec-head">Loss Audit</div>
         <div class="data-table-wrap">
           <table class="data-table">
-            <thead><tr><th>Date</th><th>Pair</th><th>Strategy</th><th>PnL</th><th>Notes</th></tr></thead>
+            <thead><tr><th>Date</th><th>Pair</th><th>Model</th><th>PnL</th><th>Notes</th></tr></thead>
             <tbody id="mr-loss-tbody"></tbody>
           </table>
         </div>
@@ -1336,7 +1336,7 @@
           <option>ERL &gt; IRL</option>
           <option value="__custom__">＋ Custom…</option>
         </select>
-        <input type="text" class="form-input" id="m-strat-custom" placeholder="Enter strategy name…" style="display:none;margin-top:6px">
+        <input type="text" class="form-input" id="m-strat-custom" placeholder="Enter model name…" style="display:none;margin-top:6px">
       </div>
       <div class="form-field"><label class="form-label">TF Alignment</label>
         <select class="form-select" id="m-tf" onchange="syncCustomTF(this.value)">
