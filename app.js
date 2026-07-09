@@ -11021,6 +11021,83 @@ function computeCalInsights(stats, monthTrades) {
 }
 function clampPct(v) { return Math.max(0, Math.min(100, v)); }
 
+// ── Calendar 2.0 Phase 4: AI Coach tie-in ──
+// Instant local heuristic preview (no API call) + a deep-link into the real
+// AI Coach page (existing 'monthly' mode), pre-scoped to the month the
+// calendar is currently viewing.
+function computeCalCoachPreview(stats) {
+  const strengths = [], weaknesses = [];
+  if (stats.profitFactor >= 2) strengths.push('Strong profit factor (' + stats.profitFactor.toFixed(2) + ')');
+  if (stats.ruleAdherence >= 85) strengths.push('Excellent rule adherence (' + Math.round(stats.ruleAdherence) + '%)');
+  if (stats.avgRR !== null && stats.avgRR >= 2) strengths.push('Healthy average R (' + stats.avgRR.toFixed(1) + 'R)');
+  if (stats.bestSession) strengths.push(stats.bestSession + ' session is carrying this month');
+  if (stats.consistency >= 70) strengths.push('Consistent day-to-day results (' + stats.consistency + '%)');
+
+  if (stats.ruleAdherence < 70) weaknesses.push('Rule adherence dipped to ' + Math.round(stats.ruleAdherence) + '%');
+  if (stats.longestLossStreak >= 3) weaknesses.push(stats.longestLossStreak + '-day losing streak this month');
+  if (stats.topMistake) weaknesses.push('"' + stats.topMistake[0] + '" repeating on losing trades');
+  if (stats.avgRR !== null && stats.avgRR < 1) weaknesses.push('Average R below 1 — entries or trade management need work');
+  if (stats.worstPair && stats.pairMap[stats.worstPair] && stats.pairMap[stats.worstPair].usd < 0) weaknesses.push(stats.worstPair + ' has been a net loser');
+
+  let recommendation = 'Keep logging consistently — there isn\u2019t enough data yet for a confident recommendation.';
+  if (stats.totalTrades >= 3) {
+    if (stats.topMistake) recommendation = `Address "${stats.topMistake[0]}" first — it's your single biggest recurring leak this month.`;
+    else if (stats.ruleAdherence < 80) recommendation = 'Tighten plan adherence before adding new strategies or size.';
+    else if (stats.avgRR !== null && stats.avgRR < 1.5) recommendation = 'Focus on letting winners run further to lift your average R.';
+    else recommendation = 'Current approach is working — protect it by keeping risk and rule adherence exactly where they are.';
+  }
+  const confidence = Math.max(35, Math.min(96, 40 + stats.totalTrades * 4 + Math.round(stats.ruleAdherence / 10)));
+  return { strengths: strengths.slice(0, 4), weaknesses: weaknesses.slice(0, 4), recommendation, confidence };
+}
+
+function renderCalCoach(stats) {
+  const el = document.getElementById('cal2-coach');
+  if (!el) return;
+  if (!stats.totalTrades) {
+    el.innerHTML = `<div class="cal2-coach-empty"><svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg> Log a few trades this month to unlock your AI Coach preview.</div>`;
+    return;
+  }
+  const p = computeCalCoachPreview(stats);
+  const monthName = new Date(calYear, calMonth, 1).toLocaleDateString('en-US', { month: 'long' });
+  el.innerHTML = `
+    <div class="cal2-coach-head">
+      <div class="cal2-coach-title"><svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg> AI Coach — ${monthName}</div>
+      <div class="cal2-coach-conf">${p.confidence}% confidence</div>
+    </div>
+    <div class="cal2-coach-cols">
+      <div class="cal2-coach-col">
+        <div class="cal2-coach-col-label green">Strengths</div>
+        ${p.strengths.length ? p.strengths.map(s => `<div class="cal2-coach-item green"><svg class="icn" aria-hidden="true"><use href="#ic-check"></use></svg>${s}</div>`).join('') : '<div class="cal2-coach-item muted">Nothing standout yet</div>'}
+      </div>
+      <div class="cal2-coach-col">
+        <div class="cal2-coach-col-label red">Weaknesses</div>
+        ${p.weaknesses.length ? p.weaknesses.map(s => `<div class="cal2-coach-item red"><svg class="icn" aria-hidden="true"><use href="#ic-warning"></use></svg>${s}</div>`).join('') : '<div class="cal2-coach-item muted">No major issues found</div>'}
+      </div>
+    </div>
+    <div class="cal2-coach-rec"><span class="cal2-coach-rec-label">Recommendation</span>${p.recommendation}</div>
+    <button class="cal2-coach-btn" onclick="calLaunchAICoach()"><svg class="icn" aria-hidden="true"><use href="#ic-sparkle"></use></svg> Get full AI monthly review</button>`;
+}
+
+function calLaunchAICoach() {
+  const monthKey = calYear + '-' + String(calMonth + 1).padStart(2, '0');
+  const monthName = new Date(calYear, calMonth, 1).toLocaleDateString('en-US', { month: 'long' });
+  const accFilter = getCalFilter();
+  const mt = trades.filter(t => t.date.startsWith(monthKey) && (!accFilter || t.account === accFilter));
+  const mWins = mt.filter(t => t.outcome === 'Win').length;
+  const mPnl = mt.reduce((a, t) => a + _pnlPctValue(t), 0).toFixed(1);
+  const prompt = `Give me a deep monthly review for ${monthName} ${calYear} (the month I'm currently viewing on my Calendar page).
+Month stats: ${mt.length} trades, WR=${mt.length ? ((mWins / mt.length) * 100).toFixed(0) : 0}%, Net PnL=${mPnl > 0 ? '+' : ''}${mPnl}%
+Full trade list: ${mt.map(t => `${t.date} ${t.pair} ${t.pos} ${t.outcome} PnL:${_pnlLabel(t)} strategy:${t.strategy} emotion:${t.emotion} followedPlan:${t.followedPlan || 'Yes'} lossReason:"${t.lossReason || ''}" notes:"${(t.notes || '').slice(0, 60)}"`).join('\n') || 'none'}
+Cover: (1) Month grade and verdict, (2) Strengths this month, (3) Weaknesses this month, (4) Specific, actionable recommendations for next month, (5) A confidence score (0-100%) in this assessment.`;
+  nav('ai', null, 'AI Coach');
+  setTimeout(() => {
+    aiSetMode('monthly');
+    const inp = document.getElementById('ai-prompt-input');
+    if (inp) inp.value = prompt;
+    aiRun();
+  }, 60);
+}
+
 function renderCalInsights(stats, monthTrades) {
   const el = document.getElementById('cal2-insights');
   if (!el) return;
@@ -11070,24 +11147,43 @@ function renderCalScore(stats, prevStats) {
     </div>`;
 }
 
-function renderCalFilterBar() {
-  const el = document.getElementById('cal2-filter-bar');
-  if (!el) return;
+function _calFilterFieldsHTML() {
   const strategies = [...new Set(trades.map(t => t.strategy).filter(Boolean))].sort();
   const sessions = [...new Set(trades.map(t => t.kz).filter(Boolean))].sort();
   const pairs = [...new Set(trades.map(t => t.pair).filter(Boolean))].sort();
-  const mkOpts = (arr, cur) => `<option value="">All</option>` + arr.map(v => `<option value="${v}"${v === cur ? ' selected' : ''}>${v}</option>`).join('');
-  el.innerHTML = `
-    <select class="form-select cal2-filter-sel" onchange="calFilters.strategy=this.value;renderCalendar()">${mkOpts(strategies, calFilters.strategy).replace('All', 'All models')}</select>
-    <select class="form-select cal2-filter-sel" onchange="calFilters.session=this.value;renderCalendar()">${mkOpts(sessions, calFilters.session).replace('All', 'All sessions')}</select>
-    <select class="form-select cal2-filter-sel" onchange="calFilters.pair=this.value;renderCalendar()">${mkOpts(pairs, calFilters.pair).replace('All', 'All pairs')}</select>
+  const mkOpts = (arr, cur, allLabel) => `<option value="">${allLabel}</option>` + arr.map(v => `<option value="${v}"${v === cur ? ' selected' : ''}>${v}</option>`).join('');
+  return `
+    <select class="form-select cal2-filter-sel" onchange="calFilters.strategy=this.value;renderCalendar()">${mkOpts(strategies, calFilters.strategy, 'All models')}</select>
+    <select class="form-select cal2-filter-sel" onchange="calFilters.session=this.value;renderCalendar()">${mkOpts(sessions, calFilters.session, 'All sessions')}</select>
+    <select class="form-select cal2-filter-sel" onchange="calFilters.pair=this.value;renderCalendar()">${mkOpts(pairs, calFilters.pair, 'All pairs')}</select>
     <select class="form-select cal2-filter-sel" onchange="calFilters.outcome=this.value;renderCalendar()">
       <option value=""${calFilters.outcome === '' ? ' selected' : ''}>All outcomes</option>
       <option value="Win"${calFilters.outcome === 'Win' ? ' selected' : ''}>Wins</option>
       <option value="Loss"${calFilters.outcome === 'Loss' ? ' selected' : ''}>Losses</option>
       <option value="BE"${calFilters.outcome === 'BE' ? ' selected' : ''}>Break-even</option>
     </select>
-    ${(calFilters.strategy || calFilters.session || calFilters.pair || calFilters.outcome) ? `<button class="cal2-filter-clear" onclick="calFilters={strategy:'',session:'',pair:'',outcome:''};renderCalendar()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg> Clear</button>` : ''}`;
+    ${(calFilters.strategy || calFilters.session || calFilters.pair || calFilters.outcome) ? `<button class="cal2-filter-clear" onclick="calFilters={strategy:'',session:'',pair:'',outcome:''};renderCalendar()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg> Clear all</button>` : ''}`;
+}
+
+function renderCalFilterBar() {
+  const el = document.getElementById('cal2-filter-bar');
+  const activeCount = ['strategy', 'session', 'pair', 'outcome'].filter(k => calFilters[k]).length;
+  const fab = document.getElementById('cal2-filter-fab-count');
+  if (fab) { fab.style.display = activeCount ? '' : 'none'; fab.textContent = activeCount; }
+  if (el) el.innerHTML = _calFilterFieldsHTML();
+  const sheetBody = document.getElementById('cal2-filter-sheet-body');
+  if (sheetBody) sheetBody.innerHTML = _calFilterFieldsHTML();
+}
+
+function calOpenFilterSheet() {
+  const sheet = document.getElementById('cal2-filter-sheet');
+  if (!sheet) return;
+  document.getElementById('cal2-filter-sheet-body').innerHTML = _calFilterFieldsHTML();
+  sheet.classList.add('open');
+}
+function calCloseFilterSheet() {
+  const sheet = document.getElementById('cal2-filter-sheet');
+  if (sheet) sheet.classList.remove('open');
 }
 
 function calSetHeatMode(mode) { calHeatMode = (calHeatMode === mode) ? 'off' : mode; renderCalendar(); }
@@ -11191,6 +11287,7 @@ function renderCalendar() {
     renderCalModeTabs();
     renderCalInsights(calStats, monthTrades);
     renderCalScore(calStats, prevStats);
+    renderCalCoach(calStats);
     renderCalAgendaView(monthTrades, dayMap, accSize);
     const gridWrap = document.querySelector('#page-calendar .cal-grid-with-weeks');
     const agendaWrap = document.getElementById('cal2-agenda-wrap');
@@ -11308,7 +11405,7 @@ function renderCalWeekSidebar(cells, dayMap, accSize) {
     const wStats = computeCalMonthStats(weekTrades, groupTradesByDay(weekTrades, accSize), accSize);
     const wGrade = computeCalScore(wStats).grade;
     const dayName = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' });
-    html += `<div class="cal-week-card cal2-week-report">
+    html += `<div class="cal-week-card cal2-week-report" onclick="this.classList.toggle('expanded')">
       <div class="cal2-week-top">
         <div class="cal-week-label">Week ${(row / 7) + 1}</div>
         <div class="cal2-week-grade" style="color:${_calGradeColor(wGrade)}">${wGrade}</div>
@@ -11321,6 +11418,7 @@ function renderCalWeekSidebar(cells, dayMap, accSize) {
         <div class="cal2-week-stat"><span class="k">Avg RR</span><span class="v">${wStats.avgRR !== null ? wStats.avgRR.toFixed(1) + 'R' : '—'}</span></div>
         ${bestDay ? `<div class="cal2-week-stat"><span class="k">Best day</span><span class="v green">${dayName(bestDay)}</span></div>` : ''}
       </div>
+      <div class="cal2-week-expand-hint">Tap for details</div>
     </div>`;
   }
   col.innerHTML = html;

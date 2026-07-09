@@ -799,8 +799,15 @@
           <div class="cal2-insights-card" id="cal2-insights"></div>
         </div>
 
+        <!-- AI Coach -->
+        <div class="cal2-coach-card" id="cal2-coach"></div>
+
         <!-- Filters -->
         <div class="cal2-filter-bar" id="cal2-filter-bar"></div>
+        <button class="cal2-filter-fab" id="cal2-filter-fab" onclick="calOpenFilterSheet()">
+          <svg class="icn" aria-hidden="true"><use href="#ic-sort"></use></svg> Filters
+          <span class="cal2-filter-fab-count" id="cal2-filter-fab-count" style="display:none"></span>
+        </button>
 
         <div class="cal-wrap">
           <!-- View mode / heatmap tabs -->
@@ -840,6 +847,20 @@
           <div class="cal2-agenda-wrap" id="cal2-agenda-wrap" style="display:none">
             <div class="cal2-agenda" id="cal2-agenda"></div>
           </div>
+        </div>
+      </div>
+
+      <!-- Mobile: bottom-sheet filters -->
+      <div class="cal2-filter-sheet" id="cal2-filter-sheet">
+        <div class="cal2-filter-sheet-backdrop" onclick="calCloseFilterSheet()"></div>
+        <div class="cal2-filter-sheet-panel">
+          <div class="cal2-filter-sheet-handle"></div>
+          <div class="cal2-filter-sheet-head">
+            <span>Filter trades</span>
+            <button onclick="calCloseFilterSheet()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
+          </div>
+          <div class="cal2-filter-sheet-body" id="cal2-filter-sheet-body"></div>
+          <button class="cal2-filter-sheet-apply" onclick="calCloseFilterSheet()">Show results</button>
         </div>
       </div>
     </div>
