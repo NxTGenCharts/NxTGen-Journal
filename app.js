@@ -2870,7 +2870,8 @@ function buildMonthlyTable(sortCol) {
     const wr    = Math.round((wins / mt.length) * 100);
     const netDollars = mt.reduce((a, t) => a + toPnlDollars(t, getAccSizeForAccount(t.account)), 0);
     const netPct = _totalPctForGroup(mt);
-    const sorted = [...mt].sort((a, b) => a.date.localeCompare(b.date));
+    // Same reversal fix as the dashboard KPI streak — see updateKPIs() for details.
+    const sorted = [...mt].reverse().sort((a, b) => a.date.localeCompare(b.date));
     let bestStreak = 0, cur = 0;
     sorted.forEach(t => { if (t.outcome === 'Win') { cur++; if (cur > bestStreak) bestStreak = cur; } else cur = 0; });
     const _mWins = mt.filter(t => _pctOfTrade(t) > 0);
@@ -3136,7 +3137,7 @@ function _renderDetail(id) {
         <div class="view-stat-val">${t.rr}</div>
       </div>
       <div class="view-stat-card">
-        <div class="view-stat-label">Strategy</div>
+        <div class="view-stat-label">Model</div>
         <div class="view-stat-val view-stat-val-sm">${t.strategy || '—'}</div>
       </div>
       <div class="view-stat-card">
@@ -3165,7 +3166,7 @@ function _renderDetail(id) {
       <div class="form-field"><label class="form-label">Killzone</label><select class="form-select" id="e-kz"><option${t.kz === 'London' ? ' selected' : ''}>London</option><option${t.kz === 'New York' ? ' selected' : ''}>New York</option><option${t.kz === 'Asian' ? ' selected' : ''}>Asian</option></select></div>
       <div class="form-field"><label class="form-label">Risk per Trade</label><input type="text" class="form-input" id="e-risk" value="${t.risk || ''}" placeholder="e.g. 0.5%"></div>
       <div class="form-field" style="grid-column:span 2"><label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Account <button type="button" onclick="_openManageAccounts()" style="font-size:10px;padding:2px 8px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.25);color:var(--blue);border-radius:4px;cursor:pointer;font-family:inherit"><svg class="icn" aria-hidden="true"><use href="#ic-settings"></use></svg> Manage</button></label><select class="form-select" id="e-acc">${_buildAccountOptions(t.account)}</select></div>
-      <div class="form-field"><label class="form-label">Strategy</label><select class="form-select" id="e-strat" onchange="_handleCustomSelect(this,'e-strat-custom')">${_buildStrategyOptions(t.strategy)}</select><input type="text" class="form-input" id="e-strat-custom" placeholder="Enter strategy name…" style="display:none;margin-top:6px" value="${_getActiveStrategies().find(m=>(m.strategyName||m.title)===t.strategy) ? '' : (t.strategy||'')}"></div>
+      <div class="form-field"><label class="form-label">Model</label><select class="form-select" id="e-strat" onchange="_handleCustomSelect(this,'e-strat-custom')">${_buildStrategyOptions(t.strategy)}</select><input type="text" class="form-input" id="e-strat-custom" placeholder="Enter strategy name…" style="display:none;margin-top:6px" value="${_getActiveStrategies().find(m=>(m.strategyName||m.title)===t.strategy) ? '' : (t.strategy||'')}"></div>
       <div class="form-field"><label class="form-label">TF Alignment</label><select class="form-select" id="e-tf" onchange="_handleCustomSelect(this,'e-tf-custom')"><option${t.tf === '30m > 3m' ? ' selected' : ''}>30m > 3m</option><option${t.tf === '1h > 5m' ? ' selected' : ''}>1h > 5m</option><option${t.tf === '1h > 3m' ? ' selected' : ''}>1h > 3m</option><option${t.tf === '4h > 15m' ? ' selected' : ''}>4h > 15m</option><option${t.tf === 'D1 > 1h' ? ' selected' : ''}>D1 > 1h</option><option${t.tf === '15m > 1m' ? ' selected' : ''}>15m > 1m</option><option${t.tf === '15m > 3m' ? ' selected' : ''}>15m > 3m</option><option value="__custom__">＋ Custom…</option></select><input type="text" class="form-input" id="e-tf-custom" placeholder="e.g. 2h > 5m" style="display:none;margin-top:6px" value="${['30m > 3m','1h > 5m','1h > 3m','4h > 15m','D1 > 1h','15m > 1m','15m > 3m'].includes(t.tf) ? '' : t.tf}"></div>
     </div>
     <div class="form-field" style="margin-bottom:10px"><label class="form-label">Rating <span style="font-size:10px;color:var(--text3);font-weight:400;text-transform:none">(tap a star)</span></label>
@@ -9661,7 +9662,10 @@ function updateKPIs() {
   }
   const rrNums = trades.map(t => _parseRR(t.rr)).filter(x => x !== null);
   const avgRR = rrNums.length ? (rrNums.reduce((a, b) => a + b, 0) / rrNums.length).toFixed(1) : null;
-  const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date));
+  // Trades are stored newest-added-first (unshift), so reverse to oldest-added-first
+  // BEFORE the stable date sort — otherwise same-day trades keep reverse-entry order,
+  // which can scramble win/loss sequencing and produce a misleading streak count.
+  const sorted = [...trades].reverse().sort((a, b) => a.date.localeCompare(b.date));
   let streak = 0, maxStreak = 0, curStreak = 0;
   sorted.forEach(t => { if (t.outcome === 'Win') { curStreak++; if (curStreak > maxStreak) maxStreak = curStreak; } else curStreak = 0; });
   const rev = [...sorted].reverse();
