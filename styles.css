@@ -11829,7 +11829,7 @@ body {
   background:var(--blue);color:#fff;font-size:9.5px;font-weight:700;border-radius:10px;
   padding:1px 6px;min-width:14px;text-align:center;
 }
-.cal2-filter-sheet{position:fixed;inset:0;z-index:310;pointer-events:none;opacity:0;transition:opacity .2s var(--ease-out)}
+.cal2-filter-sheet{position:fixed;inset:0;z-index:500;pointer-events:none;opacity:0;transition:opacity .2s var(--ease-out)}
 .cal2-filter-sheet.open{pointer-events:auto;opacity:1}
 .cal2-filter-sheet-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(3px)}
 .cal2-filter-sheet-panel{

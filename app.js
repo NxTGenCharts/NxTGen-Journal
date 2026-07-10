@@ -11181,6 +11181,13 @@ function renderCalFilterBar() {
 function calOpenFilterSheet() {
   const sheet = document.getElementById('cal2-filter-sheet');
   if (!sheet) return;
+  // Move the sheet out from under .main/#page-calendar (which set
+  // overflow:hidden for layout reasons) and make it a direct child of
+  // <body>. Several mobile WebKit/Chromium builds clip position:fixed
+  // descendants of an overflow:hidden ancestor even though the spec says
+  // fixed elements should escape it — parenting to <body> sidesteps that
+  // entirely rather than relying on z-index alone.
+  if (sheet.parentElement !== document.body) document.body.appendChild(sheet);
   document.getElementById('cal2-filter-sheet-body').innerHTML = _calFilterFieldsHTML();
   sheet.classList.add('open');
 }
