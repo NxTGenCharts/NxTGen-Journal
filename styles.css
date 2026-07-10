@@ -774,7 +774,7 @@ body{
 body.detail-resizing{cursor:ew-resize!important;user-select:none!important}
 body.detail-resizing *{user-select:none!important}
 /* Mobile is a bottom-sheet, not a resizable side panel — and fullscreen is a fixed 100vw state */
-@media(max-width:768px){
+@media (max-width: 768px){
   .detail-panel-resize-handle{display:none}
 }
 .detail-panel.fullscreen .detail-panel-resize-handle{display:none}
@@ -1056,7 +1056,7 @@ body.detail-resizing *{user-select:none!important}
   background:linear-gradient(90deg,var(--blue),var(--green));transition:width .6s var(--ease-out)}
 .wl-factor-pct{width:34px;text-align:right;color:var(--text3);font-family:var(--font-mono);font-size:11px}
 
-@media (max-width:780px){
+@media (max-width: 780px){
   .wl-readiness-card{flex-direction:column;gap:16px}
   .wl-readiness-divider{width:100%;height:1px}
   .wl-factor-label{min-width:120px}
@@ -1070,8 +1070,8 @@ body.detail-resizing *{user-select:none!important}
 .wl-overview-widget:hover{background:var(--glass-2);border-color:var(--glass-border-h);transform:translateY(-1px)}
 .wl-overview-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);font-weight:700}
 .wl-overview-gauge{align-items:center}
-@media (max-width:980px){.wl-overview-row{grid-template-columns:repeat(3,1fr)}}
-@media (max-width:600px){.wl-overview-row{grid-template-columns:repeat(2,1fr)}}
+@media (max-width: 980px){.wl-overview-row{grid-template-columns:repeat(3,1fr)}}
+@media (max-width: 600px){.wl-overview-row{grid-template-columns:repeat(2,1fr)}}
 
 /* Dollar Strength gauge (semi-circle) */
 .wl-gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;width:100%}
@@ -1179,10 +1179,10 @@ body.detail-resizing *{user-select:none!important}
 .wl-day-session-item{display:flex;flex-direction:column;gap:6px;background:var(--glass-1);
   border:1px solid var(--glass-border);border-radius:var(--r-sm);padding:10px 12px}
 .wl-day-session-item .wl-badge{cursor:pointer;width:fit-content}
-@media (max-width:780px){.wl-day-session-row{grid-template-columns:repeat(2,1fr)}}
+@media (max-width: 780px){.wl-day-session-row{grid-template-columns:repeat(2,1fr)}}
 
 .wl-day-session-setup{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:8px}
-@media (max-width:780px){.wl-day-session-setup{grid-template-columns:1fr}}
+@media (max-width: 780px){.wl-day-session-setup{grid-template-columns:1fr}}
 
 .wl-day-vitals-row{display:flex;gap:18px;margin-top:10px;flex-wrap:wrap}
 .wl-day-vital{display:flex;flex-direction:column;gap:5px}
@@ -1190,7 +1190,7 @@ body.detail-resizing *{user-select:none!important}
 
 /* ── Weekly Checklist + Weekly Focus ── */
 .wl-checklist-focus-row{display:grid;grid-template-columns:1.1fr 1fr;gap:16px;margin-bottom:18px}
-@media (max-width:900px){.wl-checklist-focus-row{grid-template-columns:1fr}}
+@media (max-width: 900px){.wl-checklist-focus-row{grid-template-columns:1fr}}
 .wl-checklist-card,.wl-focus-card{background:var(--glass-1);border:1px solid var(--glass-border);
   border-radius:var(--r-lg);padding:18px 20px}
 .wl-checklist-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
@@ -1198,7 +1198,7 @@ body.detail-resizing *{user-select:none!important}
 .wl-checklist-pct-wrap{display:flex;align-items:center;gap:8px}
 .wl-checklist-pct{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text2);width:32px;text-align:right}
 .wl-checklist-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-@media (max-width:520px){.wl-checklist-grid{grid-template-columns:1fr}}
+@media (max-width: 520px){.wl-checklist-grid{grid-template-columns:1fr}}
 .wl-checklist-row{display:flex;align-items:center;gap:9px;background:transparent;border:none;
   color:var(--text2);font-size:12.5px;padding:7px 6px;border-radius:8px;cursor:pointer;
   text-align:left;transition:var(--t-fast);width:100%}
@@ -1210,7 +1210,7 @@ body.detail-resizing *{user-select:none!important}
 .wl-checklist-row.checked span:last-child{text-decoration:line-through;text-decoration-color:var(--glass-border-h)}
 
 .wl-focus-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media (max-width:520px){.wl-focus-grid{grid-template-columns:1fr}}
+@media (max-width: 520px){.wl-focus-grid{grid-template-columns:1fr}}
 
 /* ── AI Trading Coach ── */
 .wl-coach-card{background:linear-gradient(135deg,rgba(139,92,246,0.06),rgba(96,165,250,0.04));
@@ -1240,7 +1240,7 @@ body.detail-resizing *{user-select:none!important}
 .wl-insights-card{background:var(--glass-1);border:1px solid var(--glass-border);
   border-radius:var(--r-lg);padding:18px 20px;margin-bottom:16px}
 .wl-insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px}
-@media (max-width:600px){.wl-insight-grid{grid-template-columns:1fr}}
+@media (max-width: 600px){.wl-insight-grid{grid-template-columns:1fr}}
 .wl-insight-row{display:flex;align-items:center;justify-content:space-between;gap:10px;
   padding:9px 0;border-bottom:1px solid var(--glass-border)}
 .wl-insight-label{font-size:12px;color:var(--text3);font-weight:600}
@@ -1253,7 +1253,7 @@ body.detail-resizing *{user-select:none!important}
   border-radius:var(--r-lg);padding:18px 20px;margin-bottom:16px}
 .wl-reflection-locked{text-align:center;padding:28px 20px}
 .wl-reflection-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}
-@media (max-width:700px){.wl-reflection-grid{grid-template-columns:1fr}}
+@media (max-width: 700px){.wl-reflection-grid{grid-template-columns:1fr}}
 
 /* Empty state */
 .wl-empty-state{text-align:center;padding:70px 20px}
@@ -1422,7 +1422,7 @@ body.detail-resizing *{user-select:none!important}
 /* Compare viewer */
 .wl-compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:92vw;max-height:86vh}
 .wl-compare-grid img{width:100%;height:100%;object-fit:contain;border-radius:8px;background:#000}
-@media (max-width:780px){.wl-compare-grid{grid-template-columns:1fr;max-height:none;overflow-y:auto}}
+@media (max-width: 780px){.wl-compare-grid{grid-template-columns:1fr;max-height:none;overflow-y:auto}}
 
 /* Chart drag-reorder handle (pair form + day gallery) */
 .wl-chart-thumb-drag{position:absolute;top:6px;left:6px;z-index:2;background:rgba(0,0,0,0.55);
@@ -1467,7 +1467,7 @@ body.detail-resizing *{user-select:none!important}
 [data-theme="light"] .wl-badge.neu{background:rgba(241,245,251,0.9);color:#64748b;border-color:rgba(0,0,0,0.09)}
 
 /* Responsive */
-@media(max-width:640px){
+@media (max-width: 640px){
   .wl-pairs-grid{grid-template-columns:1fr}
   .wl-form-2col{grid-template-columns:1fr}
   .wl-week-bar{flex-wrap:wrap}
@@ -1916,7 +1916,7 @@ body.detail-resizing *{user-select:none!important}
 }
 
 /* Responsive */
-@media(max-width:640px){
+@media (max-width: 640px){
   .ai-mode-bar {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -2173,7 +2173,7 @@ body.detail-resizing *{user-select:none!important}
 [data-theme="light"] .wl-cal-currency { background: rgba(0,0,0,0.05); }
 
 /* Responsive — stack days vertically on mobile */
-@media(max-width:640px) {
+@media (max-width: 640px){
   .wl-cal-body { grid-template-columns: 1fr; }
   .wl-cal-day { border-right: none; border-bottom: 1px solid var(--glass-border); }
   .wl-cal-day:last-child { border-bottom: none; }
@@ -2583,7 +2583,7 @@ body.detail-resizing *{user-select:none!important}
 }
 
 /* Responsive */
-@media(max-width:640px){
+@media (max-width: 640px){
   .chat-container { height: calc(100vh - 220px); }
   .chat-bubble { max-width: 90%; font-size: 12.5px; }
   .ai-page-tabs { width: 100%; }
@@ -2839,7 +2839,7 @@ body.detail-resizing *{user-select:none!important}
 [data-theme="light"] .drag-ghost { background: #fff; }
 
 /* Responsive — 2 cols on mobile */
-@media(max-width:520px) {
+@media (max-width: 520px){
   .chart-sort-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
 }
 /* ════════════ MONTHLY REVIEW ════════════════════════ */
@@ -2973,7 +2973,7 @@ body.detail-resizing *{user-select:none!important}
 .acc-health-why-panel ul{margin:0;padding-left:16px}
 .acc-health-why-panel li{margin-bottom:3px}
 
-@media(max-width:640px){
+@media (max-width: 640px){
   .acc-hero{grid-template-columns:1fr}
   .acc-health{flex-direction:row;justify-content:flex-start;gap:12px;margin-top:4px}
   .acc-health-ring-wrap{width:76px;height:76px}
@@ -3004,9 +3004,9 @@ body.detail-resizing *{user-select:none!important}
 .acc-kpi-card-val.gold{color:var(--gold)}
 .acc-kpi-card-spark{width:100%;height:26px;display:block}
 
-@media(max-width:1080px){ .acc-kpi-scorecard{grid-template-columns:repeat(4,1fr)} }
-@media(max-width:900px){ .acc-kpi-scorecard{grid-template-columns:repeat(3,1fr)} }
-@media(max-width:640px){ .acc-kpi-scorecard{grid-template-columns:repeat(2,1fr);gap:8px} }
+@media (max-width: 1080px){ .acc-kpi-scorecard{grid-template-columns:repeat(4,1fr)} }
+@media (max-width: 900px){ .acc-kpi-scorecard{grid-template-columns:repeat(3,1fr)} }
+@media (max-width: 640px){ .acc-kpi-scorecard{grid-template-columns:repeat(2,1fr);gap:8px} }
 
 /* — Equity curve section — */
 .acc-eq-section{
@@ -3166,8 +3166,8 @@ body.detail-resizing *{user-select:none!important}
   100%{opacity:0;transform:translateY(180px) rotate(340deg)}
 }
 
-@media(max-width:900px){ .acc-chal-stats{grid-template-columns:repeat(2,1fr)} }
-@media(max-width:640px){
+@media (max-width: 900px){ .acc-chal-stats{grid-template-columns:repeat(2,1fr)} }
+@media (max-width: 640px){
   .acc-chal-card{padding:16px 14px 18px}
   .acc-chal-target-row{flex-direction:column;align-items:flex-start;gap:8px}
   .acc-chal-progress-outer{height:26px}
@@ -3184,7 +3184,7 @@ body.detail-resizing *{user-select:none!important}
 [data-theme="light"] .acc-ds{background:rgba(255,255,255,0.7);border-color:rgba(0,0,0,0.08)}
 [data-theme="light"] .acc-empty{background:rgba(241,245,251,0.5);border-color:rgba(0,0,0,0.08)}
 
-@media(max-width:640px){
+@media (max-width: 640px){
   .acc-grid{grid-template-columns:1fr}
   .acc-detail-stats{grid-template-columns:repeat(2,1fr)}
 }
@@ -3221,13 +3221,13 @@ body.detail-resizing *{user-select:none!important}
 .dash-an-row1 { flex: none; }
 .dash-an-row2 { flex: none; }
 .dash-kpi-mini { grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 0; flex: 1; }
-@media (max-width: 900px) {
+@media (max-width: 900px){
   .dash-kpi-mini { grid-template-columns: repeat(4, 1fr); }
 }
-@media (max-width: 640px) {
+@media (max-width: 640px){
   .dash-kpi-mini { grid-template-columns: repeat(2, 1fr); gap: 8px; }
 }
-@media (max-width: 420px) {
+@media (max-width: 420px){
   .dash-kpi-mini { gap: 6px; }
 }
 
@@ -3301,17 +3301,17 @@ body.detail-resizing *{user-select:none!important}
 .dash-cal-panel .cal-nav { width: 28px; height: 28px; font-size: 15px; }
 
 /* ── Responsive breakpoints ── */
-@media (max-width: 1080px) {
+@media (max-width: 1080px){
   .dash-widgets-row { grid-template-columns: minmax(0, 1fr) 220px; }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 900px){
   .dash-widgets-row { grid-template-columns: 1fr; }
   .nxt-score-card { max-width: 380px; margin: 0 auto; width: 100%; }
   .dash-cal-panel .cal-kpi-row { grid-template-columns: repeat(3, 1fr); gap: 6px; }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 640px){
   .dash-left { padding: 12px 12px 20px; }
   .dash-cal-panel {
     padding: 12px;
@@ -3542,8 +3542,8 @@ body.detail-resizing *{user-select:none!important}
   display:grid;grid-template-columns:repeat(5,1fr);
   gap:7px;padding:0 0 10px;flex-shrink:0;
 }
-@media(max-width:900px){.cal-kpi-row{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:600px){.cal-kpi-row{grid-template-columns:repeat(2,1fr)}}
+@media (max-width: 900px){.cal-kpi-row{grid-template-columns:repeat(3,1fr)}}
+@media (max-width: 600px){.cal-kpi-row{grid-template-columns:repeat(2,1fr)}}
 
 .cal-kpi{
   background:var(--glass-1);border:1px solid var(--glass-border);
@@ -4038,7 +4038,7 @@ body.detail-resizing *{user-select:none!important}
 }
 .affirmation-fab:hover{box-shadow:0 4px 14px rgba(0,0,0,0.36)}
 .affirmation-fab.dragging{cursor:grabbing;transition:none;box-shadow:0 6px 18px rgba(0,0,0,0.4)}
-@media(max-width:768px){
+@media (max-width: 768px){
   .affirmation-fab{ width:49px;height:49px;font-size:23px }
 
 }
@@ -4049,7 +4049,7 @@ body.detail-resizing *{user-select:none!important}
 .affirmation-fab .fab-chat-svg{width:25px;height:25px;display:block}
 .affirmation-fab.mode-chat{box-shadow:0 3px 10px rgba(124,58,237,0.4)}
 .affirmation-fab.mode-chat:hover{box-shadow:0 4px 16px rgba(124,58,237,0.5)}
-@media(max-width:768px){
+@media (max-width: 768px){
   .affirmation-fab .fab-chat-svg{width:23px;height:23px}
   .affirmation-fab .fab-aff-svg{width:23px;height:23px}
 }
@@ -4091,7 +4091,7 @@ body.detail-resizing *{user-select:none!important}
   flex:1;height:auto;min-height:0;
   border:none;border-radius:0;background:transparent;
 }
-@media(max-width:640px){
+@media (max-width: 640px){
   .ai-float-chat-overlay{padding:0;align-items:flex-end;justify-content:center}
   .ai-float-chat-card{width:100%;height:86vh;border-radius:var(--r-xl) var(--r-xl) 0 0}
 }
@@ -4214,10 +4214,10 @@ body.detail-resizing *{user-select:none!important}
    When the sidebar is expanded (desktop) or open (mobile overlay), its own
    logo header is showing, so hide the topbar logo to avoid showing the
    brand twice. The topbar logo reappears once the sidebar is closed/collapsed. */
-@media (min-width: 769px) {
+@media (min-width: 769px){
   body.sb-expanded .topbar-left .brand { display: none; }
 }
-@media (max-width: 768px) {
+@media (max-width: 768px){
   body.sb-expanded .topbar-left .brand { display: none; }
 }
 
@@ -4242,7 +4242,7 @@ body.detail-resizing *{user-select:none!important}
    ══════════════════════════════════════════════════════ */
 
 /* ── 900px: tablet adjustments ── */
-@media(max-width:900px){
+@media (max-width: 900px){
   :root{ --sidebar:200px }
   .topbar-clock{ display:none }
   .data-table th:nth-child(8),
@@ -4259,7 +4259,7 @@ body.detail-resizing *{user-select:none!important}
 /* ══════════════════════════════════════════════════════
    MOBILE ≤768px — Telegram-style bottom navigation
    ══════════════════════════════════════════════════════ */
-@media(max-width:768px){
+@media (max-width: 768px){
   :root{
     --sidebar:0px;
     --topbar:54px;
@@ -4608,7 +4608,7 @@ body.detail-resizing *{user-select:none!important}
 }
 
 /* ══ small mobile ≤420px ══ */
-@media(max-width:420px){
+@media (max-width: 420px){
   .kpi-grid{ gap:6px }
   .kpi-value{ font-size:18px }
   .cover-title{ font-size:18px }
@@ -4641,10 +4641,10 @@ body.detail-resizing *{user-select:none!important}
   background:rgba(245,248,255,0.96);
   box-shadow:0 -1px 0 rgba(0,0,0,0.07),0 -4px 22px rgba(0,0,0,0.07);
 }
-@media(min-width:769px){ .mob-bottom-nav{ display:none !important } }
-@media(max-width:768px){ .mob-bottom-nav{ display:flex } }
+@media (min-width: 769px){ .mob-bottom-nav{ display:none !important } }
+@media (max-width: 768px){ .mob-bottom-nav{ display:flex } }
 /* Also hide mobile-only sheets on desktop */
-@media(min-width:769px){
+@media (min-width: 769px){
   .mob-more-sheet{ display:none !important }
   .mob-more-overlay{ display:none !important }
 }
@@ -5486,12 +5486,12 @@ body{
 .cal-day{min-height:68px}
 
 /* Responsive cal kpi */
-@media(max-width:1024px){
+@media (max-width: 1024px){
   .cal-kpi-val{font-size:16px}
   .cal-day{min-height:58px}
   .cal-day-pnl{font-size:10px}
 }
-@media(max-width:768px){
+@media (max-width: 768px){
   .cal-kpi-row{grid-template-columns:repeat(2,1fr)}
   .cal-kpi-val{font-size:14px}
   .cal-day{min-height:50px;padding:4px 5px}
@@ -6364,7 +6364,7 @@ body{
 .sm-spinner.active { display: block; }
 @keyframes sm-spin { to { transform: rotate(360deg); } }
 
-@media (max-width: 520px) {
+@media (max-width: 520px){
   /* On mobile, dock the modal to a bottom-sheet-style layout with a fixed
      viewport-relative cap instead of relying on centered auto-height —
      this is what stopped it from jumping/glitching when the browser's
@@ -6384,7 +6384,7 @@ body{
   .sm-fmt-desc { display: none; }
   .sm-fmt-btn { padding: 10px 8px; justify-content: center; text-align: center; flex-direction: column; gap: 6px; }
 }
-@media (max-width: 380px) {
+@media (max-width: 380px){
   .sm-actions { grid-template-columns: 1fr; }
   .sm-fmt-row  { grid-template-columns: 1fr; }
   .view-stats-grid { grid-template-columns: 1fr; }
@@ -6539,7 +6539,7 @@ body{
   transform:scale(1.07);
 }
 .topbar-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
-@media(max-width:768px){
+@media (max-width: 768px){
   .topbar-share-btn { display:none !important; }
   .topbar-avatar { width:30px; height:30px; font-size:10px; }
 }
@@ -6772,7 +6772,7 @@ body{
 .danger-zone:hover { border-color:rgba(248,113,113,0.30) !important; }
 
 /* Profile mobile */
-@media(max-width:768px){
+@media (max-width: 768px){
   .profile-hero-content { flex-direction:column; align-items:flex-start; padding:18px 14px; gap:14px; }
   .profile-tabs { width:100%; }
   .profile-tab { flex:1; min-width:60px; text-align:center; padding:7px 6px; font-size:11px; }
@@ -6851,12 +6851,12 @@ body{
   align-items:center;
   gap:6px;
 }
-@media(max-width:768px){
+@media (max-width: 768px){
   .sb-new-trade-wrap{ display:block }
 }
 
 /* ── Account manager mobile responsive ───────────────────── */
-@media (max-width: 480px) {
+@media (max-width: 480px){
   .acc-manager-overlay { padding: 10px; }
   .acc-manager-modal { border-radius: 12px; }
   .acc-mgr-add-row { flex-wrap: wrap; }
@@ -7460,7 +7460,7 @@ select.acc-mgr-input option {
 [data-theme="light"] .empty-cta { background: rgba(79,70,229,.08); border-color: rgba(79,70,229,.2); }
 
 /* Mobile adjustments ─────────────────────────────── */
-@media (max-width: 768px) {
+@media (max-width: 768px){
   .dash-filter-bar { gap: 4px; padding: 6px 8px; }
   .dash-filter-btn { padding: 3px 9px; font-size: 10px; }
   .cal-week-sum { display: none; } /* hide weekly sum on very small screens */
@@ -9082,7 +9082,7 @@ body {
 /* ────────────────────────────────────────────────────────────────
    40. ACCESSIBILITY & REDUCED MOTION
    ──────────────────────────────────────────────────────────────── */
-@media (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: reduce){
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -9226,7 +9226,7 @@ body {
 /* ────────────────────────────────────────────────────────────────
    49. RESPONSIVE OVERRIDES — Mobile premium touches
    ──────────────────────────────────────────────────────────────── */
-@media (max-width: 768px) {
+@media (max-width: 768px){
   .kpi-value { font-size: 22px; }
   .cover-title { font-size: 20px; }
   
@@ -9250,7 +9250,7 @@ body {
   .btn { min-height: 36px; }
 }
 
-@media (max-width: 420px) {
+@media (max-width: 420px){
   .kpi-value { font-size: 19px; }
   .kpi-card { padding: 13px 14px; border-radius: 12px; }
   .cover { padding: 18px 20px; border-radius: 14px; }
@@ -9259,7 +9259,7 @@ body {
 /* ────────────────────────────────────────────────────────────────
    50. LARGE DESKTOP — Optimize for 1400px+
    ──────────────────────────────────────────────────────────────── */
-@media (min-width: 1400px) {
+@media (min-width: 1400px){
   :root { --sidebar: 240px; }
   .kpi-value { font-size: 28px; }
   .cover-title { font-size: 26px; }
@@ -9487,7 +9487,7 @@ div[style*="data-table"] .data-table-wrap,
 }
 
 /* ── Mobile tweaks for new features ─────────────────────────────── */
-@media (max-width: 600px) {
+@media (max-width: 600px){
   .modal-checklist-grid { grid-template-columns: 1fr 1fr; }
   .review-rr-grid { grid-template-columns: 1fr 1fr; }
   .review-rr-grid .review-stat:last-child { grid-column: span 2; }
@@ -9824,7 +9824,7 @@ div[style*="data-table"] .data-table-wrap,
 [data-theme="light"] .wl-day-mindset-btn { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); }
 
 /* ── Mobile ──────────────────────────────────────────────────── */
-@media (max-width: 600px) {
+@media (max-width: 600px){
   .wl-day-content { padding: 14px 14px 16px; }
   .wl-day-pair-row {
     grid-template-columns: 64px 70px 1fr;
@@ -9946,7 +9946,7 @@ div[style*="data-table"] .data-table-wrap,
 [data-theme="light"] .wl-day-upload-zone:hover { background: rgba(99,102,241,0.04); }
 
 /* ── Mobile ──────────────────────────────────────────────────── */
-@media (max-width: 600px) {
+@media (max-width: 600px){
   .wl-day-chart-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 7px; }
   .wl-day-chart-del { opacity: 1; } /* always visible on mobile */
   .wl-day-upload-zone { padding: 12px 10px; }
@@ -10081,12 +10081,12 @@ div[style*="data-table"] .data-table-wrap,
 }
 
 /* Responsive: stack to 2-col on tablet */
-@media (max-width: 900px) {
+@media (max-width: 900px){
   .kpi-grid-bento { grid-template-columns: 1fr 1fr; }
   .kpi-card-hero  { grid-column: span 2; }
 }
 /* Mobile: 2-col, hero full width */
-@media (max-width: 600px) {
+@media (max-width: 600px){
   .kpi-grid-bento { grid-template-columns: 1fr 1fr; gap: 8px; }
   .kpi-card-hero  { grid-column: span 2; }
   .kpi-card-hero .kpi-value { font-size: 26px; }
@@ -10157,7 +10157,7 @@ div[style*="data-table"] .data-table-wrap,
    On mobile: Trade Log shows Date, Pair, PnL, Outcome only.
    All other columns hidden. Horizontal scroll wrapper activates.
    ─────────────────────────────────────────────────────────────── */
-@media (max-width: 768px) {
+@media (max-width: 768px){
   /* Show only essential trade log columns */
   .data-table th.col-pos,
   .data-table td.col-pos,
@@ -10206,7 +10206,7 @@ div[style*="data-table"] .data-table-wrap,
 }
 
 /* ── 9. MOBILE BOTTOM NAV — 5-item tighter layout ───────────────*/
-@media (max-width: 768px) {
+@media (max-width: 768px){
   .mob-bottom-nav {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -10228,7 +10228,7 @@ div[style*="data-table"] .data-table-wrap,
   }
 
   /* Labels: hide on very small screens, show on ≥375px */
-  @media (max-width: 360px) {
+  @media (max-width: 360px){
     .mob-nav-label { display: none; }
     .mob-nav-icon  { font-size: 22px; }
   }
@@ -10364,7 +10364,7 @@ select[id="filter-kz"] option[value="London"] {
 .kz-option-asian  { color: var(--kz-asian); }
 
 /* ── 23. RESPONSIVE POLISH — tablet KPI grid ────────────────────*/
-@media (max-width: 900px) {
+@media (max-width: 900px){
   .kpi-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 8px;
@@ -10521,9 +10521,9 @@ select[id="filter-kz"] option[value="London"] {
   );
 }
 
-@media (min-width: 769px) { .mob-bottom-nav { display: none !important; } }
-@media (max-width: 768px) { .mob-bottom-nav { display: flex !important; } }
-@media (min-width: 769px) {
+@media (min-width: 769px){ .mob-bottom-nav { display: none !important; } }
+@media (max-width: 768px){ .mob-bottom-nav { display: flex !important; } }
+@media (min-width: 769px){
   .mob-more-sheet { display: none !important; }
   .mob-more-overlay { display: none !important; }
 }
@@ -10658,7 +10658,7 @@ select[id="filter-kz"] option[value="London"] {
 }
 
 /* Mobile: sidebar drawer gets glass treatment */
-@media (max-width: 768px) {
+@media (max-width: 768px){
   .sidebar.mob-open {
     background: rgba(8, 12, 22, 0.42) !important;
     backdrop-filter: blur(52px) saturate(2.4) brightness(1.05) !important;
@@ -10947,20 +10947,20 @@ body {
 .dash-cal-panel .cal-month-label { font-size: 13px; }
 .dash-cal-panel .cal-nav { width: 24px; height: 24px; font-size: 13px; }
 
-@media (max-width: 1080px) {
+@media (max-width: 1080px){
   .dash-cal-panel .cal-kpi { min-width: 78px; padding: 6px 8px; }
   .dash-cal-panel .cal-kpi-label { font-size: 7px; }
   .dash-cal-panel .cal-kpi-val { font-size: 12px; }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 640px){
   .dash-cal-panel .cal-kpi-row { gap: 5px; }
   .dash-cal-panel .cal-kpi { min-width: 68px; padding: 6px 7px; flex: 0 0 auto; }
   .dash-cal-panel .cal-kpi-label { font-size: 6.5px; }
   .dash-cal-panel .cal-kpi-val { font-size: 11px; }
 }
 
-@media (max-width: 420px) {
+@media (max-width: 420px){
   .dash-cal-panel .cal-kpi { min-width: 62px; padding: 5px 6px; }
   .dash-cal-panel .cal-kpi-label { font-size: 6px; }
   .dash-cal-panel .cal-kpi-val { font-size: 10px; }
@@ -10996,7 +10996,7 @@ body {
   font-size: 10.5px;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 640px){
   #page-watchlist .cover { padding: 12px 14px; }
   #page-watchlist .cover-title { font-size: 16px; }
   .wl-quarter-nav { gap: 5px; margin-bottom: 8px; }
@@ -11082,7 +11082,7 @@ body {
 .wl-week-history-panel::-webkit-scrollbar { width: 4px; }
 .wl-week-history-panel::-webkit-scrollbar-thumb { background: var(--glass-2); border-radius: 99px; }
 
-@media (max-width: 640px) {
+@media (max-width: 640px){
   .wl-week-history-panel { left: auto; right: 0; min-width: 230px; }
   .wl-week-history-btn { padding: 4px 10px; font-size: 9.5px; }
   .wl-week-history-item-label { font-size: 10.5px; }
@@ -11222,13 +11222,13 @@ body {
 .cal-week-pnl.zero{color:var(--text3)}
 .cal-week-days{font-size:10px;color:var(--text3);background:var(--glass-2);border-radius:var(--r-full);padding:3px 9px;width:fit-content}
 
-@media(max-width:1180px){
+@media (max-width: 1180px){
   .cal-an-grid{grid-template-columns:1fr 1fr}
   .cal-an-grid > .cal-an-card:first-child{grid-column:1/3}
   .cal-an-grid.row2{grid-template-columns:1fr}
   .cal-week-col-wrap{width:118px}
 }
-@media(max-width:760px){
+@media (max-width: 760px){
   /* ── Analytics cards: compact 3-up / 2-up rows, matching desktop layout ── */
   .cal-an-grid{grid-template-columns:repeat(3,1fr);gap:7px}
   .cal-an-grid > .cal-an-card:first-child{grid-column:auto}
@@ -11315,7 +11315,7 @@ body {
   .cal-day-count{font-size:8px;margin-top:1px}
   .cal-day-pairs{font-size:7px}
 }
-@media(max-width:480px){
+@media (max-width: 480px){
   /* Devices in the 344–430px range (Fold5 folded, SE, S8+, Pixel 7, XR,
      14 Pro Max, etc.) were still hitting the 760px 3-up/2-up compact grid,
      which left too little room per card and clipped labels/values
@@ -11332,7 +11332,7 @@ body {
   .cal-an-bar-main{font-size:12px}
   .cal-an-bar-sub{font-size:9.5px}
 }
-@media(max-width:420px){
+@media (max-width: 420px){
   .cal-day{min-height:50px;padding:5px 4px}
   .cal-day-num{font-size:10px}
   .cal-day-pnl{font-size:8.5px}
@@ -11349,7 +11349,7 @@ body {
   .cal-week-card.cal2-week-report .cal-week-pnl{font-size:11px !important}
   .cal-week-card.cal2-week-report .cal-week-days{font-size:7px !important;padding:1.5px 5px !important}
 }
-@media(max-width:360px){
+@media (max-width: 360px){
   #page-calendar{padding-left:8px;padding-right:8px}
   .cal-day{min-height:44px;padding:4px 3px}
   .cal-day-num{font-size:9.5px}
@@ -11600,7 +11600,7 @@ body {
 }
 .nx-dropzone-preview-actions button svg{ width:14px;height:14px; }
 
-@media (max-width:640px){
+@media (max-width: 640px){
   .nx-dropzone{ padding:20px 14px; }
   .nx-dropzone-icon{ width:28px;height:28px; }
   .nx-dropzone-text-primary{ font-size:12.5px; }
@@ -11608,7 +11608,7 @@ body {
 }
 
 /* Reduced motion respect */
-@media (prefers-reduced-motion:reduce){
+@media (prefers-reduced-motion: reduce){
   .nx-dropzone,.nx-dropzone-icon,.nx-dropzone-preview{ transition:none;animation:none; }
 }
 
@@ -11676,7 +11676,7 @@ body {
 
 /* Trading Score + Monthly Intelligence row */
 .cal2-top-row{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:14px;margin-top:2px;min-width:0}
-@media(max-width:900px){ .cal2-top-row{grid-template-columns:1fr} }
+@media (max-width: 900px){ .cal2-top-row{grid-template-columns:1fr} }
 .cal2-score-card,.cal2-insights-card{min-width:0;
   background:var(--glass-1);border:1px solid var(--glass-border);border-radius:var(--r-xl);
   padding:16px 18px;box-shadow:var(--shadow-sm);min-width:0;
@@ -11712,7 +11712,7 @@ body {
 .cal2-insight-card.green .cal2-insight-icon{background:rgba(52,211,153,.14);color:var(--green)}
 .cal2-insight-card.red .cal2-insight-icon{background:rgba(248,113,113,.14);color:var(--red)}
 .cal2-insight-card.blue .cal2-insight-icon{background:rgba(96,165,250,.14);color:var(--blue)}
-.cal2-insight-card.amber .cal2-insight-icon{background:rgba(251,191,36,.16);color:#fbbf24}
+.cal2-insight-card.amber .cal2-insight-icon{background:rgba(251,191,36,.16);color:var(--gold)}
 .cal2-insight-icon svg{width:13px;height:13px}
 .cal2-insight-text{font-size:11.5px;line-height:1.45;color:var(--text2);overflow-wrap:anywhere;min-width:0}
 
@@ -11749,7 +11749,7 @@ body {
 .cal2-day-rule{display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;border-radius:50%}
 .cal2-day-rule svg{width:8px;height:8px}
 .cal2-day-rule.ok{color:var(--green)}
-.cal2-day-rule.warn{color:#fbbf24}
+.cal2-day-rule.warn{color:var(--gold)}
 .cal2-day-mistake{
   font-size:7px;color:var(--red);background:rgba(248,113,113,.12);border-radius:4px;
   padding:1px 4px;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
@@ -11784,7 +11784,7 @@ body {
 .cal2-agenda-pnl.green{color:var(--green)} .cal2-agenda-pnl.red{color:var(--red)} .cal2-agenda-pnl.zero{color:var(--text3)}
 
 /* Mobile tightening */
-@media(max-width:640px){
+@media (max-width: 640px){
   .cal2-insight-grid{grid-template-columns:1fr}
   .cal2-score-card{flex-direction:row;padding:14px}
   .cal2-mode-tabs{gap:8px}
@@ -11829,7 +11829,7 @@ body {
 }
 .cal2-coach-btn:hover{opacity:.9;transform:translateY(-1px)}
 .cal2-coach-btn svg{width:13px;height:13px}
-@media(max-width:640px){ .cal2-coach-cols{grid-template-columns:1fr;gap:10px} }
+@media (max-width: 640px){ .cal2-coach-cols{grid-template-columns:1fr;gap:10px} }
 
 /* Filter FAB (mobile only) + bottom sheet */
 .cal2-filter-fab{
@@ -11868,13 +11868,13 @@ body {
 }
 /* On short viewports (landscape phones, Nest Hub) the 70vh cap can still
    crowd out the Apply button below the fold — trim further. */
-@media(max-height:500px){ .cal2-filter-sheet-panel{max-height:88vh} }
+@media (max-height: 500px){ .cal2-filter-sheet-panel{max-height:88vh} }
 
 /* Collapsible week cards (mobile) */
 .cal2-week-expand-hint{display:none;font-size:9px;color:var(--text3);text-align:center;margin-top:6px}
 
 /* ── Mobile-specific layout (Phase 5) ── */
-@media(max-width:900px){
+@media (max-width: 900px){
   /* Filters: show FAB, hide inline desktop bar */
   .cal2-filter-fab{display:inline-flex}
   .cal2-filter-bar{display:none}
@@ -11904,7 +11904,7 @@ body {
    actually gives the row somewhere to grow into. The row-forcing rule
    used to live in the 900px block above and get squeezed into the
    desktop sidebar's 118px width for any viewport between 761–900px. */
-@media(max-width:760px){
+@media (max-width: 760px){
   .cal-week-col{
     flex-direction:row !important;flex-wrap:nowrap !important;
     align-items:flex-start !important;gap:5px !important;
@@ -11948,7 +11948,7 @@ body {
 }
 .cal2-max-btn svg, .cal2-min-btn svg{width:12px;height:12px}
 .cal2-min-btn{margin-right:2px}
-@media(max-width:640px){
+@media (max-width: 640px){
   .cal2-max-btn span, .cal2-min-btn span{display:none}
   .cal2-max-btn, .cal2-min-btn{padding:6px 9px}
 }
