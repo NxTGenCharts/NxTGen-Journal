@@ -1408,12 +1408,15 @@ async function aiRun() {
 /* ── Format response text → HTML ── */
 function _aiFormatResponse(text) {
   return text
+    // Strip fenced code block markers (```lang / ```) - content inside is
+    // still run through the normal list/header rules below
+    .replace(/^```[a-zA-Z]*\s*$/gm, '')
     // Bold headers: **text**
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     // Italic: *text*
     .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    // Section headers: lines starting with # or ##
-    .replace(/^#{1,3}\s+(.+)$/gm, '<div class="ai-section-head">$1</div>')
+    // Section headers: lines starting with #, ##, ###, ####, etc.
+    .replace(/^#{1,6}\s+(.+)$/gm, '<div class="ai-section-head">$1</div>')
     // Numbered lists
     .replace(/^(\d+)\.\s+(.+)$/gm, '<div class="ai-list-item numbered"><span class="ai-list-num">$1</span><span>$2</span></div>')
     // Bullet points
@@ -1484,6 +1487,7 @@ function aiPageTab(tab) {
   const chatPanel  = document.getElementById('ai-chat-panel');
   const tabCoach   = document.getElementById('ai-tab-coach');
   const tabChat    = document.getElementById('ai-tab-chat');
+  const pageAi     = document.getElementById('page-ai');
   if (!coachPanel || !chatPanel) return;
   // Reclaim the chat UI in case it's currently living in the floating chat widget
   if (typeof closeFloatingChat === 'function') closeFloatingChat();
@@ -1492,6 +1496,7 @@ function aiPageTab(tab) {
     chatPanel.style.display  = '';
     tabCoach.classList.remove('active');
     tabChat.classList.add('active');
+    pageAi?.classList.add('ai-chat-active');
     // Focus input
     setTimeout(() => document.getElementById('chat-input')?.focus(), 100);
     // Clear unread badge
@@ -1502,6 +1507,7 @@ function aiPageTab(tab) {
     chatPanel.style.display  = 'none';
     tabCoach.classList.add('active');
     tabChat.classList.remove('active');
+    pageAi?.classList.remove('ai-chat-active');
   }
 }
 

@@ -2266,13 +2266,40 @@ body.detail-resizing *{user-select:none!important}
    ════════════════════════════════════════════════════ */
 .chat-container {
   display: flex; flex-direction: column;
-  height: calc(100vh - 280px);
+  height: calc(100vh - 280px); /* fallback for browsers without :has() support */
   min-height: 500px;
   background: var(--glass-1);
   border: 1px solid var(--glass-border);
   border-radius: var(--r-lg);
   overflow: hidden;
   position: relative;
+}
+
+/* Chat tab: make the whole AI page a fixed-height flex column so the
+   chat container fills all remaining space under the tab bar, instead
+   of relying on a guessed "100vh - 280px" offset that leaves dead
+   space (or overflows) depending on screen size / chrome above it. */
+#page-ai.ai-chat-active {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--topbar));
+  padding-bottom: 0;
+}
+#page-ai.ai-chat-active .page-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+#page-ai.ai-chat-active #ai-chat-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+#page-ai.ai-chat-active .chat-container {
+  height: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Header */
