@@ -437,8 +437,19 @@ function localToday() {
 // displays across the app (chat bubbles, journal exports, watchlist times,
 // "last updated" labels, the topbar clock, etc.) should go through these
 // helpers so that changing the preferred timezone applies everywhere.
+//
+// Special value "exchange": the timezone picker includes an "Exchange"
+// entry with no fixed IANA zone of its own — it resolves to the visitor's
+// own system/browser timezone at read time. If you'd rather this be tied
+// to a specific broker or instrument's exchange hours, swap the resolution
+// below for that fixed IANA zone instead.
 function getUserTz() {
-  return (typeof _profileData !== 'undefined' && _profileData && _profileData.timezone) || 'Africa/Lagos';
+  const raw = (typeof _profileData !== 'undefined' && _profileData && _profileData.timezone) || 'Africa/Lagos';
+  if (raw === 'exchange') {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Lagos'; }
+    catch (e) { return 'Africa/Lagos'; }
+  }
+  return raw;
 }
 // Returns the short timezone label (e.g. "WAT", "GMT", "EST") for a given
 // IANA zone, falling back to "WAT" if the zone can't be resolved.
