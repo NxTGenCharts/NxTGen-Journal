@@ -11260,7 +11260,7 @@ body {
   /* ── Weekly summary: moved BELOW the calendar as its own roomy row, not squeezed to the side ── */
   .cal-grid-with-weeks{flex-direction:column;gap:14px;align-items:stretch}
   #page-calendar .cal-grid-with-weeks{min-height:0}
-  .cal-week-col-wrap{width:100%;flex-shrink:0;gap:8px}
+  .cal-week-col-wrap{width:100%;max-width:100%;flex-shrink:0;gap:8px}
   .cal-week-col-heading{
     display:block;font-size:10.5px;font-weight:800;color:var(--text3);
     text-transform:uppercase;letter-spacing:.08em;padding:0 2px;
@@ -11271,10 +11271,12 @@ body {
   .cal-week-col{
     display:flex;flex-direction:row;flex-wrap:nowrap;
     gap:6px;
-    overflow:visible;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none;padding-bottom:2px;
   }
+  .cal-week-col::-webkit-scrollbar{display:none}
   .cal-week-card{
-    min-width:0;width:auto;flex:1 1 0%;padding:10px 6px 9px;
+    min-width:56px;width:auto;flex:1 1 0%;padding:10px 6px 9px;
     flex-direction:column;align-items:center;justify-content:center;
     text-align:center;gap:3px;
   }
@@ -11341,6 +11343,11 @@ body {
   .cal-week-pnl{font-size:11px}
   .cal-week-days{font-size:7px;padding:1.5px 5px}
   .cal-an-grid{gap:5px}
+  .cal-week-card.cal2-week-report{padding:7px 3px 6px !important}
+  .cal-week-card.cal2-week-report .cal-week-label{font-size:8px !important}
+  .cal-week-card.cal2-week-report .cal2-week-grade{font-size:9px !important}
+  .cal-week-card.cal2-week-report .cal-week-pnl{font-size:11px !important}
+  .cal-week-card.cal2-week-report .cal-week-days{font-size:7px !important;padding:1.5px 5px !important}
 }
 @media(max-width:360px){
   #page-calendar{padding-left:8px;padding-right:8px}
@@ -11355,6 +11362,11 @@ body {
   .cal-week-pnl{font-size:10px}
   .cal-week-days{font-size:6.5px;padding:1.5px 4px}
   .cal-month-label{font-size:14px}
+  .cal-week-card.cal2-week-report{padding:6px 2px 5px !important}
+  .cal-week-card.cal2-week-report .cal-week-label{font-size:7.5px !important}
+  .cal-week-card.cal2-week-report .cal2-week-grade{font-size:8.5px !important}
+  .cal-week-card.cal2-week-report .cal-week-pnl{font-size:10px !important}
+  .cal-week-card.cal2-week-report .cal-week-days{font-size:6.5px !important;padding:1.5px 4px !important}
 }
 
 /* ── Calendar Settings modal ─────────────────────── */
@@ -11878,20 +11890,31 @@ body {
   }
   .cal2-week-expand-hint{display:block}
   .cal2-week-report.expanded .cal2-week-expand-hint{display:none}
+}
 
-  /* Weekly report cards carry more content (grade badge, stat rows) than
-     the original label/pnl/days-pill card, but the summary still belongs
-     in a single horizontal row like the rest of the mobile calendar —
-     stacking one full-width card per week pushed this into a tall,
-     scroll-heavy column. Keep it as one row of compact, equal-width cards;
-     tapping a card expands its extra stats in place (siblings stay top
-     aligned so they don't stretch to match the expanded card). */
+/* Weekly report cards carry more content (grade badge, stat rows) than
+   the original label/pnl/days-pill card, but the summary still belongs
+   in a single horizontal row like the rest of the mobile calendar —
+   stacking one full-width card per week pushed this into a tall,
+   scroll-heavy column. Keep it as one row of compact, equal-width cards;
+   tapping a card expands its extra stats in place (siblings stay top
+   aligned so they don't stretch to match the expanded card).
+   NOTE: this must stay at the same breakpoint as the
+   `.cal-week-col-wrap{width:100%}` rule above (760px) — that's what
+   actually gives the row somewhere to grow into. The row-forcing rule
+   used to live in the 900px block above and get squeezed into the
+   desktop sidebar's 118px width for any viewport between 761–900px. */
+@media(max-width:760px){
   .cal-week-col{
     flex-direction:row !important;flex-wrap:nowrap !important;
     align-items:flex-start !important;gap:5px !important;
   }
+  /* Cards stay flexible up to a floor width — below that (very narrow
+     screens combined with a 5-6 week month) the row scrolls horizontally
+     (see the base .cal-week-col overflow-x rule above) instead of
+     clipping the PnL/day-count text. */
   .cal-week-card.cal2-week-report{
-    flex:1 1 0% !important;width:auto !important;min-width:0 !important;
+    flex:1 1 0% !important;width:auto !important;min-width:56px !important;
     text-align:center !important;align-items:center !important;justify-content:center !important;
     padding:9px 5px 8px !important;
   }
