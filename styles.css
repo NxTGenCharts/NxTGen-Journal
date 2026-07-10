@@ -11879,21 +11879,35 @@ body {
   .cal2-week-expand-hint{display:block}
   .cal2-week-report.expanded .cal2-week-expand-hint{display:none}
 
-  /* Weekly report cards carry far more content now (grade badge, 4 stat
-     rows) than the original label/pnl/days-pill card this layout was built
-     for. Squeezing all 5 into one horizontal row (the pre-existing <760px
-     behaviour below) makes them unreadable slivers — so once a card can
-     be expanded/collapsed, force the column back to one full-width card
-     per row instead, overriding the older single-row treatment. */
-  .cal-week-col{flex-direction:column !important;flex-wrap:wrap !important}
-  .cal-week-card.cal2-week-report{
-    flex:0 0 auto !important;width:100% !important;min-width:0 !important;
-    text-align:left !important;align-items:stretch !important;justify-content:flex-start !important;
-    padding:12px 14px !important;
+  /* Weekly report cards carry more content (grade badge, stat rows) than
+     the original label/pnl/days-pill card, but the summary still belongs
+     in a single horizontal row like the rest of the mobile calendar —
+     stacking one full-width card per week pushed this into a tall,
+     scroll-heavy column. Keep it as one row of compact, equal-width cards;
+     tapping a card expands its extra stats in place (siblings stay top
+     aligned so they don't stretch to match the expanded card). */
+  .cal-week-col{
+    flex-direction:row !important;flex-wrap:nowrap !important;
+    align-items:flex-start !important;gap:5px !important;
   }
-  .cal-week-card.cal2-week-report .cal-week-label{font-size:11px !important;white-space:normal}
-  .cal-week-card.cal2-week-report .cal-week-pnl{font-size:17px !important;margin-left:0}
-  .cal-week-card.cal2-week-report .cal-week-days{font-size:10px !important;padding:3px 9px !important}
+  .cal-week-card.cal2-week-report{
+    flex:1 1 0% !important;width:auto !important;min-width:0 !important;
+    text-align:center !important;align-items:center !important;justify-content:center !important;
+    padding:9px 5px 8px !important;
+  }
+  .cal-week-card.cal2-week-report .cal2-week-top{
+    flex-direction:column !important;gap:1px;align-items:center !important;justify-content:center !important;
+  }
+  .cal-week-card.cal2-week-report .cal-week-label{font-size:9px !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .cal-week-card.cal2-week-report .cal2-week-grade{font-size:10px !important}
+  .cal-week-card.cal2-week-report .cal-week-pnl{font-size:12.5px !important;margin-left:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .cal-week-card.cal2-week-report .cal-week-days{
+    font-size:8px !important;padding:2px 6px !important;flex-shrink:0;
+    white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+  }
+  .cal-week-card.cal2-week-report .cal2-week-stats{width:100%}
+  .cal-week-card.cal2-week-report .cal2-week-stat{font-size:9px}
+  .cal-week-card.cal2-week-report .cal2-week-expand-hint{font-size:8px}
 }
 
 /* ═══════════════════════════════════════════════════════
