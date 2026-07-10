@@ -11870,14 +11870,21 @@ body {
   .cal2-week-expand-hint{display:block}
   .cal2-week-report.expanded .cal2-week-expand-hint{display:none}
 
-  /* Analytics cards become a horizontal swipeable carousel */
-  .cal-an-grid{
-    display:flex !important;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;
-    padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+  /* Weekly report cards carry far more content now (grade badge, 4 stat
+     rows) than the original label/pnl/days-pill card this layout was built
+     for. Squeezing all 5 into one horizontal row (the pre-existing <760px
+     behaviour below) makes them unreadable slivers — so once a card can
+     be expanded/collapsed, force the column back to one full-width card
+     per row instead, overriding the older single-row treatment. */
+  .cal-week-col{flex-direction:column !important;flex-wrap:wrap !important}
+  .cal-week-card.cal2-week-report{
+    flex:0 0 auto !important;width:100% !important;min-width:0 !important;
+    text-align:left !important;align-items:stretch !important;justify-content:flex-start !important;
+    padding:12px 14px !important;
   }
-  .cal-an-grid::-webkit-scrollbar{display:none}
-  .cal-an-grid .cal-an-card{scroll-snap-align:start;flex:0 0 84%;min-width:84%}
-  @media(min-width:481px){ .cal-an-grid .cal-an-card{flex:0 0 60%;min-width:60%} }
+  .cal-week-card.cal2-week-report .cal-week-label{font-size:11px !important;white-space:normal}
+  .cal-week-card.cal2-week-report .cal-week-pnl{font-size:17px !important;margin-left:0}
+  .cal-week-card.cal2-week-report .cal-week-days{font-size:10px !important;padding:3px 9px !important}
 }
 
 /* ═══════════════════════════════════════════════════════
