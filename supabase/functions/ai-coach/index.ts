@@ -5,7 +5,13 @@
 // The frontend (app.js) is UNCHANGED — it still POSTs:
 //   { system: "...", messages: [{ role, content }, ...] }
 // and still reads back:
-//   { content: [{ type: "text", text: "..." }] }
+//   { content: [{ type: "text", text: "..." }], provider: "gemini" | "groq" }
+//
+// The "provider" field is purely a debug aid — it tells you which
+// backend actually answered a given request. The frontend doesn't
+// need to read it (existing UI code that only looks at `content`
+// keeps working unchanged), but you can see it in DevTools → Network
+// → the ai-coach request → Response tab.
 //
 // Behavior:
 //   1. Try Gemini (with automatic retry on 503/429, exponential backoff).
@@ -91,7 +97,7 @@ Deno.serve(async (req: Request) => {
         const text = (candidate.content?.parts || [])
           .map((p: any) => p.text || '')
           .join('');
-        return json({ content: [{ type: 'text', text }] });
+        return json({ content: [{ type: 'text', text }], provider: 'gemini' });
       }
 
       // Candidate missing — likely a safety block, not a capacity issue.
@@ -106,6 +112,7 @@ Deno.serve(async (req: Request) => {
               : '⚠ No response generated. Try again.',
           },
         ],
+        provider: 'gemini',
       });
     }
 
@@ -126,7 +133,7 @@ Deno.serve(async (req: Request) => {
 
     try {
       const groqText = await callGroq(system, messages, hadImages);
-      return json({ content: [{ type: 'text', text: groqText }] });
+      return json({ content: [{ type: 'text', text: groqText }], provider: 'groq' });
     } catch (groqErr) {
       // Both providers failed — return a clear combined error.
       return json(
