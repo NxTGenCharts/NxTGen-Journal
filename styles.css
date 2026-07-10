@@ -2884,9 +2884,15 @@ body.detail-resizing *{user-select:none!important}
   border:1px solid rgba(52,211,153,0.28)}
 .acc-status.pending{background:rgba(251,191,36,0.10);color:var(--gold);
   border:1px solid rgba(251,191,36,0.22)}
+.acc-status.completed{background:rgba(251,191,36,0.14);color:var(--gold);
+  border:1px solid rgba(251,191,36,0.32);display:inline-flex;align-items:center}
 .acc-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}
 .acc-row .k{color:var(--text3);font-weight:500}
 .acc-row .v{font-family:var(--font-mono);font-weight:600}
+.acc-pnl-toggle{cursor:pointer;border-radius:6px;margin:0 -6px 6px;padding:2px 6px;
+  transition:background .15s var(--ease-out)}
+.acc-pnl-toggle:hover{background:var(--glass-2)}
+.acc-pnl-toggle:hover .v::after{content:'⇄';margin-left:5px;font-size:10px;color:var(--text3)}
 
 /* Recent outcomes dots */
 .acc-recent-dots{display:flex;align-items:center;gap:4px;margin-top:11px;
@@ -2945,6 +2951,7 @@ body.detail-resizing *{user-select:none!important}
   background:var(--glass-2);border:1px solid var(--glass-border);color:var(--text2)}
 .acc-hero-badge.status-active{background:var(--green-dim);border-color:rgba(52,211,153,.3);color:var(--green)}
 .acc-hero-badge.status-archived{background:var(--glass-2);color:var(--text3)}
+.acc-hero-badge.status-completed{background:rgba(251,191,36,0.14);border-color:rgba(251,191,36,.32);color:var(--gold);display:inline-flex;align-items:center}
 .acc-hero-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:14px 18px;position:relative;z-index:1}
 .acc-hero-stat{min-width:0}
 .acc-hero-stat-label{font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:3px}

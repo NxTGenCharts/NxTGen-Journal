@@ -7748,6 +7748,10 @@ function _renderAccGrid() {
       `<span class="acc-dot ${t.outcome==='Win'?'w':t.outcome==='Loss'?'l':'b'}"></span>`
     ).join('');
     const isArchived    = a.status === 'archived';
+    const isChalDone    = !isArchived && _accChallengeIsComplete(a, pnlDollars, _cardAccSize);
+    const statusClass   = isArchived ? 'archived' : (isChalDone ? 'completed' : 'active');
+    const statusLabel   = isArchived ? 'Archived' : (isChalDone ? 'Completed' : 'Active');
+    const statusIcon    = isChalDone ? `<svg class="icn" aria-hidden="true" style="width:11px;height:11px;margin-right:3px;vertical-align:-1.5px"><use href="#ic-check-c"></use></svg>` : '';
     // MT5 integration
     const mt5cfg        = a.mt5;
     const mt5Enabled    = !!mt5cfg?.enabled;
@@ -7774,11 +7778,11 @@ function _renderAccGrid() {
     <div class="acc-card${isArchived ? ' acc-card-archived' : ''}" onclick="${isArchived ? '' : `accShowDetail('${name.replace(/'/g,"\\'")}')` }">
       <div class="acc-card-head">
         <div class="acc-name">${name}${a.type ? `<span class="acc-type-badge">${a.type}</span>` : ''}${a.type === 'Challenge' && a.challengePhase ? `<span class="acc-type-badge">${a.challengePhase}</span>` : ''}${mt5HeadBadge}</div>
-        <span class="acc-status ${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span>
+        <span class="acc-status ${statusClass}">${statusIcon}${statusLabel}</span>
       </div>
       <div class="acc-row"><span class="k">Trades</span><span class="v">${at.length || '—'}</span></div>
       <div class="acc-row"><span class="k">Win Rate</span><span class="v" style="color:${wrColor}">${wr !== null ? wr + '%' : '—'}</span></div>
-      <div class="acc-row"><span class="k">Net PnL</span><span class="v" style="color:${pnlColor}">${pnlStr || '—'}</span></div>
+      <div class="acc-row acc-pnl-toggle" title="Tap to switch $ / %" onclick="event.stopPropagation();_toggleAccCardPnlMode('${name.replace(/'/g,"\\'")}')"><span class="k">Net PnL</span><span class="v" style="color:${pnlColor}">${pnlStr || '—'}</span></div>
       ${last5.length ? `<div class="acc-recent-dots">${dots}<span class="acc-recent-label">Recent</span></div>` : ''}
       ${mt5Row}
       ${mt5Btn}
@@ -8080,12 +8084,25 @@ function _accDrawEquityCurve(name) {
 // and `challengePhase` ('Phase 1' | 'Phase 2'), saved through the same
 // _saveCustomAccounts() pipeline as everything else in Manage Accounts.
 // Purely derived — no separate storage for the maths.
+// Shared helpers so "Challenge complete" logic (used by the progress card,
+// the account grid status pill, and the detail-drawer hero badge) never drifts.
+function _accChallengeTargetPct(acc) {
+  const phase         = acc.challengePhase === 'Phase 2' ? 'Phase 2' : 'Phase 1';
+  const presetTargets = phase === 'Phase 2' ? [4, 5, 6] : [8, 10];
+  const rawTarget     = acc.challengeTarget;
+  return (rawTarget !== undefined && rawTarget !== null && rawTarget !== '')
+    ? parseFloat(rawTarget) : presetTargets[0];
+}
+function _accChallengeIsComplete(acc, netDollars, accSize) {
+  if (!acc || acc.type !== 'Challenge') return false;
+  const targetPct    = _accChallengeTargetPct(acc);
+  const targetProfit = accSize > 0 ? (accSize * targetPct / 100) : 0;
+  return targetProfit > 0 && netDollars >= targetProfit;
+}
 function _accChallengeSectionHtml(acc, m, accSize, name) {
   const phase          = acc.challengePhase === 'Phase 2' ? 'Phase 2' : 'Phase 1';
   const presetTargets  = phase === 'Phase 2' ? [4, 5, 6] : [8, 10];
-  const rawTarget      = acc.challengeTarget;
-  const targetPct      = (rawTarget !== undefined && rawTarget !== null && rawTarget !== '')
-                        ? parseFloat(rawTarget) : presetTargets[0];
+  const targetPct      = _accChallengeTargetPct(acc);
   const isCustom       = !presetTargets.includes(targetPct);
 
   const targetProfit  = accSize > 0 ? (accSize * targetPct / 100) : 0;
@@ -8093,7 +8110,7 @@ function _accChallengeSectionHtml(acc, m, accSize, name) {
   const remaining     = Math.max(targetProfit - currentProfit, 0);
   const rawPct        = targetProfit > 0 ? (currentProfit / targetProfit) * 100 : 0;
   const completion    = Math.max(0, Math.min(100, rawPct));
-  const isComplete    = targetProfit > 0 && currentProfit >= targetProfit;
+  const isComplete    = _accChallengeIsComplete(acc, currentProfit, accSize);
   const badgeText     = phase === 'Phase 1' ? 'ADVANCE TO NEXT PHASE' : 'READY FOR VERIFICATION';
   const completeMsg   = phase === 'Phase 1' ? 'Advance to the Next Phase' : 'Ready for Verification';
 
@@ -8193,6 +8210,17 @@ async function _accSetChallengeTarget(name, pct) {
   if (_accActiveName === name) accShowDetail(name);
 }
 
+// Tapping the Net PnL row on an account card flips that account's display
+// between $ and % — persisted per-account (same field Manage Accounts sets).
+async function _toggleAccCardPnlMode(name) {
+  const list = _getCustomAccounts();
+  const idx  = list.findIndex(a => a.name === name);
+  if (idx < 0) return;
+  list[idx].pnlMode = (list[idx].pnlMode === '$') ? '%' : '$';
+  await _saveCustomAccounts(list);
+  _renderAccGrid();
+}
+
 function accShowDetail(name) {
   const drawer = document.getElementById('acc-detail-drawer');
   const body   = document.getElementById('acc-detail-body');
@@ -8214,10 +8242,17 @@ function accShowDetail(name) {
 
   const isArchived = acc.status === 'archived';
   const netProfitPct = accSize > 0 ? (m.netDollars / accSize) * 100 : null;
+  const isChalDone  = !isArchived && _accChallengeIsComplete(acc, m.netDollars, accSize);
+  const heroStatusClass = isArchived ? 'archived' : (isChalDone ? 'completed' : 'active');
+  const heroStatusLabel = isArchived
+    ? 'Archived'
+    : (isChalDone
+        ? `<svg class="icn" aria-hidden="true" style="width:11px;height:11px;margin-right:3px;vertical-align:-1.5px"><use href="#ic-check-c"></use></svg>Completed`
+        : 'Active');
 
   // ── Hero ──
   const heroBadges = `
-    <span class="acc-hero-badge status-${isArchived ? 'archived' : 'active'}">${isArchived ? 'Archived' : 'Active'}</span>
+    <span class="acc-hero-badge status-${heroStatusClass}">${heroStatusLabel}</span>
     ${acc.type ? `<span class="acc-hero-badge">${acc.type}</span>` : ''}
     ${acc.type === 'Challenge' && acc.challengePhase ? `<span class="acc-hero-badge">${acc.challengePhase}</span>` : ''}
   `;
