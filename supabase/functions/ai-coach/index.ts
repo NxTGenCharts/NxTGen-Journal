@@ -1,36 +1,38 @@
 // supabase/functions/ai-coach/index.ts
 //
-// NxTGen AI Coach — Gemini backend
+// NxTGen AI Coach — Gemini primary, Groq fallback
 // ─────────────────────────────────────────────────────────────────
-// Drop-in replacement for the old Anthropic-powered function.
 // The frontend (app.js) is UNCHANGED — it still POSTs:
 //   { system: "...", messages: [{ role, content }, ...] }
 // and still reads back:
 //   { content: [{ type: "text", text: "..." }] }
 //
-// Internally this function now talks to Google's Gemini API
-// (generativelanguage.googleapis.com) instead of Anthropic, and
-// translates between the two formats so nothing else has to change.
+// Behavior:
+//   1. Try Gemini (with automatic retry on 503/429, exponential backoff).
+//   2. If Gemini still fails after all retries, fall back to Groq
+//      (Llama 3.3 70B via Groq's OpenAI-compatible chat completions API).
+//   3. Image blocks are only sent to Gemini — Groq's free-tier text
+//      models don't support vision, so if the fallback triggers on a
+//      message containing images, we strip images and note that in
+//      the prompt so the reply still makes sense contextually.
 //
-// UPDATE: Added automatic retry with exponential backoff when Gemini
-// returns 503 ("model overloaded / high demand"). This is a transient
-// error on Google's side, not a bug in this function — retrying a
-// couple of times with a short delay usually succeeds.
+// Required secrets:
+//   GEMINI_API_KEY   (existing)
+//   GEMINI_MODEL     (optional, defaults to gemini-flash-latest)
+//   GROQ_API_KEY     (new — get one free at https://console.groq.com/keys)
+//   GROQ_MODEL       (optional, defaults to llama-3.3-70b-versatile)
 // ─────────────────────────────────────────────────────────────────
 
 // deno-lint-ignore-file no-explicit-any
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-
-// Any current Gemini model that supports vision (images) works here.
-// gemini-flash-latest always points at Google's current recommended
-// Flash model, so you don't have to update this when they rev versions.
-// Pin an exact version (e.g. "gemini-2.5-flash") instead if you want
-// stable, predictable behaviour and to avoid congestion on the alias.
 const GEMINI_MODEL = Deno.env.get('GEMINI_MODEL') || 'gemini-flash-latest';
-
 const GEMINI_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
+const GROQ_MODEL = Deno.env.get('GROQ_MODEL') || 'llama-3.3-70b-versatile';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // Retry configuration for transient Gemini errors (503 = overloaded,
 // 429 = rate limited). Exponential backoff: 500ms, 1s, 2s.
@@ -64,6 +66,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'messages array is required' }, 400);
     }
 
+    // ---- Attempt 1: Gemini (with built-in retry) ----
     const contents = messages.map(anthropicMessageToGemini);
 
     const geminiBody: Record<string, any> = {
@@ -79,53 +82,63 @@ Deno.serve(async (req: Request) => {
     }
 
     const geminiRes = await callGeminiWithRetry(geminiBody);
-    const geminiData = await geminiRes.json();
 
-    if (!geminiRes.ok) {
-      const msg = geminiData?.error?.message || `Gemini API error ${geminiRes.status}`;
+    if (geminiRes.ok) {
+      const geminiData = await geminiRes.json();
+      const candidate = geminiData?.candidates?.[0];
 
-      // Give the frontend a clearer signal for transient overload errors
-      // so it can show a friendlier message instead of the raw Gemini text.
-      if (RETRYABLE_STATUS_CODES.has(geminiRes.status)) {
-        return json(
-          {
-            error: 'AI Coach is experiencing high demand right now. Please try again in a few seconds.',
-            transient: true,
-            rawError: msg,
-          },
-          geminiRes.status,
-        );
+      if (candidate) {
+        const text = (candidate.content?.parts || [])
+          .map((p: any) => p.text || '')
+          .join('');
+        return json({ content: [{ type: 'text', text }] });
       }
 
-      return json({ error: msg }, geminiRes.status);
+      // Candidate missing — likely a safety block, not a capacity issue.
+      // No point falling back to Groq for this; return the block reason.
+      const blockReason = geminiData?.promptFeedback?.blockReason;
+      return json({
+        content: [
+          {
+            type: 'text',
+            text: blockReason
+              ? `⚠ Response blocked by Gemini safety filters (${blockReason}). Try rephrasing.`
+              : '⚠ No response generated. Try again.',
+          },
+        ],
+      });
     }
 
-    const candidate = geminiData?.candidates?.[0];
+    // ---- Gemini failed after retries. Fall back to Groq if it's a
+    //      capacity/rate issue (not e.g. an auth or bad-request error). ----
+    const geminiErrBody = await geminiRes.json().catch(() => ({}));
+    const geminiErrMsg = geminiErrBody?.error?.message || `Gemini API error ${geminiRes.status}`;
 
-    // Handle safety blocks / empty responses gracefully
-    if (!candidate) {
-      const blockReason = geminiData?.promptFeedback?.blockReason;
+    const shouldFallback = RETRYABLE_STATUS_CODES.has(geminiRes.status) && !!GROQ_API_KEY;
+
+    if (!shouldFallback) {
+      return json({ error: geminiErrMsg }, geminiRes.status);
+    }
+
+    const hadImages = messages.some(
+      (m: any) => Array.isArray(m.content) && m.content.some((b: any) => b.type === 'image'),
+    );
+
+    try {
+      const groqText = await callGroq(system, messages, hadImages);
+      return json({ content: [{ type: 'text', text: groqText }] });
+    } catch (groqErr) {
+      // Both providers failed — return a clear combined error.
       return json(
         {
-          content: [
-            {
-              type: 'text',
-              text: blockReason
-                ? `⚠ Response blocked by Gemini safety filters (${blockReason}). Try rephrasing.`
-                : '⚠ No response generated. Try again.',
-            },
-          ],
+          error:
+            'AI Coach is experiencing high demand right now. Please try again in a few seconds.',
+          transient: true,
+          rawError: `Gemini: ${geminiErrMsg} | Groq fallback: ${(groqErr as Error).message}`,
         },
+        503,
       );
     }
-
-    const text = (candidate.content?.parts || [])
-      .map((p: any) => p.text || '')
-      .join('');
-
-    // Return in the same shape the old Anthropic proxy returned,
-    // so app.js's `data.content.filter(b => b.type === 'text')...` keeps working.
-    return json({ content: [{ type: 'text', text }] });
   } catch (err) {
     return json({ error: (err as Error).message || 'Unknown server error' }, 500);
   }
@@ -159,9 +172,85 @@ async function callGeminiWithRetry(body: Record<string, any>): Promise<Response>
     }
   }
 
-  // Exhausted all retries — return the last (failing) response so the
-  // caller can surface Gemini's error message to the client.
   return lastRes as Response;
+}
+
+/**
+ * Calls Groq's OpenAI-compatible chat completions endpoint as a fallback
+ * when Gemini is unavailable. Groq's free-tier text models don't support
+ * vision, so image blocks are stripped and noted in the text instead.
+ */
+async function callGroq(
+  system: string | undefined,
+  messages: any[],
+  hadImages: boolean,
+): Promise<string> {
+  if (!GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY is not set');
+  }
+
+  const groqMessages: any[] = [];
+
+  if (system) {
+    groqMessages.push({ role: 'system', content: system });
+  }
+
+  for (const m of messages) {
+    groqMessages.push({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: anthropicContentToPlainText(m.content),
+    });
+  }
+
+  if (hadImages) {
+    groqMessages.push({
+      role: 'system',
+      content:
+        'Note: one or more images were attached to this conversation but could not be ' +
+        'analyzed because the primary vision-capable AI is temporarily unavailable. ' +
+        'Let the user know you cannot see the image right now and ask them to describe ' +
+        'it or try again shortly.',
+    });
+  }
+
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: groqMessages,
+      temperature: 0.7,
+      max_tokens: 4096,
+    }),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    const msg = data?.error?.message || `Groq API error ${res.status}`;
+    throw new Error(msg);
+  }
+
+  return data?.choices?.[0]?.message?.content || '⚠ No response generated. Try again.';
+}
+
+/**
+ * Convert Anthropic-style content (string, or array of text/image blocks)
+ * into a single plain-text string for providers that don't understand
+ * the block format (i.e. Groq).
+ */
+function anthropicContentToPlainText(content: any): string {
+  if (typeof content === 'string') return content;
+
+  return (content || [])
+    .map((block: any) => {
+      if (block.type === 'image') return '[image attached]';
+      return block.text || '';
+    })
+    .join('\n');
 }
 
 /**
