@@ -451,6 +451,29 @@ function getUserTz() {
   }
   return raw;
 }
+// Returns the same human label shown in the Account tab's Timezone
+// dropdown (e.g. "(UTC-4) New York") for the user's current setting, by
+// looking up the matching <option> — single source of truth, so the
+// topbar and the Account page can never drift out of sync with each other.
+function getUserTzCityLabel() {
+  const raw = (typeof _profileData !== 'undefined' && _profileData && _profileData.timezone) || 'Africa/Lagos';
+  const sel = document.getElementById('pf-timezone');
+  if (sel) {
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === raw) return sel.options[i].textContent;
+    }
+  }
+  // Fallback (dropdown not in DOM yet, or a stored value with no matching
+  // option): synthesize a "(UTC±H) Zone" label from the resolved IANA zone.
+  const tz = getUserTz();
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts(new Date());
+    const off = (parts.find(p => p.type === 'timeZoneName') || {}).value || '';
+    return '(' + off.replace('GMT', 'UTC') + ') ' + tz.split('/').pop().replace(/_/g, ' ');
+  } catch (e) {
+    return tz;
+  }
+}
 // Returns the short timezone label (e.g. "WAT", "GMT", "EST") for a given
 // IANA zone, falling back to "WAT" if the zone can't be resolved.
 function getUserTzLabel(tz) {
@@ -10606,23 +10629,13 @@ function loadTheme() {
 
 // ── LIVE CLOCK ────────────────────────────────────────
 // Respects the "Timezone" setting on the Account tab (_profileData.timezone),
-// falling back to Africa/Lagos (WAT) if unset or invalid.
+// falling back to Africa/Lagos (WAT) if unset or invalid. Shows the same
+// "(UTC±H) City" label as the Account tab's Timezone dropdown, rather than
+// a ticking clock, so the topbar always matches what's selected there.
 function updateClock() {
   const el = document.getElementById('topbar-clock');
   if (!el) return;
-  const now = new Date();
-  const tz  = getUserTz();
-  let t, d;
-  try {
-    t = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: tz });
-    d = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz });
-  } catch (e) {
-    // Unknown/invalid IANA zone — fall back safely
-    t = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Africa/Lagos' });
-    d = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Africa/Lagos' });
-  }
-  const tzLabel = getUserTzLabel(tz);
-  el.textContent = d + ' · ' + t + (tzLabel ? ' ' + tzLabel : '');
+  el.textContent = getUserTzCityLabel();
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────
