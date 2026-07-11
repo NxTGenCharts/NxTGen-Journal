@@ -10645,13 +10645,23 @@ function loadTheme() {
 
 // ── LIVE CLOCK ────────────────────────────────────────
 // Respects the "Timezone" setting on the Account tab (_profileData.timezone),
-// falling back to Africa/Lagos (WAT) if unset or invalid. Shows the same
-// "(UTC±H) City" label as the Account tab's Timezone dropdown, rather than
-// a ticking clock, so the topbar always matches what's selected there.
+// falling back to Africa/Lagos (WAT) if unset or invalid. Shows the current
+// date + ticking time + UTC offset (e.g. "Sat, Jul 11  04:10:35 AM  UTC-4"),
+// keeping the city name out so the pill stays compact.
 function updateClock() {
   const el = document.getElementById('topbar-clock');
   if (!el) return;
-  el.textContent = getUserTzCityLabel();
+  const tz = getUserTz();
+  const now = new Date();
+  let date, time;
+  try {
+    date = now.toLocaleDateString('en-US', { timeZone: tz, weekday: 'short', month: 'short', day: 'numeric' });
+    time = now.toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  } catch (e) {
+    date = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  }
+  el.textContent = date + '  ' + time + '  ' + getUserTzOffsetLabel(tz);
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────
