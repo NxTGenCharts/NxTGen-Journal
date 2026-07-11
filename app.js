@@ -485,6 +485,22 @@ function getUserTzLabel(tz) {
     return 'WAT';
   }
 }
+// Returns the abbreviated UTC-offset label (e.g. "UTC-4", "UTC+1") for a
+// given IANA zone, matching the offset shown in the Account tab's Timezone
+// dropdown (just without the city name). All timestamp displays across the
+// app use this instead of getUserTzLabel()'s zone-abbreviation ("EDT",
+// "WAT", etc.), so the label always reflects the user's chosen offset
+// consistently everywhere.
+function getUserTzOffsetLabel(tz) {
+  tz = tz || getUserTz();
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts(new Date());
+    const off = (parts.find(p => p.type === 'timeZoneName') || {}).value || '';
+    return off.replace('GMT', 'UTC') || 'UTC';
+  } catch (e) {
+    return 'UTC';
+  }
+}
 // Formats a time (defaults to now) as "HH:MM" in the user's preferred timezone.
 function formatUserTime(date) {
   date = date || new Date();
@@ -1355,7 +1371,7 @@ async function aiRun() {
   const metaEl       = document.getElementById('ai-response-meta');
   if (responseWrap) responseWrap.style.display = '';
   if (modeLabel)    modeLabel.textContent = _AI_MODE_LABELS[_aiMode];
-  if (metaEl)       metaEl.textContent = formatUserTime() + ' ' + getUserTzLabel();
+  if (metaEl)       metaEl.textContent = formatUserDateTime(new Date(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' ' + getUserTzOffsetLabel();
   if (responseBody) { responseBody.innerHTML = '<div class="ai-thinking"><span></span><span></span><span></span></div>'; }
 
   const userPrompt = _aiUserPrompt(_aiMode, customQ);
@@ -2006,7 +2022,7 @@ function _chatAddBubble(role, content, ts, animate, images) {
   const isUser = role === 'user';
   const isErr  = role === 'error';
   const time   = formatUserTime(new Date(ts));
-  const tzLabel = getUserTzLabel();
+  const tzLabel = getUserTzOffsetLabel();
 
   const imgHtml = images ? images.map(img =>
     `<div class="chat-bubble-img-wrap">
@@ -2125,7 +2141,7 @@ function chatExport() {
   const lines = _chatHistory.map(m => {
     const role = m.role === 'user' ? 'You' : 'AI Coach';
     const time = formatUserDateTime(new Date(m.ts));
-    return `[${time} ${getUserTzLabel()}] ${role}:\n${m.content}\n`;
+    return `[${time} ${getUserTzOffsetLabel()}] ${role}:\n${m.content}\n`;
   });
   const blob = new Blob([lines.join('\n---\n\n')], { type: 'text/plain' });
   const a = document.createElement('a');
@@ -6703,7 +6719,7 @@ function _wlCalRender(weekId, events, startDate, endDate) {
         : (e.impact === 'medium' || e.impact === 'med') ? 'med' : 'low';
       const isMyPair = pairCurs.has(e.country);
       const timeStr  = e.date && e.date.includes('T')
-        ? formatUserTime(new Date(e.date)) + ' ' + getUserTzLabel()
+        ? formatUserTime(new Date(e.date)) + ' ' + getUserTzOffsetLabel()
         : 'All day';
 
       return `
@@ -9939,7 +9955,7 @@ function updateKPIs() {
   _checkDailyLossLimit(trades);
   setTimeout(() => { _drawEquityCurve(); _renderHeatmap(trades); }, 50);
   const subEl = document.getElementById('dash-last-updated');
-  if (subEl) { const now = formatUserTime(); subEl.textContent = 'Last updated ' + now + ' ' + getUserTzLabel(); }
+  if (subEl) { const now = formatUserDateTime(new Date(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); subEl.textContent = 'Last updated ' + now + ' ' + getUserTzOffsetLabel(); }
 
   // ── Dashboard insight bar — computed from this user's actual data ──
   const insightEl = document.getElementById('dash-insight-text');
