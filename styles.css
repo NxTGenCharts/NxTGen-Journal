@@ -6740,6 +6740,15 @@ body{
   border-color:var(--border-focus); background:var(--glass-3);
   box-shadow:0 0 0 3px rgba(96,165,250,0.08);
 }
+/* Native <option> popups render on a plain white background in most
+   browsers regardless of page theme/color-scheme, so a light theme
+   text color (var(--text)) becomes near-invisible until the browser's
+   own hover/selection highlight kicks in. Force a readable dark-on-light
+   pairing for the options themselves, independent of theme. */
+.profile-select option, .form-select option {
+  color:#0f172a;
+  background:#ffffff;
+}
 .profile-textarea { resize:vertical; min-height:72px; }
 .profile-toggle-row {
   display:flex; align-items:center; justify-content:space-between;
