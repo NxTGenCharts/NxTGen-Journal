@@ -501,6 +501,16 @@ function getUserTzOffsetLabel(tz) {
     return 'UTC';
   }
 }
+// Converts a fixed UTC session hour (e.g. London Open = 7 UTC) into a
+// "h:mm AM/PM" string in the user's selected timezone. Used to keep
+// session/killzone times shown around the app in sync with whatever
+// timezone is set on the Account tab, instead of a hardcoded WAT offset.
+function formatUtcHourInUserTz(utcHour, tz) {
+  tz = tz || getUserTz();
+  const d = new Date(Date.UTC(2000, 0, 1, utcHour, 0, 0));
+  try { return d.toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }); }
+  catch (e) { return utcHour + ':00 UTC'; }
+}
 // Formats a time (defaults to now) as "HH:MM" in the user's preferred timezone.
 function formatUserTime(date) {
   date = date || new Date();
@@ -564,7 +574,30 @@ const WL_PAIRS=[
   {name:"EURUSD",priority:"MED",bias:"Bear",tfs:[{tf:"Weekly",bias:"bear"},{tf:"Daily",bias:"bear"},{tf:"4H",bias:"bear"}],note:"Setup: Liquidity sweep · FOMC risk — wait for NY open · R:R 1:3"},
   {name:"GBPJPY",priority:"MED",bias:"Bull",tfs:[{tf:"Weekly",bias:"bull"},{tf:"Daily",bias:"bull"},{tf:"4H",bias:"neu"}],note:"Check DXY correlation · SMT divergence with GBPUSD · R:R 1:5"},
 ];
-const PREWEEK_CHECKS=["DXY analysis complete","All high-priority pairs analyzed top-down","Key news events noted (WAT times)","Weekly levels drawn on charts","London KZ confirmed: 9am–12pm WAT","New York KZ confirmed: 3pm–6pm WAT","Asian KZ confirmed: 2am–5am WAT","Max 2 trades/day set","Max daily loss −2% set","Max weekly loss −5% set","No pending FOMO setups","Mindset: calm and rule-based"];
+// Preweek prep checklist for the Weekly Watchlist page. Session/killzone
+// hours are converted from fixed UTC windows into whatever timezone is
+// selected on the Account tab (falls back to WAT if unset), so this always
+// matches the topbar clock and AI Coach rather than being stuck on WAT.
+function getPreweekChecks() {
+  const tz = getUserTz();
+  const off = getUserTzOffsetLabel(tz);
+  const h = (u) => formatUtcHourInUserTz(u, tz);
+  return [
+    "DXY analysis complete",
+    "All high-priority pairs analyzed top-down",
+    `Key news events noted (${off} times)`,
+    "Weekly levels drawn on charts",
+    `London KZ confirmed: ${h(8)}–${h(11)} ${off}`,
+    `New York KZ confirmed: ${h(14)}–${h(17)} ${off}`,
+    `Asian KZ confirmed: ${h(1)}–${h(4)} ${off}`,
+    "Max 2 trades/day set",
+    "Max daily loss −2% set",
+    "Max weekly loss −5% set",
+    "No pending FOMO setups",
+    "Mindset: calm and rule-based",
+  ];
+}
+const PREWEEK_CHECKS = getPreweekChecks();
 const MILESTONES=["Pass GFT $5k Phase 1","Pass GFT $10k Phase 1","Receive first funded payout","Scale to $50k funded","Scale to $100k funded","Open personal live account","Consistent $1k/month"];
 const GOALS=[
   {q:"Q1 2026 — Complete",items:[{t:"Log every trade with full notes",done:true},{t:"Achieve 70%+ win rate in March",done:true},{t:"Pass first GFT challenge (Phase 1)",done:true},{t:"Build consistent London session routine",done:true},{t:"Achieve $1,000 profit from funded accounts",done:false}]},
@@ -1048,6 +1081,18 @@ function _aiSystemPrompt() {
   const wr    = totalTrades ? ((wins / totalTrades) * 100).toFixed(1) : 0;
   const netPnl = trades.reduce((a, t) => a + _pnlPctValue(t), 0).toFixed(1);
 
+  // Trader's location/timezone label, driven by the Profile > Timezone setting
+  // (falls back to Africa/Lagos / WAT if unset), so the coach's session times
+  // always match what's shown in the topbar clock and Account tab.
+  const _tz = getUserTz();
+  const _tzCityLabel = getUserTzCityLabel().replace(/^\(UTC[^)]*\)\s*/, '') || 'Lagos';
+  const _tzOffsetLabel = getUserTzOffsetLabel(_tz);
+  // Fixed session windows (defined in UTC), converted to the trader's timezone
+  // so "London Open", "Overlap", and "Asian" hours read correctly wherever they are.
+  const _londonOpen   = `${formatUtcHourInUserTz(7, _tz)}–${formatUtcHourInUserTz(11, _tz)} ${_tzOffsetLabel}`;
+  const _londonNYOverlap = `${formatUtcHourInUserTz(12, _tz)}–${formatUtcHourInUserTz(16, _tz)} ${_tzOffsetLabel}`;
+  const _asianSession = `${formatUtcHourInUserTz(0, _tz)}–${formatUtcHourInUserTz(4, _tz)} ${_tzOffsetLabel}`;
+
   // Emotion breakdown
   const emotionMap = {};
   trades.forEach(t => { if(t.emotion) emotionMap[t.emotion] = (emotionMap[t.emotion]||0) + 1; });
@@ -1099,12 +1144,12 @@ function _aiSystemPrompt() {
     `${r}★: wr=${((d.wins/d.n)*100).toFixed(0)}% (${d.n}trades)`
   ).join(', ');
 
-  return `You are the NxTGen AI Trading Coach — an elite, precision-focused coach for a professional forex and futures prop trader based in Lagos, Nigeria (WAT timezone).
+  return `You are the NxTGen AI Trading Coach — an elite, precision-focused coach for a professional forex and futures prop trader based in ${_tzCityLabel} (${_tzOffsetLabel} timezone).
 
 TRADER PROFILE:
 - Platform: NxTGen Trading Journal
 - Style: ICT-based methodology (IRL>ERL, ERL>IRL, SMT divergence, CISD, NxtGen Modified model)
-- Sessions: London Open (8am–12pm WAT) PRIMARY, London/NY Overlap (1–5pm WAT) PRIMARY, Asian (1–5am WAT) secondary
+- Sessions: London Open (${_londonOpen}) PRIMARY, London/NY Overlap (${_londonNYOverlap}) PRIMARY, Asian (${_asianSession}) secondary
 - Accounts: Paper + multiple GFT prop funded accounts (Phase 1 & 2 challenges)
 - Risk: 0.5–1% per trade, max 2 trades/day, no trades below 3★ rating
 - Rules include: HTF bias required, active killzone required, never trade red news ±15min
