@@ -14,6 +14,14 @@ const BASE_URL      = 'https://nxtgencharts.github.io/NxTGen-Journal';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
+// Declared here (instead of near _profileLoad further down) so that any
+// code which runs at script load — like getUserTz()/getPreweekChecks() —
+// can safely reference _profileData without hitting a "Cannot access
+// before initialization" error. Actual profile data is populated later
+// by _profileLoad() once the user is authenticated.
+let _profileData  = {};
+let _profileRowId = null;
+
 // ══════════════════════════════════════════════════════
 // ICON SYSTEM — every icon used across the app renders as an
 // inline <svg><use> referencing the sprite injected once in
@@ -13747,8 +13755,8 @@ async function _restoreAccountByName(name) {
 //    ON journal_profiles FOR ALL USING (auth.uid() = user_id);
 // ════════════════════════════════════════════════════════════════════
 
-let _profileData  = {};
-let _profileRowId = null;
+// _profileData / _profileRowId are declared near the top of the file
+// (right after the Supabase client is created) — see comment there.
 
 async function _profileLoad() {
   if (!_currentUser) return;
