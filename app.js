@@ -8,7 +8,7 @@
 // SUPABASE CONFIG — paste your full publishable key below
 // ══════════════════════════════════════════════════════
 const SUPABASE_URL  = 'https://jlqgdwfbwdiieafhwisy.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpscWdkd2Zid2RpaWVhZmh3aXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5OTIwNTIsImV4cCI6MjA5NDU2ODA1Mn0.5Z8wZ2X7zTvz8CeGy5cBF8b4vs21YVoj-ZGr-jvSXaw';
+const SUPABASE_ANON = 'sb_publishable_t_Bu9PTxcykClDo-_hvO5w_avgOKCDt';
 const BASE_URL      = 'https://nxtgencharts.github.io/NxTGen-Journal';
 
 const { createClient } = supabase;
