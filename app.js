@@ -693,7 +693,6 @@ function _rowToTrade(row) {
     chartLabels: row.chart_labels || [...CHART_LABELS],
     mistakes: row.mistakes || '',
     source:   row.source || '',
-    plannedRr: row.planned_rr || '',
     wouldRetake: row.would_retake !== undefined ? row.would_retake : null,
     lossReason:  row.loss_reason || '',
     followedPlan: row.followed_plan || 'Yes',
@@ -732,7 +731,7 @@ function _hideSkeletons() { /* replaced by actual data rendering */ }
 const _TRADE_LIST_COLUMNS =
   'id, trade_date, pair, pos, rr, pnl, pnl_unit, outcome, kz, strategy, tf, ' +
   'account, rating, risk, notes, pretrade, emotion, checklist, chart_labels, ' +
-  'mistakes, source, planned_rr, would_retake, loss_reason, followed_plan';
+  'mistakes, source, would_retake, loss_reason, followed_plan';
 
 async function loadTrades() {
   _showSkeletons();
@@ -877,7 +876,6 @@ async function _cloudSaveTrade(t) {
     chart_labels: s.chartLabels || t.chartLabels || [...CHART_LABELS],
     mistakes:     s.mistakes !== undefined ? s.mistakes : '',
     source:       t.source || '',
-    planned_rr:   t.plannedRr || '',
     would_retake: s.wouldRetake !== undefined ? s.wouldRetake : (t.wouldRetake !== undefined ? t.wouldRetake : null),
     loss_reason:  t.lossReason || '',
     followed_plan: t.followedPlan || 'Yes',
@@ -3166,7 +3164,6 @@ async function duplicateTrade(id) {
     risk:          orig.risk,
     notes:         orig.notes || '',
     pretrade:      orig.pretrade || '',
-    planned_rr:    orig.plannedRr || '',
     emotion:       orig.emotion || 'Focused',
     loss_reason:   orig.lossReason || '',
     followed_plan: orig.followedPlan || 'Yes',
@@ -3457,37 +3454,22 @@ function _renderDetail(id) {
     </div>`;
 
   // ── Review Tab ─────────────────────────────────────────────────────────
-  const plannedRrVal = t.plannedRr || '';
-  const actualRrNum  = _parseRR(t.rr);
-  const plannedRrNum = _parseRR(plannedRrVal);
-  const rrDiff = (actualRrNum && plannedRrNum) ? (actualRrNum - plannedRrNum).toFixed(2) : null;
-  const rrDiffColor = rrDiff === null ? 'var(--text3)' : parseFloat(rrDiff) >= 0 ? 'var(--green)' : 'var(--red)';
   const retakeState = s.wouldRetake !== undefined ? s.wouldRetake : t.wouldRetake;
   const checklistScore = ((s.checklist || t.checklist || []).length / CHECKLIST_ITEMS.length * 100).toFixed(0);
 
   const reviewContent = `
     <div class="det-tab-content${_detActiveTab === 'review' ? ' active' : ''}" data-tab="review">
       <div class="detail-section">
-        <div class="detail-section-label">R:R Analysis</div>
+        <div class="detail-section-label">R:R</div>
         <div class="review-rr-grid">
-          <div class="review-stat"><div class="review-stat-label">Planned R:R</div>
-            ${_detEditMode
-              ? `<input type="text" class="form-input" id="e-planned-rr" value="${plannedRrVal}" placeholder="1:3" style="margin-top:4px">`
-              : `<div class="review-stat-val">${plannedRrVal || '—'}</div>`}
-          </div>
           <div class="review-stat"><div class="review-stat-label">Actual R:R</div><div class="review-stat-val">${t.rr || '—'}</div></div>
-          <div class="review-stat"><div class="review-stat-label">Difference</div>
-            <div class="review-stat-val" style="color:${rrDiffColor}">${rrDiff !== null ? (parseFloat(rrDiff) >= 0 ? '+' : '') + rrDiff + 'R' : '—'}</div>
-          </div>
         </div>
-        ${rrDiff !== null ? `<div style="font-size:11px;color:var(--text3);margin-top:8px;padding:8px;background:var(--glass-0);border-radius:var(--r-sm);border:1px solid var(--glass-border)">
-          ${parseFloat(rrDiff) >= 0 ? '<svg class="icn icn-green" aria-hidden="true"><use href="#ic-check-c"></use></svg> You captured more R than planned — good patience.' : '<svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg> You captured less R than planned — did you cut early or move SL?'}
-        </div>` : ''}
       </div>
 
       <div class="detail-section">
         <div class="detail-section-label">Checklist Score</div>
         <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+
           <div style="flex:1;height:8px;background:var(--glass-border);border-radius:4px;overflow:hidden">
             <div style="height:100%;width:${checklistScore}%;background:${parseInt(checklistScore)>=80?'var(--green)':parseInt(checklistScore)>=50?'var(--gold)':'var(--red)'};border-radius:4px;transition:width .4s"></div>
           </div>
@@ -4225,7 +4207,6 @@ function openModal(prefill) {
   document.getElementById('m-pair-custom').style.display = 'none';
   document.getElementById('m-pos').value = 'Buy';
   document.getElementById('m-rr').value = '';
-  const mPlannedRr = document.getElementById('m-planned-rr'); if (mPlannedRr) mPlannedRr.value = '';
   document.getElementById('m-pnl').value = '';
   document.getElementById('m-outcome').value = 'Win';
   document.getElementById('m-kz').value = 'London';
@@ -4399,7 +4380,6 @@ async function saveTrade() {
     risk:         document.getElementById('m-risk').value,
     notes:        document.getElementById('m-notes').value,
     pretrade:     document.getElementById('m-pretrade').value,
-    planned_rr:   document.getElementById('m-planned-rr')?.value.trim() || '',
     emotion:      _modalMentalState || 'Focused',
     loss_reason:  lossReasonVal,
     followed_plan: _modalFollowedPlan || 'Yes',
@@ -10783,8 +10763,6 @@ async function _saveEdit(id) {
   else if (stratVal === '__custom__') { const sc = get('e-strat-custom'); if (sc && sc.trim()) t.strategy = sc.trim(); }
   if (tfVal && tfVal !== '__custom__') t.tf = tfVal;
   t.rating = ratingVal;
-  const plannedRrEdit = document.getElementById('e-planned-rr');
-  if (plannedRrEdit) t.plannedRr = plannedRrEdit.value.trim();
   trades.sort((a, b) => b.date.localeCompare(a.date) || (b.id - a.id));
 
   // Instant UI update — no waiting
@@ -13924,7 +13902,7 @@ function _playChime(kind) {
 
 // ── Auto-save drafts — unfinished New Trade form persisted to localStorage ──
 const _DRAFT_KEY = 'nxtgen_trade_draft_v1';
-const _DRAFT_FIELDS = ['m-date','m-pair','m-pair-custom','m-pos','m-rr','m-planned-rr','m-pnl',
+const _DRAFT_FIELDS = ['m-date','m-pair','m-pair-custom','m-pos','m-rr','m-pnl',
   'm-outcome','m-kz','m-strat','m-strat-custom','m-tf','m-tf-custom','m-acc','m-rating','m-risk',
   'm-pretrade','m-notes','m-loss-reason'];
 let _draftSaveTimer = null;
