@@ -34,11 +34,11 @@
   --glass-shine:   rgba(255,255,255,0.06);
 
   /* Blur levels */
-  --blur-xs: blur(8px);
-  --blur-sm: blur(16px);
-  --blur-md: blur(28px);
-  --blur-lg: blur(44px);
-  --blur-xl: blur(64px);
+  --blur-xs: blur(6px);
+  --blur-sm: blur(10px);
+  --blur-md: blur(16px);
+  --blur-lg: blur(24px);
+  --blur-xl: blur(32px);
 
   /* Borders */
   --border:        rgba(255,255,255,0.07);
@@ -105,10 +105,10 @@
   --ease-in-out: cubic-bezier(0.4,0.0,0.2,1);
 
   /* Transitions */
-  --t-fast:   all 0.14s var(--ease-in-out);
-  --t-med:    all 0.24s var(--ease-in-out);
-  --t-slow:   all 0.4s  var(--ease-in-out);
-  --t-spring: all 0.32s var(--ease-spring);
+  --t-fast:   background 0.14s var(--ease-in-out), border-color 0.14s var(--ease-in-out), box-shadow 0.14s var(--ease-in-out), color 0.14s var(--ease-in-out), opacity 0.14s var(--ease-in-out), transform 0.14s var(--ease-in-out), fill 0.14s var(--ease-in-out), stroke 0.14s var(--ease-in-out);
+  --t-med:    background 0.24s var(--ease-in-out), border-color 0.24s var(--ease-in-out), box-shadow 0.24s var(--ease-in-out), color 0.24s var(--ease-in-out), opacity 0.24s var(--ease-in-out), transform 0.24s var(--ease-in-out), fill 0.24s var(--ease-in-out), stroke 0.24s var(--ease-in-out);
+  --t-slow:   background 0.4s  var(--ease-in-out), border-color 0.4s  var(--ease-in-out), box-shadow 0.4s  var(--ease-in-out), color 0.4s  var(--ease-in-out), opacity 0.4s  var(--ease-in-out), transform 0.4s  var(--ease-in-out), fill 0.4s  var(--ease-in-out), stroke 0.4s  var(--ease-in-out);
+  --t-spring: background 0.32s var(--ease-spring), border-color 0.32s var(--ease-spring), box-shadow 0.32s var(--ease-spring), color 0.32s var(--ease-spring), opacity 0.32s var(--ease-spring), transform 0.32s var(--ease-spring), fill 0.32s var(--ease-spring), stroke 0.32s var(--ease-spring);
 }
 
 /* ── Light Mode ─────────────────────────────────────── */
@@ -11994,4 +11994,20 @@ body {
 @media (max-width: 640px){
   .cal2-max-btn span, .cal2-min-btn span{display:none}
   .cal2-max-btn, .cal2-min-btn{padding:6px 9px}
+}
+
+/* ── Performance: reduce backdrop-filter cost on mobile ──────────────────
+   backdrop-filter is one of the most GPU-expensive CSS properties, and
+   phone GPUs handle it far worse than desktop ones. This further lowers
+   blur radii (on top of the base reduction above) specifically for small
+   screens/touch devices, where the lag was most noticeable. Visually the
+   glass effect is still present, just lighter. */
+@media (max-width: 768px){
+  :root{
+    --blur-xs: blur(3px);
+    --blur-sm: blur(5px);
+    --blur-md: blur(8px);
+    --blur-lg: blur(12px);
+    --blur-xl: blur(16px);
+  }
 }
