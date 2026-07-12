@@ -4457,7 +4457,15 @@ const _WL_LIQ_ITEMS = [
   { k: 'bos',      l: 'BOS' },
   { k: 'pdArray',  l: 'PD Array' },
 ];
-const _WL_MODELS = ['ICT','Silver Bullet','Power of Three','AMD','Breaker','Forever Model','Custom'];
+// Pulls the live list of models from the Playbook page's "Manage Models"
+// data (_pbData.models) instead of a hardcoded list, so the Watchlist's
+// model dropdowns always stay in sync with whatever the user has defined
+// on the Playbook. Falls back to 'Custom' only if no models exist yet.
+function _WL_MODELS() {
+  const active = (_pbData.models || []).filter(m => m.status !== 'archived' && m.status !== 'deleted');
+  const names = active.map(m => m.strategyName || m.title).filter(Boolean);
+  return names.length ? [...names, 'Custom'] : ['Custom'];
+}
 const _WL_DIRECTIONS = ['long','short','wait'];
 const _WL_STAGES = ['Weekly','Daily','4H','1H','Execution'];
 const _WL_CHART_TAGS = ['Weekly','Daily','4H','1H','Entry','Results'];
@@ -5851,7 +5859,7 @@ function _wlBuildDailyGameplan(week) {
             <label class="wl-form-label">Expected Entry Model</label>
             <select class="wl-form-select" onchange="_wlSaveDayField('${week.id}','${activeDay}','entryModel',this.value)">
               <option value=""${!plan.entryModel?' selected':''}>— Select —</option>
-              ${_WL_MODELS.map(m => `<option value="${m}"${plan.entryModel===m?' selected':''}>${m}</option>`).join('')}
+              ${_WL_MODELS().map(m => `<option value="${m}"${plan.entryModel===m?' selected':''}>${m}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -7223,7 +7231,7 @@ function _wlShowPairModal(pair) {
         <label class="wl-form-label">Model Used</label>
         <select class="wl-form-select" id="wl-p-model">
           <option value=""${!pair||!pair.model?' selected':''}>— Select —</option>
-          ${_WL_MODELS.map(m => `<option value="${m}"${pair&&pair.model===m?' selected':''}>${m}</option>`).join('')}
+          ${_WL_MODELS().map(m => `<option value="${m}"${pair&&pair.model===m?' selected':''}>${m}</option>`).join('')}
         </select>
       </div>
       <div class="wl-form-row">
