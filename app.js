@@ -2459,6 +2459,7 @@ function nav(pageId, sbEl, label, extra) {
   if (pageId === 'trash') { setTimeout(renderTrash, 0); }
   if (pageId === 'monthly') { buildMonthlyReview(); }
   if (pageId === 'ai') { buildAI(); }
+  if (pageId === 'backtesting') { buildBacktestingLab(); }
   if (pageId === 'profile') { setTimeout(buildProfile, 0); }
   // Sync mobile bottom nav
   mobNavActivate(pageId);
@@ -9190,6 +9191,378 @@ function pbDeleteRule(i) {
 }
 
 // ═══════════════════════════════════════════════════
+// BACKTESTING LAB — Phase 1: Strategy Library
+// Table: journal_backtest_lab { id, user_id, data jsonb }
+// data = { strategies: [ {...} ], sessions: [] }
+// `sessions` is a reserved stub for Phase 2 (Backtest Sessions);
+// each strategy's `stats` object will be computed from linked
+// sessions once those exist — for now it holds manual/blank values.
+// ═══════════════════════════════════════════════════
+let _blData  = { strategies: [], sessions: [] };
+let _blRowId = null;
+let _blTabState = 'active'; // 'active' | 'archived'
+
+const BL_COLORS = ['gold', 'blue', 'green', 'red', 'purple', 'teal'];
+
+function _blEmptyStats() {
+  return {
+    winRate: null, expectancy: null, profitFactor: null, avgRR: null,
+    totalTests: 0, avgHoldTime: null, maxDrawdown: null,
+    consistencyScore: null, confidenceScore: null,
+  };
+}
+
+function _blNewStrategy() {
+  return {
+    id: (crypto.randomUUID ? crypto.randomUUID() : 'bl_' + Date.now() + '_' + Math.random().toString(36).slice(2)),
+    name: '', description: '', market: '', instrument: '', timeframe: '', session: '',
+    riskPercent: '', rrTarget: '', entryModel: '', confirmationChecklist: [],
+    invalidationRules: '', exitRules: '', notes: '',
+    colorTag: 'gold', status: 'active',
+    stats: _blEmptyStats(),
+    versions: [],
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  };
+}
+
+async function _blLoad() {
+  if (!_currentUser) return;
+  const { data, error } = await sb
+    .from('journal_backtest_lab')
+    .select('id, data')
+    .eq('user_id', _currentUser.id)
+    .maybeSingle();
+  if (error) { console.error('_blLoad:', error.message); return; }
+  if (data) {
+    _blRowId = data.id;
+    _blData  = data.data || { strategies: [], sessions: [] };
+    if (!_blData.strategies) _blData.strategies = [];
+    if (!_blData.sessions)   _blData.sessions   = [];
+    // Backfill any fields added after a strategy was first created
+    _blData.strategies = _blData.strategies.map(s => ({ ..._blNewStrategy(), ...s, stats: { ..._blEmptyStats(), ...(s.stats || {}) } }));
+  }
+}
+
+async function _blSave() {
+  if (!_currentUser) return;
+  const row = { user_id: _currentUser.id, data: _blData };
+  if (_blRowId) {
+    await sb.from('journal_backtest_lab').update(row).eq('id', _blRowId);
+  } else {
+    const { data } = await sb.from('journal_backtest_lab').insert(row).select('id').single();
+    if (data) _blRowId = data.id;
+  }
+}
+
+function _blGetById(id) { return (_blData.strategies || []).find(s => s.id === id); }
+function _blGetIndexById(id) { return (_blData.strategies || []).findIndex(s => s.id === id); }
+
+function _blTab(tab, btn) {
+  _blTabState = tab;
+  document.querySelectorAll('#bl-tabs .bl-tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  buildBacktestingLab();
+}
+
+// ── RENDER: Strategy Library grid ──────────────────────
+function buildBacktestingLab() {
+  const wrap = document.getElementById('bl-strategy-cards');
+  if (!wrap) return;
+  const all = _blData.strategies || [];
+  const visible = all.filter(s => _blTabState === 'archived' ? s.status === 'archived' : s.status !== 'archived');
+
+  const cardsHTML = visible.map(s => _blCardHTML(s)).join('');
+  const emptyCard = `<div class="bl-empty-card" onclick="_openStrategyEditModal(null)">
+      <span style="font-size:22px">＋</span>
+      <p style="margin:0;font-size:12.5px;font-weight:600">Add ${_blTabState === 'archived' ? 'a' : 'your first'} strategy</p>
+    </div>`;
+
+  wrap.innerHTML = visible.length
+    ? (cardsHTML + (_blTabState === 'active' ? `<div class="bl-empty-card" onclick="_openStrategyEditModal(null)"><span style="font-size:22px">＋</span><p style="margin:0;font-size:12.5px;font-weight:600">New Strategy</p></div>` : ''))
+    : emptyCard;
+}
+
+function _blStatCell(label, value, suffix) {
+  const empty = value === null || value === undefined || value === '';
+  return `<div class="bl-stat">
+      <div class="bl-stat-label">${label}</div>
+      <div class="bl-stat-value${empty ? ' empty' : ''}">${empty ? '—' : value + (suffix || '')}</div>
+    </div>`;
+}
+
+function _blCardHTML(s) {
+  const isArchived = s.status === 'archived';
+  const st = s.stats || _blEmptyStats();
+  const metaParts = [s.market, s.instrument, s.timeframe, s.session].filter(Boolean).join(' · ');
+  return `
+  <div class="bl-strategy-card${isArchived ? ' bl-strategy-card-archived' : ''}" style="--bl-tag-color:var(--${s.colorTag || 'gold'})">
+    <div class="bl-card-head">
+      <div style="min-width:0">
+        <div class="bl-card-title">${s.name || 'Untitled Strategy'}</div>
+        ${metaParts ? `<div class="bl-card-meta">${metaParts}</div>` : ''}
+      </div>
+    </div>
+    ${s.description ? `<div class="bl-card-desc">${s.description}</div>` : ''}
+    <div class="bl-stat-grid">
+      ${_blStatCell('Win Rate', st.winRate, '%')}
+      ${_blStatCell('Expectancy', st.expectancy)}
+      ${_blStatCell('Profit Factor', st.profitFactor)}
+      ${_blStatCell('Avg RR', st.avgRR)}
+      ${_blStatCell('Tests', st.totalTests || null)}
+      ${_blStatCell('Max DD', st.maxDrawdown, '%')}
+    </div>
+    <div class="bl-card-actions">
+      <button class="wl-week-btn" onclick="_openStrategyEditModal('${s.id}')"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Edit</button>
+      <button class="wl-week-btn" onclick="_blDuplicateStrategy('${s.id}')"><svg class="icn" aria-hidden="true"><use href="#ic-copy"></use></svg> Duplicate</button>
+      <button class="wl-week-btn" onclick="_blOpenVersionHistory('${s.id}')"><svg class="icn" aria-hidden="true"><use href="#ic-folder"></use></svg> History</button>
+      <button class="wl-week-btn${isArchived ? ' restore' : ' archive'}" onclick="_blToggleArchiveStrategy('${s.id}')">${isArchived ? '<svg class="icn" aria-hidden="true"><use href="#ic-restore"></use></svg> Restore' : '<svg class="icn" aria-hidden="true"><use href="#ic-archive"></use></svg> Archive'}</button>
+      <button class="wl-week-btn danger" onclick="_blDeleteStrategy('${s.id}')"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg></button>
+    </div>
+  </div>`;
+}
+
+// ── CREATE / EDIT MODAL ────────────────────────────────
+function _openStrategyEditModal(id) {
+  const isNew = id === null;
+  const s = isNew ? _blNewStrategy() : _blGetById(id);
+  if (!s) return;
+
+  const existing = document.getElementById('bl-strat-edit-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'bl-strat-edit-overlay';
+  overlay.className = 'acc-manager-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  const colorSwatches = BL_COLORS.map(c => `<div class="bl-color-dot${s.colorTag === c ? ' selected' : ''}" style="background:var(--${c})" onclick="_blPickColor(this,'${c}')" data-color="${c}"></div>`).join('');
+
+  overlay.innerHTML = `
+  <div class="acc-manager-modal" style="max-width:640px;max-height:88vh">
+    <div class="acc-manager-header">
+      <span>${isNew ? '＋ New Strategy' : '<svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Edit Strategy'}</span>
+      <button onclick="document.getElementById('bl-strat-edit-overlay').remove()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
+    </div>
+    <div class="acc-manager-body" style="display:flex;flex-direction:column;gap:12px;padding:16px;overflow-y:auto">
+
+      <div>
+        <label class="bl-lbl">Strategy Name</label>
+        <input type="text" id="bl-f-name" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="e.g. ICT Silver Bullet" value="${s.name || ''}">
+      </div>
+
+      <div>
+        <label class="bl-lbl">Description</label>
+        <textarea id="bl-f-description" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:60px;resize:vertical" placeholder="What is this strategy and when does it apply?">${s.description || ''}</textarea>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label class="bl-lbl">Market</label><input type="text" id="bl-f-market" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="Forex, Futures…" value="${s.market || ''}"></div>
+        <div><label class="bl-lbl">Instrument</label><input type="text" id="bl-f-instrument" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="EURUSD, NQ…" value="${s.instrument || ''}"></div>
+        <div><label class="bl-lbl">Timeframe</label><input type="text" id="bl-f-timeframe" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="M5, H1…" value="${s.timeframe || ''}"></div>
+        <div><label class="bl-lbl">Session</label><input type="text" id="bl-f-session" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="London, NY…" value="${s.session || ''}"></div>
+        <div><label class="bl-lbl">Risk %</label><input type="number" step="0.1" id="bl-f-risk" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="1" value="${s.riskPercent ?? ''}"></div>
+        <div><label class="bl-lbl">RR Target</label><input type="number" step="0.1" id="bl-f-rr" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="2" value="${s.rrTarget ?? ''}"></div>
+      </div>
+
+      <div>
+        <label class="bl-lbl">Entry Model</label>
+        <textarea id="bl-f-entry" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:50px;resize:vertical" placeholder="Describe the entry model…">${s.entryModel || ''}</textarea>
+      </div>
+
+      <div>
+        <label class="bl-lbl">Confirmation Checklist <span class="bl-lbl-sub">(one per line)</span></label>
+        <textarea id="bl-f-checklist" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:80px;resize:vertical;font-size:12px;line-height:1.6" placeholder="Liquidity swept&#10;FVG formed&#10;Displacement confirmed…">${(s.confirmationChecklist || []).join('\n')}</textarea>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label class="bl-lbl">Invalidation Rules</label><textarea id="bl-f-invalid" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:60px;resize:vertical">${s.invalidationRules || ''}</textarea></div>
+        <div><label class="bl-lbl">Exit Rules</label><textarea id="bl-f-exit" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:60px;resize:vertical">${s.exitRules || ''}</textarea></div>
+      </div>
+
+      <div>
+        <label class="bl-lbl">Notes</label>
+        <textarea id="bl-f-notes" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:50px;resize:vertical">${s.notes || ''}</textarea>
+      </div>
+
+      <div>
+        <label class="bl-lbl">Color Tag</label>
+        <div class="bl-color-row" id="bl-color-row">${colorSwatches}</div>
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+        ${!isNew ? `<button onclick="_blDeleteStrategy('${s.id}')" class="acc-mgr-btn del" style="padding:6px 14px;margin-right:auto"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg> Delete</button>` : ''}
+        <button onclick="document.getElementById('bl-strat-edit-overlay').remove()" class="acc-mgr-btn" style="padding:6px 14px">Cancel</button>
+        <button onclick="_blSaveStrategyModal('${isNew ? '' : s.id}')" class="acc-mgr-add-btn" style="padding:6px 18px">Save</button>
+      </div>
+    </div>
+  </div>`;
+
+  document.body.appendChild(overlay);
+  overlay._blColorTag = s.colorTag || 'gold';
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  document.getElementById('bl-f-name')?.focus();
+}
+
+function _blPickColor(el, color) {
+  const overlay = document.getElementById('bl-strat-edit-overlay');
+  if (overlay) overlay._blColorTag = color;
+  document.querySelectorAll('#bl-color-row .bl-color-dot').forEach(d => d.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+async function _blSaveStrategyModal(id) {
+  const isNew = !id;
+  const name = document.getElementById('bl-f-name')?.value.trim();
+  if (!name) { showToast('Strategy name is required', 'danger'); return; }
+
+  const overlay = document.getElementById('bl-strat-edit-overlay');
+  const colorTag = overlay?._blColorTag || 'gold';
+  const checklistRaw = document.getElementById('bl-f-checklist')?.value || '';
+
+  const fields = {
+    name,
+    description: document.getElementById('bl-f-description')?.value.trim() || '',
+    market: document.getElementById('bl-f-market')?.value.trim() || '',
+    instrument: document.getElementById('bl-f-instrument')?.value.trim() || '',
+    timeframe: document.getElementById('bl-f-timeframe')?.value.trim() || '',
+    session: document.getElementById('bl-f-session')?.value.trim() || '',
+    riskPercent: document.getElementById('bl-f-risk')?.value || '',
+    rrTarget: document.getElementById('bl-f-rr')?.value || '',
+    entryModel: document.getElementById('bl-f-entry')?.value.trim() || '',
+    confirmationChecklist: checklistRaw.split('\n').map(x => x.trim()).filter(Boolean),
+    invalidationRules: document.getElementById('bl-f-invalid')?.value.trim() || '',
+    exitRules: document.getElementById('bl-f-exit')?.value.trim() || '',
+    notes: document.getElementById('bl-f-notes')?.value.trim() || '',
+    colorTag,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (isNew) {
+    const s = { ..._blNewStrategy(), ...fields };
+    _blData.strategies.push(s);
+  } else {
+    const idx = _blGetIndexById(id);
+    if (idx === -1) return;
+    const prev = _blData.strategies[idx];
+    // Snapshot the pre-edit version before overwriting (cap at 20 snapshots)
+    const versions = [...(prev.versions || []), { ts: new Date().toISOString(), snapshot: { ...prev, versions: undefined } }].slice(-20);
+    _blData.strategies[idx] = { ...prev, ...fields, versions };
+  }
+
+  document.getElementById('bl-strat-edit-overlay')?.remove();
+  buildBacktestingLab();
+  await _blSave();
+  showToast(isNew ? 'Strategy created ✓' : 'Strategy updated ✓', 'restore');
+}
+
+// ── DUPLICATE / ARCHIVE / DELETE ───────────────────────
+async function _blDuplicateStrategy(id) {
+  const s = _blGetById(id); if (!s) return;
+  const copy = {
+    ...s,
+    id: (crypto.randomUUID ? crypto.randomUUID() : 'bl_' + Date.now() + '_' + Math.random().toString(36).slice(2)),
+    name: s.name + ' (Copy)',
+    stats: _blEmptyStats(),
+    versions: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  _blData.strategies.push(copy);
+  buildBacktestingLab();
+  await _blSave();
+  showToast('Strategy duplicated ✓', 'restore');
+}
+
+async function _blToggleArchiveStrategy(id) {
+  const s = _blGetById(id); if (!s) return;
+  const wasArchived = s.status === 'archived';
+  s.status = wasArchived ? 'active' : 'archived';
+  s.updatedAt = new Date().toISOString();
+  buildBacktestingLab();
+  await _blSave();
+  showToast(wasArchived ? 'Strategy restored ✓' : 'Strategy archived', 'restore');
+}
+
+async function _blDeleteStrategy(id) {
+  const s = _blGetById(id); if (!s) return;
+  openGlassModal({
+    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg>',
+    title: 'Delete Strategy?',
+    body: `<strong>${s.name}</strong> and its version history will be permanently removed.<br><small style="color:var(--text3)">This does not delete any linked backtest sessions.</small>`,
+    confirmLabel: 'Delete Strategy',
+    confirmClass: 'glass-btn-danger',
+    onConfirm: async () => {
+      document.getElementById('bl-strat-edit-overlay')?.remove();
+      const idx = _blGetIndexById(id);
+      if (idx !== -1) _blData.strategies.splice(idx, 1);
+      buildBacktestingLab();
+      await _blSave();
+      showToast('Strategy deleted', 'danger');
+    }
+  });
+}
+
+// ── VERSION HISTORY ─────────────────────────────────────
+function _blOpenVersionHistory(id) {
+  const s = _blGetById(id); if (!s) return;
+  const existing = document.getElementById('bl-version-overlay');
+  if (existing) existing.remove();
+
+  const versions = [...(s.versions || [])].reverse();
+  const overlay = document.createElement('div');
+  overlay.id = 'bl-version-overlay';
+  overlay.className = 'acc-manager-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  const listHTML = versions.length
+    ? versions.map((v, i) => {
+        const realIdx = s.versions.length - 1 - i; // index within s.versions
+        return `<div class="bl-version-item">
+          <div>
+            <div>${v.snapshot?.name || 'Untitled'}</div>
+            <div class="bl-version-ts">${new Date(v.ts).toLocaleString()}</div>
+          </div>
+          <button class="wl-week-btn" onclick="_blRestoreVersion('${s.id}', ${realIdx})">Restore</button>
+        </div>`;
+      }).join('')
+    : `<div class="acc-mgr-empty">No saved versions yet — edits create a snapshot automatically.</div>`;
+
+  overlay.innerHTML = `
+  <div class="acc-manager-modal" style="max-width:480px">
+    <div class="acc-manager-header">
+      <span><svg class="icn" aria-hidden="true"><use href="#ic-folder"></use></svg> Version History — ${s.name}</span>
+      <button onclick="document.getElementById('bl-version-overlay').remove()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
+    </div>
+    <div class="acc-manager-body" style="padding:16px">${listHTML}</div>
+  </div>`;
+
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
+}
+
+async function _blRestoreVersion(id, versionIdx) {
+  const idx = _blGetIndexById(id); if (idx === -1) return;
+  const s = _blData.strategies[idx];
+  const version = (s.versions || [])[versionIdx]; if (!version) return;
+  openGlassModal({
+    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-restore"></use></svg>',
+    title: 'Restore This Version?',
+    body: `Current strategy fields will be replaced with the snapshot from <strong>${new Date(version.ts).toLocaleString()}</strong>. This itself will be saved as a new version first.`,
+    confirmLabel: 'Restore',
+    confirmClass: 'glass-btn-danger',
+    onConfirm: async () => {
+      const versions = [...(s.versions || []), { ts: new Date().toISOString(), snapshot: { ...s, versions: undefined } }].slice(-20);
+      _blData.strategies[idx] = { ...version.snapshot, id: s.id, stats: s.stats, versions, updatedAt: new Date().toISOString() };
+      document.getElementById('bl-version-overlay')?.remove();
+      document.getElementById('bl-strat-edit-overlay')?.remove();
+      buildBacktestingLab();
+      await _blSave();
+      showToast('Version restored ✓', 'restore');
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════
 // GOALS — Supabase-backed, per user
 // Table: journal_goals  { id, user_id, data jsonb, created_at }
 // data = { groups: [{q, items:[{t,done}]}], affirmations: [str] }
@@ -12644,6 +13017,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     _wlLoad(),
     _goalsLoad(),
     _pbLoad(),
+    _blLoad(),
     _accLoad(),
     _profileLoad(),
   ]);

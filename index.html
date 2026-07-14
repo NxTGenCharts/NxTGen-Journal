@@ -178,6 +178,7 @@
     <div class="sb-section">
       <div class="sb-section-label">Resources</div>
       <div class="sb-item ai-glow" onclick="nav('ai',this,'AI Coach')"><span class="ico"><svg class="icn" aria-hidden="true"><use href="#ic-robot"></use></svg></span><span class="lbl">AI Coach</span></div>
+      <div class="sb-item" onclick="nav('backtesting',this,'Backtesting Lab')"><span class="ico"><svg class="icn" aria-hidden="true"><use href="#ic-flask"></use></svg></span><span class="lbl">Backtesting Lab</span></div>
       <div class="sb-item" onclick="nav('playbook',this,'Trading Playbook')"><span class="ico"><svg class="icn" aria-hidden="true"><use href="#ic-notebook"></use></svg></span><span class="lbl">Playbook</span></div>
       <div class="sb-item" onclick="nav('goals',this,'Goals & Milestones')"><span class="ico"><svg class="icn" aria-hidden="true"><use href="#ic-target"></use></svg></span><span class="lbl">Goals</span></div>
       <div class="sb-item" onclick="nav('monthly',this,'Monthly Review')"><span class="ico"><svg class="icn" aria-hidden="true"><use href="#ic-trend-up"></use></svg></span><span class="lbl">Monthly Review</span></div>
@@ -632,6 +633,41 @@
             <button class="wl-modal-close" onclick="mt5CloseModal()"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
           </div>
           <div class="mt5-modal-body" id="mt5-modal-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         BACKTESTING LAB — Phase 1: Strategy Library
+         (Sessions / Replay / Simulator / Analytics land in
+          later phases — see bl-roadmap-note below)
+    ═══════════════════════════════════════════════ -->
+    <div class="page" id="page-backtesting">
+      <div class="page-inner">
+        <div class="cover">
+          <div class="cover-label">Research · Refine · Prove Your Edge</div>
+          <div class="cover-title">Backtesting Lab</div>
+          <div class="cover-sub">Build and manage the strategies you test</div>
+        </div>
+
+        <div class="sec-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <span>Strategy Library</span>
+            <div class="bl-tabs" id="bl-tabs">
+              <button class="bl-tab active" onclick="_blTab('active',this)">Active</button>
+              <button class="bl-tab" onclick="_blTab('archived',this)">Archived</button>
+            </div>
+          </div>
+          <button onclick="_openStrategyEditModal(null)" style="font-size:11px;padding:4px 12px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);color:var(--gold);border-radius:20px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .15s" onmouseover="this.style.background='rgba(251,191,36,.22)'" onmouseout="this.style.background='rgba(251,191,36,.12)'">＋ New Strategy</button>
+        </div>
+
+        <div id="bl-strategy-cards" class="bl-strategy-grid"></div>
+
+        <div class="sec-head" style="margin-top:22px">What's Next</div>
+        <div class="model-card" id="bl-roadmap-note" style="opacity:.8">
+          <div class="model-sub" style="margin-bottom:0">
+            Strategies you build here will link to <strong>Backtest Sessions</strong>, the <strong>Chart Replay</strong> engine, the <strong>Trade Simulator</strong>, and the analytics suite as those phases ship — each strategy's Win Rate, Expectancy, Profit Factor and other stats will populate automatically from linked sessions instead of being entered by hand.
+          </div>
         </div>
       </div>
     </div>
@@ -1695,6 +1731,10 @@
     <button class="mob-more-item" onclick="mobMoreNav('ai','AI Coach')">
       <div class="mob-more-icon"><svg class="icn" aria-hidden="true"><use href="#ic-robot"></use></svg></div>
       <span>AI Coach</span>
+    </button>
+    <button class="mob-more-item" onclick="mobMoreNav('backtesting','Backtesting Lab')">
+      <div class="mob-more-icon"><svg class="icn" aria-hidden="true"><use href="#ic-flask"></use></svg></div>
+      <span>Backtest Lab</span>
     </button>
     <button class="mob-more-item" onclick="mobMoreNav('monthly','Monthly Review')">
       <div class="mob-more-icon"><svg class="icn" aria-hidden="true"><use href="#ic-trend-up"></use></svg></div>
