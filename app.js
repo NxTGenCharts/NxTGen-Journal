@@ -9757,18 +9757,21 @@ function _btSessionCardHTML(s) {
   const strategy = s.strategyId ? _blGetById(s.strategyId) : null;
   const metaParts = [s.pair, s.timeframe, s.date].filter(Boolean).join(' · ');
   return `
-  <div class="bt-session-card${s.status === 'completed' ? ' bt-session-card-completed' : ''}" onclick="_openSessionDetail('${s.id}')">
-    <div class="bt-session-head">
+  <div class="bt-session-card${s.status === 'completed' ? ' bt-session-card-completed' : ''}">
+    <div class="bt-session-head" onclick="_openSessionDetail('${s.id}')" style="cursor:pointer">
       <div style="min-width:0">
         <div class="bt-session-title">${s.name || 'Untitled Session'}</div>
         <div class="bt-session-meta">${metaParts || 'No details set'}${strategy ? ' · ' + strategy.name : ''}</div>
       </div>
       <span class="bt-status-pill bt-status-${s.status}">${s.status}</span>
     </div>
-    <div class="bl-stat-grid">
+    <div class="bl-stat-grid" onclick="_openSessionDetail('${s.id}')" style="cursor:pointer">
       ${_blStatCell('Trades', stats.totalTests || null)}
       ${_blStatCell('Win Rate', stats.winRate, '%')}
       ${_blStatCell('Net', stats.netReturn)}
+    </div>
+    <div class="bl-card-actions">
+      <button class="wl-week-btn" onclick="_repOpen('${s.id}')"><svg class="icn" aria-hidden="true"><use href="#ic-chart-line"></use></svg> Chart Replay</button>
     </div>
   </div>`;
 }
@@ -9917,6 +9920,7 @@ function _openSessionDetail(id) {
     <div class="acc-manager-header">
       <span>${s.name}</span>
       <div style="display:flex;gap:6px;align-items:center">
+        <button onclick="document.getElementById('bt-session-detail-overlay').remove();_repOpen('${s.id}')" class="acc-mgr-close" title="Chart Replay"><svg class="icn" aria-hidden="true"><use href="#ic-chart-line"></use></svg></button>
         <button onclick="document.getElementById('bt-session-detail-overlay').remove();_openSessionEditModal('${s.id}')" class="acc-mgr-close" title="Edit session"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg></button>
         <button onclick="document.getElementById('bt-session-detail-overlay').remove()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
       </div>
@@ -9975,12 +9979,15 @@ function _btRenderSessionDetail(sessionId) {
 }
 
 // ── TRADE ENTRY MODAL (Trade Simulator, Section 4/5) ────
-function _openTradeEntryModal(sessionId, tradeId) {
+function _openTradeEntryModal(sessionId, tradeId, prefill) {
   const session = _btGetSessionById(sessionId); if (!session) return;
   const isNew = !tradeId;
   const t = isNew ? {
-    direction: 'buy', entry_price: '', exit_price: '', stop_price: '',
-    rr: '', pnl: '', entry_time: '', exit_time: '', data: {},
+    direction: (prefill && prefill.direction) || 'buy',
+    entry_price: (prefill && prefill.entry_price) || '',
+    exit_price: '', stop_price: '',
+    rr: '', pnl: '',
+    entry_time: (prefill && prefill.entry_time) || '', exit_time: '', data: {},
   } : _btTrades.find(x => x.id === tradeId);
   if (!t) return;
   const d = t.data || {};
@@ -10161,6 +10168,587 @@ function _btDeleteTradeConfirm(sessionId, tradeId) {
       buildBacktestingLab();
       showToast('Trade deleted', 'danger');
     }
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// BACKTESTING LAB — Phase 3: Chart Replay
+//
+// Candles come from Twelve Data via a Supabase Edge Function
+// (market-data-proxy) so the API key stays server-side and
+// CORS is a non-issue — same pattern as ai-coach. The Edge
+// Function also caches responses in market_data_cache to stay
+// well within Twelve Data's free-tier 800 calls/day limit.
+//
+// Replay position + drawings persist per-session inside
+// session.replayState (part of the same journal_backtest_lab
+// JSONB row) so leaving and reopening a session resumes where
+// you left off.
+//
+// Scope note: drawing tools below cover trendline/arrow/measure
+// (line), horizontal/vertical lines, rectangle-based tools
+// (rect — reused for FVG, Order Block, Session/Killzone Box,
+// Premium-Discount Zone, all just differently colored
+// rectangles), Fibonacci retracement, and text annotations.
+// None of these are auto-detected — ICT concept recognition
+// (auto FVG/OB/liquidity detection) is a future analytics-phase
+// feature, not a replay-drawing feature.
+// ═══════════════════════════════════════════════════
+let _repState = null;
+
+const REP_TOOLS = [
+  { id: 'trendline',        label: 'Trendline',         kind: 'line', color: '#fbbf24' },
+  { id: 'arrow',             label: 'Arrow',             kind: 'line', color: '#fbbf24', arrow: true },
+  { id: 'measure',           label: 'Measure',           kind: 'line', color: '#60a5fa', measure: true },
+  { id: 'hline',             label: 'H-Line',            kind: 'hline', color: '#a78bfa' },
+  { id: 'vline',             label: 'V-Line',            kind: 'vline', color: '#a78bfa' },
+  { id: 'rect',              label: 'Rectangle',         kind: 'rect', color: 'rgba(96,165,250,.16)', stroke: '#60a5fa' },
+  { id: 'fib',               label: 'Fibonacci',         kind: 'fib', color: '#2dd4bf' },
+  { id: 'text',              label: 'Text',              kind: 'text', color: '#e2e8f0' },
+  { id: 'killzone',          label: 'Session Box',       kind: 'rect', color: 'rgba(52,211,153,.10)', stroke: '#34d399', drawLabel: 'Killzone' },
+  { id: 'liquidity',         label: 'Liquidity',         kind: 'hline', color: '#f87171', dashed: true },
+  { id: 'fvg',               label: 'FVG',               kind: 'rect', color: 'rgba(167,139,250,.16)', stroke: '#a78bfa', drawLabel: 'FVG' },
+  { id: 'orderblock',        label: 'Order Block',       kind: 'rect', color: 'rgba(251,191,36,.14)', stroke: '#fbbf24', drawLabel: 'OB' },
+  { id: 'premiumdiscount',   label: 'Premium/Discount',  kind: 'rect', color: 'rgba(45,212,191,.10)', stroke: '#2dd4bf', drawLabel: 'PD' },
+];
+
+function _repUid() { return 'rd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); }
+
+// ── Symbol / interval mapping ───────────────────────────
+function _repMapPairToSymbol(pair) {
+  if (!pair) return 'EUR/USD';
+  const p = pair.trim().toUpperCase().replace(/\s+/g, '');
+  if (p.includes('/')) return p;
+  if (/^[A-Z]{6}$/.test(p)) return p.slice(0, 3) + '/' + p.slice(3);
+  return p;
+}
+function _repMapIntervalToTD(tf) {
+  const map = { M1: '1min', M5: '5min', M15: '15min', M30: '30min', H1: '1h', H4: '4h', D1: '1day', W1: '1week' };
+  const key = (tf || '').trim().toUpperCase();
+  return map[key] || '1h';
+}
+
+// ── Fetch candles via Edge Function proxy ───────────────
+async function _repFetchCandles(symbol, interval, outputsize = 500) {
+  const { data: { session } } = await sb.auth.getSession();
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/market-data-proxy`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session?.access_token || SUPABASE_ANON}`,
+    },
+    body: JSON.stringify({ symbol, interval, outputsize }),
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Server error ${response.status}: ${errText}`);
+  }
+  const json = await response.json();
+  return json.candles || [];
+}
+
+// ── Open / close the fullscreen replay view ─────────────
+async function _repOpen(sessionId) {
+  const session = _btGetSessionById(sessionId); if (!session) return;
+  const saved = session.replayState || {};
+  const symbol = saved.symbol || _repMapPairToSymbol(session.pair);
+  const interval = saved.interval || _repMapIntervalToTD(session.timeframe);
+
+  _repState = {
+    sessionId, symbol, interval,
+    candles: [], index: 0, viewEnd: 0,
+    candlesPerView: saved.candlesPerView || 120,
+    drawings: saved.drawings ? JSON.parse(JSON.stringify(saved.drawings)) : [],
+    activeTool: null, drawDraft: null, panning: false, playing: false, speed: 1,
+    _savedIndex: typeof saved.index === 'number' ? saved.index : null,
+  };
+
+  _repRenderShell();
+  await _repLoadCandles();
+}
+
+function _repClose() {
+  _repPause();
+  _repSaveState();
+  document.getElementById('rep-fullscreen-overlay')?.remove();
+  _repState = null;
+}
+
+async function _repSaveState() {
+  if (!_repState) return;
+  const session = _btGetSessionById(_repState.sessionId); if (!session) return;
+  session.replayState = {
+    symbol: _repState.symbol, interval: _repState.interval,
+    index: _repState.index, candlesPerView: _repState.candlesPerView,
+    drawings: _repState.drawings,
+  };
+  await _blSave();
+}
+
+// ── DOM shell ────────────────────────────────────────────
+function _repRenderShell() {
+  document.getElementById('rep-fullscreen-overlay')?.remove();
+  const session = _btGetSessionById(_repState.sessionId);
+  const overlay = document.createElement('div');
+  overlay.id = 'rep-fullscreen-overlay';
+  overlay.className = 'rep-fullscreen-overlay';
+
+  const toolButtons = REP_TOOLS.map(t => `<button class="rep-tool-btn" data-tool="${t.id}" onclick="_repSetTool('${t.id}')">${t.label}</button>`).join('');
+
+  overlay.innerHTML = `
+    <div class="rep-topbar">
+      <div class="rep-topbar-title">📈 ${session?.name || 'Chart Replay'}</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="rep-symbol-input" class="rep-select" style="width:90px" value="${_repState.symbol}" title="Symbol (e.g. EUR/USD)">
+        <select id="rep-interval-select" class="rep-select">
+          ${['1min','5min','15min','30min','1h','4h','1day','1week'].map(iv => `<option value="${iv}"${iv === _repState.interval ? ' selected' : ''}>${iv}</option>`).join('')}
+        </select>
+        <button class="rep-ctrl-btn" onclick="_repChangeSymbolInterval()">Load</button>
+        <button class="rep-ctrl-btn" onclick="_repClose()">✕ Close</button>
+      </div>
+    </div>
+    <div class="rep-toolbar">
+      <button class="rep-ctrl-btn" onclick="_repReset()">⏮ Reset</button>
+      <button class="rep-ctrl-btn" onclick="_repStep(-1)">⏪ Step Back</button>
+      <button class="rep-ctrl-btn" id="rep-play-btn" onclick="_repTogglePlay()">▶ Play</button>
+      <button class="rep-ctrl-btn" onclick="_repStep(1)">Step Forward ⏩</button>
+      <select id="rep-speed-select" class="rep-select" onchange="_repSetSpeed(this.value)">
+        <option value="0.5">0.5x</option><option value="1" selected>1x</option>
+        <option value="2">2x</option><option value="5">5x</option><option value="10">10x</option>
+      </select>
+      <input type="date" id="rep-jump-date" class="rep-select" onchange="_repJumpToDate(this.value)">
+      <button class="rep-ctrl-btn" onclick="_repZoom(-1)">－ Zoom</button>
+      <button class="rep-ctrl-btn" onclick="_repZoom(1)">＋ Zoom</button>
+      <button class="rep-ctrl-btn" onclick="_repClearDrawings()">🗑 Clear Drawings</button>
+    </div>
+    <div class="rep-tool-row">${toolButtons}</div>
+    <div class="rep-canvas-wrap" id="rep-canvas-wrap">
+      <div class="rep-loading">Loading candles…</div>
+    </div>
+    <div class="rep-exec-bar">
+      <button class="rep-exec-btn rep-exec-buy" onclick="_repExecuteTrade('buy')">▲ Buy</button>
+      <button class="rep-exec-btn rep-exec-sell" onclick="_repExecuteTrade('sell')">▼ Sell</button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
+}
+
+async function _repChangeSymbolInterval() {
+  if (!_repState) return;
+  _repPause();
+  _repState.symbol = document.getElementById('rep-symbol-input')?.value.trim() || _repState.symbol;
+  _repState.interval = document.getElementById('rep-interval-select')?.value || _repState.interval;
+  _repState._savedIndex = null;
+  await _repLoadCandles();
+}
+
+async function _repLoadCandles() {
+  const wrap = document.getElementById('rep-canvas-wrap');
+  if (wrap) wrap.innerHTML = '<div class="rep-loading">Loading candles…</div>';
+  try {
+    const candles = await _repFetchCandles(_repState.symbol, _repState.interval, 500);
+    if (!candles.length) throw new Error('No candle data returned for this symbol/interval');
+    _repState.candles = candles;
+    const seed = Math.min(_repState.candlesPerView - 1, candles.length - 1);
+    _repState.index = (_repState._savedIndex !== null && _repState._savedIndex < candles.length) ? _repState._savedIndex : seed;
+    _repState.viewEnd = _repState.index;
+
+    if (wrap) wrap.innerHTML = '<canvas id="rep-canvas"></canvas><div id="rep-crosshair-box" class="rep-crosshair-box" style="display:none"></div>';
+    _repInitCanvas();
+    _repDrawChart();
+  } catch (err) {
+    const isSetup = /404|not found|relay/i.test(err.message);
+    if (wrap) wrap.innerHTML = `<div class="rep-error">Couldn't load chart data: ${err.message}<br><small style="color:var(--text3)">${isSetup ? 'The market-data-proxy Edge Function may not be deployed yet, or TWELVE_DATA_API_KEY isn\'t set.' : 'Double-check the symbol format (e.g. EUR/USD) and try again.'}</small></div>`;
+  }
+}
+
+// ── Canvas setup ─────────────────────────────────────────
+function _repInitCanvas() {
+  const canvas = document.getElementById('rep-canvas'); if (!canvas) return;
+  const wrap = document.getElementById('rep-canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  _repState.canvas = canvas; _repState.ctx = ctx;
+  _repState.cssWidth = rect.width; _repState.cssHeight = rect.height;
+
+  canvas.addEventListener('mousedown', _repCanvasMouseDown);
+  canvas.addEventListener('mousemove', _repCanvasMouseMove);
+  window.addEventListener('mouseup', _repCanvasMouseUp);
+  canvas.addEventListener('wheel', _repCanvasWheel, { passive: false });
+  canvas.addEventListener('mouseleave', () => {
+    const box = document.getElementById('rep-crosshair-box'); if (box) box.style.display = 'none';
+  });
+  window.addEventListener('resize', _repHandleResize);
+}
+
+function _repHandleResize() {
+  if (!_repState || !document.getElementById('rep-canvas')) return;
+  _repInitCanvas();
+  _repDrawChart();
+}
+
+// ── Geometry helpers ─────────────────────────────────────
+const REP_PAD = { top: 10, bottom: 24, right: 64 };
+
+function _repVisibleSlice() {
+  const total = _repState.candles.length;
+  const perView = _repState.candlesPerView;
+  const viewEnd = Math.min(_repState.viewEnd, total - 1);
+  const startIdx = Math.max(0, viewEnd - perView + 1);
+  return { startIdx, endIdx: viewEnd, list: _repState.candles.slice(startIdx, viewEnd + 1) };
+}
+function _repPriceRange(list) {
+  let min = Infinity, max = -Infinity;
+  list.forEach(c => { if (c.low < min) min = c.low; if (c.high > max) max = c.high; });
+  if (!isFinite(min)) { min = 0; max = 1; }
+  const pad = (max - min) * 0.08 || 0.0005;
+  return { min: min - pad, max: max + pad };
+}
+function _repIndexForTime(ms) {
+  const arr = _repState.candles;
+  let lo = 0, hi = arr.length - 1;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (arr[mid].time < ms) lo = mid + 1; else hi = mid; }
+  return lo;
+}
+function _repPointFromPixel(cssX, cssY) {
+  const { startIdx, list } = _repVisibleSlice();
+  const chartW = _repState.cssWidth - REP_PAD.right, chartH = _repState.cssHeight - REP_PAD.top - REP_PAD.bottom;
+  const candleW = chartW / Math.max(1, list.length);
+  let relIdx = Math.floor(cssX / candleW);
+  relIdx = Math.max(0, Math.min(relIdx, list.length - 1));
+  const idx = startIdx + relIdx;
+  const candle = _repState.candles[idx] || list[list.length - 1];
+  const { min, max } = _repPriceRange(list);
+  const price = max - ((cssY - REP_PAD.top) / chartH) * (max - min);
+  return { time: candle.time, price };
+}
+
+// ── Main render ──────────────────────────────────────────
+function _repDrawChart() {
+  if (!_repState || !_repState.ctx) return;
+  const ctx = _repState.ctx, W = _repState.cssWidth, H = _repState.cssHeight;
+  ctx.clearRect(0, 0, W, H);
+  const { startIdx, list } = _repVisibleSlice();
+  if (!list.length) return;
+  const { min, max } = _repPriceRange(list);
+  const chartW = W - REP_PAD.right, chartH = H - REP_PAD.top - REP_PAD.bottom;
+  const candleW = chartW / list.length;
+  const bodyW = Math.max(1, candleW * 0.6);
+  const yFor = p => REP_PAD.top + (max - p) / (max - min) * chartH;
+  const xFor = i => i * candleW + candleW / 2;
+
+  // grid + price axis
+  ctx.lineWidth = 1;
+  for (let g = 0; g <= 4; g++) {
+    const y = REP_PAD.top + (chartH / 4) * g;
+    ctx.strokeStyle = 'rgba(255,255,255,.05)';
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartW, y); ctx.stroke();
+    const price = max - (max - min) * (g / 4);
+    ctx.fillStyle = 'rgba(226,232,240,.45)'; ctx.font = '10px monospace';
+    ctx.fillText(price.toFixed(5), chartW + 6, y + 3);
+  }
+
+  // candles
+  list.forEach((c, i) => {
+    const x = xFor(i);
+    const up = c.close >= c.open;
+    ctx.strokeStyle = up ? '#34d399' : '#f87171';
+    ctx.fillStyle = up ? '#34d399' : '#f87171';
+    ctx.beginPath(); ctx.moveTo(x, yFor(c.high)); ctx.lineTo(x, yFor(c.low)); ctx.stroke();
+    const yO = yFor(c.open), yC = yFor(c.close);
+    const top = Math.min(yO, yC), h = Math.max(1, Math.abs(yC - yO));
+    ctx.fillRect(x - bodyW / 2, top, bodyW, h);
+  });
+
+  const geo = { startIdx, candleW, yFor, chartW, chartH };
+  _repRenderDrawingList(ctx, _repState.drawings, geo);
+
+  if (_repState.drawDraft && _repState.drawDraft.p1 && _repState.drawDraft.cur) {
+    const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
+    if (tool && !['hline', 'vline', 'text'].includes(tool.kind)) {
+      _repRenderDrawingList(ctx, [{
+        kind: tool.kind, color: tool.color, stroke: tool.stroke, dashed: tool.dashed,
+        arrow: tool.arrow, measure: tool.measure, label: tool.drawLabel,
+        p1: _repState.drawDraft.p1, p2: _repState.drawDraft.cur,
+      }], geo);
+    }
+  }
+
+  // time axis
+  ctx.fillStyle = 'rgba(226,232,240,.4)'; ctx.font = '10px monospace';
+  const labelEvery = Math.max(1, Math.floor(list.length / 6));
+  list.forEach((c, i) => {
+    if (i % labelEvery !== 0) return;
+    const d = new Date(c.time);
+    const lbl = d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    ctx.fillText(lbl, xFor(i) - 20, H - 6);
+  });
+}
+
+function _repRenderDrawingList(ctx, list, geo) {
+  const { startIdx, candleW, yFor, chartW, chartH } = geo;
+  const xForTime = ms => (_repIndexForTime(ms) - startIdx) * candleW + candleW / 2;
+
+  (list || []).forEach(dw => {
+    ctx.save();
+    ctx.strokeStyle = dw.stroke || dw.color; ctx.fillStyle = dw.color; ctx.lineWidth = 1.5;
+    ctx.setLineDash(dw.dashed ? [5, 4] : []);
+
+    if (dw.kind === 'hline') {
+      const y = yFor(dw.p1.price);
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartW, y); ctx.stroke();
+      ctx.fillStyle = dw.color; ctx.font = '10px monospace';
+      ctx.fillText(dw.p1.price.toFixed(5), 4, y - 4);
+    } else if (dw.kind === 'vline') {
+      const x = xForTime(dw.p1.time);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, chartH); ctx.stroke();
+    } else if (dw.kind === 'rect') {
+      const x1 = xForTime(dw.p1.time), x2 = xForTime(dw.p2.time);
+      const y1 = yFor(dw.p1.price), y2 = yFor(dw.p2.price);
+      const rx = Math.min(x1, x2), ry = Math.min(y1, y2), rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1);
+      ctx.setLineDash([]);
+      ctx.fillRect(rx, ry, rw, rh);
+      ctx.strokeRect(rx, ry, rw, rh);
+      if (dw.label) { ctx.fillStyle = dw.stroke || dw.color; ctx.font = '10px sans-serif'; ctx.fillText(dw.label, rx + 3, ry + 11); }
+    } else if (dw.kind === 'line') {
+      const x1 = xForTime(dw.p1.time), y1 = yFor(dw.p1.price);
+      const x2 = xForTime(dw.p2.time), y2 = yFor(dw.p2.price);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      if (dw.arrow) {
+        const angle = Math.atan2(y2 - y1, x2 - x1), len = 8;
+        ctx.beginPath();
+        ctx.moveTo(x2, y2); ctx.lineTo(x2 - len * Math.cos(angle - Math.PI / 6), y2 - len * Math.sin(angle - Math.PI / 6));
+        ctx.moveTo(x2, y2); ctx.lineTo(x2 - len * Math.cos(angle + Math.PI / 6), y2 - len * Math.sin(angle + Math.PI / 6));
+        ctx.stroke();
+      }
+      if (dw.measure) {
+        const dPrice = dw.p2.price - dw.p1.price;
+        const dMin = Math.round((dw.p2.time - dw.p1.time) / 60000);
+        ctx.setLineDash([]); ctx.fillStyle = dw.color; ctx.font = '11px monospace';
+        ctx.fillText(`Δ${dPrice.toFixed(5)} / ${dMin}m`, (x1 + x2) / 2, (y1 + y2) / 2 - 6);
+      }
+    } else if (dw.kind === 'fib') {
+      const levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+      const x1 = xForTime(dw.p1.time), x2 = xForTime(dw.p2.time);
+      levels.forEach(l => {
+        const price = dw.p1.price + (dw.p2.price - dw.p1.price) * l;
+        const y = yFor(price);
+        ctx.beginPath(); ctx.moveTo(Math.min(x1, x2), y); ctx.lineTo(Math.max(x1, x2), y); ctx.stroke();
+        ctx.fillStyle = dw.color; ctx.font = '9px monospace';
+        ctx.fillText(`${l} (${price.toFixed(5)})`, Math.max(x1, x2) + 4, y + 3);
+      });
+    } else if (dw.kind === 'text') {
+      const x = xForTime(dw.p1.time), y = yFor(dw.p1.price);
+      ctx.setLineDash([]); ctx.fillStyle = dw.color; ctx.font = '12px sans-serif';
+      ctx.fillText(dw.text || '', x, y);
+    }
+    ctx.restore();
+  });
+}
+
+// ── Mouse interaction: pan + drawing tools ──────────────
+function _repCanvasMouseDown(e) {
+  if (!_repState) return;
+  const rect = _repState.canvas.getBoundingClientRect();
+  const cssX = e.clientX - rect.left, cssY = e.clientY - rect.top;
+  const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
+
+  if (!tool) {
+    _repState.panning = true;
+    _repState.panStartX = cssX;
+    _repState.panStartViewEnd = _repState.viewEnd;
+    return;
+  }
+
+  const point = _repPointFromPixel(cssX, cssY);
+
+  if (tool.kind === 'hline') {
+    _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'hline', color: tool.color, dashed: tool.dashed, p1: { price: point.price } });
+    _repFinishToolPlacement(); return;
+  }
+  if (tool.kind === 'vline') {
+    _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'vline', color: tool.color, p1: { time: point.time } });
+    _repFinishToolPlacement(); return;
+  }
+  if (tool.kind === 'text') {
+    const txt = prompt('Annotation text:');
+    if (txt) _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'text', color: tool.color, p1: point, text: txt });
+    _repFinishToolPlacement(); return;
+  }
+  // line / rect / fib — begin drag
+  _repState.drawDraft = { p1: point, cur: point };
+}
+
+function _repFinishToolPlacement() {
+  _repState.activeTool = null;
+  _repUpdateToolbarActive();
+  _repSaveState();
+  _repDrawChart();
+}
+
+function _repCanvasMouseMove(e) {
+  if (!_repState) return;
+  const rect = _repState.canvas.getBoundingClientRect();
+  const cssX = e.clientX - rect.left, cssY = e.clientY - rect.top;
+
+  if (_repState.panning) {
+    const { list } = _repVisibleSlice();
+    const candleW = (_repState.cssWidth - REP_PAD.right) / Math.max(1, list.length);
+    const dx = cssX - _repState.panStartX;
+    const deltaCandles = Math.round(dx / candleW);
+    let newViewEnd = _repState.panStartViewEnd - deltaCandles;
+    newViewEnd = Math.max(_repState.candlesPerView - 1, Math.min(newViewEnd, _repState.index));
+    _repState.viewEnd = newViewEnd;
+    _repDrawChart();
+    return;
+  }
+
+  if (_repState.drawDraft) {
+    _repState.drawDraft.cur = _repPointFromPixel(cssX, cssY);
+    _repDrawChart();
+    return;
+  }
+
+  _repUpdateCrosshair(cssX, cssY);
+}
+
+function _repCanvasMouseUp() {
+  if (!_repState) return;
+  if (_repState.panning) { _repState.panning = false; return; }
+  if (_repState.drawDraft) {
+    const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
+    if (tool) {
+      _repState.drawings.push({
+        id: _repUid(), type: tool.id, kind: tool.kind, color: tool.color, stroke: tool.stroke,
+        dashed: tool.dashed, arrow: tool.arrow, measure: tool.measure, label: tool.drawLabel,
+        p1: _repState.drawDraft.p1, p2: _repState.drawDraft.cur,
+      });
+    }
+    _repState.drawDraft = null;
+    _repFinishToolPlacement();
+  }
+}
+
+function _repCanvasWheel(e) {
+  e.preventDefault();
+  const dir = e.deltaY > 0 ? 1 : -1;
+  _repZoom(dir);
+}
+
+function _repUpdateCrosshair(cssX, cssY) {
+  const box = document.getElementById('rep-crosshair-box'); if (!box) return;
+  const point = _repPointFromPixel(cssX, cssY);
+  const idx = _repIndexForTime(point.time);
+  const c = _repState.candles[idx];
+  if (!c) { box.style.display = 'none'; return; }
+  _repDrawChart();
+  const d = new Date(c.time);
+  box.style.display = 'block';
+  box.innerHTML = `${d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} &nbsp; O ${c.open.toFixed(5)} H ${c.high.toFixed(5)} L ${c.low.toFixed(5)} C ${c.close.toFixed(5)}`;
+
+  const ctx = _repState.ctx;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(226,232,240,.35)'; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, cssY); ctx.lineTo(_repState.cssWidth - REP_PAD.right, cssY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cssX, 0); ctx.lineTo(cssX, _repState.cssHeight - REP_PAD.bottom); ctx.stroke();
+  ctx.restore();
+}
+
+// ── Toolbar / controls ───────────────────────────────────
+function _repSetTool(id) {
+  _repState.activeTool = (_repState.activeTool === id) ? null : id;
+  _repState.drawDraft = null;
+  _repUpdateToolbarActive();
+}
+function _repUpdateToolbarActive() {
+  document.querySelectorAll('.rep-tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === _repState.activeTool));
+}
+function _repClearDrawings() {
+  openGlassModal({
+    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg>',
+    title: 'Clear All Drawings?',
+    body: 'Every trendline, zone, and annotation on this chart will be removed. This cannot be undone.',
+    confirmLabel: 'Clear Drawings',
+    confirmClass: 'glass-btn-danger',
+    onConfirm: () => { _repState.drawings = []; _repSaveState(); _repDrawChart(); }
+  });
+}
+
+function _repTogglePlay() { _repState.playing ? _repPause() : _repPlay(); }
+function _repPlay() {
+  if (!_repState || _repState.playing) return;
+  if (_repState.index >= _repState.candles.length - 1) return;
+  _repState.playing = true;
+  const btn = document.getElementById('rep-play-btn'); if (btn) btn.textContent = '⏸ Pause';
+  const delay = 600 / _repState.speed;
+  _repState._timer = setInterval(() => {
+    if (_repState.index >= _repState.candles.length - 1) { _repPause(); return; }
+    _repState.index++; _repState.viewEnd = _repState.index;
+    _repDrawChart();
+  }, delay);
+}
+function _repPause() {
+  if (!_repState) return;
+  _repState.playing = false;
+  clearInterval(_repState._timer);
+  const btn = document.getElementById('rep-play-btn'); if (btn) btn.textContent = '▶ Play';
+  _repSaveState();
+}
+function _repStep(dir) {
+  if (!_repState) return;
+  _repPause();
+  _repState.index = Math.max(0, Math.min(_repState.candles.length - 1, _repState.index + dir));
+  _repState.viewEnd = _repState.index;
+  _repDrawChart();
+  _repSaveState();
+}
+function _repReset() {
+  if (!_repState) return;
+  _repPause();
+  _repState.index = Math.min(_repState.candlesPerView - 1, _repState.candles.length - 1);
+  _repState.viewEnd = _repState.index;
+  _repDrawChart();
+  _repSaveState();
+}
+function _repSetSpeed(val) { if (_repState) { _repState.speed = parseFloat(val) || 1; if (_repState.playing) { _repPause(); _repPlay(); } } }
+function _repZoom(dir) {
+  if (!_repState) return;
+  _repState.candlesPerView = Math.max(20, Math.min(400, _repState.candlesPerView + dir * 10));
+  _repDrawChart();
+}
+function _repJumpToDate(dateStr) {
+  if (!_repState || !dateStr) return;
+  _repPause();
+  const targetMs = new Date(dateStr).getTime();
+  const idx = _repIndexForTime(targetMs);
+  _repState.index = Math.max(0, Math.min(_repState.candles.length - 1, idx));
+  _repState.viewEnd = _repState.index;
+  _repDrawChart();
+  _repSaveState();
+}
+
+// ── Trade execution bridge (Chart Replay → Trade Simulator) ──
+function _repExecuteTrade(direction) {
+  if (!_repState) return;
+  const candle = _repState.candles[_repState.viewEnd];
+  if (!candle) { showToast('No candle to execute against', 'danger'); return; }
+  const sessionId = _repState.sessionId;
+  _repSaveState();
+  document.getElementById('rep-fullscreen-overlay')?.remove();
+  _repState = null;
+  _openTradeEntryModal(sessionId, null, {
+    direction,
+    entry_price: candle.close,
+    entry_time: new Date(candle.time).toISOString(),
   });
 }
 

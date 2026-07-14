@@ -12130,3 +12130,64 @@ body {
 .bt-screenshot-slot:hover { border-color:var(--gold); color:var(--gold); }
 .bt-screenshot-slot.filled { border-style:solid; color:transparent; }
 .bt-screenshot-slot.filled span { display:none; }
+
+/* ══════════════════════════════════════════════════════
+   BACKTESTING LAB — Chart Replay (Phase 3)
+═══════════════════════════════════════════════════════ */
+.rep-fullscreen-overlay {
+  position:fixed; inset:0; z-index:2000; background:rgba(8,10,14,.96);
+  backdrop-filter:blur(6px); display:flex; flex-direction:column;
+  opacity:0; transition:opacity .18s;
+}
+.rep-fullscreen-overlay.open { opacity:1; }
+.rep-topbar {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:10px 16px; border-bottom:1px solid var(--glass-border); flex-shrink:0; flex-wrap:wrap;
+}
+.rep-topbar-title { font-family:var(--font-head); font-weight:700; font-size:14px; }
+.rep-select {
+  background:var(--glass-1); border:1px solid var(--glass-border); color:var(--text);
+  border-radius:var(--r-sm); padding:5px 8px; font-size:11.5px; font-family:var(--font-body);
+}
+.rep-toolbar {
+  display:flex; align-items:center; gap:6px; padding:8px 16px; flex-wrap:wrap;
+  border-bottom:1px solid var(--glass-border); flex-shrink:0;
+}
+.rep-ctrl-btn {
+  background:var(--glass-1); border:1px solid var(--glass-border); color:var(--text);
+  border-radius:var(--r-sm); padding:5px 11px; font-size:12px; cursor:pointer;
+  font-family:var(--font-body); transition:var(--t-fast); font-weight:600;
+}
+.rep-ctrl-btn:hover { background:var(--glass-2); border-color:var(--glass-border-h); }
+.rep-tool-row { display:flex; gap:5px; padding:8px 16px; flex-wrap:wrap; border-bottom:1px solid var(--glass-border); flex-shrink:0; }
+.rep-tool-btn {
+  background:transparent; border:1px solid var(--glass-border); color:var(--text2);
+  border-radius:20px; padding:4px 11px; font-size:10.5px; cursor:pointer;
+  font-family:var(--font-body); transition:var(--t-fast); font-weight:600;
+}
+.rep-tool-btn:hover { color:var(--text); background:var(--glass-1); }
+.rep-tool-btn.active { background:rgba(251,191,36,.16); border-color:var(--gold); color:var(--gold); }
+.rep-canvas-wrap { flex:1; position:relative; min-height:0; }
+.rep-canvas-wrap canvas { display:block; width:100%; height:100%; cursor:crosshair; }
+.rep-crosshair-box {
+  position:absolute; top:8px; left:8px; background:rgba(10,12,16,.85);
+  border:1px solid var(--glass-border); border-radius:var(--r-sm); padding:5px 9px;
+  font-family:var(--font-mono); font-size:11px; color:var(--text2); pointer-events:none;
+}
+.rep-loading, .rep-error { display:flex; align-items:center; justify-content:center; height:100%; color:var(--text3); font-size:13px; text-align:center; padding:20px; }
+.rep-error { color:var(--red); }
+.rep-exec-bar { position:absolute; bottom:16px; right:16px; display:flex; gap:8px; }
+.rep-exec-btn {
+  padding:10px 20px; border-radius:var(--r-lg); font-weight:700; font-size:13px;
+  cursor:pointer; border:1px solid transparent; font-family:var(--font-body);
+  box-shadow:var(--shadow-md); transition:var(--t-fast);
+}
+.rep-exec-buy { background:rgba(52,211,153,.16); border-color:rgba(52,211,153,.4); color:var(--green); }
+.rep-exec-buy:hover { background:rgba(52,211,153,.26); }
+.rep-exec-sell { background:rgba(248,113,113,.16); border-color:rgba(248,113,113,.4); color:var(--red); }
+.rep-exec-sell:hover { background:rgba(248,113,113,.26); }
+
+@media (max-width:768px){
+  .rep-toolbar, .rep-tool-row { padding:6px 10px; }
+  .rep-exec-bar { bottom:8px; right:8px; }
+}
