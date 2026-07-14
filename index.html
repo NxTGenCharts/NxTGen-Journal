@@ -639,15 +639,15 @@
 
     <!-- ═══════════════════════════════════════════════
          BACKTESTING LAB — Phase 1: Strategy Library
-         (Sessions / Replay / Simulator / Analytics land in
-          later phases — see bl-roadmap-note below)
+         Phase 2: Backtest Sessions + Manual Trade Simulator
+         (Chart Replay / live analytics land in later phases)
     ═══════════════════════════════════════════════ -->
     <div class="page" id="page-backtesting">
       <div class="page-inner">
         <div class="cover">
           <div class="cover-label">Research · Refine · Prove Your Edge</div>
           <div class="cover-title">Backtesting Lab</div>
-          <div class="cover-sub">Build and manage the strategies you test</div>
+          <div class="cover-sub">Build strategies, run sessions, log simulated trades</div>
         </div>
 
         <div class="sec-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -663,10 +663,24 @@
 
         <div id="bl-strategy-cards" class="bl-strategy-grid"></div>
 
+        <div class="sec-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:26px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <span>Backtest Sessions</span>
+            <div class="bl-tabs" id="bt-session-tabs">
+              <button class="bl-tab active" onclick="_btSessionTab('all',this)">All</button>
+              <button class="bl-tab" onclick="_btSessionTab('active',this)">Active</button>
+              <button class="bl-tab" onclick="_btSessionTab('completed',this)">Completed</button>
+            </div>
+          </div>
+          <button onclick="_openSessionEditModal(null)" style="font-size:11px;padding:4px 12px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.3);color:var(--blue);border-radius:20px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .15s" onmouseover="this.style.background='rgba(96,165,250,.22)'" onmouseout="this.style.background='rgba(96,165,250,.12)'">＋ New Session</button>
+        </div>
+
+        <div id="bt-session-cards" class="bl-strategy-grid"></div>
+
         <div class="sec-head" style="margin-top:22px">What's Next</div>
         <div class="model-card" id="bl-roadmap-note" style="opacity:.8">
           <div class="model-sub" style="margin-bottom:0">
-            Strategies you build here will link to <strong>Backtest Sessions</strong>, the <strong>Chart Replay</strong> engine, the <strong>Trade Simulator</strong>, and the analytics suite as those phases ship — each strategy's Win Rate, Expectancy, Profit Factor and other stats will populate automatically from linked sessions instead of being entered by hand.
+            Strategy stats above now compute live from the trades you log in each session. The <strong>Chart Replay</strong> engine (live candles, drawing tools, and auto-timestamped trade execution) and the full <strong>Advanced Analytics + AI Review</strong> suite land in the next phases — for now, sessions and trades are logged manually against your own screenshots and price levels.
           </div>
         </div>
       </div>

@@ -12082,3 +12082,51 @@ body {
 
 .bl-lbl { font-size:11px; color:var(--text3); font-weight:600; text-transform:uppercase; letter-spacing:.05em; display:block; margin-bottom:5px; }
 .bl-lbl-sub { font-weight:400; text-transform:none; color:var(--gold); letter-spacing:normal; }
+
+/* ══════════════════════════════════════════════════════
+   BACKTESTING LAB — Sessions + Trade Simulator (Phase 2)
+═══════════════════════════════════════════════════════ */
+.bt-session-card {
+  background:var(--glass-1); border:1px solid var(--glass-border);
+  border-radius:var(--r-lg); padding:16px; transition:var(--t-med);
+  box-shadow:var(--shadow-sm); display:flex; flex-direction:column; gap:10px;
+}
+.bt-session-card:hover { background:var(--glass-2); border-color:var(--glass-border-h); transform:translateY(-1px); }
+.bt-session-card-completed { opacity:.75; }
+.bt-session-head { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+.bt-session-title { font-family:var(--font-head); font-size:15px; font-weight:700; letter-spacing:-.2px; }
+.bt-session-meta { font-size:10.5px; color:var(--text3); margin-top:2px; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.04em; }
+.bt-status-pill { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:3px 8px; border-radius:20px; flex-shrink:0; }
+.bt-status-active { background:rgba(52,211,153,.14); color:var(--green); border:1px solid rgba(52,211,153,.3); }
+.bt-status-completed { background:rgba(148,163,184,.14); color:var(--text3); border:1px solid var(--glass-border); }
+
+.bt-detail-overlay { z-index:1000; }
+.bt-detail-modal { max-width:920px; width:94vw; max-height:90vh; }
+.bt-stat-bar { display:grid; grid-template-columns:repeat(auto-fit, minmax(100px, 1fr)); gap:8px; margin:14px 0; }
+.bt-stat-bar .bl-stat-value { font-size:14px; }
+.bt-timeline { display:flex; flex-direction:column; gap:8px; }
+.bt-timeline-item {
+  display:flex; align-items:center; gap:12px; padding:10px 12px;
+  border:1px solid var(--glass-border); border-radius:var(--r-sm);
+  background:var(--glass-0, rgba(255,255,255,.02)); cursor:pointer; transition:var(--t-fast);
+}
+.bt-timeline-item:hover { background:var(--glass-1); border-color:var(--glass-border-h); }
+.bt-timeline-dir { font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; flex-shrink:0; text-transform:uppercase; }
+.bt-timeline-dir.buy { background:rgba(52,211,153,.14); color:var(--green); }
+.bt-timeline-dir.sell { background:rgba(248,113,113,.14); color:var(--red); }
+.bt-timeline-main { flex:1; min-width:0; font-size:12px; }
+.bt-timeline-time { font-family:var(--font-mono); font-size:10px; color:var(--text3); }
+.bt-timeline-rr { font-family:var(--font-mono); font-size:13px; font-weight:700; flex-shrink:0; }
+.bt-timeline-rr.pos { color:var(--green); }
+.bt-timeline-rr.neg { color:var(--red); }
+.bt-rating-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.bt-screenshot-row { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+.bt-screenshot-slot {
+  border:1.5px dashed var(--glass-border); border-radius:var(--r-sm); padding:10px 6px;
+  text-align:center; font-size:10px; color:var(--text3); cursor:pointer; transition:var(--t-fast);
+  display:flex; flex-direction:column; align-items:center; gap:4px; min-height:70px; justify-content:center;
+  background-size:cover; background-position:center; position:relative; overflow:hidden;
+}
+.bt-screenshot-slot:hover { border-color:var(--gold); color:var(--gold); }
+.bt-screenshot-slot.filled { border-style:solid; color:transparent; }
+.bt-screenshot-slot.filled span { display:none; }

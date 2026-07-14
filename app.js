@@ -2459,7 +2459,7 @@ function nav(pageId, sbEl, label, extra) {
   if (pageId === 'trash') { setTimeout(renderTrash, 0); }
   if (pageId === 'monthly') { buildMonthlyReview(); }
   if (pageId === 'ai') { buildAI(); }
-  if (pageId === 'backtesting') { buildBacktestingLab(); }
+  if (pageId === 'backtesting') { buildBacktestingLab(); _btRenderSessionGrid(); }
   if (pageId === 'profile') { setTimeout(buildProfile, 0); }
   // Sync mobile bottom nav
   mobNavActivate(pageId);
@@ -9292,7 +9292,8 @@ function _blStatCell(label, value, suffix) {
 
 function _blCardHTML(s) {
   const isArchived = s.status === 'archived';
-  const st = s.stats || _blEmptyStats();
+  const linkedTrades = (typeof _btTradesForStrategy === 'function') ? _btTradesForStrategy(s.id) : [];
+  const st = linkedTrades.length ? _btComputeStats(linkedTrades, 0) : (s.stats || _blEmptyStats());
   const metaParts = [s.market, s.instrument, s.timeframe, s.session].filter(Boolean).join(' · ');
   return `
   <div class="bl-strategy-card${isArchived ? ' bl-strategy-card-archived' : ''}" style="--bl-tag-color:var(--${s.colorTag || 'gold'})">
@@ -9558,6 +9559,607 @@ async function _blRestoreVersion(id, versionIdx) {
       buildBacktestingLab();
       await _blSave();
       showToast('Version restored ✓', 'restore');
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// BACKTESTING LAB — Phase 2: Backtest Sessions +
+// Manual Trade Simulator
+//
+// Sessions live inside the same journal_backtest_lab row as
+// strategies (_blData.sessions). Individual simulated trades are
+// real rows in journal_backtest_trades — Table: journal_backtest_trades
+// { id, user_id, session_id, strategy_id, direction, entry_price,
+//   exit_price, stop_price, rr, pnl, entry_time, exit_time, data jsonb }
+// `data` holds everything else (MFE/MAE, screenshots, reasons,
+// mistakes, psychology + ratings, notes) so the schema doesn't need
+// to change every time a new field is added.
+// ═══════════════════════════════════════════════════
+let _btTrades = [];       // all simulated trades for this user, loaded once
+let _btSessionTabState = 'all'; // 'all' | 'active' | 'completed'
+
+function _btNewSession() {
+  return {
+    id: (crypto.randomUUID ? crypto.randomUUID() : 'bs_' + Date.now() + '_' + Math.random().toString(36).slice(2)),
+    strategyId: '', name: '',
+    date: new Date().toISOString().slice(0, 10),
+    pair: '', timeframe: '', startingBalance: '', riskPercent: '',
+    commission: '', spread: '', slippage: '', accountType: '',
+    propFirmRules: '', evaluationRules: '', notes: '',
+    status: 'active',
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  };
+}
+
+function _btGetSessionById(id) { return (_blData.sessions || []).find(s => s.id === id); }
+function _btGetSessionIndexById(id) { return (_blData.sessions || []).findIndex(s => s.id === id); }
+function _btTradesForSession(sessionId) { return _btTrades.filter(t => t.session_id === sessionId); }
+function _btTradesForStrategy(strategyId) { return _btTrades.filter(t => t.strategy_id === strategyId); }
+
+// ── LOAD / SAVE TRADES (real table, per-row) ───────────
+async function _btLoadTrades() {
+  if (!_currentUser) return;
+  const { data, error } = await sb
+    .from('journal_backtest_trades')
+    .select('*')
+    .eq('user_id', _currentUser.id)
+    .order('entry_time', { ascending: true });
+  if (error) { console.error('_btLoadTrades:', error.message); return; }
+  _btTrades = data || [];
+}
+
+async function _btSaveTrade(trade) {
+  const row = {
+    user_id: _currentUser.id,
+    session_id: trade.session_id,
+    strategy_id: trade.strategy_id || null,
+    direction: trade.direction,
+    entry_price: trade.entry_price || null,
+    exit_price: trade.exit_price || null,
+    stop_price: trade.stop_price || null,
+    rr: trade.rr,
+    pnl: trade.pnl,
+    entry_time: trade.entry_time || null,
+    exit_time: trade.exit_time || null,
+    data: trade.data || {},
+  };
+  if (trade.id) {
+    const { error } = await sb.from('journal_backtest_trades').update(row).eq('id', trade.id);
+    if (error) { console.error('_btSaveTrade update:', error.message); showToast('Failed to save trade', 'danger'); return null; }
+    const idx = _btTrades.findIndex(t => t.id === trade.id);
+    if (idx !== -1) _btTrades[idx] = { ..._btTrades[idx], ...row, id: trade.id };
+    return trade.id;
+  } else {
+    const { data, error } = await sb.from('journal_backtest_trades').insert(row).select().single();
+    if (error) { console.error('_btSaveTrade insert:', error.message); showToast('Failed to save trade', 'danger'); return null; }
+    _btTrades.push(data);
+    return data.id;
+  }
+}
+
+async function _btDeleteTrade(id) {
+  const { error } = await sb.from('journal_backtest_trades').delete().eq('id', id);
+  if (error) { console.error('_btDeleteTrade:', error.message); return false; }
+  _btTrades = _btTrades.filter(t => t.id !== id);
+  return true;
+}
+
+/* Reuse the same client-side compression + trade-charts bucket
+   already used by the Watchlist chart uploads. */
+async function _btUploadScreenshot(file) {
+  const compressed = await _compressChartImage(file);
+  const path = `${_currentUser.id}/bt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const { error } = await sb.storage.from('trade-charts')
+    .upload(path, compressed, { upsert: false, contentType: 'image/jpeg' });
+  if (error) { console.error('bt screenshot upload error:', error.message); return null; }
+  const { data } = sb.storage.from('trade-charts').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+// ── STATS ENGINE (shared by session summary + strategy cards) ──
+function _btComputeStats(trades, startingBalance) {
+  if (!trades.length) {
+    return { winRate: null, expectancy: null, profitFactor: null, avgRR: null, totalTests: 0,
+      avgHoldTime: null, maxDrawdown: null, consistencyScore: null, confidenceScore: null,
+      netReturn: null, bestTrade: null, worstTrade: null };
+  }
+  const rrs = trades.map(t => Number(t.rr) || 0);
+  const pnls = trades.map(t => Number(t.pnl) || 0);
+  const wins = trades.filter(t => (Number(t.pnl) || 0) > 0);
+  const losses = trades.filter(t => (Number(t.pnl) || 0) < 0);
+
+  const winRate = (wins.length / trades.length) * 100;
+  const avgRR = rrs.reduce((a, b) => a + b, 0) / rrs.length;
+  const grossWin = wins.reduce((a, t) => a + (Number(t.pnl) || 0), 0);
+  const grossLoss = Math.abs(losses.reduce((a, t) => a + (Number(t.pnl) || 0), 0));
+  const profitFactor = grossLoss > 0 ? grossWin / grossLoss : (grossWin > 0 ? Infinity : 0);
+  const avgWinR = wins.length ? wins.reduce((a, t) => a + (Number(t.rr) || 0), 0) / wins.length : 0;
+  const avgLossR = losses.length ? Math.abs(losses.reduce((a, t) => a + (Number(t.rr) || 0), 0) / losses.length) : 0;
+  const expectancy = (winRate / 100) * avgWinR - (1 - winRate / 100) * avgLossR;
+  const netReturn = pnls.reduce((a, b) => a + b, 0);
+  const bestTrade = Math.max(...pnls);
+  const worstTrade = Math.min(...pnls);
+
+  // Equity curve + max drawdown (peak-to-trough, in $ relative to starting balance if given)
+  let running = 0, peak = 0, maxDD = 0;
+  trades.forEach(t => {
+    running += Number(t.pnl) || 0;
+    if (running > peak) peak = running;
+    const dd = peak - running;
+    if (dd > maxDD) maxDD = dd;
+  });
+  const maxDrawdownPct = startingBalance > 0 ? (maxDD / startingBalance) * 100 : null;
+
+  // Hold time
+  const durations = trades
+    .map(t => (t.entry_time && t.exit_time) ? (new Date(t.exit_time) - new Date(t.entry_time)) / 60000 : null)
+    .filter(d => d !== null && !isNaN(d) && d >= 0);
+  const avgHoldMin = durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : null;
+
+  // Consistency: lower spread of R-multiples relative to their mean = more consistent
+  const meanR = rrs.reduce((a, b) => a + b, 0) / rrs.length;
+  const variance = rrs.reduce((a, r) => a + Math.pow(r - meanR, 2), 0) / rrs.length;
+  const stdDev = Math.sqrt(variance);
+  const consistencyScore = meanR !== 0 ? Math.max(0, Math.min(100, Math.round(100 - (stdDev / Math.abs(meanR)) * 100))) : null;
+
+  // Confidence: average of self-reported confidence ratings (1-10 scale) → 0-100
+  const confRatings = trades.map(t => t.data?.confidenceLevel).filter(v => v !== undefined && v !== null && v !== '');
+  const confidenceScore = confRatings.length ? Math.round((confRatings.reduce((a, b) => a + Number(b), 0) / confRatings.length) * 10) : null;
+
+  return {
+    winRate: Math.round(winRate * 10) / 10,
+    expectancy: Math.round(expectancy * 100) / 100,
+    profitFactor: isFinite(profitFactor) ? Math.round(profitFactor * 100) / 100 : '∞',
+    avgRR: Math.round(avgRR * 100) / 100,
+    totalTests: trades.length,
+    avgHoldTime: avgHoldMin !== null ? _btFmtDuration(avgHoldMin) : null,
+    maxDrawdown: maxDrawdownPct !== null ? Math.round(maxDrawdownPct * 10) / 10 : null,
+    consistencyScore, confidenceScore,
+    netReturn: Math.round(netReturn * 100) / 100,
+    bestTrade: Math.round(bestTrade * 100) / 100,
+    worstTrade: Math.round(worstTrade * 100) / 100,
+  };
+}
+
+function _btFmtDuration(mins) {
+  if (mins < 60) return Math.round(mins) + 'm';
+  const h = Math.floor(mins / 60), m = Math.round(mins % 60);
+  return h + 'h ' + (m ? m + 'm' : '');
+}
+
+// ── RENDER: Session grid ───────────────────────────────
+function _btSessionTab(tab, btn) {
+  _btSessionTabState = tab;
+  document.querySelectorAll('#bt-session-tabs .bl-tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _btRenderSessionGrid();
+}
+
+function _btRenderSessionGrid() {
+  const wrap = document.getElementById('bt-session-cards');
+  if (!wrap) return;
+  const all = _blData.sessions || [];
+  const visible = _btSessionTabState === 'all' ? all : all.filter(s => s.status === _btSessionTabState);
+
+  const cards = visible.map(s => _btSessionCardHTML(s)).join('');
+  const addCard = `<div class="bl-empty-card" onclick="_openSessionEditModal(null)">
+      <span style="font-size:22px">＋</span>
+      <p style="margin:0;font-size:12.5px;font-weight:600">New Session</p>
+    </div>`;
+
+  wrap.innerHTML = visible.length ? (cards + addCard) : `<div class="bl-empty-card" onclick="_openSessionEditModal(null)"><span style="font-size:22px">＋</span><p style="margin:0;font-size:12.5px;font-weight:600">Start your first session</p></div>`;
+}
+
+function _btSessionCardHTML(s) {
+  const trades = _btTradesForSession(s.id);
+  const stats = _btComputeStats(trades, Number(s.startingBalance) || 0);
+  const strategy = s.strategyId ? _blGetById(s.strategyId) : null;
+  const metaParts = [s.pair, s.timeframe, s.date].filter(Boolean).join(' · ');
+  return `
+  <div class="bt-session-card${s.status === 'completed' ? ' bt-session-card-completed' : ''}" onclick="_openSessionDetail('${s.id}')">
+    <div class="bt-session-head">
+      <div style="min-width:0">
+        <div class="bt-session-title">${s.name || 'Untitled Session'}</div>
+        <div class="bt-session-meta">${metaParts || 'No details set'}${strategy ? ' · ' + strategy.name : ''}</div>
+      </div>
+      <span class="bt-status-pill bt-status-${s.status}">${s.status}</span>
+    </div>
+    <div class="bl-stat-grid">
+      ${_blStatCell('Trades', stats.totalTests || null)}
+      ${_blStatCell('Win Rate', stats.winRate, '%')}
+      ${_blStatCell('Net', stats.netReturn)}
+    </div>
+  </div>`;
+}
+
+// ── SESSION CREATE/EDIT MODAL ───────────────────────────
+function _openSessionEditModal(id) {
+  const isNew = id === null;
+  const s = isNew ? _btNewSession() : _btGetSessionById(id);
+  if (!s) return;
+
+  const existing = document.getElementById('bt-session-edit-overlay');
+  if (existing) existing.remove();
+
+  const strategyOptions = `<option value="">— None —</option>` + (_blData.strategies || [])
+    .filter(st => st.status !== 'archived')
+    .map(st => `<option value="${st.id}"${s.strategyId === st.id ? ' selected' : ''}>${st.name}</option>`).join('');
+
+  const overlay = document.createElement('div');
+  overlay.id = 'bt-session-edit-overlay';
+  overlay.className = 'acc-manager-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  overlay.innerHTML = `
+  <div class="acc-manager-modal" style="max-width:600px;max-height:88vh">
+    <div class="acc-manager-header">
+      <span>${isNew ? '＋ New Backtest Session' : '<svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Edit Session'}</span>
+      <button onclick="document.getElementById('bt-session-edit-overlay').remove()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
+    </div>
+    <div class="acc-manager-body" style="display:flex;flex-direction:column;gap:12px;padding:16px;overflow-y:auto">
+
+      <div><label class="bl-lbl">Session Name</label><input type="text" id="bt-f-name" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="e.g. ICT Silver Bullet — London" value="${s.name || ''}"></div>
+
+      <div><label class="bl-lbl">Linked Strategy</label>
+        <select id="bt-f-strategy" class="acc-mgr-input" style="width:100%;box-sizing:border-box">${strategyOptions}</select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label class="bl-lbl">Date</label><input type="date" id="bt-f-date" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${s.date || ''}"></div>
+        <div><label class="bl-lbl">Pair</label><input type="text" id="bt-f-pair" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="EURUSD" value="${s.pair || ''}"></div>
+        <div><label class="bl-lbl">Timeframe</label><input type="text" id="bt-f-timeframe" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="M5" value="${s.timeframe || ''}"></div>
+        <div><label class="bl-lbl">Account Type</label><input type="text" id="bt-f-accttype" class="acc-mgr-input" style="width:100%;box-sizing:border-box" placeholder="Prop Firm, Personal…" value="${s.accountType || ''}"></div>
+        <div><label class="bl-lbl">Starting Balance</label><input type="number" step="0.01" id="bt-f-balance" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${s.startingBalance ?? ''}"></div>
+        <div><label class="bl-lbl">Risk %</label><input type="number" step="0.1" id="bt-f-risk" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${s.riskPercent ?? ''}"></div>
+        <div><label class="bl-lbl">Commission</label><input type="number" step="0.01" id="bt-f-comm" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${s.commission ?? ''}"></div>
+        <div><label class="bl-lbl">Spread</label><input type="number" step="0.01" id="bt-f-spread" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${s.spread ?? ''}"></div>
+        <div><label class="bl-lbl">Slippage</label><input type="number" step="0.01" id="bt-f-slippage" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${s.slippage ?? ''}"></div>
+        <div><label class="bl-lbl">Status</label>
+          <select id="bt-f-status" class="acc-mgr-input" style="width:100%;box-sizing:border-box">
+            <option value="active"${s.status !== 'completed' ? ' selected' : ''}>Active</option>
+            <option value="completed"${s.status === 'completed' ? ' selected' : ''}>Completed</option>
+          </select>
+        </div>
+      </div>
+
+      <div><label class="bl-lbl">Prop Firm Rules</label><textarea id="bt-f-propfirm" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:50px;resize:vertical">${s.propFirmRules || ''}</textarea></div>
+      <div><label class="bl-lbl">Evaluation Rules</label><textarea id="bt-f-evalrules" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:50px;resize:vertical">${s.evaluationRules || ''}</textarea></div>
+      <div><label class="bl-lbl">Notes</label><textarea id="bt-f-notes" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:50px;resize:vertical">${s.notes || ''}</textarea></div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+        ${!isNew ? `<button onclick="_btDeleteSession('${s.id}')" class="acc-mgr-btn del" style="padding:6px 14px;margin-right:auto"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg> Delete</button>` : ''}
+        <button onclick="document.getElementById('bt-session-edit-overlay').remove()" class="acc-mgr-btn" style="padding:6px 14px">Cancel</button>
+        <button onclick="_btSaveSessionModal('${isNew ? '' : s.id}')" class="acc-mgr-add-btn" style="padding:6px 18px">Save</button>
+      </div>
+    </div>
+  </div>`;
+
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  document.getElementById('bt-f-name')?.focus();
+}
+
+async function _btSaveSessionModal(id) {
+  const isNew = !id;
+  const name = document.getElementById('bt-f-name')?.value.trim();
+  if (!name) { showToast('Session name is required', 'danger'); return; }
+
+  const fields = {
+    name,
+    strategyId: document.getElementById('bt-f-strategy')?.value || '',
+    date: document.getElementById('bt-f-date')?.value || '',
+    pair: document.getElementById('bt-f-pair')?.value.trim() || '',
+    timeframe: document.getElementById('bt-f-timeframe')?.value.trim() || '',
+    accountType: document.getElementById('bt-f-accttype')?.value.trim() || '',
+    startingBalance: document.getElementById('bt-f-balance')?.value || '',
+    riskPercent: document.getElementById('bt-f-risk')?.value || '',
+    commission: document.getElementById('bt-f-comm')?.value || '',
+    spread: document.getElementById('bt-f-spread')?.value || '',
+    slippage: document.getElementById('bt-f-slippage')?.value || '',
+    status: document.getElementById('bt-f-status')?.value || 'active',
+    propFirmRules: document.getElementById('bt-f-propfirm')?.value.trim() || '',
+    evaluationRules: document.getElementById('bt-f-evalrules')?.value.trim() || '',
+    notes: document.getElementById('bt-f-notes')?.value.trim() || '',
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (isNew) {
+    _blData.sessions.push({ ..._btNewSession(), ...fields });
+  } else {
+    const idx = _btGetSessionIndexById(id);
+    if (idx === -1) return;
+    _blData.sessions[idx] = { ..._blData.sessions[idx], ...fields };
+  }
+
+  document.getElementById('bt-session-edit-overlay')?.remove();
+  _btRenderSessionGrid();
+  await _blSave();
+  showToast(isNew ? 'Session created ✓' : 'Session updated ✓', 'restore');
+}
+
+async function _btDeleteSession(id) {
+  const s = _btGetSessionById(id); if (!s) return;
+  const tradeCount = _btTradesForSession(id).length;
+  openGlassModal({
+    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg>',
+    title: 'Delete Session?',
+    body: `<strong>${s.name}</strong> will be permanently removed${tradeCount ? `, along with its <strong>${tradeCount}</strong> logged trade${tradeCount === 1 ? '' : 's'}` : ''}.`,
+    confirmLabel: 'Delete Session',
+    confirmClass: 'glass-btn-danger',
+    onConfirm: async () => {
+      document.getElementById('bt-session-edit-overlay')?.remove();
+      document.getElementById('bt-session-detail-overlay')?.remove();
+      const idx = _btGetSessionIndexById(id);
+      if (idx !== -1) _blData.sessions.splice(idx, 1);
+      // Clean up linked trades
+      const toDelete = _btTradesForSession(id).map(t => t.id);
+      for (const tid of toDelete) await _btDeleteTrade(tid);
+      _btRenderSessionGrid();
+      await _blSave();
+      showToast('Session deleted', 'danger');
+    }
+  });
+}
+
+// ── SESSION DETAIL: summary + timeline + trade simulator ──
+function _openSessionDetail(id) {
+  const s = _btGetSessionById(id); if (!s) return;
+  const existing = document.getElementById('bt-session-detail-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'bt-session-detail-overlay';
+  overlay.className = 'acc-manager-overlay bt-detail-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `
+  <div class="acc-manager-modal bt-detail-modal">
+    <div class="acc-manager-header">
+      <span>${s.name}</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button onclick="document.getElementById('bt-session-detail-overlay').remove();_openSessionEditModal('${s.id}')" class="acc-mgr-close" title="Edit session"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg></button>
+        <button onclick="document.getElementById('bt-session-detail-overlay').remove()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
+      </div>
+    </div>
+    <div class="acc-manager-body" style="padding:16px;overflow-y:auto">
+      <div id="bt-detail-stats"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px">
+        <div class="sec-head" style="margin-bottom:0">Trade Timeline</div>
+        <button onclick="_openTradeEntryModal('${s.id}', null)" class="acc-mgr-add-btn" style="padding:5px 14px">＋ Log Trade</button>
+      </div>
+      <div id="bt-timeline" class="bt-timeline"></div>
+    </div>
+  </div>`;
+
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  _btRenderSessionDetail(id);
+}
+
+function _btRenderSessionDetail(sessionId) {
+  const s = _btGetSessionById(sessionId); if (!s) return;
+  const trades = _btTradesForSession(sessionId).slice().sort((a, b) => new Date(a.entry_time || 0) - new Date(b.entry_time || 0));
+  const stats = _btComputeStats(trades, Number(s.startingBalance) || 0);
+
+  const statsEl = document.getElementById('bt-detail-stats');
+  if (statsEl) {
+    statsEl.innerHTML = `<div class="bt-stat-bar">
+      ${_blStatCell('Net Return', stats.netReturn)}
+      ${_blStatCell('Win Rate', stats.winRate, '%')}
+      ${_blStatCell('Avg RR', stats.avgRR)}
+      ${_blStatCell('Profit Factor', stats.profitFactor)}
+      ${_blStatCell('Max DD', stats.maxDrawdown, '%')}
+      ${_blStatCell('Expectancy', stats.expectancy)}
+      ${_blStatCell('Best Trade', stats.bestTrade)}
+      ${_blStatCell('Worst Trade', stats.worstTrade)}
+      ${_blStatCell('Avg Hold', stats.avgHoldTime)}
+      ${_blStatCell('Total Trades', stats.totalTests || null)}
+    </div>`;
+  }
+
+  const timelineEl = document.getElementById('bt-timeline');
+  if (timelineEl) {
+    timelineEl.innerHTML = trades.length ? trades.map(t => {
+      const rr = Number(t.rr) || 0;
+      const time = t.entry_time ? new Date(t.entry_time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+      return `<div class="bt-timeline-item" onclick="_openTradeEntryModal('${sessionId}', '${t.id}')">
+        <span class="bt-timeline-dir ${t.direction}">${t.direction || '—'}</span>
+        <div class="bt-timeline-main">
+          <div>${t.entry_price ?? '—'} → ${t.exit_price ?? '—'}</div>
+          <div class="bt-timeline-time">${time}</div>
+        </div>
+        <div class="bt-timeline-rr ${rr >= 0 ? 'pos' : 'neg'}">${rr >= 0 ? '+' : ''}${rr.toFixed(2)}R</div>
+      </div>`;
+    }).join('') : `<div class="acc-mgr-empty">No trades logged yet — click "Log Trade" to record your first simulated entry.</div>`;
+  }
+}
+
+// ── TRADE ENTRY MODAL (Trade Simulator, Section 4/5) ────
+function _openTradeEntryModal(sessionId, tradeId) {
+  const session = _btGetSessionById(sessionId); if (!session) return;
+  const isNew = !tradeId;
+  const t = isNew ? {
+    direction: 'buy', entry_price: '', exit_price: '', stop_price: '',
+    rr: '', pnl: '', entry_time: '', exit_time: '', data: {},
+  } : _btTrades.find(x => x.id === tradeId);
+  if (!t) return;
+  const d = t.data || {};
+
+  const existing = document.getElementById('bt-trade-edit-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'bt-trade-edit-overlay';
+  overlay.className = 'acc-manager-overlay';
+  overlay.style.zIndex = '1100';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  const screenshotSlots = ['before', 'entry', 'exit', 'marked'].map(key => {
+    const url = d.screenshots?.[key];
+    return `<div class="bt-screenshot-slot${url ? ' filled' : ''}" id="bt-shot-${key}" style="${url ? `background-image:url('${url}')` : ''}" onclick="document.getElementById('bt-shot-input-${key}').click()">
+      <span>${key[0].toUpperCase() + key.slice(1)}</span>
+      <input type="file" accept="image/*" id="bt-shot-input-${key}" style="display:none" onchange="_btHandleScreenshotPick(this,'${key}')">
+    </div>`;
+  }).join('');
+
+  overlay.innerHTML = `
+  <div class="acc-manager-modal" style="max-width:640px;max-height:90vh">
+    <div class="acc-manager-header">
+      <span>${isNew ? '＋ Log Simulated Trade' : 'Edit Trade'}</span>
+      <button onclick="document.getElementById('bt-trade-edit-overlay').remove()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
+    </div>
+    <div class="acc-manager-body" style="display:flex;flex-direction:column;gap:12px;padding:16px;overflow-y:auto">
+
+      <div style="display:flex;gap:8px">
+        <button type="button" id="bt-dir-buy" class="wl-week-btn${t.direction !== 'sell' ? ' restore' : ''}" onclick="_btSetDirection('buy')" style="flex:1">Buy / Long</button>
+        <button type="button" id="bt-dir-sell" class="wl-week-btn${t.direction === 'sell' ? ' danger' : ''}" onclick="_btSetDirection('sell')" style="flex:1">Sell / Short</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div><label class="bl-lbl">Entry Price</label><input type="number" step="any" id="bt-t-entry" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${t.entry_price ?? ''}" oninput="_btAutoCalc()"></div>
+        <div><label class="bl-lbl">Stop Price</label><input type="number" step="any" id="bt-t-stop" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${t.stop_price ?? ''}" oninput="_btAutoCalc()"></div>
+        <div><label class="bl-lbl">Exit Price</label><input type="number" step="any" id="bt-t-exit" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${t.exit_price ?? ''}" oninput="_btAutoCalc()"></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label class="bl-lbl">RR <span class="bl-lbl-sub">(auto, editable)</span></label><input type="number" step="any" id="bt-t-rr" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${t.rr ?? ''}"></div>
+        <div><label class="bl-lbl">P/L $ <span class="bl-lbl-sub">(auto, editable)</span></label><input type="number" step="any" id="bt-t-pnl" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${t.pnl ?? ''}"></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label class="bl-lbl">Entry Time</label><input type="datetime-local" id="bt-t-entrytime" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${t.entry_time ? t.entry_time.slice(0, 16) : ''}"></div>
+        <div><label class="bl-lbl">Exit Time</label><input type="datetime-local" id="bt-t-exittime" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${t.exit_time ? t.exit_time.slice(0, 16) : ''}"></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label class="bl-lbl">MFE <span class="bl-lbl-sub">(R units)</span></label><input type="number" step="any" id="bt-t-mfe" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${d.mfe ?? ''}"></div>
+        <div><label class="bl-lbl">MAE <span class="bl-lbl-sub">(R units)</span></label><input type="number" step="any" id="bt-t-mae" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${d.mae ?? ''}"></div>
+      </div>
+
+      <div><label class="bl-lbl">Reason for Entry</label><textarea id="bt-t-reasonentry" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:50px;resize:vertical">${d.reasonEntry || ''}</textarea></div>
+      <div><label class="bl-lbl">Reason for Exit</label><textarea id="bt-t-reasonexit" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:50px;resize:vertical">${d.reasonExit || ''}</textarea></div>
+      <div><label class="bl-lbl">Mistakes <span class="bl-lbl-sub">(one per line)</span></label><textarea id="bt-t-mistakes" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:50px;resize:vertical">${(d.mistakes || []).join('\n')}</textarea></div>
+      <div><label class="bl-lbl">Psychology</label><textarea id="bt-t-psych" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:50px;resize:vertical">${d.psychology || ''}</textarea></div>
+
+      <div class="bt-rating-row">
+        <div><label class="bl-lbl">Confidence <span class="bl-lbl-sub">1-10</span></label><input type="number" min="1" max="10" id="bt-t-conf" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${d.confidenceLevel ?? ''}"></div>
+        <div><label class="bl-lbl">Execution <span class="bl-lbl-sub">1-10</span></label><input type="number" min="1" max="10" id="bt-t-exec" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${d.executionRating ?? ''}"></div>
+        <div><label class="bl-lbl">Discipline <span class="bl-lbl-sub">1-10</span></label><input type="number" min="1" max="10" id="bt-t-disc" class="acc-mgr-input" style="width:100%;box-sizing:border-box" value="${d.disciplineRating ?? ''}"></div>
+      </div>
+
+      <div><label class="bl-lbl">Screenshots</label><div class="bt-screenshot-row" id="bt-shot-row">${screenshotSlots}</div></div>
+      <div><label class="bl-lbl">Notes</label><textarea id="bt-t-notes" class="acc-mgr-input" style="width:100%;box-sizing:border-box;min-height:50px;resize:vertical">${d.notes || ''}</textarea></div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+        ${!isNew ? `<button onclick="_btDeleteTradeConfirm('${sessionId}','${t.id}')" class="acc-mgr-btn del" style="padding:6px 14px;margin-right:auto"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg> Delete</button>` : ''}
+        <button onclick="document.getElementById('bt-trade-edit-overlay').remove()" class="acc-mgr-btn" style="padding:6px 14px">Cancel</button>
+        <button onclick="_btSaveTradeModal('${sessionId}', '${isNew ? '' : t.id}')" class="acc-mgr-add-btn" style="padding:6px 18px">Save Trade</button>
+      </div>
+    </div>
+  </div>`;
+
+  document.body.appendChild(overlay);
+  overlay._btDirection = t.direction || 'buy';
+  overlay._btScreenshots = { ...(d.screenshots || {}) };
+  requestAnimationFrame(() => overlay.classList.add('open'));
+}
+
+function _btSetDirection(dir) {
+  const overlay = document.getElementById('bt-trade-edit-overlay');
+  if (overlay) overlay._btDirection = dir;
+  document.getElementById('bt-dir-buy')?.classList.toggle('restore', dir === 'buy');
+  document.getElementById('bt-dir-sell')?.classList.toggle('danger', dir === 'sell');
+  _btAutoCalc();
+}
+
+/* Suggest RR from entry/stop/exit — trader can still override manually. */
+function _btAutoCalc() {
+  const overlay = document.getElementById('bt-trade-edit-overlay'); if (!overlay) return;
+  const dir = overlay._btDirection || 'buy';
+  const entry = parseFloat(document.getElementById('bt-t-entry')?.value);
+  const stop = parseFloat(document.getElementById('bt-t-stop')?.value);
+  const exit = parseFloat(document.getElementById('bt-t-exit')?.value);
+  if (isNaN(entry) || isNaN(stop) || isNaN(exit)) return;
+
+  const risk = dir === 'buy' ? entry - stop : stop - entry;
+  const reward = dir === 'buy' ? exit - entry : entry - exit;
+  if (risk <= 0) return;
+  const rr = reward / risk;
+  const rrField = document.getElementById('bt-t-rr');
+  if (rrField) rrField.value = Math.round(rr * 100) / 100;
+}
+
+async function _btHandleScreenshotPick(input, key) {
+  const file = input.files?.[0]; if (!file) return;
+  const slot = document.getElementById('bt-shot-' + key);
+  if (slot) { slot.querySelector('span').textContent = 'Uploading…'; }
+  const url = await _btUploadScreenshot(file);
+  if (!url) { showToast('Screenshot upload failed', 'danger'); return; }
+  const overlay = document.getElementById('bt-trade-edit-overlay');
+  if (overlay) { overlay._btScreenshots = overlay._btScreenshots || {}; overlay._btScreenshots[key] = url; }
+  if (slot) { slot.style.backgroundImage = `url('${url}')`; slot.classList.add('filled'); }
+}
+
+async function _btSaveTradeModal(sessionId, tradeId) {
+  const session = _btGetSessionById(sessionId); if (!session) return;
+  const overlay = document.getElementById('bt-trade-edit-overlay');
+  const direction = overlay?._btDirection || 'buy';
+
+  const entryTimeRaw = document.getElementById('bt-t-entrytime')?.value;
+  const exitTimeRaw = document.getElementById('bt-t-exittime')?.value;
+  const mistakesRaw = document.getElementById('bt-t-mistakes')?.value || '';
+
+  const trade = {
+    id: tradeId || null,
+    session_id: sessionId,
+    strategy_id: session.strategyId || null,
+    direction,
+    entry_price: parseFloat(document.getElementById('bt-t-entry')?.value) || null,
+    stop_price: parseFloat(document.getElementById('bt-t-stop')?.value) || null,
+    exit_price: parseFloat(document.getElementById('bt-t-exit')?.value) || null,
+    rr: parseFloat(document.getElementById('bt-t-rr')?.value) || 0,
+    pnl: parseFloat(document.getElementById('bt-t-pnl')?.value) || 0,
+    entry_time: entryTimeRaw ? new Date(entryTimeRaw).toISOString() : null,
+    exit_time: exitTimeRaw ? new Date(exitTimeRaw).toISOString() : null,
+    data: {
+      mfe: document.getElementById('bt-t-mfe')?.value || '',
+      mae: document.getElementById('bt-t-mae')?.value || '',
+      reasonEntry: document.getElementById('bt-t-reasonentry')?.value.trim() || '',
+      reasonExit: document.getElementById('bt-t-reasonexit')?.value.trim() || '',
+      mistakes: mistakesRaw.split('\n').map(x => x.trim()).filter(Boolean),
+      psychology: document.getElementById('bt-t-psych')?.value.trim() || '',
+      confidenceLevel: document.getElementById('bt-t-conf')?.value || '',
+      executionRating: document.getElementById('bt-t-exec')?.value || '',
+      disciplineRating: document.getElementById('bt-t-disc')?.value || '',
+      notes: document.getElementById('bt-t-notes')?.value.trim() || '',
+      screenshots: overlay?._btScreenshots || {},
+    },
+  };
+
+  const savedId = await _btSaveTrade(trade);
+  if (!savedId) return;
+
+  document.getElementById('bt-trade-edit-overlay')?.remove();
+  _btRenderSessionDetail(sessionId);
+  _btRenderSessionGrid();
+  buildBacktestingLab(); // refresh strategy stats since they roll up from trades
+  showToast(tradeId ? 'Trade updated ✓' : 'Trade logged ✓', 'restore');
+}
+
+function _btDeleteTradeConfirm(sessionId, tradeId) {
+  openGlassModal({
+    icon: '<svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg>',
+    title: 'Delete Trade?',
+    body: 'This simulated trade will be permanently removed from the session.',
+    confirmLabel: 'Delete Trade',
+    confirmClass: 'glass-btn-danger',
+    onConfirm: async () => {
+      await _btDeleteTrade(tradeId);
+      document.getElementById('bt-trade-edit-overlay')?.remove();
+      _btRenderSessionDetail(sessionId);
+      _btRenderSessionGrid();
+      buildBacktestingLab();
+      showToast('Trade deleted', 'danger');
     }
   });
 }
@@ -13018,6 +13620,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     _goalsLoad(),
     _pbLoad(),
     _blLoad(),
+    _btLoadTrades(),
     _accLoad(),
     _profileLoad(),
   ]);
