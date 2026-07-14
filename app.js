@@ -3497,15 +3497,12 @@ function _renderDetail(id) {
         <div style="margin-top:8px">
           ${(() => {
             let score = 0, max = 0;
-            // Rating (max 30)
-            max += 30; score += ((t.rating || 3) / 5) * 30;
+            // Rating (max 40)
+            max += 40; score += ((t.rating || 3) / 5) * 40;
             // Checklist (max 30)
             max += 30; score += (parseInt(checklistScore) / 100) * 30;
-            // R:R hit/miss (max 20)
-            max += 20;
-            if (rrDiff !== null) score += parseFloat(rrDiff) >= 0 ? 20 : Math.max(0, 20 + parseFloat(rrDiff) * 5);
-            // Would retake (max 20)
-            max += 20; if (retakeState === true) score += 20; else if (retakeState === false) score += 0; else score += 10;
+            // Would retake (max 30)
+            max += 30; if (retakeState === true) score += 30; else if (retakeState === false) score += 0; else score += 15;
             const pct = Math.round((score / max) * 100);
             const grade = pct >= 85 ? 'A' : pct >= 70 ? 'B' : pct >= 55 ? 'C' : pct >= 40 ? 'D' : 'F';
             const col = pct >= 85 ? 'var(--green)' : pct >= 70 ? 'var(--teal)' : pct >= 55 ? 'var(--gold)' : 'var(--red)';
