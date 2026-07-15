@@ -12255,8 +12255,8 @@ tr.bl-compare-best td { border-color:rgba(251,191,36,.2); }
 
 .rep-chart-area { flex:1; min-width:0; position:relative; }
 .rep-chart-wrap { position:absolute; inset:0; }
-.rep-overlay-canvas { position:absolute; inset:0; z-index:5; cursor:default; }
-.rep-overlay-canvas.drawing { cursor:crosshair; }
+.rep-overlay-canvas { position:absolute; inset:0; z-index:5; cursor:default; pointer-events:none; }
+.rep-overlay-canvas.drawing { cursor:crosshair; pointer-events:auto; }
 .rep-overlay-canvas.dragging { cursor:grabbing; }
 
 .rep-loading, .rep-error {

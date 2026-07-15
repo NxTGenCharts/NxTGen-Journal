@@ -10511,6 +10511,7 @@ async function _repOpen(sessionId) {
     skipWeekends: saved.skipWeekends !== undefined ? saved.skipWeekends : true,
     playing: false, speed: saved.speed || 1,
     indicators: saved.indicators || { ema9: false, ema21: false, sma50: false, vwap: false },
+    theme: Object.assign({ upColor: '#34d399', downColor: '#f87171', grid: true, volume: true, watermark: true }, saved.theme || {}),
     history: { undo: [], redo: [] },
     indicatorSeries: {},
     _savedIndex: typeof saved.index === 'number' ? saved.index : null,
@@ -10537,7 +10538,7 @@ async function _repSaveState() {
     symbol: _repState.symbol, interval: _repState.interval, source: _repState.source,
     index: _repState.index, candlesPerView: _repState.candlesPerView,
     drawings: _repState.drawings, magnet: _repState.magnet, loop: _repState.loop,
-    skipWeekends: _repState.skipWeekends, speed: _repState.speed, indicators: _repState.indicators,
+    skipWeekends: _repState.skipWeekends, speed: _repState.speed, indicators: _repState.indicators, theme: _repState.theme,
   };
   await _blSave();
 }
@@ -10569,8 +10570,8 @@ function _repRenderShell() {
         <select id="rep-source-select" class="rep-select" onchange="_repSourceChanged()" title="Data source">
           ${REP_SOURCES.map(s => `<option value="${s.id}"${s.id === _repState.source ? ' selected' : ''}>${s.label}</option>`).join('')}
         </select>
-        <input type="text" id="rep-symbol-input" class="rep-input" value="${_repState.symbol}" title="Symbol (e.g. ${_repGetSource(_repState.source).symbolPlaceholder})">
-        <select id="rep-interval-select" class="rep-select">
+        <input type="text" id="rep-symbol-input" class="rep-input" value="${_repState.symbol}" title="Symbol (e.g. ${_repGetSource(_repState.source).symbolPlaceholder}) — press Enter to load" onkeydown="if(event.key==='Enter')_repChangeSymbolInterval()">
+        <select id="rep-interval-select" class="rep-select" onchange="_repChangeSymbolInterval()" title="Timeframe">
           ${_repGetSource(_repState.source).intervals.map(iv => `<option value="${iv}"${iv === _repState.interval ? ' selected' : ''}>${iv}</option>`).join('')}
         </select>
         <button class="rep-icon-btn" onclick="_repChangeSymbolInterval()" title="Load"><svg class="icn" aria-hidden="true"><use href="#ic-refresh"></use></svg></button>
@@ -10583,6 +10584,7 @@ function _repRenderShell() {
         <button class="rep-icon-btn" onclick="_repSaveLayout()" title="Save Layout">${_repIcon('save', 'icn')}</button>
         <button class="rep-icon-btn" onclick="_repToggleLayoutsPopover()" title="Load Layout">${_repIcon('load', 'icn')}</button>
         <button class="rep-icon-btn" onclick="_repClearDrawings()" title="Clear all drawings"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg></button>
+        <button class="rep-icon-btn" id="rep-settings-btn" onclick="_repToggleSettingsPopover()" title="Chart settings & theme"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.2a1.7 1.7 0 013.4 0 1.7 1.7 0 002.5 1.5 1.7 1.7 0 012.4 2.4A1.7 1.7 0 0020.1 10a1.7 1.7 0 010 3.4 1.7 1.7 0 00-1.5 2.5 1.7 1.7 0 01-2.4 2.4A1.7 1.7 0 0013.7 20a1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.5-1.5 1.7 1.7 0 01-2.4-2.4A1.7 1.7 0 003.9 13.4a1.7 1.7 0 010-3.4 1.7 1.7 0 001.5-2.5 1.7 1.7 0 012.4-2.4A1.7 1.7 0 0010.3 3.2z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
         <div class="rep-topbar-divider"></div>
         <button class="rep-icon-btn" onclick="_repToggleFullscreen()" title="Fullscreen">${_repIcon('fullscreen', 'icn')}</button>
         <button class="rep-close-btn" onclick="_repClose()" title="Close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
@@ -10607,6 +10609,22 @@ function _repRenderShell() {
         <div class="rep-popover" id="rep-layouts-popover">
           <div class="rep-popover-title">Saved Layouts</div>
           <div id="rep-layouts-list" style="display:flex;flex-direction:column;gap:2px"></div>
+        </div>
+        <div class="rep-popover" id="rep-settings-popover" style="width:230px">
+          <div class="rep-popover-title">Chart Theme</div>
+          <div style="display:flex;gap:8px;padding:4px 6px 8px">
+            <label style="flex:1;display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text2)">Bull candle
+              <input type="color" id="rep-theme-up" value="${_repState.theme.upColor}" oninput="_repSetTheme('upColor', this.value)" style="width:100%;height:28px;border:1px solid var(--glass-border);border-radius:6px;background:none;cursor:pointer">
+            </label>
+            <label style="flex:1;display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text2)">Bear candle
+              <input type="color" id="rep-theme-down" value="${_repState.theme.downColor}" oninput="_repSetTheme('downColor', this.value)" style="width:100%;height:28px;border:1px solid var(--glass-border);border-radius:6px;background:none;cursor:pointer">
+            </label>
+          </div>
+          <div class="rep-popover-row ${_repState.theme.grid ? 'on' : ''}" data-theme-toggle="grid" onclick="_repToggleThemeFlag('grid')"><span>Grid lines</span><span class="rep-popover-check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg></span></div>
+          <div class="rep-popover-row ${_repState.theme.volume ? 'on' : ''}" data-theme-toggle="volume" onclick="_repToggleThemeFlag('volume')"><span>Volume panel</span><span class="rep-popover-check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg></span></div>
+          <div class="rep-popover-row ${_repState.theme.watermark ? 'on' : ''}" data-theme-toggle="watermark" onclick="_repToggleThemeFlag('watermark')"><span>Symbol watermark</span><span class="rep-popover-check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg></span></div>
+          <div class="rep-popover-sep" style="height:1px;background:var(--glass-border);margin:6px 2px"></div>
+          <div class="rep-popover-row" onclick="_repResetTheme()"><span>Reset to default</span></div>
         </div>
         <div class="rep-ctx-menu" id="rep-ctx-menu"></div>
 
@@ -10763,6 +10781,7 @@ function _repInitChart() {
   overlay.addEventListener('mouseleave', () => { const b = document.getElementById('rep-ohlc-badge'); if (b && !_repState.activeTool) b.style.display = 'none'; });
 
   new ResizeObserver(() => _repResizeOverlay()).observe(container);
+  _repApplyTheme();
   _repResizeOverlay();
 }
 
@@ -11273,15 +11292,59 @@ function _repHideContextMenu() { document.getElementById('rep-ctx-menu')?.classL
 function _repClosePopovers() {
   document.getElementById('rep-indicators-popover')?.classList.remove('open');
   document.getElementById('rep-layouts-popover')?.classList.remove('open');
+  document.getElementById('rep-settings-popover')?.classList.remove('open');
+}
+function _repToggleSettingsPopover() {
+  const p = document.getElementById('rep-settings-popover'); if (!p) return;
+  document.getElementById('rep-indicators-popover')?.classList.remove('open');
+  document.getElementById('rep-layouts-popover')?.classList.remove('open');
+  p.classList.toggle('open');
+}
+function _repSetTheme(key, value) {
+  if (!_repState) return;
+  _repState.theme[key] = value;
+  _repApplyTheme();
+  _repSaveState();
+}
+function _repToggleThemeFlag(key) {
+  if (!_repState) return;
+  _repState.theme[key] = !_repState.theme[key];
+  document.querySelector(`#rep-settings-popover .rep-popover-row[data-theme-toggle="${key}"]`)?.classList.toggle('on', _repState.theme[key]);
+  _repApplyTheme();
+  _repSaveState();
+}
+function _repResetTheme() {
+  if (!_repState) return;
+  _repState.theme = { upColor: '#34d399', downColor: '#f87171', grid: true, volume: true, watermark: true };
+  const up = document.getElementById('rep-theme-up'); if (up) up.value = _repState.theme.upColor;
+  const down = document.getElementById('rep-theme-down'); if (down) down.value = _repState.theme.downColor;
+  document.querySelectorAll('#rep-settings-popover .rep-popover-row[data-theme-toggle]').forEach(row => row.classList.add('on'));
+  _repApplyTheme();
+  _repSaveState();
+}
+function _repApplyTheme() {
+  if (!_repState || !_repState.chart) return;
+  const t = _repState.theme;
+  _repState.candleSeries.applyOptions({ upColor: t.upColor, downColor: t.downColor, wickUpColor: t.upColor, wickDownColor: t.downColor });
+  _repState.chart.applyOptions({
+    grid: {
+      vertLines: { color: 'rgba(255,255,255,.04)', visible: t.grid },
+      horzLines: { color: 'rgba(255,255,255,.04)', visible: t.grid },
+    },
+  });
+  if (_repState.volumeSeries) _repState.volumeSeries.applyOptions({ visible: t.volume });
+  const badge = document.querySelector('.rep-symbol-badge'); if (badge) badge.style.display = t.watermark ? 'block' : 'none';
 }
 function _repToggleIndicatorsPopover() {
   const p = document.getElementById('rep-indicators-popover'); if (!p) return;
   document.getElementById('rep-layouts-popover')?.classList.remove('open');
+  document.getElementById('rep-settings-popover')?.classList.remove('open');
   p.classList.toggle('open');
 }
 function _repToggleLayoutsPopover() {
   const p = document.getElementById('rep-layouts-popover'); if (!p) return;
   document.getElementById('rep-indicators-popover')?.classList.remove('open');
+  document.getElementById('rep-settings-popover')?.classList.remove('open');
   p.classList.toggle('open');
   _repRenderLayoutsList();
 }
