@@ -10310,6 +10310,52 @@ function _btDeleteTradeConfirm(sessionId, tradeId) {
 // ═══════════════════════════════════════════════════
 let _repState = null;
 
+// ── Data sources ─────────────────────────────────────────
+// Each source is fetched through the same market-data-proxy
+// Edge Function; the function branches on `source` server-side
+// so API keys/secrets for each vendor stay off the client.
+// Interval option *values* are already in the format each
+// vendor's API expects — no client-side remapping needed.
+const REP_SOURCES = [
+  {
+    id: 'twelvedata', label: 'Twelve Data',
+    intervals: ['1min', '5min', '15min', '30min', '1h', '4h', '1day', '1week'],
+    defaultInterval: '1h',
+    symbolPlaceholder: 'EUR/USD',
+    mapPair(pair) {
+      if (!pair) return 'EUR/USD';
+      const p = pair.trim().toUpperCase().replace(/\s+/g, '');
+      if (p.includes('/')) return p;
+      if (/^[A-Z]{6}$/.test(p)) return p.slice(0, 3) + '/' + p.slice(3);
+      return p;
+    },
+  },
+  {
+    id: 'dukascopy', label: 'Dukascopy',
+    intervals: ['m1', 'm5', 'm15', 'm30', 'h1', 'h4', 'd1'],
+    defaultInterval: 'h1',
+    symbolPlaceholder: 'eurusd',
+    mapPair(pair) {
+      if (!pair) return 'eurusd';
+      return pair.trim().toLowerCase().replace(/[\/\s]/g, '');
+    },
+  },
+  {
+    id: 'oanda', label: 'OANDA',
+    intervals: ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D', 'W'],
+    defaultInterval: 'H1',
+    symbolPlaceholder: 'EUR_USD',
+    mapPair(pair) {
+      if (!pair) return 'EUR_USD';
+      const p = pair.trim().toUpperCase().replace(/\s+/g, '');
+      if (p.includes('_')) return p;
+      if (/^[A-Z]{6}$/.test(p)) return p.slice(0, 3) + '_' + p.slice(3);
+      return p;
+    },
+  },
+];
+function _repGetSource(id) { return REP_SOURCES.find(s => s.id === id) || REP_SOURCES[0]; }
+
 const REP_TOOLS = [
   { id: 'trendline',        label: 'Trendline',         kind: 'line', color: '#fbbf24' },
   { id: 'arrow',             label: 'Arrow',             kind: 'line', color: '#fbbf24', arrow: true },
@@ -10329,21 +10375,34 @@ const REP_TOOLS = [
 function _repUid() { return 'rd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); }
 
 // ── Symbol / interval mapping ───────────────────────────
-function _repMapPairToSymbol(pair) {
-  if (!pair) return 'EUR/USD';
-  const p = pair.trim().toUpperCase().replace(/\s+/g, '');
-  if (p.includes('/')) return p;
-  if (/^[A-Z]{6}$/.test(p)) return p.slice(0, 3) + '/' + p.slice(3);
-  return p;
-}
+// Kept as thin wrappers around REP_SOURCES so any old call
+// sites (or saved replayState from before multi-source
+// support) keep working against Twelve Data by default.
+function _repMapPairToSymbol(pair) { return _repGetSource('twelvedata').mapPair(pair); }
 function _repMapIntervalToTD(tf) {
   const map = { M1: '1min', M5: '5min', M15: '15min', M30: '30min', H1: '1h', H4: '4h', D1: '1day', W1: '1week' };
   const key = (tf || '').trim().toUpperCase();
   return map[key] || '1h';
 }
+// Same idea, but for whichever source is currently active.
+function _repMapIntervalForSource(tf, sourceId) {
+  const src = _repGetSource(sourceId);
+  const legacy = _repMapIntervalToTD(tf); // normalize e.g. "H1" -> "1h" first
+  const bySourceMap = {
+    twelvedata: { '1min': '1min', '5min': '5min', '15min': '15min', '30min': '30min', '1h': '1h', '4h': '4h', '1day': '1day', '1week': '1week' },
+    dukascopy:  { '1min': 'm1', '5min': 'm5', '15min': 'm15', '30min': 'm30', '1h': 'h1', '4h': 'h4', '1day': 'd1', '1week': 'd1' },
+    oanda:      { '1min': 'M1', '5min': 'M5', '15min': 'M15', '30min': 'M30', '1h': 'H1', '4h': 'H4', '1day': 'D', '1week': 'W' },
+  };
+  return (bySourceMap[src.id] && bySourceMap[src.id][legacy]) || src.defaultInterval;
+}
 
 // ── Fetch candles via Edge Function proxy ───────────────
-async function _repFetchCandles(symbol, interval, outputsize = 500) {
+// The Edge Function (market-data-proxy) branches on `source`
+// server-side and keeps each vendor's key/token as a Supabase
+// secret — see /supabase/functions/market-data-proxy for the
+// Dukascopy + OANDA branches added alongside the existing
+// Twelve Data one.
+async function _repFetchCandles(symbol, interval, outputsize = 500, source = 'twelvedata') {
   const { data: { session } } = await sb.auth.getSession();
   const response = await fetch(`${SUPABASE_URL}/functions/v1/market-data-proxy`, {
     method: 'POST',
@@ -10351,7 +10410,7 @@ async function _repFetchCandles(symbol, interval, outputsize = 500) {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${session?.access_token || SUPABASE_ANON}`,
     },
-    body: JSON.stringify({ symbol, interval, outputsize }),
+    body: JSON.stringify({ symbol, interval, outputsize, source }),
   });
   if (!response.ok) {
     const errText = await response.text();
@@ -10365,11 +10424,12 @@ async function _repFetchCandles(symbol, interval, outputsize = 500) {
 async function _repOpen(sessionId) {
   const session = _btGetSessionById(sessionId); if (!session) return;
   const saved = session.replayState || {};
-  const symbol = saved.symbol || _repMapPairToSymbol(session.pair);
-  const interval = saved.interval || _repMapIntervalToTD(session.timeframe);
+  const source = _repGetSource(saved.source || 'twelvedata').id;
+  const symbol = saved.symbol || _repGetSource(source).mapPair(session.pair);
+  const interval = saved.interval || _repMapIntervalForSource(session.timeframe, source);
 
   _repState = {
-    sessionId, symbol, interval,
+    sessionId, symbol, interval, source,
     candles: [], index: 0, viewEnd: 0,
     candlesPerView: saved.candlesPerView || 120,
     drawings: saved.drawings ? JSON.parse(JSON.stringify(saved.drawings)) : [],
@@ -10392,7 +10452,7 @@ async function _repSaveState() {
   if (!_repState) return;
   const session = _btGetSessionById(_repState.sessionId); if (!session) return;
   session.replayState = {
-    symbol: _repState.symbol, interval: _repState.interval,
+    symbol: _repState.symbol, interval: _repState.interval, source: _repState.source,
     index: _repState.index, candlesPerView: _repState.candlesPerView,
     drawings: _repState.drawings,
   };
@@ -10413,9 +10473,12 @@ function _repRenderShell() {
     <div class="rep-topbar">
       <div class="rep-topbar-title">📈 ${session?.name || 'Chart Replay'}</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="text" id="rep-symbol-input" class="rep-select" style="width:90px" value="${_repState.symbol}" title="Symbol (e.g. EUR/USD)">
+        <select id="rep-source-select" class="rep-select" onchange="_repSourceChanged()" title="Data source">
+          ${REP_SOURCES.map(s => `<option value="${s.id}"${s.id === _repState.source ? ' selected' : ''}>${s.label}</option>`).join('')}
+        </select>
+        <input type="text" id="rep-symbol-input" class="rep-select" style="width:90px" value="${_repState.symbol}" title="Symbol (e.g. ${_repGetSource(_repState.source).symbolPlaceholder})">
         <select id="rep-interval-select" class="rep-select">
-          ${['1min','5min','15min','30min','1h','4h','1day','1week'].map(iv => `<option value="${iv}"${iv === _repState.interval ? ' selected' : ''}>${iv}</option>`).join('')}
+          ${_repGetSource(_repState.source).intervals.map(iv => `<option value="${iv}"${iv === _repState.interval ? ' selected' : ''}>${iv}</option>`).join('')}
         </select>
         <button class="rep-ctrl-btn" onclick="_repChangeSymbolInterval()">Load</button>
         <button class="rep-ctrl-btn" onclick="_repClose()">✕ Close</button>
@@ -10458,11 +10521,28 @@ async function _repChangeSymbolInterval() {
   await _repLoadCandles();
 }
 
+// Switching source re-maps the current symbol/interval into the
+// new vendor's format (e.g. EUR/USD -> EUR_USD for OANDA) rather
+// than clearing the fields, then re-renders the bar so the
+// interval dropdown shows that vendor's options.
+function _repSourceChanged() {
+  if (!_repState) return;
+  const newSourceId = document.getElementById('rep-source-select')?.value || _repState.source;
+  const oldSession = _btGetSessionById(_repState.sessionId);
+  const newSrc = _repGetSource(newSourceId);
+  _repState.symbol = newSrc.mapPair(oldSession?.pair) || newSrc.symbolPlaceholder;
+  _repState.interval = _repMapIntervalForSource(oldSession?.timeframe, newSourceId);
+  _repState.source = newSourceId;
+  _repState._savedIndex = null;
+  _repRenderShell();
+  _repLoadCandles();
+}
+
 async function _repLoadCandles() {
   const wrap = document.getElementById('rep-canvas-wrap');
   if (wrap) wrap.innerHTML = '<div class="rep-loading">Loading candles…</div>';
   try {
-    const candles = await _repFetchCandles(_repState.symbol, _repState.interval, 500);
+    const candles = await _repFetchCandles(_repState.symbol, _repState.interval, 500, _repState.source);
     if (!candles.length) throw new Error('No candle data returned for this symbol/interval');
     _repState.candles = candles;
     const seed = Math.min(_repState.candlesPerView - 1, candles.length - 1);
