@@ -10356,6 +10356,50 @@ const REP_SOURCES = [
 ];
 function _repGetSource(id) { return REP_SOURCES.find(s => s.id === id) || REP_SOURCES[0]; }
 
+// Maps our existing REP_TOOLS ids to the real TradingView LineTool*
+// identifiers used by chart.selectLineTool(). These are the
+// library's documented built-in tool names — verify the exact
+// strings against your installed library version's docs (Drawings
+// API reference) if any tool doesn't arm correctly; naming has
+// shifted slightly across major versions.
+const TV_LINE_TOOL_MAP = {
+  select: 'cursor',
+  trendline: 'LineToolTrendLine',
+  ray: 'LineToolRay',
+  arrow: 'LineToolArrow',
+  hline: 'LineToolHorzLine',
+  vline: 'LineToolVertLine',
+  measure: 'LineToolCircle', // TODO: swap for the measure tool's exact id once confirmed for your version
+  rect: 'LineToolRectangle',
+  circle: 'LineToolCircle',
+  brush: 'LineToolBrush',
+  text: 'LineToolText',
+  fib: 'LineToolFibRetracement',
+  fibext: 'LineToolFibExtension',
+  killzone: 'LineToolRectangle',
+  orderblock: 'LineToolRectangle',
+  fvg: 'LineToolRectangle',
+  liquidity: 'LineToolHorzLine',
+  premiumdiscount: 'LineToolRectangle',
+};
+
+// TradingView's built-in study names + default inputs for the
+// indicators your popover already lists — real studies now render
+// natively on the chart instead of the old hand-rolled line series.
+const REP_TV_STUDY_MAP = {
+  ema9: { name: 'Moving Average Exponential', inputs: { length: 9 } },
+  ema21: { name: 'Moving Average Exponential', inputs: { length: 21 } },
+  ema50: { name: 'Moving Average Exponential', inputs: { length: 50 } },
+  sma50: { name: 'Moving Average', inputs: { length: 50 } },
+  sma200: { name: 'Moving Average', inputs: { length: 200 } },
+  vwap: { name: 'Volume Weighted Average Price', inputs: {} },
+  bb: { name: 'Bollinger Bands', inputs: { length: 20, mult: 2 } },
+  rsi: { name: 'Relative Strength Index', inputs: { length: 14 } },
+  macd: { name: 'MACD', inputs: { fastLength: 12, slowLength: 26, signalLength: 9 } },
+  stoch: { name: 'Stochastic', inputs: { k: 14, d: 3, smooth: 3 } },
+  atr: { name: 'Average True Range', inputs: { length: 14 } },
+};
+
 // Drawing tools shown in the left toolbar, top to bottom.
 // `group` clusters related tools for the toolbar dividers.
 // `icon` refers to an id in the icon sprite (index.html <defs>)
@@ -10570,7 +10614,10 @@ function _repRenderShell() {
         <select id="rep-source-select" class="rep-select" onchange="_repSourceChanged()" title="Data source">
           ${REP_SOURCES.map(s => `<option value="${s.id}"${s.id === _repState.source ? ' selected' : ''}>${s.label}</option>`).join('')}
         </select>
-        <input type="text" id="rep-symbol-input" class="rep-input" value="${_repState.symbol}" title="Symbol (e.g. ${_repGetSource(_repState.source).symbolPlaceholder}) — press Enter to load" onkeydown="if(event.key==='Enter')_repChangeSymbolInterval()">
+        <button class="rep-icon-btn" id="rep-symbol-trigger" style="width:auto;padding:0 10px;font-family:var(--font-mono);font-weight:600;gap:6px" onclick="_repOpenSymbolSearch()" title="Search symbol (/)">
+          <span>${_repState.symbol}</span>
+          <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        </button>
         <select id="rep-interval-select" class="rep-select" onchange="_repChangeSymbolInterval()" title="Timeframe">
           ${_repGetSource(_repState.source).intervals.map(iv => `<option value="${iv}"${iv === _repState.interval ? ' selected' : ''}>${iv}</option>`).join('')}
         </select>
@@ -10628,6 +10675,19 @@ function _repRenderShell() {
         </div>
         <div class="rep-ctx-menu" id="rep-ctx-menu"></div>
 
+        <div class="rep-symbol-search-backdrop" id="rep-symbol-search-backdrop" onclick="if(event.target===this)_repCloseSymbolSearch()">
+          <div class="rep-symbol-search" id="rep-symbol-search" role="dialog" aria-label="Symbol search">
+            <div class="rep-symsearch-input-row">
+              <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input type="text" id="rep-symsearch-input" placeholder="Search symbol (EURUSD, XAUUSD, BTC…)" autocomplete="off" oninput="_repSymbolSearchInput(this.value)" onkeydown="_repSymbolSearchKeydown(event)">
+              <button class="rep-icon-btn" onclick="_repCloseSymbolSearch()" title="Close (Esc)"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
+            </div>
+            <div class="rep-symsearch-tabs" id="rep-symsearch-tabs"></div>
+            <div class="rep-symsearch-results" id="rep-symsearch-results"></div>
+          </div>
+        </div>
+
+
         <div class="rep-replay-pill" id="rep-replay-pill">
           <span class="rep-drag-handle"><span></span><span></span><span></span><span></span><span></span><span></span></span>
           <button class="rep-step-btn" onclick="_repReset()" title="Reset (Home)">${_repIcon('reset', 'icn')}</button>
@@ -10672,17 +10732,140 @@ function _repKeyHandler(e) {
   else if (e.key === 'ArrowRight') { _repStep(1); }
   else if (e.key === 'ArrowLeft') { _repStep(-1); }
   else if (e.key === 'Home') { _repReset(); }
-  else if (e.key === 'Escape') { _repSetTool(null); _repHideContextMenu(); _repClosePopovers(); }
+  else if (e.key === '/') { e.preventDefault(); _repOpenSymbolSearch(); }
+  else if (e.key === 'Escape') { _repCloseSymbolSearch(); _repSetTool(null); _repHideContextMenu(); _repClosePopovers(); }
   else if (e.key === 'Delete' || e.key === 'Backspace') { _repDeleteSelected(); }
   else if (e.key === 'v' || e.key === 'V') { _repSetTool('select'); }
   else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); _repUndo(); }
   else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); _repRedo(); }
 }
 
+// ══════════════════════════════════════════════════════
+// SYMBOL SEARCH — TradingView-style dialog: type to filter,
+// ↑/↓/Enter/Esc to navigate, tabs for Favorites/Recent/Popular/
+// Forex/Crypto/Indices/Synthetic. Reads TV_SYMBOL_CATALOG from
+// tv-datafeed.js, so results here are exactly what the chart's
+// Datafeed can actually resolve — no dead ends.
+// ══════════════════════════════════════════════════════
+const REP_SYMSEARCH_TABS = [
+  { id: 'popular', label: 'Popular' },
+  { id: 'favorites', label: 'Favorites' },
+  { id: 'recent', label: 'Recent' },
+  { id: 'forex', label: 'Forex' },
+  { id: 'crypto', label: 'Crypto' },
+  { id: 'index', label: 'Indices' },
+  { id: 'synthetic', label: 'Synthetic' },
+];
+let _repSymSearchState = { tab: 'popular', query: '', highlighted: 0, results: [] };
+
+function _repSymSearchStore(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
+function _repSymSearchFavorites() { return _repSymSearchStore('nxtgen_rep_fav_symbols'); }
+function _repSymSearchRecents() { return _repSymSearchStore('nxtgen_rep_recent_symbols'); }
+function _repSymSearchToggleFavorite(symbol) {
+  const favs = _repSymSearchFavorites();
+  const idx = favs.indexOf(symbol);
+  if (idx >= 0) favs.splice(idx, 1); else favs.unshift(symbol);
+  localStorage.setItem('nxtgen_rep_fav_symbols', JSON.stringify(favs.slice(0, 30)));
+  _repRenderSymbolSearchResults();
+}
+function _repSymSearchPushRecent(symbol) {
+  const recents = _repSymSearchRecents().filter(s => s !== symbol);
+  recents.unshift(symbol);
+  localStorage.setItem('nxtgen_rep_recent_symbols', JSON.stringify(recents.slice(0, 12)));
+}
+
+function _repOpenSymbolSearch() {
+  const backdrop = document.getElementById('rep-symbol-search-backdrop'); if (!backdrop) return;
+  _repClosePopovers();
+  _repSymSearchState = { tab: 'popular', query: '', highlighted: 0, results: [] };
+  backdrop.classList.add('open');
+  _repRenderSymbolSearchTabs();
+  _repRenderSymbolSearchResults();
+  const input = document.getElementById('rep-symsearch-input');
+  if (input) { input.value = ''; setTimeout(() => input.focus(), 0); }
+}
+function _repCloseSymbolSearch() {
+  document.getElementById('rep-symbol-search-backdrop')?.classList.remove('open');
+}
+function _repSetSymSearchTab(tabId) {
+  _repSymSearchState.tab = tabId;
+  _repSymSearchState.highlighted = 0;
+  _repRenderSymbolSearchTabs();
+  _repRenderSymbolSearchResults();
+}
+function _repRenderSymbolSearchTabs() {
+  const el = document.getElementById('rep-symsearch-tabs'); if (!el) return;
+  el.innerHTML = REP_SYMSEARCH_TABS.map(t => `<button class="rep-symsearch-tab ${_repSymSearchState.tab === t.id ? 'active' : ''}" onclick="_repSetSymSearchTab('${t.id}')">${t.label}</button>`).join('');
+}
+function _repSymbolSearchInput(value) {
+  _repSymSearchState.query = value;
+  _repSymSearchState.highlighted = 0;
+  _repRenderSymbolSearchResults();
+}
+function _repSymbolSearchMatches() {
+  const q = (_repSymSearchState.query || '').trim().toUpperCase();
+  const pool = (typeof TV_SYMBOL_CATALOG !== 'undefined') ? TV_SYMBOL_CATALOG : [];
+  if (q) return pool.filter(s => s.symbol.toUpperCase().includes(q) || s.description.toUpperCase().includes(q));
+  if (_repSymSearchState.tab === 'favorites') { const favs = _repSymSearchFavorites(); return pool.filter(s => favs.includes(s.symbol)); }
+  if (_repSymSearchState.tab === 'recent') return _repSymSearchRecents().map(sym => pool.find(s => s.symbol === sym)).filter(Boolean);
+  if (_repSymSearchState.tab === 'popular') return pool;
+  return pool.filter(s => s.type === _repSymSearchState.tab);
+}
+function _repRenderSymbolSearchResults() {
+  const el = document.getElementById('rep-symsearch-results'); if (!el) return;
+  const favs = _repSymSearchFavorites();
+  const results = _repSymbolSearchMatches();
+  _repSymSearchState.results = results;
+  if (!results.length) {
+    el.innerHTML = `<div class="rep-symsearch-empty">No symbols match "${_repSymSearchState.query}"</div>`;
+    return;
+  }
+  el.innerHTML = results.map((s, i) => `
+    <div class="rep-symsearch-row ${i === _repSymSearchState.highlighted ? 'highlighted' : ''}" onmouseenter="_repSymSearchState.highlighted=${i}" onclick="_repSymbolSearchSelect('${s.symbol}')">
+      <span class="rep-symsearch-type">${s.type}</span>
+      <span class="rep-symsearch-name">${s.symbol}</span>
+      <span class="rep-symsearch-desc">${s.description}</span>
+      <button class="rep-symsearch-fav ${favs.includes(s.symbol) ? 'on' : ''}" onclick="event.stopPropagation();_repSymSearchToggleFavorite('${s.symbol}')" title="Favorite">★</button>
+    </div>`).join('');
+}
+function _repSymbolSearchKeydown(e) {
+  const results = _repSymSearchState.results;
+  if (e.key === 'ArrowDown') { e.preventDefault(); _repSymSearchState.highlighted = Math.min(results.length - 1, _repSymSearchState.highlighted + 1); _repRenderSymbolSearchResults(); _repSymSearchScrollHighlighted(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); _repSymSearchState.highlighted = Math.max(0, _repSymSearchState.highlighted - 1); _repRenderSymbolSearchResults(); _repSymSearchScrollHighlighted(); }
+  else if (e.key === 'Enter') { e.preventDefault(); const s = results[_repSymSearchState.highlighted]; if (s) _repSymbolSearchSelect(s.symbol); }
+  else if (e.key === 'Escape') { e.preventDefault(); _repCloseSymbolSearch(); }
+}
+function _repSymSearchScrollHighlighted() {
+  document.querySelector('#rep-symsearch-results .rep-symsearch-row.highlighted')?.scrollIntoView({ block: 'nearest' });
+}
+
+async function _repSymbolSearchSelect(symbol) {
+  if (!_repState) return;
+  _repSymSearchPushRecent(symbol);
+  _repCloseSymbolSearch();
+  _repPause();
+  _repState.symbol = symbol;
+  _repState._savedIndex = null;
+
+  const chart = _repState.tvChart;
+  if (chart && chart.setSymbol) {
+    // Real chart already exists — swap its symbol in place instead
+    // of tearing down and rebuilding the whole widget.
+    const tvInterval = tvIntervalFromSourceInterval(_repState.interval, _repState.source);
+    chart.setSymbol(symbol, tvInterval, () => {
+      if (window.TVReplay) { TVReplay.bars = []; TVReplay.cursor = -1; } // force re-seed on next getBars
+      _repRenderShell();
+      _repLoadCandles(); // keeps _repState.candles/index/HUD in sync exactly as before
+    });
+  } else {
+    _repRenderShell();
+    await _repLoadCandles();
+  }
+}
+
 async function _repChangeSymbolInterval() {
   if (!_repState) return;
   _repPause();
-  _repState.symbol = document.getElementById('rep-symbol-input')?.value.trim() || _repState.symbol;
   _repState.interval = document.getElementById('rep-interval-select')?.value || _repState.interval;
   _repState._savedIndex = null;
   await _repLoadCandles();
@@ -10738,84 +10921,105 @@ async function _repLoadCandles() {
   }
 }
 
-// ── TradingView Lightweight Charts bootstrap ────────────
+// ── TradingView Advanced Charting Library bootstrap ─────
+// Requires charting_library/ (from TradingView's private repo,
+// see TRADINGVIEW_INTEGRATION_GUIDE.md) and tv-datafeed.js to be
+// loaded first. Until that folder is added, `TradingView.widget`
+// won't exist and this will throw — the catch below falls back
+// to a clear status message instead of a silent blank chart.
 function _repInitChart() {
   const container = document.getElementById('rep-chart-wrap'); if (!container) return;
-  const chart = LightweightCharts.createChart(container, {
-    autoSize: true,
-    layout: { background: { type: 'solid', color: 'transparent' }, textColor: 'rgba(226,232,240,.62)', fontFamily: 'JetBrains Mono, monospace', fontSize: 11 },
-    grid: { vertLines: { color: 'rgba(255,255,255,.04)' }, horzLines: { color: 'rgba(255,255,255,.04)' } },
-    rightPriceScale: { borderColor: 'rgba(255,255,255,.08)', scaleMargins: { top: 0.08, bottom: 0.22 } },
-    timeScale: { borderColor: 'rgba(255,255,255,.08)', timeVisible: true, secondsVisible: false, rightOffset: 4 },
-    crosshair: {
-      mode: LightweightCharts.CrosshairMode.Normal,
-      vertLine: { color: 'rgba(226,232,240,.3)', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#1a2030' },
-      horzLine: { color: 'rgba(226,232,240,.3)', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#1a2030' },
+  if (typeof TradingView === 'undefined' || !TradingView.widget) {
+    const status = document.getElementById('rep-status-msg');
+    if (status) {
+      status.innerHTML = `<div>TradingView charting library not found.</div><small style="color:var(--text3)">Add charting_library/ (see TRADINGVIEW_INTEGRATION_GUIDE.md) and reload.</small>`;
+      status.classList.add('rep-error'); status.style.display = 'flex';
+    }
+    return;
+  }
+
+  const tvInterval = tvIntervalFromSourceInterval(_repState.interval, _repState.source);
+  const widget = new TradingView.widget({
+    container,
+    library_path: 'charting_library/',
+    datafeed: TVDatafeed,
+    symbol: _repState.symbol,
+    interval: tvInterval,
+    fullscreen: false,
+    autosize: true,
+    theme: 'Dark',
+    overrides: {
+      'paneProperties.background': '#080b12',
+      'paneProperties.backgroundType': 'solid',
+      'paneProperties.vertGridProperties.color': 'rgba(255,255,255,.04)',
+      'paneProperties.horzGridProperties.color': 'rgba(255,255,255,.04)',
+      'mainSeriesProperties.candleStyle.upColor': '#34d399',
+      'mainSeriesProperties.candleStyle.downColor': '#f87171',
+      'mainSeriesProperties.candleStyle.wickUpColor': '#34d399',
+      'mainSeriesProperties.candleStyle.wickDownColor': '#f87171',
+      'mainSeriesProperties.candleStyle.borderVisible': false,
+      'scalesProperties.textColor': 'rgba(226,232,240,.62)',
     },
-    handleScroll: true, handleScale: true,
+    disabled_features: ['header_symbol_search', 'header_compare'],
+    enabled_features: ['study_templates', 'use_localstorage_for_settings'],
+    client_id: 'nxtgen-journal',
+    user_id: (window._currentUserId || 'guest'),
+    load_last_chart: true,
   });
-  const candleSeries = chart.addCandlestickSeries({
-    upColor: '#34d399', downColor: '#f87171', borderVisible: false,
-    wickUpColor: '#34d399', wickDownColor: '#f87171',
+
+  widget.onChartReady(() => {
+    _repState.tvChart = widget.activeChart();
+    _repApplyTheme();
+    _repUpdateReplayHud();
   });
-  const volumeSeries = chart.addHistogramSeries({
-    priceFormat: { type: 'volume' }, priceScaleId: 'rep-vol', color: 'rgba(96,165,250,.35)',
-  });
-  chart.priceScale('rep-vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
-  chart.priceScale(REP_OSC_SCALE).applyOptions({ scaleMargins: { top: 0.78, bottom: 0.02 } });
 
-  _repState.chart = chart;
-  _repState.candleSeries = candleSeries;
-  _repState.volumeSeries = volumeSeries;
-
-  chart.timeScale().subscribeVisibleLogicalRangeChange(() => _repDrawOverlay());
-  chart.subscribeCrosshairMove(param => _repNativeCrosshairUpdate(param));
-
-  const overlay = document.getElementById('rep-overlay');
-  overlay.addEventListener('mousedown', _repOverlayMouseDown);
-  overlay.addEventListener('mousemove', _repOverlayMouseMove);
-  window.addEventListener('mouseup', _repOverlayMouseUp);
-  overlay.addEventListener('wheel', _repOverlayWheel, { passive: false });
-  overlay.addEventListener('contextmenu', _repOverlayContextMenu);
-  overlay.addEventListener('dblclick', _repOverlayDblClick);
-  overlay.addEventListener('mouseleave', () => { const b = document.getElementById('rep-ohlc-badge'); if (b && !_repState.activeTool) b.style.display = 'none'; });
-
-  new ResizeObserver(() => _repResizeOverlay()).observe(container);
-  _repApplyTheme();
-  _repResizeOverlay();
+  _repState.chart = widget;
 }
 
-function _repResizeOverlay() {
-  if (!_repState) return;
-  const container = document.getElementById('rep-chart-wrap');
-  const canvas = document.getElementById('rep-overlay');
-  if (!container || !canvas) return;
-  const rect = container.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
-  canvas.style.width = rect.width + 'px'; canvas.style.height = rect.height + 'px';
-  const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  _repState.overlayCtx = ctx; _repState.overlayW = rect.width; _repState.overlayH = rect.height;
-  _repDrawOverlay();
+// Kept as a no-op call target — the real chart autosizes itself.
+// This used to resize the canvas overlay the old hand-rolled
+// drawing engine painted into.
+function _repResizeOverlay() {}
+
+// TV resolution string ("1","5","15","30","60","240","1D","1W")
+// from whatever interval shorthand the active source uses.
+function tvIntervalFromSourceInterval(interval, sourceId) {
+  const table = {
+    twelvedata: { '1min': '1', '5min': '5', '15min': '15', '30min': '30', '1h': '60', '4h': '240', '1day': '1D', '1week': '1W' },
+    dukascopy: { m1: '1', m5: '5', m15: '15', m30: '30', h1: '60', h4: '240', d1: '1D' },
+    oanda: { M1: '1', M5: '5', M15: '15', M30: '30', H1: '60', H4: '240', D: '1D', W: '1W' },
+  };
+  return (table[sourceId] && table[sourceId][interval]) || '60';
 }
 
-// ── Feed the visible replay window into the chart ───────
+// ── Feed the visible replay window into the real chart ──
+// _repState.index stays the single source of truth (every existing
+// play/step/scrub/jump-to-date function only ever touches that
+// number, unchanged) — this function's job is just to make the
+// real TradingView chart agree with it.
+//
+// The library's realtime API (subscribeBars) is built for a live
+// feed appending new bars in order, not for arbitrary rewinding —
+// so a plain +1 step is pushed as a tick (cheap, matches how the
+// library expects updates), while any backward step, scrub, or
+// date-jump forces the datafeed's getBars to be re-queried against
+// the new cursor via resetCache()/resetData().
 function _repSetChartData(recenter) {
   if (!_repState || !_repState.chart) return;
-  const slice = _repState.candles.slice(0, _repState.index + 1);
-  const cs = slice.map(c => ({ time: Math.floor(c.time / 1000), open: c.open, high: c.high, low: c.low, close: c.close }));
-  const vs = slice.map(c => ({ time: Math.floor(c.time / 1000), value: c.volume || 0, color: c.close >= c.open ? 'rgba(52,211,153,.45)' : 'rgba(248,113,113,.45)' }));
-  _repState.candleSeries.setData(cs);
-  _repState.volumeSeries.setData(vs);
-  _repApplyIndicators(slice);
+  if (!window.TVReplay || !TVReplay.bars.length) { _repUpdateReplayHud(); return; }
 
-  if (recenter) {
-    const total = cs.length;
-    const from = Math.max(0, total - _repState.candlesPerView);
-    _repState.chart.timeScale().setVisibleLogicalRange({ from, to: total - 1 + 3 });
+  const delta = _repState.index - TVReplay.cursor;
+  if (delta === 1) {
+    TVReplay.step(1);
+  } else if (delta !== 0) {
+    TVReplay.cursor = _repState.index;
+    const chart = _repState.tvChart;
+    if (chart && chart.resetCache && chart.resetData) {
+      chart.resetCache();
+      chart.resetData();
+    }
   }
   _repUpdateReplayHud();
-  _repDrawOverlay();
 }
 
 function _repUpdateReplayHud() {
@@ -11199,6 +11403,9 @@ function _repSetTool(id) {
   _repState.activeTool = (_repState.activeTool === id) ? null : id;
   _repState.drawDraft = null;
   _repUpdateToolbarActive();
+  const chart = _repState.tvChart; if (!chart) return;
+  const toolName = TV_LINE_TOOL_MAP[_repState.activeTool];
+  chart.selectLineTool((_repState.activeTool && toolName && toolName !== 'cursor') ? toolName : 'cursor');
 }
 function _repUpdateToolbarActive() {
   document.querySelectorAll('.rep-tool-btn[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === _repState.activeTool));
@@ -11228,28 +11435,27 @@ function _repClearDrawings() {
     body: 'Every trendline, zone, and annotation on this chart will be removed. This cannot be undone.',
     confirmLabel: 'Clear Drawings',
     confirmClass: 'glass-btn-danger',
-    onConfirm: () => { _repPushHistory(); _repState.drawings = []; _repState.selectedId = null; _repSaveState(); _repDrawOverlay(); }
+    onConfirm: () => { _repState.tvChart?.removeAllShapes(); }
   });
 }
 function _repDeleteSelected() {
-  if (!_repState || !_repState.selectedId) return;
-  _repPushHistory();
-  _repState.drawings = _repState.drawings.filter(d => d.id !== _repState.selectedId);
-  _repState.selectedId = null;
-  _repSaveState(); _repDrawOverlay(); _repHideContextMenu();
+  const chart = _repState?.tvChart; if (!chart) return;
+  chart.selection().allSources().forEach(id => chart.removeEntity(id));
+  chart.selection().clear();
+  _repHideContextMenu();
 }
 function _repDuplicateSelected() {
-  if (!_repState || !_repState.selectedId) return;
-  const orig = _repState.drawings.find(d => d.id === _repState.selectedId); if (!orig) return;
-  _repPushHistory();
-  const shiftMs = (_repState.candles[1]?.time - _repState.candles[0]?.time) * 6 || 0;
-  const copy = JSON.parse(JSON.stringify(orig));
-  copy.id = _repUid();
-  if (copy.p1?.time !== undefined) copy.p1.time += shiftMs;
-  if (copy.p2?.time !== undefined) copy.p2.time += shiftMs;
-  _repState.drawings.push(copy);
-  _repState.selectedId = copy.id;
-  _repSaveState(); _repDrawOverlay(); _repHideContextMenu();
+  const chart = _repState?.tvChart; if (!chart) return;
+  const [id] = chart.selection().allSources(); if (!id) return;
+  const shape = chart.getShapeById(id); if (!shape) return;
+  const shiftSec = ((_repState.candles[1]?.time - _repState.candles[0]?.time) / 1000 * 6) || 0;
+  const points = shape.getPoints().map(p => ({ ...p, time: p.time + shiftSec }));
+  const props = shape.getProperties();
+  chart.createMultipointShape(points, { shape: props.linetool || props.shape, overrides: props }).then(newId => {
+    chart.selection().clear();
+    chart.selection().add(newId);
+  });
+  _repHideContextMenu();
 }
 function _repChangeLayer(dir) {
   if (!_repState || !_repState.selectedId) return;
@@ -11538,30 +11744,47 @@ function _repATR(candles, period) {
   return [{ kind: 'line', color: '#2dd4bf', width: 1.5, data: out }];
 }
 
+// Indicators now render as real TradingView studies (multi-pane,
+// draggable, resizable — for free) instead of the old hand-rolled
+// line series, so this only has to track which study id backs
+// which of your existing popover toggles.
 function _repToggleIndicator(id) {
-  const def = REP_IND_DEFS[id]; if (!def) return;
+  const def = REP_IND_DEFS[id]; const study = REP_TV_STUDY_MAP[id];
+  const chart = _repState?.tvChart;
+  if (!def || !study || !chart) return;
   const turningOn = !_repState.indicators[id];
 
   if (turningOn && def.type === 'oscillator') {
-    // Only one oscillator sub-pane at a time (see comment above REP_OSC_SCALE).
+    // No longer a hard limit — real panes stack cleanly — but we
+    // keep "one oscillator at a time" as the default UX unless you
+    // want to open this up now that multi-pane is free.
     Object.keys(REP_IND_DEFS).forEach(otherId => {
       if (otherId !== id && REP_IND_DEFS[otherId].type === 'oscillator' && _repState.indicators[otherId]) {
-        _repState.indicators[otherId] = false;
-        (_repState.indicatorSeries[otherId] || []).forEach(s => _repState.chart.removeSeries(s));
-        delete _repState.indicatorSeries[otherId];
-        document.querySelector(`#rep-indicators-popover .rep-popover-row[data-ind="${otherId}"]`)?.classList.remove('on');
+        _repRemoveIndicatorStudy(otherId);
       }
     });
   }
 
   _repState.indicators[id] = turningOn;
   document.querySelector(`#rep-indicators-popover .rep-popover-row[data-ind="${id}"]`)?.classList.toggle('on', turningOn);
-  if (!turningOn && _repState.indicatorSeries[id]) {
-    _repState.indicatorSeries[id].forEach(s => _repState.chart.removeSeries(s));
-    delete _repState.indicatorSeries[id];
+
+  if (turningOn) {
+    chart.createStudy(study.name, false, false, study.inputs).then(studyId => {
+      _repState.indicatorStudyIds = _repState.indicatorStudyIds || {};
+      _repState.indicatorStudyIds[id] = studyId;
+    });
+  } else {
+    _repRemoveIndicatorStudy(id);
   }
-  _repApplyIndicators(_repState.candles.slice(0, _repState.index + 1));
   _repSaveState();
+}
+function _repRemoveIndicatorStudy(id) {
+  const chart = _repState?.tvChart;
+  const studyId = _repState?.indicatorStudyIds?.[id];
+  if (chart && studyId) chart.removeEntity(studyId);
+  if (_repState?.indicatorStudyIds) delete _repState.indicatorStudyIds[id];
+  _repState.indicators[id] = false;
+  document.querySelector(`#rep-indicators-popover .rep-popover-row[data-ind="${id}"]`)?.classList.remove('on');
 }
 
 function _repApplyIndicators(slice) {
@@ -11638,8 +11861,11 @@ function _repSetSpeed(val) { if (_repState) { _repState.speed = parseFloat(val) 
 function _repZoom(dir) {
   if (!_repState) return;
   _repState.candlesPerView = Math.max(20, Math.min(400, _repState.candlesPerView + dir * 10));
-  const total = Math.min(_repState.index + 1, _repState.candles.length);
-  _repState.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, total - _repState.candlesPerView), to: total - 1 + 3 });
+  // Native mouse-wheel/pinch/trackpad zoom is built into the real
+  // chart now, so the toolbar buttons just proxy to it — this
+  // action id name should be confirmed against your library
+  // version's docs (IChartWidgetApi action ids).
+  try { _repState.tvChart?.executeActionById(dir > 0 ? 'zoomIn' : 'zoomOut'); } catch (e) {}
   _repSaveState();
 }
 function _repJumpToDate(dateStr) {

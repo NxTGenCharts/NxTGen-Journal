@@ -12255,9 +12255,57 @@ tr.bl-compare-best td { border-color:rgba(251,191,36,.2); }
 
 .rep-chart-area { flex:1; min-width:0; position:relative; }
 .rep-chart-wrap { position:absolute; inset:0; }
+/* rep-overlay-canvas: legacy hand-rolled drawing surface. No longer
+   wired to mouse events now that the real TradingView chart owns
+   drawing/crosshair/zoom — left in place (inert) rather than ripped
+   out, so the #rep-overlay element some other code still references
+   doesn't disappear. Safe to delete once you're fully migrated. */
 .rep-overlay-canvas { position:absolute; inset:0; z-index:5; cursor:default; pointer-events:none; }
 .rep-overlay-canvas.drawing { cursor:crosshair; pointer-events:auto; }
 .rep-overlay-canvas.dragging { cursor:grabbing; }
+
+/* ── TradingView-style symbol search dialog ── */
+.rep-symbol-search-backdrop {
+  display:none; position:fixed; inset:0; z-index:200;
+  background:rgba(4,6,10,.55); backdrop-filter:blur(2px);
+  align-items:flex-start; justify-content:center; padding-top:12vh;
+}
+.rep-symbol-search-backdrop.open { display:flex; }
+.rep-symbol-search {
+  width:520px; max-width:92vw; max-height:64vh; display:flex; flex-direction:column;
+  background:var(--glass-1, #10141d); border:1px solid var(--glass-border, rgba(255,255,255,.08));
+  border-radius:12px; box-shadow:0 24px 60px rgba(0,0,0,.55); overflow:hidden;
+}
+.rep-symsearch-input-row {
+  display:flex; align-items:center; gap:8px; padding:12px 14px;
+  border-bottom:1px solid var(--glass-border, rgba(255,255,255,.08));
+}
+.rep-symsearch-input-row svg { width:16px; height:16px; color:var(--text3, #8b96a8); flex:none; }
+.rep-symsearch-input-row input {
+  flex:1; background:transparent; border:none; outline:none; color:var(--text, #e2e8f0);
+  font-family:var(--font-mono); font-size:14px; font-weight:600;
+}
+.rep-symsearch-tabs { display:flex; gap:2px; padding:8px 10px 0; overflow-x:auto; flex:none; }
+.rep-symsearch-tab {
+  background:transparent; border:none; color:var(--text3, #8b96a8); font-size:11.5px; font-weight:600;
+  padding:6px 10px; border-radius:6px 6px 0 0; cursor:pointer; white-space:nowrap;
+}
+.rep-symsearch-tab:hover { color:var(--text, #e2e8f0); background:rgba(255,255,255,.04); }
+.rep-symsearch-tab.active { color:var(--gold, #fbbf24); border-bottom:2px solid var(--gold, #fbbf24); }
+.rep-symsearch-results { overflow-y:auto; padding:6px; }
+.rep-symsearch-row {
+  display:flex; align-items:center; gap:10px; padding:8px 8px; border-radius:6px; cursor:pointer;
+}
+.rep-symsearch-row:hover, .rep-symsearch-row.highlighted { background:rgba(255,255,255,.06); }
+.rep-symsearch-type {
+  font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+  color:var(--text3, #8b96a8); background:rgba(255,255,255,.06); border-radius:4px; padding:2px 6px; flex:none;
+}
+.rep-symsearch-name { font-family:var(--font-mono); font-weight:700; color:var(--text, #e2e8f0); flex:none; width:96px; }
+.rep-symsearch-desc { flex:1; font-size:12px; color:var(--text2, #a8b3c4); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rep-symsearch-fav { background:none; border:none; color:var(--text3, #8b96a8); cursor:pointer; font-size:14px; padding:2px 4px; }
+.rep-symsearch-fav.on, .rep-symsearch-fav:hover { color:var(--gold, #fbbf24); }
+.rep-symsearch-empty { padding:24px 12px; text-align:center; color:var(--text3, #8b96a8); font-size:13px; }
 
 .rep-loading, .rep-error {
   position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
