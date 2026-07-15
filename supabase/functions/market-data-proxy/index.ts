@@ -34,7 +34,7 @@
 
 import { serve } from "https://deno.land/std@0.203.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getHistoricalRates } from "npm:dukascopy-node@3";
+import { getHistoricalRates } from "npm:dukascopy-node@1.46.4";
 
 const TWELVE_DATA_KEY = Deno.env.get("TWELVE_DATA_API_KEY") ?? "";
 const OANDA_API_KEY = Deno.env.get("OANDA_API_KEY") ?? "";
