@@ -10908,10 +10908,18 @@ async function _repLoadCandles() {
     const seed = Math.min(_repState.candlesPerView - 1, candles.length - 1);
     _repState.index = (_repState._savedIndex !== null && _repState._savedIndex < candles.length) ? _repState._savedIndex : seed;
 
-    if (!_repState.chart) _repInitChart();
-    _repSetChartData(true);
+    const chartReady = _repState.chart ? true : _repInitChart();
+    if (chartReady) {
+      _repSetChartData(true);
+      if (status) status.style.display = 'none';
+    }
+    // Keep the counter/progress bar/date field in sync with the
+    // loaded candles regardless of whether the chart itself could
+    // render (e.g. charting_library/ not added yet) — this used to
+    // get stuck at 0 / 0 because _repSetChartData bails out early
+    // when there's no chart, and the HUD update lived inside it.
+    _repUpdateReplayHud();
     _repRenderBottomDock();
-    if (document.getElementById('rep-status-msg')) document.getElementById('rep-status-msg').style.display = 'none';
   } catch (err) {
     const isSetup = /404|not found|relay/i.test(err.message);
     if (status) {
@@ -10928,14 +10936,14 @@ async function _repLoadCandles() {
 // won't exist and this will throw — the catch below falls back
 // to a clear status message instead of a silent blank chart.
 function _repInitChart() {
-  const container = document.getElementById('rep-chart-wrap'); if (!container) return;
+  const container = document.getElementById('rep-chart-wrap'); if (!container) return false;
   if (typeof TradingView === 'undefined' || !TradingView.widget) {
     const status = document.getElementById('rep-status-msg');
     if (status) {
       status.innerHTML = `<div>TradingView charting library not found.</div><small style="color:var(--text3)">Add charting_library/ (see TRADINGVIEW_INTEGRATION_GUIDE.md) and reload.</small>`;
       status.classList.add('rep-error'); status.style.display = 'flex';
     }
-    return;
+    return false;
   }
 
   const tvInterval = tvIntervalFromSourceInterval(_repState.interval, _repState.source);
@@ -10974,6 +10982,7 @@ function _repInitChart() {
   });
 
   _repState.chart = widget;
+  return true;
 }
 
 // Kept as a no-op call target — the real chart autosizes itself.
