@@ -334,6 +334,21 @@
             <span class="insight-text" id="dash-insight-text">Analysing your data…</span>
           </div>
 
+          <!-- Backtesting Lab widgets (Phase 7) — pulls live from journal_backtest_lab + journal_backtest_trades -->
+          <div class="cal2-sec-head-row">
+            <div class="sec-head" style="margin:0;flex:1"><svg class="icn" aria-hidden="true"><use href="#ic-flask"></use></svg> Backtesting Lab</div>
+            <button class="cal2-max-btn" onclick="nav('backtesting', document.querySelector('.sb-item[onclick*=\'backtesting\']'), 'Backtesting Lab')" title="Open Backtesting Lab">
+              <svg class="icn" aria-hidden="true" viewBox="0 0 24 24"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>Open Lab</span>
+            </button>
+          </div>
+          <div class="kpi-grid dash-kpi-mini" id="dash-bl-widgets">
+            <div class="kpi-card"><div class="kpi-label"><span class="cal-kpi-icon"><svg class="icn" aria-hidden="true"><use href="#ic-flask"></use></svg></span><span>Total backtests</span></div><div class="kpi-value blue" id="dash-bl-total">—</div><div style="font-size:10px;color:var(--text3);margin-top:2px" id="dash-bl-total-sub"></div></div>
+            <div class="kpi-card" title="Estimated from simulated trades logged — roughly 12 min of analysis per trade"><div class="kpi-label"><span class="cal-kpi-icon"><svg class="icn" aria-hidden="true"><use href="#ic-clock"></use></svg></span><span>Hours practiced</span> <span class="info-dot">i</span></div><div class="kpi-value blue" id="dash-bl-hours">—</div></div>
+            <div class="kpi-card" title="Edge Score of your strongest active strategy (see Strategy Comparison)"><div class="kpi-label"><span class="cal-kpi-icon"><svg class="icn" aria-hidden="true"><use href="#ic-target"></use></svg></span><span>Current edge</span> <span class="info-dot">i</span></div><div class="kpi-value gold" id="dash-bl-edge">—</div><div style="font-size:10px;color:var(--text3);margin-top:2px" id="dash-bl-edge-sub"></div></div>
+            <div class="kpi-card"><div class="kpi-label"><span class="cal-kpi-icon"><svg class="icn" aria-hidden="true"><use href="#ic-fire"></use></svg></span><span>Practice streak</span></div><div class="kpi-value teal" id="dash-bl-streak">—</div></div>
+          </div>
+
           <!-- Trading Calendar (moved inline, no longer a sliding side panel) -->
           <div class="cal2-sec-head-row">
             <div class="sec-head" style="margin:0;flex:1"><svg class="icn" aria-hidden="true"><use href="#ic-calendar"></use></svg> Trading Calendar</div>
@@ -677,10 +692,29 @@
 
         <div id="bt-session-cards" class="bl-strategy-grid"></div>
 
+        <div class="sec-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:26px">
+          <span>Screenshot Gallery</span>
+          <select class="form-select" id="bl-gallery-strategy-filter" onchange="_blRenderGallery()" style="font-size:11px;padding:4px 8px;height:30px;max-width:220px">
+            <option value="">All strategies</option>
+          </select>
+        </div>
+        <div id="bl-gallery-grid" class="bl-gallery-grid"></div>
+
+        <div class="sec-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:26px">
+          <span>Strategy Comparison</span>
+          <button onclick="_blExportLabReportPDF()" style="font-size:11px;padding:4px 12px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);color:var(--gold);border-radius:20px;cursor:pointer;font-family:inherit;font-weight:600"><svg class="icn" aria-hidden="true"><use href="#ic-download"></use></svg> Download Lab Report (PDF)</button>
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table" id="bl-compare-table">
+            <thead><tr><th>Strategy</th><th>Trades</th><th>Win Rate</th><th>Avg RR</th><th>Profit Factor</th><th>Max DD</th><th>Edge Score</th></tr></thead>
+            <tbody id="bl-compare-tbody"></tbody>
+          </table>
+        </div>
+
         <div class="sec-head" style="margin-top:22px">What's Next</div>
         <div class="model-card" id="bl-roadmap-note" style="opacity:.8">
           <div class="model-sub" style="margin-bottom:0">
-            Each session now includes an <strong>Analytics</strong> tab (equity curve, rolling win rate, R-multiple distribution, streaks, Monte Carlo) and an <strong>AI Review</strong> tab that coaches you on the edge and leaks in that trade set — open any session and use the tabs at the top. Next up: screenshot gallery, strategy comparison, exportable reports, and Dashboard/Playbook/Calendar integration.
+            Each session now includes an <strong>Analytics</strong> tab (equity curve, rolling win rate, R-multiple distribution, streaks, Monte Carlo) and an <strong>AI Review</strong> tab — open any session and use the tabs at the top. The <strong>Screenshot Gallery</strong> and <strong>Strategy Comparison</strong> below pull from every trade you've logged. A strategy that clears the bar (5+ tests, 55%+ win rate, 1.5+ profit factor) is flagged <strong>Strong Setup</strong> — one click on <strong>Save to Playbook</strong> promotes it into a real Model. Every session also shows up on your <strong>Calendar</strong> — tap the <svg class="icn" style="width:11px;height:11px;vertical-align:-1px"><use href="#ic-flask"></use></svg> on any day to drill into that day's sessions, trades, and Chart Replay.
           </div>
         </div>
       </div>

@@ -2459,7 +2459,7 @@ function nav(pageId, sbEl, label, extra) {
   if (pageId === 'trash') { setTimeout(renderTrash, 0); }
   if (pageId === 'monthly') { buildMonthlyReview(); }
   if (pageId === 'ai') { buildAI(); }
-  if (pageId === 'backtesting') { buildBacktestingLab(); _btRenderSessionGrid(); }
+  if (pageId === 'backtesting') { buildBacktestingLab(); _btRenderSessionGrid(); _blRenderGalleryControls(); _blRenderGallery(); _blRenderComparisonTable(); }
   if (pageId === 'profile') { setTimeout(buildProfile, 0); }
   // Sync mobile bottom nav
   mobNavActivate(pageId);
@@ -9042,6 +9042,8 @@ function buildPlaybook() {
     mc.innerHTML = (_pbData.models || []).filter(m => m.status !== 'deleted').map((m, mi) => {
       const isArchived = m.status === 'archived';
       const sName = m.strategyName || m.title;
+      const fromLab = !!m.sourceStrategyId;
+      const labStrategyStillExists = fromLab && (typeof _blGetById === 'function') && !!_blGetById(m.sourceStrategyId);
       return `
       <div class="model-card${isArchived ? ' model-card-archived' : ''}" style="position:relative">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
@@ -9049,9 +9051,11 @@ function buildPlaybook() {
             <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
               <div class="model-title">${m.title}</div>
               ${isArchived ? '<span class="acc-mgr-type-badge" style="background:rgba(148,163,184,.12);color:var(--text3)">Archived</span>' : ''}
+              ${fromLab ? `<span class="acc-mgr-type-badge pb-lab-badge"${labStrategyStillExists ? ` onclick="nav('backtesting', document.querySelector('.sb-item[onclick*=&quot;backtesting&quot;]'), 'Backtesting Lab')" style="cursor:pointer" title="Open in Backtesting Lab"` : ' title="Original Lab strategy has since been removed"'}><svg class="icn" aria-hidden="true"><use href="#ic-flask"></use></svg> From Backtesting Lab</span>` : ''}
             </div>
             <div class="model-sub" style="margin-top:2px">${m.sub}</div>
             ${sName !== m.title ? `<div style="margin-top:4px;font-size:10px;color:var(--gold);opacity:.7">Model tag: <strong>${sName}</strong></div>` : ''}
+            ${fromLab && m.sourceStats && m.sourceStats.totalTests ? `<div style="margin-top:4px;font-size:10px;color:var(--text3)">Saved at ${m.sourceStats.winRate}% WR · ${m.sourceStats.profitFactor} PF over ${m.sourceStats.totalTests} tests</div>` : ''}
           </div>
           <div style="display:flex;gap:5px;flex-shrink:0">
             <button class="wl-week-btn" style="font-size:10px;padding:3px 9px" onclick="pbEditModelModal(${mi})"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg> Edit</button>
@@ -9280,6 +9284,9 @@ function buildBacktestingLab() {
   wrap.innerHTML = visible.length
     ? (cardsHTML + (_blTabState === 'active' ? `<div class="bl-empty-card" onclick="_openStrategyEditModal(null)"><span style="font-size:22px">＋</span><p style="margin:0;font-size:12.5px;font-weight:600">New Strategy</p></div>` : ''))
     : emptyCard;
+
+  if (typeof _blRenderGalleryControls === 'function') _blRenderGalleryControls();
+  if (typeof _blRenderComparisonTable === 'function') _blRenderComparisonTable();
 }
 
 function _blStatCell(label, value, suffix) {
@@ -9295,11 +9302,19 @@ function _blCardHTML(s) {
   const linkedTrades = (typeof _btTradesForStrategy === 'function') ? _btTradesForStrategy(s.id) : [];
   const st = linkedTrades.length ? _btComputeStats(linkedTrades, 0) : (s.stats || _blEmptyStats());
   const metaParts = [s.market, s.instrument, s.timeframe, s.session].filter(Boolean).join(' · ');
+  const isStrong = (typeof _blIsStrongStrategy === 'function') ? _blIsStrongStrategy(st) : false;
+  const pbModel  = (typeof _blPlaybookModelFor === 'function') ? _blPlaybookModelFor(s.id) : null;
+  const pbBtn = pbModel
+    ? `<button class="wl-week-btn restore" onclick="nav('playbook', document.querySelector('.sb-item[onclick*=&quot;playbook&quot;]'), 'Trading Playbook')" title="Already saved to Playbook"><svg class="icn" aria-hidden="true"><use href="#ic-check-c"></use></svg> In Playbook</button>`
+    : `<button class="wl-week-btn${isStrong ? ' bl-save-pb-strong' : ''}" onclick="_blSaveToPlaybook('${s.id}')" title="${isStrong ? 'Save this proven setup to your Playbook' : 'Save to Playbook'}"><svg class="icn" aria-hidden="true"><use href="#ic-bookmark"></use></svg> Save to Playbook</button>`;
   return `
-  <div class="bl-strategy-card${isArchived ? ' bl-strategy-card-archived' : ''}" style="--bl-tag-color:var(--${s.colorTag || 'gold'})">
+  <div class="bl-strategy-card${isArchived ? ' bl-strategy-card-archived' : ''}${isStrong ? ' bl-strategy-card-strong' : ''}" style="--bl-tag-color:var(--${s.colorTag || 'gold'})">
     <div class="bl-card-head">
       <div style="min-width:0">
-        <div class="bl-card-title">${s.name || 'Untitled Strategy'}</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <div class="bl-card-title">${s.name || 'Untitled Strategy'}</div>
+          ${isStrong ? `<span class="bl-strong-badge" title="${BL_STRONG_MIN_TESTS}+ tests, ${BL_STRONG_MIN_WINRATE}%+ win rate, ${BL_STRONG_MIN_PF}+ profit factor"><svg class="icn" aria-hidden="true"><use href="#ic-trophy"></use></svg> Strong Setup</span>` : ''}
+        </div>
         ${metaParts ? `<div class="bl-card-meta">${metaParts}</div>` : ''}
       </div>
     </div>
@@ -9319,6 +9334,7 @@ function _blCardHTML(s) {
       <button class="wl-week-btn${isArchived ? ' restore' : ' archive'}" onclick="_blToggleArchiveStrategy('${s.id}')">${isArchived ? '<svg class="icn" aria-hidden="true"><use href="#ic-restore"></use></svg> Restore' : '<svg class="icn" aria-hidden="true"><use href="#ic-archive"></use></svg> Archive'}</button>
       <button class="wl-week-btn danger" onclick="_blDeleteStrategy('${s.id}')"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg></button>
     </div>
+    <div class="bl-card-actions">${pbBtn}</div>
   </div>`;
 }
 
@@ -9561,6 +9577,75 @@ async function _blRestoreVersion(id, versionIdx) {
       showToast('Version restored ✓', 'restore');
     }
   });
+}
+
+// ═══════════════════════════════════════════════════
+// BACKTESTING LAB — Phase 8: Save to Playbook (Section 13)
+// A strategy is flagged "strong" once it has a minimum sample size
+// and clears win-rate / profit-factor bars — at that point it's
+// eligible for one-click promotion into the Playbook as a real
+// Model, carrying its entry/confirmation/invalidation/exit rules
+// over as steps. The Playbook model keeps a `sourceStrategyId` link
+// back to the Lab strategy so the card can show "In Playbook" and
+// the Playbook card can show "From Backtesting Lab" — a two-way tie.
+// ═══════════════════════════════════════════════════
+const BL_STRONG_MIN_TESTS   = 5;    // minimum simulated trades before a strategy can be called "proven"
+const BL_STRONG_MIN_WINRATE = 55;   // %
+const BL_STRONG_MIN_PF      = 1.5;  // profit factor
+
+function _blIsStrongStrategy(st) {
+  if (!st || !st.totalTests || st.totalTests < BL_STRONG_MIN_TESTS) return false;
+  if (st.winRate === null || st.winRate < BL_STRONG_MIN_WINRATE) return false;
+  const pf = st.profitFactor === '∞' ? Infinity : Number(st.profitFactor);
+  if (!isFinite(pf) && pf !== Infinity) return false;
+  return pf >= BL_STRONG_MIN_PF;
+}
+
+// Find the Playbook model (if any) already linked to this Lab strategy
+function _blPlaybookModelFor(strategyId) {
+  return (_pbData.models || []).find(m => m.sourceStrategyId === strategyId);
+}
+
+async function _blSaveToPlaybook(id) {
+  const s = _blGetById(id); if (!s) return;
+  const already = _blPlaybookModelFor(id);
+  if (already) {
+    showToast('Already in your Playbook', 'restore');
+    nav('playbook', document.querySelector('.sb-item[onclick*="playbook"]'), 'Trading Playbook');
+    return;
+  }
+
+  const linkedTrades = _btTradesForStrategy(id);
+  const st = linkedTrades.length ? _btComputeStats(linkedTrades, 0) : (s.stats || _blEmptyStats());
+  const strong = _blIsStrongStrategy(st);
+
+  // Build step-by-step playbook instructions from whatever the strategy has filled in
+  const steps = [];
+  if (s.entryModel) steps.push('Entry: ' + s.entryModel);
+  (s.confirmationChecklist || []).forEach(c => steps.push('Confirm: ' + c));
+  if (s.invalidationRules) steps.push('Invalidate: ' + s.invalidationRules);
+  if (s.exitRules) steps.push('Exit: ' + s.exitRules);
+  if (!steps.length && s.description) steps.push(s.description);
+
+  const subParts = [s.market, s.instrument, s.timeframe, s.session].filter(Boolean).join(' · ');
+
+  const model = {
+    title: s.name || 'Untitled Strategy',
+    strategyName: s.name || 'Untitled Strategy',
+    sub: subParts || s.description || '',
+    steps,
+    status: 'active',
+    sourceStrategyId: s.id,
+    sourceStats: { winRate: st.winRate, profitFactor: st.profitFactor, avgRR: st.avgRR, totalTests: st.totalTests },
+    savedFromBacktestAt: new Date().toISOString(),
+  };
+
+  _pbData.models.push(model);
+  await _pbSave();
+  buildPlaybook();
+  _refreshStrategyDropdowns();
+  buildBacktestingLab(); // re-render Lab cards so this one now shows "In Playbook"
+  showToast(strong ? '🏆 Strong setup saved to Playbook ✓' : 'Saved to Playbook ✓', 'restore');
 }
 
 // ═══════════════════════════════════════════════════
@@ -9919,7 +10004,13 @@ function _openSessionDetail(id) {
   <div class="acc-manager-modal bt-detail-modal">
     <div class="acc-manager-header">
       <span>${s.name}</span>
-      <div style="display:flex;gap:6px;align-items:center">
+      <div style="display:flex;gap:6px;align-items:center;position:relative">
+        <button onclick="_btToggleExportMenu(event,'${s.id}')" class="acc-mgr-close" title="Export report"><svg class="icn" aria-hidden="true"><use href="#ic-download"></use></svg></button>
+        <div id="bt-export-menu" class="bt-export-menu" style="display:none">
+          <button onclick="_btExportCSV('${s.id}')"><svg class="icn" aria-hidden="true"><use href="#ic-clipboard"></use></svg> Export CSV</button>
+          <button onclick="_btExportExcel('${s.id}')"><svg class="icn" aria-hidden="true"><use href="#ic-box"></use></svg> Export Excel</button>
+          <button onclick="_btExportPDF('${s.id}')"><svg class="icn" aria-hidden="true"><use href="#ic-clipboard"></use></svg> Export PDF Report</button>
+        </div>
         <button onclick="document.getElementById('bt-session-detail-overlay').remove();_repOpen('${s.id}')" class="acc-mgr-close" title="Chart Replay"><svg class="icn" aria-hidden="true"><use href="#ic-chart-line"></use></svg></button>
         <button onclick="document.getElementById('bt-session-detail-overlay').remove();_openSessionEditModal('${s.id}')" class="acc-mgr-close" title="Edit session"><svg class="icn" aria-hidden="true"><use href="#ic-edit"></use></svg></button>
         <button onclick="document.getElementById('bt-session-detail-overlay').remove()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
@@ -10171,6 +10262,7 @@ async function _btSaveTradeModal(sessionId, tradeId) {
   _btRenderSessionDetail(sessionId);
   _btRenderSessionGrid();
   buildBacktestingLab(); // refresh strategy stats since they roll up from trades
+  _blRenderGalleryControls(); _blRenderGallery(); _blRenderComparisonTable();
   showToast(tradeId ? 'Trade updated ✓' : 'Trade logged ✓', 'restore');
 }
 
@@ -10187,6 +10279,7 @@ function _btDeleteTradeConfirm(sessionId, tradeId) {
       _btRenderSessionDetail(sessionId);
       _btRenderSessionGrid();
       buildBacktestingLab();
+      _blRenderGalleryControls(); _blRenderGallery(); _blRenderComparisonTable();
       showToast('Trade deleted', 'danger');
     }
   });
@@ -11714,6 +11807,8 @@ function updateKPIs() {
   if (subTextEl) subTextEl.textContent = _cqT.length
     ? _cqT.length + ' trades · Win rate ' + _cqWr + '% · Net PnL ' + _cqFmt
     : 'No trades yet this period — tap + New Trade to begin';
+
+  if (typeof _blRenderDashboardWidgets === 'function') _blRenderDashboardWidgets();
 }
 
 // ── Dashboard date range filter ──────────────────────
@@ -12809,6 +12904,448 @@ function _btRenderAIReviewPanel(sessionId) {
   `;
 }
 
+// ═══════════════════════════════════════════════════
+// BACKTESTING LAB — Phase 5: Screenshot Gallery +
+// Strategy Comparison (Sections 9 & 10)
+// Gallery reads screenshots straight off journal_backtest_trades
+// (trade.data.screenshots.{before,entry,exit,marked}); the existing
+// gallery-aware openLightbox(images, startPos) helper is reused as-is.
+// ═══════════════════════════════════════════════════
+
+const BL_SHOT_KEYS = ['before', 'entry', 'exit', 'marked'];
+
+/* Flatten every screenshot across (optionally) one strategy into a
+   single ordered list, newest trade first, so gallery + lightbox
+   share one array of {url, key, trade, session, strategy}. */
+function _blCollectScreenshots(strategyId) {
+  const trades = (strategyId ? _btTradesForStrategy(strategyId) : _btTrades)
+    .slice()
+    .sort((a, b) => new Date(b.entry_time || b.created_at || 0) - new Date(a.entry_time || a.created_at || 0));
+  const out = [];
+  trades.forEach(t => {
+    const shots = (t.data && t.data.screenshots) || {};
+    BL_SHOT_KEYS.forEach(key => {
+      if (shots[key]) {
+        const session = _btGetSessionById(t.session_id);
+        const strategy = _blGetById(t.strategy_id);
+        out.push({ url: shots[key], key, trade: t, session, strategy });
+      }
+    });
+  });
+  return out;
+}
+
+function _blRenderGalleryControls() {
+  const sel = document.getElementById('bl-gallery-strategy-filter');
+  if (!sel) return;
+  const current = sel.value;
+  const strategies = _blData.strategies || [];
+  sel.innerHTML = `<option value="">All strategies</option>` +
+    strategies.map(s => `<option value="${s.id}"${s.id === current ? ' selected' : ''}>${s.name || 'Untitled'}</option>`).join('');
+}
+
+function _blRenderGallery() {
+  const grid = document.getElementById('bl-gallery-grid');
+  if (!grid) return;
+  const strategyId = document.getElementById('bl-gallery-strategy-filter')?.value || '';
+  const shots = _blCollectScreenshots(strategyId);
+  window._blGalleryShots = shots; // stash for lightbox nav
+
+  if (!shots.length) {
+    grid.innerHTML = `<div class="acc-mgr-empty">No screenshots logged yet — attach charts from the trade entry form and they'll show up here.</div>`;
+    return;
+  }
+
+  grid.innerHTML = shots.map((sh, i) => {
+    const rr = Number(sh.trade.rr) || 0;
+    const date = sh.trade.entry_time ? new Date(sh.trade.entry_time).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—';
+    return `<div class="bl-gallery-thumb" style="background-image:url('${sh.url}')" onclick="_blOpenGalleryLightbox(${i})">
+      <div class="bl-gallery-thumb-tag">${sh.key}</div>
+      <div class="bl-gallery-thumb-meta">
+        <span class="${rr >= 0 ? 'pos' : 'neg'}">${rr >= 0 ? '+' : ''}${rr.toFixed(2)}R</span>
+        <span>${date}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _blOpenGalleryLightbox(startIdx) {
+  const shots = window._blGalleryShots || [];
+  if (!shots.length) return;
+  const images = shots.map(sh => {
+    const rr = Number(sh.trade.rr) || 0;
+    const stratName = sh.strategy ? sh.strategy.name : 'Unlinked';
+    const sessName = sh.session ? sh.session.name : '';
+    return { src: sh.url, label: `${stratName} · ${sessName} · ${sh.key} · ${rr >= 0 ? '+' : ''}${rr.toFixed(2)}R` };
+  });
+  openLightbox(images, startIdx);
+}
+
+/* ── Strategy comparison ── */
+function _blEdgeScore(stats) {
+  if (!stats || !stats.totalTests) return 0;
+  const winRate = stats.winRate || 0;
+  const avgRR = Math.max(0, Math.min(stats.avgRR || 0, 3));
+  const pfNum = stats.profitFactor === '∞' ? 5 : Math.max(0, Math.min(Number(stats.profitFactor) || 0, 5));
+  const dd = Math.max(0, Math.min(stats.maxDrawdown || 0, 100));
+
+  const f1 = winRate;                 // 0-100
+  const f2 = (avgRR / 3) * 100;        // 0-100
+  const f3 = (pfNum / 5) * 100;        // 0-100
+  const f4 = 100 - dd;                 // 0-100, lower drawdown = higher score
+
+  return Math.round(f1 * 0.35 + f2 * 0.25 + f3 * 0.25 + f4 * 0.15);
+}
+
+function _blComputeStrategyComparison() {
+  return (_blData.strategies || [])
+    .filter(s => s.status !== 'archived')
+    .map(s => {
+      const trades = _btTradesForStrategy(s.id);
+      const stats = trades.length ? _btComputeStats(trades, 0) : null;
+      return { strategy: s, stats, edgeScore: stats ? _blEdgeScore(stats) : null };
+    })
+    .sort((a, b) => (b.edgeScore ?? -1) - (a.edgeScore ?? -1));
+}
+
+function _blRenderComparisonTable() {
+  const tbody = document.getElementById('bl-compare-tbody');
+  if (!tbody) return;
+  const rows = _blComputeStrategyComparison();
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:20px">No strategies yet — add one in the Strategy Library above.</td></tr>`;
+    return;
+  }
+
+  const bestId = rows.find(r => r.edgeScore !== null)?.strategy.id;
+
+  tbody.innerHTML = rows.map(r => {
+    const s = r.stats;
+    const isBest = r.strategy.id === bestId && r.edgeScore !== null;
+    if (!s) {
+      return `<tr${isBest ? ' class="bl-compare-best"' : ''}>
+        <td class="bold">${r.strategy.name || 'Untitled'}</td>
+        <td colspan="6" style="color:var(--text3)">No trades logged yet</td>
+      </tr>`;
+    }
+    return `<tr${isBest ? ' class="bl-compare-best"' : ''}>
+      <td class="bold">${r.strategy.name || 'Untitled'}${isBest ? ' <span class="pill pill-gold" style="margin-left:6px">STRONGEST</span>' : ''}</td>
+      <td>${s.totalTests}</td>
+      <td>${s.winRate}%</td>
+      <td>${s.avgRR}</td>
+      <td>${s.profitFactor}</td>
+      <td>${s.maxDrawdown !== null ? s.maxDrawdown + '%' : '—'}</td>
+      <td class="bold" style="color:${isBest ? 'var(--gold)' : 'var(--text)'}">${r.edgeScore}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// BACKTESTING LAB — Phase 6: Reports (Section 11)
+// CSV needs no library. Excel uses SheetJS, PDF uses jsPDF +
+// autotable — both lazy-loaded on first use, same pattern as the
+// existing _smEnsureLibs() used for calendar image export, so
+// nothing extra loads until a report is actually requested.
+// ═══════════════════════════════════════════════════
+
+function _btEnsureReportLibs(cb) {
+  const need = [];
+  if (typeof window.jspdf === 'undefined') need.push('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  if (typeof window.XLSX === 'undefined') need.push('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+  const loadNext = () => {
+    if (!need.length) {
+      // autotable plugin patches window.jspdf.jsPDF.prototype — load last, after jsPDF itself
+      if (typeof window.jspdf !== 'undefined' && !window.jspdf.jsPDF.API.autoTable) {
+        const at = document.createElement('script');
+        at.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+        at.onload = cb;
+        document.head.appendChild(at);
+      } else cb();
+      return;
+    }
+    const src = need.shift();
+    const s = document.createElement('script');
+    s.src = src; s.onload = loadNext;
+    document.head.appendChild(s);
+  };
+  loadNext();
+}
+
+function _downloadBlob(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+function _btToggleExportMenu(e, sessionId) {
+  e.stopPropagation();
+  const menu = document.getElementById('bt-export-menu');
+  if (!menu) return;
+  const open = menu.style.display !== 'none';
+  menu.style.display = open ? 'none' : 'flex';
+  if (!open) {
+    const closer = ev => { if (!menu.contains(ev.target)) { menu.style.display = 'none'; document.removeEventListener('click', closer); } };
+    setTimeout(() => document.addEventListener('click', closer), 0);
+  }
+}
+
+/* Flat row shape shared by CSV + Excel exports */
+function _btTradeRows(trades) {
+  return trades.map((t, i) => {
+    const d = t.data || {};
+    return {
+      '#': i + 1,
+      Direction: t.direction || '',
+      Entry: t.entry_price ?? '',
+      Stop: t.stop_price ?? '',
+      Exit: t.exit_price ?? '',
+      RR: Number(t.rr) || 0,
+      'P/L': Number(t.pnl) || 0,
+      'Entry Time': t.entry_time || '',
+      'Exit Time': t.exit_time || '',
+      MFE: d.mfe || '', MAE: d.mae || '',
+      'Reason (Entry)': d.reasonEntry || '', 'Reason (Exit)': d.reasonExit || '',
+      Mistakes: (d.mistakes || []).join('; '),
+      Psychology: d.psychology || '',
+      Confidence: d.confidenceLevel || '', Execution: d.executionRating || '', Discipline: d.disciplineRating || '',
+      Notes: d.notes || '',
+    };
+  });
+}
+
+function _csvEscape(v) { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function _rowsToCSV(rows) {
+  if (!rows.length) return '';
+  const headers = Object.keys(rows[0]);
+  const lines = [headers.join(',')];
+  rows.forEach(r => lines.push(headers.map(h => _csvEscape(r[h])).join(',')));
+  return lines.join('\n');
+}
+
+function _btExportCSV(sessionId) {
+  const s = _btGetSessionById(sessionId); if (!s) return;
+  const trades = _btTradesForSession(sessionId).slice().sort((a, b) => new Date(a.entry_time || 0) - new Date(b.entry_time || 0));
+  if (!trades.length) { showToast('No trades to export', 'danger'); return; }
+  const csv = _rowsToCSV(_btTradeRows(trades));
+  _downloadBlob(new Blob([csv], { type: 'text/csv' }), `${(s.name || 'session').replace(/\s+/g, '_')}_trades.csv`);
+  document.getElementById('bt-export-menu').style.display = 'none';
+  showToast('CSV exported ✓', 'restore');
+}
+
+function _btExportExcel(sessionId) {
+  const s = _btGetSessionById(sessionId); if (!s) return;
+  const trades = _btTradesForSession(sessionId).slice().sort((a, b) => new Date(a.entry_time || 0) - new Date(b.entry_time || 0));
+  if (!trades.length) { showToast('No trades to export', 'danger'); return; }
+  const stats = _btComputeStats(trades, Number(s.startingBalance) || 0);
+
+  _btEnsureReportLibs(() => {
+    const wb = XLSX.utils.book_new();
+    const summaryRows = [
+      { Metric: 'Session', Value: s.name },
+      { Metric: 'Pair', Value: s.pair || '' },
+      { Metric: 'Timeframe', Value: s.timeframe || '' },
+      { Metric: 'Total Trades', Value: stats.totalTests },
+      { Metric: 'Win Rate', Value: stats.winRate + '%' },
+      { Metric: 'Expectancy', Value: stats.expectancy },
+      { Metric: 'Profit Factor', Value: stats.profitFactor },
+      { Metric: 'Avg RR', Value: stats.avgRR },
+      { Metric: 'Max Drawdown', Value: (stats.maxDrawdown ?? '—') + '%' },
+      { Metric: 'Net Return', Value: stats.netReturn },
+      { Metric: 'Best Trade', Value: stats.bestTrade },
+      { Metric: 'Worst Trade', Value: stats.worstTrade },
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'Summary');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(_btTradeRows(trades)), 'Trades');
+    XLSX.writeFile(wb, `${(s.name || 'session').replace(/\s+/g, '_')}_report.xlsx`);
+    document.getElementById('bt-export-menu').style.display = 'none';
+    showToast('Excel report exported ✓', 'restore');
+  });
+}
+
+/* Render an equity curve to an offscreen canvas at export time (independent
+   of whatever's on-screen) so PDF export works even if the Analytics tab
+   was never opened. */
+function _btChartToImage(trades, drawFn, w, h) {
+  const tmp = document.createElement('canvas');
+  tmp.id = '_bt_export_tmp_' + Date.now();
+  tmp.style.position = 'fixed'; tmp.style.left = '-9999px'; tmp.style.width = w + 'px';
+  const wrap = document.createElement('div'); wrap.style.cssText = `position:fixed;left:-9999px;top:0;width:${w}px`;
+  wrap.appendChild(tmp);
+  document.body.appendChild(wrap);
+  drawFn(trades, tmp.id);
+  const dataUrl = tmp.toDataURL('image/png');
+  wrap.remove();
+  return dataUrl;
+}
+
+function _btExportPDF(sessionId) {
+  const s = _btGetSessionById(sessionId); if (!s) return;
+  const trades = _btTradesForSession(sessionId).slice().sort((a, b) => new Date(a.entry_time || 0) - new Date(b.entry_time || 0));
+  if (!trades.length) { showToast('No trades to export', 'danger'); return; }
+  const stats = _btComputeStats(trades, Number(s.startingBalance) || 0);
+  document.getElementById('bt-export-menu').style.display = 'none';
+  showToast('Building PDF report…', 'info');
+
+  _btEnsureReportLibs(() => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    let y = 48;
+
+    doc.setFontSize(18); doc.setFont(undefined, 'bold');
+    doc.text('NxTGen Backtesting Lab — Session Report', 40, y); y += 22;
+    doc.setFontSize(11); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+    doc.text(`${s.name}  ·  ${s.pair || 'pair n/a'}  ·  ${s.timeframe || 'tf n/a'}  ·  generated ${new Date().toLocaleDateString()}`, 40, y);
+    doc.setTextColor(0); y += 26;
+
+    doc.autoTable({
+      startY: y, theme: 'grid', styles: { fontSize: 9 },
+      head: [['Trades', 'Win Rate', 'Expectancy', 'Profit Factor', 'Avg RR', 'Max DD', 'Net Return']],
+      body: [[stats.totalTests, stats.winRate + '%', stats.expectancy, stats.profitFactor, stats.avgRR, (stats.maxDrawdown ?? '—') + '%', stats.netReturn]],
+    });
+    y = doc.lastAutoTable.finalY + 20;
+
+    if (trades.length >= 2) {
+      const imgW = pageW - 80, imgH = 150;
+      const dataUrl = _btChartToImage(trades, (tr, id) => _btDrawEquityCurve(tr, id), imgW, imgH);
+      doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text('Equity Curve', 40, y); y += 8;
+      doc.addImage(dataUrl, 'PNG', 40, y, imgW, imgH); y += imgH + 24;
+    }
+
+    if (s.aiReview && s.aiReview.text) {
+      if (y > 650) { doc.addPage(); y = 48; }
+      doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text('AI Review', 40, y); y += 16;
+      doc.setFontSize(9.5); doc.setFont(undefined, 'normal');
+      const plain = s.aiReview.text.replace(/[#*_`]/g, '');
+      const lines = doc.splitTextToSize(plain, pageW - 80);
+      lines.forEach(line => { if (y > 780) { doc.addPage(); y = 48; } doc.text(line, 40, y); y += 12; });
+      y += 16;
+    }
+
+    doc.addPage();
+    doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text('Trade Log', 40, 48);
+    doc.autoTable({
+      startY: 62, theme: 'striped', styles: { fontSize: 7.5 }, headStyles: { fillColor: [30, 30, 40] },
+      head: [['#', 'Dir', 'Entry', 'Stop', 'Exit', 'RR', 'P/L', 'Entry Time']],
+      body: trades.map((t, i) => [i + 1, t.direction || '', t.entry_price ?? '', t.stop_price ?? '', t.exit_price ?? '', (Number(t.rr) || 0).toFixed(2), (Number(t.pnl) || 0).toFixed(2), t.entry_time ? new Date(t.entry_time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—']),
+    });
+
+    doc.save(`${(s.name || 'session').replace(/\s+/g, '_')}_report.pdf`);
+    showToast('PDF report ready ✓', 'restore');
+  });
+}
+
+/* ── Lab-wide report: cover + strategy comparison + per-strategy stats ── */
+function _blExportLabReportPDF() {
+  const rows = _blComputeStrategyComparison();
+  if (!rows.length) { showToast('No strategies to report on', 'danger'); return; }
+  showToast('Building Lab Report…', 'info');
+
+  _btEnsureReportLibs(() => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    let y = 48;
+
+    doc.setFontSize(20); doc.setFont(undefined, 'bold');
+    doc.text('NxTGen Backtesting Lab — Full Report', 40, y); y += 22;
+    doc.setFontSize(11); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+    doc.text(`${rows.length} strategies · generated ${new Date().toLocaleDateString()}`, 40, y);
+    doc.setTextColor(0); y += 26;
+
+    doc.setFontSize(13); doc.setFont(undefined, 'bold'); doc.text('Strategy Comparison', 40, y); y += 8;
+    doc.autoTable({
+      startY: y, theme: 'grid', styles: { fontSize: 9 },
+      head: [['Strategy', 'Trades', 'Win Rate', 'Avg RR', 'Profit Factor', 'Max DD', 'Edge Score']],
+      body: rows.map(r => [
+        r.strategy.name || 'Untitled',
+        r.stats ? r.stats.totalTests : 0,
+        r.stats ? r.stats.winRate + '%' : '—',
+        r.stats ? r.stats.avgRR : '—',
+        r.stats ? r.stats.profitFactor : '—',
+        r.stats ? (r.stats.maxDrawdown ?? '—') + '%' : '—',
+        r.edgeScore ?? '—',
+      ]),
+      didParseCell: (data) => {
+        if (data.section === 'body' && rows[data.row.index]?.strategy.id === rows.find(x => x.edgeScore !== null)?.strategy.id) {
+          data.cell.styles.fillColor = [251, 191, 36]; data.cell.styles.textColor = [20, 20, 20];
+        }
+      },
+    });
+    y = doc.lastAutoTable.finalY + 26;
+
+    rows.filter(r => r.stats).forEach(r => {
+      const trades = _btTradesForStrategy(r.strategy.id).slice().sort((a, b) => new Date(a.entry_time || 0) - new Date(b.entry_time || 0));
+      if (y > 620) { doc.addPage(); y = 48; }
+      doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text(r.strategy.name || 'Untitled', 40, y); y += 6;
+      if (trades.length >= 2) {
+        const imgW = pageW - 80, imgH = 120;
+        const dataUrl = _btChartToImage(trades, (tr, id) => _btDrawEquityCurve(tr, id), imgW, imgH);
+        doc.addImage(dataUrl, 'PNG', 40, y, imgW, imgH); y += imgH + 14;
+      } else { y += 14; }
+    });
+
+    doc.save('NxTGen_Lab_Report.pdf');
+    showToast('Lab Report ready ✓', 'restore');
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// BACKTESTING LAB — Phase 7: Dashboard Integration (Section 12)
+// Pulls live from _blData.sessions / _blData.strategies / _btTrades
+// (all already loaded at app init) — no extra fetch needed.
+// ═══════════════════════════════════════════════════
+
+const BL_MIN_PER_TRADE = 12; // assumption: ~12 min of chart analysis/journaling per simulated trade logged
+
+/* Consecutive-day practice streak, based on the calendar dates of
+   simulated trade entries. Counts back from today (or yesterday, so
+   a day in progress doesn't show as "broken" before it's over). */
+function _blPracticeStreak() {
+  const days = new Set(_btTrades.map(t => (t.entry_time || t.created_at || '').slice(0, 10)).filter(Boolean));
+  if (!days.size) return 0;
+  const todayStr = localToday ? localToday() : new Date().toISOString().slice(0, 10);
+  let cursor = new Date(todayStr + 'T12:00:00');
+  // If nothing logged today, allow the streak to still "count" through yesterday
+  if (!days.has(todayStr)) cursor.setDate(cursor.getDate() - 1);
+  let streak = 0;
+  while (true) {
+    const ds = cursor.toISOString().slice(0, 10);
+    if (days.has(ds)) { streak++; cursor.setDate(cursor.getDate() - 1); }
+    else break;
+  }
+  return streak;
+}
+
+function _blFmtHours(mins) {
+  const h = Math.floor(mins / 60), m = Math.round(mins % 60);
+  if (h === 0) return m + 'm';
+  return h + 'h' + (m ? ' ' + m + 'm' : '');
+}
+
+function _blRenderDashboardWidgets() {
+  const totalEl = document.getElementById('dash-bl-total');
+  if (!totalEl) return; // widgets not in DOM (shouldn't happen, but stay defensive)
+
+  const sessions = _blData.sessions || [];
+  const totalTrades = _btTrades.length;
+
+  document.getElementById('dash-bl-total').textContent = sessions.length;
+  document.getElementById('dash-bl-total-sub').textContent = totalTrades + ' trade' + (totalTrades === 1 ? '' : 's') + ' logged';
+
+  document.getElementById('dash-bl-hours').textContent = totalTrades ? _blFmtHours(totalTrades * BL_MIN_PER_TRADE) : '—';
+
+  const comparison = (typeof _blComputeStrategyComparison === 'function') ? _blComputeStrategyComparison() : [];
+  const top = comparison.find(r => r.edgeScore !== null);
+  document.getElementById('dash-bl-edge').textContent = top ? top.edgeScore : '—';
+  document.getElementById('dash-bl-edge-sub').textContent = top ? top.strategy.name : (comparison.length ? 'Log trades to unlock' : 'No strategies yet');
+
+  document.getElementById('dash-bl-streak').textContent = totalTrades ? _blPracticeStreak() + 'd' : '—';
+}
+
 // ── CALENDAR ─────────────────────────────────────────
 const MONTH_NAMES_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 let calYear = new Date().getFullYear();
@@ -13385,6 +13922,15 @@ function renderCalendar() {
   const _dayVals = Object.values(dayMap);
   const _maxAbsUSD = _dayVals.length ? Math.max(...(_dayVals.map(d => Math.abs(d.totalPnlUSD))), 1) : 1;
   const _maxTradeCount = _dayVals.length ? Math.max(...(_dayVals.map(d => d.trades.length)), 1) : 1;
+  // ── Phase 8: Backtest Sessions on Calendar (Section 14) ──
+  // date -> [sessions], built from the whole Lab (not month-scoped) so
+  // prev/next-month edge cells on the grid still light up correctly.
+  const btDayMap = {};
+  (((typeof _blData !== 'undefined') && _blData.sessions) || []).forEach(sess => {
+    if (!sess.date) return;
+    (btDayMap[sess.date] = btDayMap[sess.date] || []).push(sess);
+  });
+  window._btDayMap = btDayMap;
   const _kzTag = kz => kz === 'London' ? 'LDN' : kz === 'New York' ? 'NY' : kz === 'Asian' ? 'ASN' : (kz || '').slice(0, 3).toUpperCase();
   const _kzCls = kz => kz === 'London' ? 'london' : kz === 'New York' ? 'ny' : kz === 'Asian' ? 'asian' : '';
 
@@ -13394,8 +13940,10 @@ function renderCalendar() {
     const dateStr = c.year + '-' + String(c.month).padStart(2, '0') + '-' + String(c.day).padStart(2, '0');
     const isToday = dateStr === today; const dayData = dayMap[dateStr]; const hasTrades = !!dayData;
     const outcome = hasTrades ? calculateDailyOutcome(dayData.totalPnlUSD) : null;
+    const btSessions = btDayMap[dateStr] || []; const hasBacktest = btSessions.length > 0;
     let cls = 'cal-day'; if (!c.current) cls += ' other-month'; if (isToday) cls += ' today';
     if (hasTrades) { cls += ' has-trades'; if (outcome === 'win') cls += ' win-day'; else if (outcome === 'loss') cls += ' loss-day'; else cls += ' mixed-day'; }
+    if (hasBacktest) cls += ' has-backtest';
     const dayNumHTML = isToday ? `<div class="cal-day-num"><span class="cal-today-badge">${c.day}</span></div>` : `<div class="cal-day-num">${String(c.day).padStart(2, '0')}</div>`;
     let dotHTML = '', pnlHTML = '', countHTML = '', pairsHTML = '', metaHTML = '', heatStyle = '';
     if (hasTrades) {
@@ -13434,8 +13982,14 @@ function renderCalendar() {
     }
     let clickAttr = '', hoverAttr = '';
     if (c.current) { if (hasTrades) { clickAttr = `onclick="openCalPopup(event,'${dateStr}')"`;  hoverAttr = `onmouseenter="showCalTooltip(event,window._dayMap&&window._dayMap['${dateStr}'],'${dateStr}',${accSize})" onmouseleave="hideCalTooltip()"`; } else { clickAttr = `onclick="closeCalPopup();openModal({date:'${dateStr}'})"` ; } }
+    // Backtest session badge (Phase 8 / Section 14) — independent of live-trade state,
+    // stops propagation so it never triggers the live-trade popup/add-trade modal underneath.
+    let btBadgeHTML = '';
+    if (c.current && hasBacktest) {
+      btBadgeHTML = `<div class="cal-day-bt-badge" onclick="event.stopPropagation();_openBacktestDayDrilldown('${dateStr}')" title="${btSessions.length} backtest session${btSessions.length > 1 ? 's' : ''} logged this day"><svg class="icn" aria-hidden="true"><use href="#ic-flask"></use></svg>${btSessions.length > 1 ? `<span class="cal-day-bt-count">${btSessions.length}</span>` : ''}</div>`;
+    }
     const styleAttr = heatStyle ? ` style="${heatStyle}"` : '';
-    return `<div class="${cls}" ${clickAttr} ${hoverAttr}${styleAttr}>${dotHTML}${dayNumHTML}${pnlHTML}${countHTML}${pairsHTML}${metaHTML}</div>`;
+    return `<div class="${cls}" ${clickAttr} ${hoverAttr}${styleAttr}>${dotHTML}${dayNumHTML}${pnlHTML}${countHTML}${pairsHTML}${metaHTML}${btBadgeHTML}</div>`;
   }).join(''); };
   function followedN_safe(dayData) { return dayData.trades.filter(_calFollowed).length / dayData.trades.length; }
   _calDaysHTML_fn(daysEl); _calDaysHTML_fn(daysEl2);
@@ -13958,6 +14512,80 @@ function openCalPopup(e, dateStr) {
 }
 function closeCalPopup() { document.getElementById('cal-popup').style.display = 'none'; }
 document.addEventListener('click', e => { const p = document.getElementById('cal-popup'); if (p && !p.contains(e.target)) closeCalPopup(); });
+
+// ═══════════════════════════════════════════════════
+// BACKTESTING LAB — Phase 8: Calendar Drill-Down (Section 14)
+// Every backtest session's `date` puts it on the Calendar (see the
+// flask badge added in renderCalendar's cell loop). Clicking that
+// badge opens this modal: one card per session that day, its mini
+// stat line, a peek at the trades logged, and one-click jumps into
+// the full Session Detail view or straight into Chart Replay.
+// ═══════════════════════════════════════════════════
+function _openBacktestDayDrilldown(dateStr) {
+  const sessions = ((typeof _blData !== 'undefined') && _blData.sessions || []).filter(s => s.date === dateStr);
+  if (!sessions.length) return;
+
+  const existing = document.getElementById('bt-day-drilldown-overlay');
+  if (existing) existing.remove();
+
+  const dt = new Date(dateStr + 'T12:00:00');
+  const dateLabel = dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  const rows = sessions.map(s => {
+    const strategy = s.strategyId ? _blGetById(s.strategyId) : null;
+    const sTrades = _btTradesForSession(s.id).slice().sort((a, b) => new Date(a.entry_time || 0) - new Date(b.entry_time || 0));
+    const stats = _btComputeStats(sTrades, Number(s.startingBalance) || 0);
+    const metaParts = [s.pair, s.timeframe, strategy ? strategy.name : null].filter(Boolean).join(' · ');
+
+    const tradeChips = sTrades.length
+      ? `<div class="bt-day-trade-list">${sTrades.slice(0, 8).map(t => {
+          const pnl = Number(t.pnl) || 0;
+          const cls = pnl > 0 ? 'green' : pnl < 0 ? 'red' : 'blue';
+          const rrLabel = (t.rr !== null && t.rr !== undefined && t.rr !== '') ? Number(t.rr).toFixed(1) + 'R' : '—';
+          return `<div class="bt-day-trade-chip ${cls}" onclick="event.stopPropagation();document.getElementById('bt-day-drilldown-overlay').remove();_openSessionDetail('${s.id}')" title="${t.direction || ''} · ${rrLabel}">${t.direction === 'short' ? '▼' : '▲'} ${rrLabel}</div>`;
+        }).join('')}${sTrades.length > 8 ? `<div class="bt-day-trade-chip muted">+${sTrades.length - 8} more</div>` : ''}</div>`
+      : `<div class="acc-mgr-empty" style="padding:6px 0;text-align:left">No trades logged yet for this session.</div>`;
+
+    return `
+    <div class="bt-day-session-row">
+      <div class="bt-day-session-head">
+        <div style="min-width:0">
+          <div class="bt-day-session-title">${s.name || 'Untitled Session'}</div>
+          <div class="bt-day-session-meta">${metaParts || 'No details set'}</div>
+        </div>
+        <span class="bt-status-pill bt-status-${s.status}">${s.status}</span>
+      </div>
+      <div class="bl-stat-grid">
+        ${_blStatCell('Trades', stats.totalTests || null)}
+        ${_blStatCell('Win Rate', stats.winRate, '%')}
+        ${_blStatCell('Net', stats.netReturn)}
+      </div>
+      ${tradeChips}
+      <div class="bl-card-actions" style="margin-top:2px">
+        <button class="wl-week-btn" onclick="document.getElementById('bt-day-drilldown-overlay').remove();_openSessionDetail('${s.id}')"><svg class="icn" aria-hidden="true"><use href="#ic-folder-open"></use></svg> Open Session</button>
+        <button class="wl-week-btn" onclick="document.getElementById('bt-day-drilldown-overlay').remove();_repOpen('${s.id}')"><svg class="icn" aria-hidden="true"><use href="#ic-chart-line"></use></svg> Chart Replay</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const overlay = document.createElement('div');
+  overlay.id = 'bt-day-drilldown-overlay';
+  overlay.className = 'acc-manager-overlay';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `
+  <div class="acc-manager-modal bt-day-drilldown-modal">
+    <div class="acc-manager-header">
+      <span><svg class="icn" aria-hidden="true"><use href="#ic-flask"></use></svg> ${dateLabel}</span>
+      <button onclick="document.getElementById('bt-day-drilldown-overlay').remove()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
+    </div>
+    <div class="acc-manager-body" style="padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px">
+      <div style="font-size:11px;color:var(--text3)">${sessions.length} backtest session${sessions.length > 1 ? 's' : ''} logged this day</div>
+      ${rows}
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
+}
 
 // ── TRASH SYSTEM ──────────────────────────────────────
 let trashSettings = { autoDays: 30 };
