@@ -2,6 +2,19 @@
 <html lang="en" data-theme="">
 <head>
 <meta charset="UTF-8">
+<script>
+  // Restore the real URL (e.g. /tradelog) after the 404.html redirect trick,
+  // so the address bar is correct before app.js reads it to pick the page.
+  (function () {
+    var redirect = sessionStorage.getItem('nxtgen_redirect');
+    if (redirect) {
+      sessionStorage.removeItem('nxtgen_redirect');
+      if (redirect !== location.pathname + location.search + location.hash) {
+        history.replaceState(null, '', redirect);
+      }
+    }
+  })();
+</script>
 <meta name="description" content="NxTGen Trading Journal — Premium ICT Trading Dashboard with glassmorphism design">
 <meta name="theme-color" content="#080b12" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f1f5fb" media="(prefers-color-scheme: light)">

@@ -486,6 +486,13 @@
   const { createClient } = supabase;
   const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
+  // If the user was redirected here from a deep link (e.g. /tradelog), send them back
+  // to it after signing in instead of always landing on the dashboard.
+  function _postLoginDestination() {
+    const next = new URLSearchParams(window.location.search).get('next');
+    return (next && next.startsWith('/') && !next.startsWith('//')) ? next : './';
+  }
+
 
 
   window.addEventListener('load', () => {
@@ -498,10 +505,10 @@
 
   (async () => {
     const { data: { session } } = await sb.auth.getSession();
-    if (session) window.location.replace('./');
+    if (session) window.location.replace(_postLoginDestination());
   })();
   sb.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_IN' && session) window.location.replace('./');
+    if (event === 'SIGNED_IN' && session) window.location.replace(_postLoginDestination());
   });
 
   const savedTheme = localStorage.getItem('nxtgen-theme') || 'dark';

@@ -2432,7 +2432,7 @@ function _csRebuildGrid(tradeId) {
   _renderDetail(tradeId);
 }
 // ── NAVIGATION ────────────────────────────────────────
-function nav(pageId, sbEl, label, extra) {
+function nav(pageId, sbEl, label, extra, _skipPush) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.sb-item').forEach(s => s.classList.remove('active'));
@@ -2463,7 +2463,79 @@ function nav(pageId, sbEl, label, extra) {
   if (pageId === 'profile') { setTimeout(buildProfile, 0); }
   // Sync mobile bottom nav
   mobNavActivate(pageId);
+
+  // Update the URL bar to reflect the current page (e.g. /tradelog, /calendar)
+  if (!_skipPush) _pushRoute(pageId, extra);
 }
+
+// ── CLIENT-SIDE ROUTING — clean URLs like /tradelog, /backtesting, /calendar ──
+const _PAGE_LABELS = {
+  dashboard:   'Dashboard',
+  tradelog:    'Trade Log',
+  watchlist:   'Weekly Watchlist',
+  accounts:    'Account Tracker',
+  calendar:    'Calendar',
+  ai:          'AI Coach',
+  backtesting: 'Backtesting Lab',
+  playbook:    'Trading Playbook',
+  goals:       'Goals & Milestones',
+  monthly:     'Monthly Review',
+  trash:       'Trash',
+  profile:     'My Profile'
+};
+const _VALID_PAGES = Object.keys(_PAGE_LABELS).concat(['quarter']);
+
+// Build the canonical URL path for a given page (+ optional extra data, e.g. quarter year/q)
+function _buildPath(pageId, extra) {
+  if (pageId === 'dashboard') return '/';
+  if (pageId === 'quarter' && extra && extra.year && extra.q) return `/quarter/${extra.year}/${extra.q}`;
+  return '/' + pageId;
+}
+
+// Push a new history entry so the URL bar matches the visible page
+function _pushRoute(pageId, extra) {
+  const path = _buildPath(pageId, extra);
+  if (location.pathname !== path) {
+    history.pushState({ pageId, extra: extra || null }, '', path);
+  }
+}
+
+// Read the current URL and activate the matching page (used on load + back/forward)
+function _routeFromLocation() {
+  const parts = location.pathname.split('/').filter(Boolean);
+  let pageId = parts[0] || 'dashboard';
+  let extra = null;
+  let label;
+
+  if (pageId === 'quarter') {
+    const year = parseInt(parts[1], 10) || new Date().getFullYear();
+    const q    = parseInt(parts[2], 10) || getQuarter(localToday());
+    extra = { year, q };
+    label = `Q${q} ${year} — ${Q_MONTHS[q]}`;
+  } else if (!_VALID_PAGES.includes(pageId)) {
+    pageId = 'dashboard';
+    label  = _PAGE_LABELS.dashboard;
+  } else {
+    label = _PAGE_LABELS[pageId];
+  }
+
+  const sbEl = pageId === 'quarter'
+    ? document.getElementById(`sb-q-${extra.year}-${extra.q}`)
+    : document.querySelector(`.sb-item[onclick*="nav('${pageId}'"]`);
+
+  nav(pageId, sbEl, label, extra, true);
+
+  // Normalize the URL (fixes unknown paths, trailing slashes, etc.)
+  const canonicalPath = _buildPath(pageId, extra);
+  if (location.pathname !== canonicalPath) {
+    history.replaceState({ pageId, extra }, '', canonicalPath);
+  }
+}
+
+// Handle browser Back/Forward buttons
+window.addEventListener('popstate', function () {
+  _routeFromLocation();
+});
 
 // ── DASHBOARD: PAIR TABLE ────────────────────────────
 function _sortIndicator(col, sortState) {
@@ -16314,7 +16386,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   // 2. Auth guard — redirect to login if not signed in
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
-    window.location.replace('./login.html');
+    const next = location.pathname !== '/' ? '?next=' + encodeURIComponent(location.pathname) : '';
+    window.location.replace('./login.html' + next);
     return;
   }
   _currentUser = session.user;
@@ -16388,8 +16461,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   updateClock();
   setInterval(updateClock, 1000);
 
-  // 8. Mobile bottom nav + calendar toggle
-  mobNavActivate('dashboard');
+  // 8. Mobile bottom nav + calendar toggle + route to the page matching the current URL
+  _routeFromLocation();
   _initCalToggle();
 });
 
