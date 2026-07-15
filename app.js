@@ -9925,19 +9925,40 @@ function _openSessionDetail(id) {
         <button onclick="document.getElementById('bt-session-detail-overlay').remove()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
       </div>
     </div>
+    <div class="bl-tabs" id="bt-detail-tabs" style="margin:14px 16px 0">
+      <button class="bl-tab active" onclick="_btDetailTab('overview',this,'${s.id}')">Overview</button>
+      <button class="bl-tab" onclick="_btDetailTab('analytics',this,'${s.id}')">Analytics</button>
+      <button class="bl-tab" onclick="_btDetailTab('ai',this,'${s.id}')">AI Review</button>
+    </div>
     <div class="acc-manager-body" style="padding:16px;overflow-y:auto">
-      <div id="bt-detail-stats"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px">
-        <div class="sec-head" style="margin-bottom:0">Trade Timeline</div>
-        <button onclick="_openTradeEntryModal('${s.id}', null)" class="acc-mgr-add-btn" style="padding:5px 14px">＋ Log Trade</button>
+      <div id="bt-detail-panel-overview">
+        <div id="bt-detail-stats"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px">
+          <div class="sec-head" style="margin-bottom:0">Trade Timeline</div>
+          <button onclick="_openTradeEntryModal('${s.id}', null)" class="acc-mgr-add-btn" style="padding:5px 14px">＋ Log Trade</button>
+        </div>
+        <div id="bt-timeline" class="bt-timeline"></div>
       </div>
-      <div id="bt-timeline" class="bt-timeline"></div>
+      <div id="bt-detail-panel-analytics" style="display:none"></div>
+      <div id="bt-detail-panel-ai" style="display:none"></div>
     </div>
   </div>`;
 
   document.body.appendChild(overlay);
   requestAnimationFrame(() => overlay.classList.add('open'));
   _btRenderSessionDetail(id);
+}
+
+/* Switch between Overview / Analytics / AI Review inside the session detail modal */
+function _btDetailTab(tab, btn, sessionId) {
+  document.querySelectorAll('#bt-detail-tabs .bl-tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  ['overview', 'analytics', 'ai'].forEach(t => {
+    const el = document.getElementById('bt-detail-panel-' + t);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  if (tab === 'analytics') _btRenderAnalyticsPanel(sessionId);
+  if (tab === 'ai') _btRenderAIReviewPanel(sessionId);
 }
 
 function _btRenderSessionDetail(sessionId) {
@@ -12438,6 +12459,354 @@ function removeChart(id, slot) {
   if (s.charts) s.charts[slot] = null;
   _renderDetail(id);
   _bgSave(id);
+}
+
+// ═══════════════════════════════════════════════════
+// BACKTESTING LAB — Phase 4: Advanced Analytics + AI Review
+// Analytics are computed client-side from journal_backtest_trades
+// (same rows Phase 2/3 write to). AI Review reuses the existing
+// ai-coach Edge Function — no new function needed, just a
+// different system prompt + a compact data payload.
+// ═══════════════════════════════════════════════════
+
+/* ── Rolling win rate (window of N trades) ── */
+function _btRollingWinRate(trades, window) {
+  window = window || Math.max(3, Math.min(10, Math.floor(trades.length / 3)));
+  const out = [];
+  for (let i = 0; i < trades.length; i++) {
+    const slice = trades.slice(Math.max(0, i - window + 1), i + 1);
+    const wins = slice.filter(t => (Number(t.pnl) || 0) > 0).length;
+    out.push({ i, wr: (wins / slice.length) * 100 });
+  }
+  return { points: out, window };
+}
+
+/* ── R-multiple distribution buckets ── */
+function _btRDistribution(trades) {
+  const buckets = [
+    { label: '≤-2R', min: -Infinity, max: -2, n: 0 },
+    { label: '-2..-1R', min: -2, max: -1, n: 0 },
+    { label: '-1..0R', min: -1, max: 0, n: 0 },
+    { label: '0..1R', min: 0, max: 1, n: 0 },
+    { label: '1..2R', min: 1, max: 2, n: 0 },
+    { label: '2..3R', min: 2, max: 3, n: 0 },
+    { label: '≥3R', min: 3, max: Infinity, n: 0 },
+  ];
+  trades.forEach(t => {
+    const r = Number(t.rr) || 0;
+    const b = buckets.find(b => r > b.min && r <= b.max) || buckets.find(b => r <= b.min);
+    if (b) b.n++;
+  });
+  return buckets;
+}
+
+/* ── Win/loss streaks ── */
+function _btStreaks(trades) {
+  let curStreak = 0, curType = null, longestWin = 0, longestLoss = 0, run = 0, runType = null;
+  trades.forEach(t => {
+    const pnl = Number(t.pnl) || 0;
+    const type = pnl > 0 ? 'win' : pnl < 0 ? 'loss' : 'be';
+    if (type === runType) { run++; } else { runType = type; run = 1; }
+    if (type === 'win') longestWin = Math.max(longestWin, run);
+    if (type === 'loss') longestLoss = Math.max(longestLoss, run);
+    curType = type; curStreak = run;
+  });
+  return { longestWin, longestLoss, current: curStreak, currentType: curType };
+}
+
+/* ── Monte Carlo simulation: shuffle trade order N times, track final equity + max DD spread ── */
+function _btMonteCarlo(trades, runs) {
+  runs = runs || 500;
+  if (trades.length < 5) return null;
+  const pnls = trades.map(t => Number(t.pnl) || 0);
+  const finals = [];
+  const maxDDs = [];
+  for (let r = 0; r < runs; r++) {
+    const shuffled = [...pnls];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    let running = 0, peak = 0, maxDD = 0;
+    shuffled.forEach(p => { running += p; if (running > peak) peak = running; const dd = peak - running; if (dd > maxDD) maxDD = dd; });
+    finals.push(running);
+    maxDDs.push(maxDD);
+  }
+  finals.sort((a, b) => a - b);
+  maxDDs.sort((a, b) => a - b);
+  const pct = (arr, p) => arr[Math.min(arr.length - 1, Math.floor(arr.length * p))];
+  return {
+    runs,
+    finalP5: pct(finals, 0.05), finalP50: pct(finals, 0.5), finalP95: pct(finals, 0.95),
+    ddP50: pct(maxDDs, 0.5), ddP95: pct(maxDDs, 0.95),
+  };
+}
+
+/* ── Generic equity curve renderer (adapted from the journal-wide _drawEquityCurve) ── */
+function _btDrawEquityCurve(trades, canvasId, emptyId) {
+  const canvas = document.getElementById(canvasId);
+  const emptyEl = emptyId ? document.getElementById(emptyId) : null;
+  if (!canvas) return;
+  if (trades.length < 2) {
+    canvas.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'block';
+    return;
+  }
+  canvas.style.display = 'block';
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  let cum = 0;
+  const points = [{ x: 0, y: 0 }];
+  trades.forEach((t, i) => { cum += Number(t.pnl) || 0; points.push({ x: i + 1, y: cum, outcome: (Number(t.pnl) || 0) > 0 ? 'Win' : (Number(t.pnl) || 0) < 0 ? 'Loss' : 'BE' }); });
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth - 32 || 600;
+  const H = 180;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 16, right: 16, bottom: 20, left: 56 };
+  const cW = W - pad.left - pad.right, cH = H - pad.top - pad.bottom;
+  const ys = points.map(p => p.y);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const rangeY = maxY - minY || 1;
+  const px = i => pad.left + (i / (points.length - 1)) * cW;
+  const py = v => pad.top + cH - ((v - minY) / rangeY) * cH;
+
+  const zeroY = py(0);
+  ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(pad.left + cW, zeroY);
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = '10px system-ui,sans-serif'; ctx.textAlign = 'right';
+  [minY, (minY + maxY) / 2, maxY].forEach(v => ctx.fillText((v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(0), pad.left - 6, py(v) + 4));
+
+  const isPos = points[points.length - 1].y >= 0;
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + cH);
+  grad.addColorStop(0, isPos ? 'rgba(34,197,94,0.28)' : 'rgba(239,68,68,0.28)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.beginPath(); ctx.moveTo(px(0), py(points[0].y));
+  points.forEach((p, i) => { if (i > 0) ctx.lineTo(px(i), py(p.y)); });
+  ctx.lineTo(px(points.length - 1), py(0)); ctx.lineTo(px(0), py(0)); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  for (let i = 1; i < points.length; i++) {
+    ctx.beginPath(); ctx.moveTo(px(i - 1), py(points[i - 1].y)); ctx.lineTo(px(i), py(points[i].y));
+    ctx.strokeStyle = points[i].outcome === 'Win' ? '#22c55e' : points[i].outcome === 'Loss' ? '#ef4444' : '#60a5fa';
+    ctx.lineWidth = 2; ctx.stroke();
+  }
+  points.forEach((p, i) => {
+    if (i === 0) return;
+    ctx.beginPath(); ctx.arc(px(i), py(p.y), 3, 0, Math.PI * 2);
+    ctx.fillStyle = p.outcome === 'Win' ? '#22c55e' : p.outcome === 'Loss' ? '#ef4444' : '#60a5fa';
+    ctx.fill();
+  });
+}
+
+/* ── Rolling win-rate line chart ── */
+function _btDrawRollingWinRate(trades, canvasId) {
+  const canvas = document.getElementById(canvasId); if (!canvas) return;
+  if (trades.length < 3) { canvas.style.display = 'none'; return; }
+  canvas.style.display = 'block';
+  const { points, window: win } = _btRollingWinRate(trades);
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth - 32 || 600;
+  const H = 140;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 14, right: 16, bottom: 18, left: 40 };
+  const cW = W - pad.left - pad.right, cH = H - pad.top - pad.bottom;
+  const px = i => pad.left + (points.length > 1 ? (i / (points.length - 1)) * cW : 0);
+  const py = v => pad.top + cH - (v / 100) * cH;
+
+  [0, 25, 50, 75, 100].forEach(v => {
+    ctx.beginPath(); ctx.moveTo(pad.left, py(v)); ctx.lineTo(pad.left + cW, py(v));
+    ctx.strokeStyle = v === 50 ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = '9px system-ui,sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(v + '%', pad.left - 6, py(v) + 3);
+  });
+
+  ctx.beginPath();
+  points.forEach((p, i) => { const x = px(i), y = py(p.wr); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+  ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '9px system-ui,sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText(`Rolling ${win}-trade win rate`, pad.left, H - 4);
+}
+
+/* ── R-multiple distribution bar chart ── */
+function _btDrawRDistribution(trades, canvasId) {
+  const canvas = document.getElementById(canvasId); if (!canvas) return;
+  const buckets = _btRDistribution(trades);
+  const maxN = Math.max(1, ...buckets.map(b => b.n));
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth - 32 || 600;
+  const H = 150;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 10, right: 10, bottom: 26, left: 10 };
+  const cW = W - pad.left - pad.right, cH = H - pad.top - pad.bottom;
+  const bw = cW / buckets.length;
+
+  buckets.forEach((b, i) => {
+    const h = (b.n / maxN) * (cH - 16);
+    const x = pad.left + i * bw + bw * 0.15;
+    const w = bw * 0.7;
+    const y = pad.top + (cH - 16) - h;
+    ctx.fillStyle = b.max <= 0 ? 'rgba(239,68,68,0.55)' : 'rgba(34,197,94,0.55)';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '9px system-ui,sans-serif'; ctx.textAlign = 'center';
+    if (b.n) ctx.fillText(String(b.n), x + w / 2, y - 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = '8px system-ui,sans-serif';
+    ctx.fillText(b.label, x + w / 2, H - 8);
+  });
+}
+
+/* ── Render the Analytics tab ── */
+function _btRenderAnalyticsPanel(sessionId) {
+  const panel = document.getElementById('bt-detail-panel-analytics'); if (!panel) return;
+  const s = _btGetSessionById(sessionId); if (!s) return;
+  const trades = _btTradesForSession(sessionId).slice().sort((a, b) => new Date(a.entry_time || 0) - new Date(b.entry_time || 0));
+
+  if (trades.length < 2) {
+    panel.innerHTML = `<div class="acc-mgr-empty">Log at least 2 trades to unlock equity curve, rolling win rate, R-distribution and Monte Carlo analysis.</div>`;
+    return;
+  }
+
+  const streaks = _btStreaks(trades);
+  const mc = _btMonteCarlo(trades);
+
+  panel.innerHTML = `
+    <div class="sec-head" style="margin-bottom:8px">Equity Curve</div>
+    <div class="model-card" style="padding:12px 16px">
+      <canvas id="bt-an-equity"></canvas>
+      <div id="bt-an-equity-empty" style="display:none;color:var(--text3);font-size:12px;text-align:center;padding:20px">Not enough trades yet</div>
+    </div>
+
+    <div class="sec-head" style="margin:16px 0 8px">Rolling Win Rate</div>
+    <div class="model-card" style="padding:12px 16px">
+      <canvas id="bt-an-rollwr"></canvas>
+    </div>
+
+    <div class="sec-head" style="margin:16px 0 8px">R-Multiple Distribution</div>
+    <div class="model-card" style="padding:12px 16px">
+      <canvas id="bt-an-rdist"></canvas>
+    </div>
+
+    <div class="sec-head" style="margin:16px 0 8px">Streaks</div>
+    <div class="bt-stat-bar">
+      ${_blStatCell('Longest Win Streak', streaks.longestWin)}
+      ${_blStatCell('Longest Loss Streak', streaks.longestLoss)}
+      ${_blStatCell('Current Streak', streaks.current, streaks.currentType ? ' ' + streaks.currentType : '')}
+    </div>
+
+    <div class="sec-head" style="margin:16px 0 8px">Monte Carlo <span style="font-size:10px;color:var(--text3);font-weight:400;font-family:var(--font-mono)">· ${mc ? mc.runs : 0} shuffled runs of this trade set</span></div>
+    ${mc ? `<div class="bt-stat-bar">
+      ${_blStatCell('Median Outcome', (mc.finalP50 >= 0 ? '+$' : '-$') + Math.abs(mc.finalP50).toFixed(0))}
+      ${_blStatCell('5th %ile (bad luck)', (mc.finalP5 >= 0 ? '+$' : '-$') + Math.abs(mc.finalP5).toFixed(0))}
+      ${_blStatCell('95th %ile (good luck)', (mc.finalP95 >= 0 ? '+$' : '-$') + Math.abs(mc.finalP95).toFixed(0))}
+      ${_blStatCell('Median Max Drawdown', '$' + mc.ddP50.toFixed(0))}
+      ${_blStatCell('95th %ile Drawdown', '$' + mc.ddP95.toFixed(0))}
+    </div>` : `<div class="acc-mgr-empty">Log at least 5 trades to run a Monte Carlo simulation.</div>`}
+  `;
+
+  requestAnimationFrame(() => {
+    _btDrawEquityCurve(trades, 'bt-an-equity', 'bt-an-equity-empty');
+    _btDrawRollingWinRate(trades, 'bt-an-rollwr');
+    _btDrawRDistribution(trades, 'bt-an-rdist');
+  });
+}
+
+/* ── AI Review: reuses the ai-coach Edge Function with a dedicated system prompt ── */
+function _btAIReviewSystemPrompt() {
+  return `You are an elite trading performance coach reviewing a BACKTEST session (simulated trades, not live money) inside a trading journal app. You will be given the session's stats and a compact list of its trades (direction, RR, P/L, and any notes/mistakes/psychology the trader logged). Write a sharp, specific review covering: 1) what the data shows about the strategy's edge (win rate, expectancy, RR discipline), 2) concrete patterns in the winning vs losing trades, 3) the biggest leak or risk in this trade set, and 4) 2-3 precise, actionable adjustments before taking this strategy live. Be direct and concise — no generic platitudes, no disclaimers about not being financial advice. Use short section headers (##) and bullet points. Keep it under 300 words.`;
+}
+
+function _btBuildAIReviewPayload(s, trades, stats) {
+  const tradeLines = trades.slice(-40).map((t, i) => {
+    const d = t.data || {};
+    const parts = [`#${i + 1} ${t.direction || '?'} RR:${(Number(t.rr) || 0).toFixed(2)} PnL:${(Number(t.pnl) || 0).toFixed(2)}`];
+    if (d.reasonEntry) parts.push(`entry:"${d.reasonEntry.slice(0, 80)}"`);
+    if (d.mistakes && d.mistakes.length) parts.push(`mistakes:${d.mistakes.slice(0, 3).join(';')}`);
+    if (d.psychology) parts.push(`psych:"${d.psychology.slice(0, 60)}"`);
+    return parts.join(' | ');
+  }).join('\n');
+
+  return `SESSION: ${s.name} (${s.pair || 'pair n/a'}, ${s.timeframe || 'tf n/a'})
+STATS: winRate=${stats.winRate?.toFixed(1)}% expectancy=${stats.expectancy?.toFixed(2)}R profitFactor=${(stats.profitFactor === Infinity ? '∞' : stats.profitFactor?.toFixed(2))} avgRR=${stats.avgRR?.toFixed(2)} maxDD=${stats.maxDrawdown ?? 'n/a'} totalTrades=${stats.totalTests}
+
+TRADES:
+${tradeLines}`;
+}
+
+async function _btRequestAIReview(sessionId, force) {
+  const s = _btGetSessionById(sessionId); if (!s) return;
+  const trades = _btTradesForSession(sessionId).slice().sort((a, b) => new Date(a.entry_time || 0) - new Date(b.entry_time || 0));
+  if (!trades.length) { showToast('Log at least one trade first', 'danger'); return; }
+
+  if (s.aiReview && !force) { _btRenderAIReviewPanel(sessionId); return; }
+
+  const panel = document.getElementById('bt-detail-panel-ai');
+  if (panel) panel.innerHTML = `<div class="acc-mgr-empty"><svg class="icn" aria-hidden="true"><use href="#ic-robot"></use></svg> Analysing ${trades.length} trade(s)…</div>`;
+
+  const stats = _btComputeStats(trades, Number(s.startingBalance) || 0);
+  const userPayload = _btBuildAIReviewPayload(s, trades, stats);
+
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-coach`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token || SUPABASE_ANON}`,
+      },
+      body: JSON.stringify({
+        system: _btAIReviewSystemPrompt(),
+        messages: [{ role: 'user', content: userPayload }],
+      }),
+    });
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    const data = await res.json();
+    const reply = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+
+    s.aiReview = { text: reply, generatedAt: new Date().toISOString(), tradeCount: trades.length };
+    await _blSave();
+    _btRenderAIReviewPanel(sessionId);
+  } catch (err) {
+    if (panel) panel.innerHTML = `<div class="ai-error"><strong><svg class="icn icn-gold" aria-hidden="true"><use href="#ic-warning"></use></svg> Error</strong><br>${err.message || 'Connection error'}. Check your Edge Function is deployed.</div>`;
+  }
+}
+
+function _btRenderAIReviewPanel(sessionId) {
+  const panel = document.getElementById('bt-detail-panel-ai'); if (!panel) return;
+  const s = _btGetSessionById(sessionId); if (!s) return;
+
+  if (!s.aiReview) {
+    panel.innerHTML = `<div class="acc-mgr-empty" style="display:flex;flex-direction:column;gap:12px;align-items:center;padding:32px 16px">
+      <svg class="icn icn-gold" style="width:28px;height:28px" aria-hidden="true"><use href="#ic-robot"></use></svg>
+      <div>Get an AI-generated review of this session's trades — edge, patterns, and what to fix before going live.</div>
+      <button class="acc-mgr-add-btn" style="padding:6px 18px" onclick="_btRequestAIReview('${sessionId}')">Generate AI Review</button>
+    </div>`;
+    return;
+  }
+
+  const genDate = new Date(s.aiReview.generatedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  panel.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <span style="font-size:11px;color:var(--text3)">Generated ${genDate} · ${s.aiReview.tradeCount} trade(s)</span>
+      <button class="acc-mgr-close" title="Regenerate" onclick="_btRequestAIReview('${sessionId}', true)"><svg class="icn" aria-hidden="true"><use href="#ic-refresh"></use></svg></button>
+    </div>
+    <div class="model-card ai-response-body" style="padding:16px">${_aiFormatResponse(s.aiReview.text)}</div>
+  `;
 }
 
 // ── CALENDAR ─────────────────────────────────────────
