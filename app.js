@@ -10402,6 +10402,10 @@ function _repMapIntervalForSource(tf, sourceId) {
 // secret — see /supabase/functions/market-data-proxy for the
 // Dukascopy + OANDA branches added alongside the existing
 // Twelve Data one.
+// Returns the full response object, not just candles, because the
+// server may auto-fallback to a different source (e.g. OANDA -> Dukascopy
+// if OANDA_API_KEY isn't set) — callers need `source`/`symbol`/`interval`
+// back to keep the UI in sync with what actually loaded.
 async function _repFetchCandles(symbol, interval, outputsize = 500, source = 'twelvedata') {
   const { data: { session } } = await sb.auth.getSession();
   const response = await fetch(`${SUPABASE_URL}/functions/v1/market-data-proxy`, {
@@ -10416,8 +10420,7 @@ async function _repFetchCandles(symbol, interval, outputsize = 500, source = 'tw
     const errText = await response.text();
     throw new Error(`Server error ${response.status}: ${errText}`);
   }
-  const json = await response.json();
-  return json.candles || [];
+  return await response.json();
 }
 
 // ── Open / close the fullscreen replay view ─────────────
@@ -10542,14 +10545,30 @@ async function _repLoadCandles() {
   const wrap = document.getElementById('rep-canvas-wrap');
   if (wrap) wrap.innerHTML = '<div class="rep-loading">Loading candles…</div>';
   try {
-    const candles = await _repFetchCandles(_repState.symbol, _repState.interval, 500, _repState.source);
+    const result = await _repFetchCandles(_repState.symbol, _repState.interval, 500, _repState.source);
+    const candles = result.candles || [];
     if (!candles.length) throw new Error('No candle data returned for this symbol/interval');
+
+    // Server may have auto-fallen-back to a different source (e.g. no
+    // OANDA_API_KEY set yet) — sync state + the top-bar dropdowns to
+    // whatever actually loaded, and let the trader know.
+    if (result.fallback && result.source !== _repState.source) {
+      const from = _repGetSource(result.requestedSource || _repState.source).label;
+      const to = _repGetSource(result.source).label;
+      _repState.source = result.source;
+      _repState.symbol = result.symbol || _repState.symbol;
+      _repState.interval = result.interval || _repState.interval;
+      _repRenderShell(); // rebuild bar so source/interval dropdowns show the fallback source
+      if (typeof showToast === 'function') showToast(`${from} unavailable — showing ${to} data instead`, 'info');
+    }
+
     _repState.candles = candles;
     const seed = Math.min(_repState.candlesPerView - 1, candles.length - 1);
     _repState.index = (_repState._savedIndex !== null && _repState._savedIndex < candles.length) ? _repState._savedIndex : seed;
     _repState.viewEnd = _repState.index;
 
-    if (wrap) wrap.innerHTML = '<canvas id="rep-canvas"></canvas><div id="rep-crosshair-box" class="rep-crosshair-box" style="display:none"></div>';
+    const wrapNow = document.getElementById('rep-canvas-wrap'); // may have been re-rendered above
+    if (wrapNow) wrapNow.innerHTML = '<canvas id="rep-canvas"></canvas><div id="rep-crosshair-box" class="rep-crosshair-box" style="display:none"></div>';
     _repInitCanvas();
     _repDrawChart();
   } catch (err) {
