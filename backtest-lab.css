@@ -1,0 +1,121 @@
+/* Backtest Lab — chart chrome styles. Reuses theme vars from styles.css
+   (--bg2,--glass-2,--glass-border,--blue,--text,--text2,--border) so this
+   drops into the existing app without a new design system. Falls back to
+   sane defaults if those vars aren't present (e.g. standalone demo). */
+
+.bl-root {
+  --bl-bg: var(--bg-base, #080b12);
+  --bl-panel: var(--bg2, rgba(13,17,26,0.94));
+  --bl-border: var(--glass-border, rgba(255,255,255,0.08));
+  --bl-accent: var(--blue, #60a5fa);
+  --bl-text: var(--text, rgba(248,250,252,0.95));
+  --bl-text2: var(--text2, rgba(148,163,184,0.82));
+  display: flex; flex-direction: column; height: 100%; min-height: 600px;
+  background: var(--bl-bg); border: 1px solid var(--bl-border); border-radius: 14px;
+  overflow: hidden; font-family: "Plus Jakarta Sans", -apple-system, sans-serif;
+  color: var(--bl-text);
+}
+
+.bl-topbar {
+  display: flex; align-items: center; gap: 14px; padding: 8px 14px;
+  background: var(--bl-panel); border-bottom: 1px solid var(--bl-border); flex-shrink: 0;
+}
+
+.bl-symbol-search { position: relative; }
+.bl-symbol-btn {
+  background: var(--glass-2, rgba(255,255,255,0.07)); border: 1px solid var(--bl-border);
+  color: var(--bl-text); font-weight: 600; font-size: 13px; padding: 6px 12px;
+  border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 4px;
+}
+.bl-symbol-btn:hover { border-color: var(--bl-accent); }
+.bl-symbol-caret { font-size: 10px; opacity: .7; }
+.bl-symbol-dropdown {
+  position: absolute; top: calc(100% + 6px); left: 0; width: 280px; z-index: 40;
+  background: var(--bl-panel); border: 1px solid var(--bl-border); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.5); padding: 8px; backdrop-filter: blur(16px);
+}
+.bl-symbol-input {
+  width: 100%; box-sizing: border-box; background: var(--glass-1, rgba(255,255,255,0.04));
+  border: 1px solid var(--bl-border); color: var(--bl-text); border-radius: 8px;
+  padding: 8px 10px; font-size: 13px; margin-bottom: 6px; outline: none;
+}
+.bl-symbol-input:focus { border-color: var(--bl-accent); }
+.bl-symbol-list { max-height: 260px; overflow-y: auto; }
+.bl-symbol-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.bl-symbol-row:hover { background: var(--glass-2, rgba(255,255,255,0.07)); }
+.bl-symbol-row span { color: var(--bl-text2); font-size: 11px; }
+.bl-symbol-empty { padding: 10px; color: var(--bl-text2); font-size: 12px; }
+
+.bl-tf-selector { display: flex; gap: 2px; background: var(--glass-1, rgba(255,255,255,0.04)); border-radius: 8px; padding: 2px; }
+.bl-tf-btn { background: transparent; border: none; color: var(--bl-text2); font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 6px; cursor: pointer; }
+.bl-tf-btn:hover { color: var(--bl-text); }
+.bl-tf-btn.active { background: var(--bl-accent); color: #0a0e16; }
+
+.bl-body { display: flex; flex: 1; min-height: 0; position: relative; }
+
+.bl-toolbar {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  width: 44px; flex-shrink: 0; background: var(--bl-panel); border-right: 1px solid var(--bl-border);
+  padding: 8px 0; overflow-y: auto;
+}
+.bl-tool-btn {
+  width: 32px; height: 32px; border: none; background: transparent; color: var(--bl-text2);
+  border-radius: 7px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.bl-tool-btn:hover { background: var(--glass-2, rgba(255,255,255,0.07)); color: var(--bl-text); }
+.bl-tool-btn.active { background: var(--bl-accent); color: #0a0e16; }
+.bl-tool-sep { width: 22px; height: 1px; background: var(--bl-border); margin: 6px 0; }
+
+.bl-chart-wrap { flex: 1; position: relative; min-width: 0; }
+.bl-chart-canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+.bl-prop-panel {
+  position: absolute; top: 10px; right: 14px; z-index: 30; width: 190px;
+  background: var(--bl-panel); border: 1px solid var(--bl-border); border-radius: 10px;
+  padding: 10px; backdrop-filter: blur(16px); box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.bl-prop-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.bl-prop-row:last-child { margin-bottom: 0; }
+.bl-prop-row label { font-size: 11px; color: var(--bl-text2); width: 46px; }
+.bl-prop-row input[type=range] { flex: 1; }
+.bl-prop-colors { gap: 6px; }
+.bl-prop-swatch { width: 20px; height: 20px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.bl-prop-swatch.active { border-color: var(--bl-text); }
+
+.bl-replay-bar {
+  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 30;
+  display: flex; align-items: center; gap: 8px; background: var(--bl-panel);
+  border: 1px solid var(--bl-border); border-radius: 999px; padding: 6px 14px;
+  backdrop-filter: blur(16px); box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+.bl-replay-btn { background: transparent; border: none; color: var(--bl-text); font-size: 13px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
+.bl-replay-btn:hover { background: var(--glass-2, rgba(255,255,255,0.07)); }
+.bl-replay-play { background: var(--bl-accent); color: #0a0e16; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; padding: 0; }
+.bl-replay-slider { width: 160px; accent-color: var(--bl-accent); }
+.bl-replay-speed { background: var(--glass-1, rgba(255,255,255,0.04)); border: 1px solid var(--bl-border); color: var(--bl-text); font-size: 11px; border-radius: 6px; padding: 3px 4px; }
+.bl-replay-clock { font-size: 11px; color: var(--bl-text2); font-family: "JetBrains Mono", monospace; min-width: 92px; }
+
+.bl-order-panel { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.bl-order-panel select, .bl-order-panel input {
+  background: var(--glass-1, rgba(255,255,255,0.04)); border: 1px solid var(--bl-border);
+  color: var(--bl-text); border-radius: 7px; padding: 6px 8px; font-size: 12px; outline: none;
+}
+.bl-order-panel select:focus, .bl-order-panel input:focus { border-color: var(--bl-accent); }
+.bl-order-panel button { border: none; border-radius: 7px; padding: 7px 16px; font-weight: 700; font-size: 12px; cursor: pointer; }
+.bl-o-buy { background: #34d399; color: #04160f; }
+.bl-o-sell { background: #f87171; color: #200606; }
+.bl-o-buy:hover, .bl-o-sell:hover { filter: brightness(1.08); }
+
+.bl-account-bar {
+  display: flex; align-items: center; gap: 20px; padding: 10px 16px;
+  background: var(--bl-panel); border-top: 1px solid var(--bl-border); flex-shrink: 0; font-size: 12px;
+}
+.bl-account-bar span { color: var(--bl-text2); display: flex; gap: 5px; align-items: baseline; }
+.bl-account-bar b { color: var(--bl-text); font-family: "JetBrains Mono", monospace; }
+.bl-account-bar .pos b { color: #34d399; }
+.bl-account-bar .neg b { color: #f87171; }
+.bl-account-bar button {
+  margin-left: auto; background: var(--glass-2, rgba(255,255,255,0.07)); border: 1px solid var(--bl-border);
+  color: var(--bl-text); border-radius: 7px; padding: 6px 14px; font-size: 12px; cursor: pointer; font-weight: 600;
+}
+.bl-account-bar button:hover { border-color: #f87171; color: #f87171; }
