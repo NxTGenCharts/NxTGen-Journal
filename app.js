@@ -10601,12 +10601,8 @@ function _repRenderShell() {
         <div class="rep-ohlc-badge" id="rep-ohlc-badge" style="display:none"></div>
         <div class="rep-loading" id="rep-status-msg"><div class="rep-spinner"></div>Loading candles…</div>
 
-        <div class="rep-popover" id="rep-indicators-popover">
-          <div class="rep-popover-title">Overlays</div>
-          <div class="rep-popover-row" data-ind="ema9" onclick="_repToggleIndicator('ema9')"><span><span class="dot" style="background:#fbbf24"></span>EMA 9</span><span class="rep-popover-check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg></span></div>
-          <div class="rep-popover-row" data-ind="ema21" onclick="_repToggleIndicator('ema21')"><span><span class="dot" style="background:#60a5fa"></span>EMA 21</span><span class="rep-popover-check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg></span></div>
-          <div class="rep-popover-row" data-ind="sma50" onclick="_repToggleIndicator('sma50')"><span><span class="dot" style="background:#a78bfa"></span>SMA 50</span><span class="rep-popover-check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg></span></div>
-          <div class="rep-popover-row" data-ind="vwap" onclick="_repToggleIndicator('vwap')"><span><span class="dot" style="background:#2dd4bf"></span>VWAP</span><span class="rep-popover-check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg></span></div>
+        <div class="rep-popover" id="rep-indicators-popover" style="width:250px;max-height:70vh;overflow-y:auto">
+          ${_repIndicatorPopoverHtml()}
         </div>
         <div class="rep-popover" id="rep-layouts-popover">
           <div class="rep-popover-title">Saved Layouts</div>
@@ -10748,6 +10744,7 @@ function _repInitChart() {
     priceFormat: { type: 'volume' }, priceScaleId: 'rep-vol', color: 'rgba(96,165,250,.35)',
   });
   chart.priceScale('rep-vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+  chart.priceScale(REP_OSC_SCALE).applyOptions({ scaleMargins: { top: 0.78, bottom: 0.02 } });
 
   _repState.chart = chart;
   _repState.candleSeries = candleSeries;
@@ -11297,19 +11294,46 @@ function _repRenderIndicatorPopoverState() {
 
 // ══════════════════════════════════════════════════════
 // INDICATORS — computed client-side from the visible replay
-// window and rendered as extra Lightweight Charts line series.
-// Kept intentionally small (EMA/SMA/VWAP) as the first real
-// entries in what will become a full indicator manager.
+// window. `type:'overlay'` indicators share the main price
+// scale (drawn over candles); `type:'oscillator'` indicators
+// render in a dedicated strip pinned to the bottom of the
+// same chart via their own price scale — Lightweight Charts
+// v4 doesn't have true stacked panes, so only one oscillator
+// can be active at a time to keep that strip readable (this
+// is the one place we fall short of full TradingView parity;
+// multi-pane support is a v5-library upgrade for a later pass).
 // ══════════════════════════════════════════════════════
-const REP_IND_DEFS = {
-  ema9:  { color: '#fbbf24', calc: c => _repEMA(c, 9) },
-  ema21: { color: '#60a5fa', calc: c => _repEMA(c, 21) },
-  sma50: { color: '#a78bfa', calc: c => _repSMA(c, 50) },
-  vwap:  { color: '#2dd4bf', calc: c => _repVWAP(c) },
+const REP_OSC_SCALE = 'rep-osc';
+function _repIndicatorPopoverHtml() {
+  const checkSvg = '<svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg>';
+  const row = id => `<div class="rep-popover-row" data-ind="${id}" onclick="_repToggleIndicator('${id}')">
+      <span><span class="dot" style="background:${REP_IND_DEFS_COLORS[id]}"></span>${REP_IND_DEFS[id].label}</span>
+      <span class="rep-popover-check">${checkSvg}</span></div>`;
+  const overlays = Object.keys(REP_IND_DEFS).filter(id => REP_IND_DEFS[id].type === 'overlay');
+  const oscillators = Object.keys(REP_IND_DEFS).filter(id => REP_IND_DEFS[id].type === 'oscillator');
+  return `<div class="rep-popover-title">Overlays</div>${overlays.map(row).join('')}
+    <div class="rep-popover-title" style="margin-top:6px">Oscillators <span style="text-transform:none;font-weight:500;opacity:.7">(1 active)</span></div>${oscillators.map(row).join('')}`;
+}
+const REP_IND_DEFS_COLORS = {
+  ema9: '#fbbf24', ema21: '#60a5fa', ema50: '#f472b6', sma50: '#a78bfa', sma200: '#f87171',
+  vwap: '#2dd4bf', bb: '#60a5fa', rsi: '#a78bfa', macd: '#60a5fa', stoch: '#60a5fa', atr: '#2dd4bf',
 };
+const REP_IND_DEFS = {
+  ema9:   { label: 'EMA 9',                 type: 'overlay',    calc: c => [{ kind: 'line', color: '#fbbf24', data: _repEMA(c, 9) }] },
+  ema21:  { label: 'EMA 21',                type: 'overlay',    calc: c => [{ kind: 'line', color: '#60a5fa', data: _repEMA(c, 21) }] },
+  ema50:  { label: 'EMA 50',                type: 'overlay',    calc: c => [{ kind: 'line', color: '#f472b6', data: _repEMA(c, 50) }] },
+  sma50:  { label: 'SMA 50',                type: 'overlay',    calc: c => [{ kind: 'line', color: '#a78bfa', data: _repSMA(c, 50) }] },
+  sma200: { label: 'SMA 200',               type: 'overlay',    calc: c => [{ kind: 'line', color: '#f87171', data: _repSMA(c, 200) }] },
+  vwap:   { label: 'VWAP',                  type: 'overlay',    calc: c => [{ kind: 'line', color: '#2dd4bf', data: _repVWAP(c) }] },
+  bb:     { label: 'Bollinger Bands (20,2)',type: 'overlay',    calc: c => _repBollinger(c, 20, 2) },
+  rsi:    { label: 'RSI (14)',              type: 'oscillator', calc: c => _repRSI(c, 14) },
+  macd:   { label: 'MACD (12,26,9)',        type: 'oscillator', calc: c => _repMACD(c, 12, 26, 9) },
+  stoch:  { label: 'Stochastic (14,3,3)',   type: 'oscillator', calc: c => _repStochastic(c, 14, 3, 3) },
+  atr:    { label: 'ATR (14)',              type: 'oscillator', calc: c => _repATR(c, 14) },
+};
+
 function _repEMA(candles, period) {
-  const k = 2 / (period + 1);
-  let ema = null;
+  const k = 2 / (period + 1); let ema = null;
   return candles.map((c, i) => {
     if (i < period - 1) return null;
     if (ema === null) { ema = candles.slice(0, period).reduce((a, x) => a + x.close, 0) / period; return { time: Math.floor(c.time / 1000), value: ema }; }
@@ -11317,13 +11341,11 @@ function _repEMA(candles, period) {
     return { time: Math.floor(c.time / 1000), value: ema };
   }).filter(Boolean);
 }
+function _repSMAValues(candles, period) {
+  return candles.map((c, i) => i < period - 1 ? null : candles.slice(i - period + 1, i + 1).reduce((a, x) => a + x.close, 0) / period);
+}
 function _repSMA(candles, period) {
-  return candles.map((c, i) => {
-    if (i < period - 1) return null;
-    const slice = candles.slice(i - period + 1, i + 1);
-    const avg = slice.reduce((a, x) => a + x.close, 0) / period;
-    return { time: Math.floor(c.time / 1000), value: avg };
-  }).filter(Boolean);
+  return _repSMAValues(candles, period).map((v, i) => v == null ? null : { time: Math.floor(candles[i].time / 1000), value: v }).filter(Boolean);
 }
 function _repVWAP(candles) {
   let cumPV = 0, cumV = 0;
@@ -11334,25 +11356,165 @@ function _repVWAP(candles) {
     return { time: Math.floor(c.time / 1000), value: cumPV / cumV };
   });
 }
+function _repBollinger(candles, period, mult) {
+  const sma = _repSMAValues(candles, period);
+  const mid = [], upper = [], lower = [];
+  candles.forEach((c, i) => {
+    if (sma[i] == null) return;
+    const slice = candles.slice(i - period + 1, i + 1);
+    const variance = slice.reduce((a, x) => a + Math.pow(x.close - sma[i], 2), 0) / period;
+    const sd = Math.sqrt(variance);
+    const t = Math.floor(c.time / 1000);
+    mid.push({ time: t, value: sma[i] }); upper.push({ time: t, value: sma[i] + mult * sd }); lower.push({ time: t, value: sma[i] - mult * sd });
+  });
+  return [
+    { kind: 'line', color: 'rgba(96,165,250,.55)', width: 1, data: upper },
+    { kind: 'line', color: 'rgba(226,232,240,.4)', width: 1, data: mid },
+    { kind: 'line', color: 'rgba(96,165,250,.55)', width: 1, data: lower },
+  ];
+}
+function _repRSI(candles, period) {
+  let avgGain = 0, avgLoss = 0; const out = [];
+  for (let i = 1; i < candles.length; i++) {
+    const change = candles[i].close - candles[i - 1].close;
+    const gain = Math.max(0, change), loss = Math.max(0, -change);
+    if (i <= period) { avgGain += gain / period; avgLoss += loss / period; if (i === period) out.push(_repRsiPoint(candles[i], avgGain, avgLoss)); continue; }
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    out.push(_repRsiPoint(candles[i], avgGain, avgLoss));
+  }
+  return [
+    { kind: 'line', color: '#a78bfa', width: 1.5, data: out },
+    { kind: 'line', color: 'rgba(248,113,113,.35)', width: 1, data: candles.map(c => ({ time: Math.floor(c.time / 1000), value: 70 })) },
+    { kind: 'line', color: 'rgba(52,211,153,.35)', width: 1, data: candles.map(c => ({ time: Math.floor(c.time / 1000), value: 30 })) },
+  ];
+}
+function _repRsiPoint(c, avgGain, avgLoss) {
+  const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  const rsi = avgLoss === 0 ? 100 : 100 - 100 / (1 + rs);
+  return { time: Math.floor(c.time / 1000), value: rsi };
+}
+function _repEmaSeries(values, period) {
+  const k = 2 / (period + 1); let ema = null; const out = [];
+  values.forEach((v, i) => {
+    if (v == null) { out.push(null); return; }
+    if (ema === null) { ema = v; } else { ema = v * k + ema * (1 - k); }
+    out.push(ema);
+  });
+  return out;
+}
+function _repMACD(candles, fast, slow, signalPeriod) {
+  const closes = candles.map(c => c.close);
+  const emaFast = _repEmaSeriesFromCloses(closes, fast);
+  const emaSlow = _repEmaSeriesFromCloses(closes, slow);
+  const macdLine = closes.map((_, i) => (emaFast[i] != null && emaSlow[i] != null) ? emaFast[i] - emaSlow[i] : null);
+  const signal = _repEmaSeries(macdLine, signalPeriod);
+  const t = i => Math.floor(candles[i].time / 1000);
+  const macdData = [], signalData = [], histData = [];
+  candles.forEach((c, i) => {
+    if (macdLine[i] == null) return;
+    macdData.push({ time: t(i), value: macdLine[i] });
+    if (signal[i] != null) {
+      signalData.push({ time: t(i), value: signal[i] });
+      const hist = macdLine[i] - signal[i];
+      histData.push({ time: t(i), value: hist, color: hist >= 0 ? 'rgba(52,211,153,.65)' : 'rgba(248,113,113,.65)' });
+    }
+  });
+  return [
+    { kind: 'histogram', data: histData },
+    { kind: 'line', color: '#60a5fa', width: 1.5, data: macdData },
+    { kind: 'line', color: '#fbbf24', width: 1.5, data: signalData },
+  ];
+}
+function _repEmaSeriesFromCloses(closes, period) {
+  const k = 2 / (period + 1); let ema = null;
+  return closes.map((v, i) => {
+    if (i < period - 1) return null;
+    if (ema === null) { ema = closes.slice(0, period).reduce((a, x) => a + x, 0) / period; return ema; }
+    ema = v * k + ema * (1 - k); return ema;
+  });
+}
+function _repStochastic(candles, period, kSmooth, dSmooth) {
+  const rawK = candles.map((c, i) => {
+    if (i < period - 1) return null;
+    const slice = candles.slice(i - period + 1, i + 1);
+    const hh = Math.max(...slice.map(x => x.high)), ll = Math.min(...slice.map(x => x.low));
+    return hh === ll ? 50 : ((c.close - ll) / (hh - ll)) * 100;
+  });
+  const kVals = rawK.map((v, i) => {
+    if (v == null) return null;
+    const window = rawK.slice(Math.max(0, i - kSmooth + 1), i + 1).filter(x => x != null);
+    return window.reduce((a, b) => a + b, 0) / window.length;
+  });
+  const dVals = kVals.map((v, i) => {
+    if (v == null) return null;
+    const window = kVals.slice(Math.max(0, i - dSmooth + 1), i + 1).filter(x => x != null);
+    return window.reduce((a, b) => a + b, 0) / window.length;
+  });
+  const t = i => Math.floor(candles[i].time / 1000);
+  return [
+    { kind: 'line', color: '#60a5fa', width: 1.5, data: kVals.map((v, i) => v == null ? null : { time: t(i), value: v }).filter(Boolean) },
+    { kind: 'line', color: '#fbbf24', width: 1.5, data: dVals.map((v, i) => v == null ? null : { time: t(i), value: v }).filter(Boolean) },
+    { kind: 'line', color: 'rgba(248,113,113,.3)', width: 1, data: candles.map(c => ({ time: Math.floor(c.time / 1000), value: 80 })) },
+    { kind: 'line', color: 'rgba(52,211,153,.3)', width: 1, data: candles.map(c => ({ time: Math.floor(c.time / 1000), value: 20 })) },
+  ];
+}
+function _repATR(candles, period) {
+  const trs = candles.map((c, i) => {
+    if (i === 0) return c.high - c.low;
+    const prevClose = candles[i - 1].close;
+    return Math.max(c.high - c.low, Math.abs(c.high - prevClose), Math.abs(c.low - prevClose));
+  });
+  let atr = null; const out = [];
+  trs.forEach((tr, i) => {
+    if (i < period - 1) return;
+    if (atr === null) { atr = trs.slice(0, period).reduce((a, b) => a + b, 0) / period; }
+    else { atr = (atr * (period - 1) + tr) / period; }
+    out.push({ time: Math.floor(candles[i].time / 1000), value: atr });
+  });
+  return [{ kind: 'line', color: '#2dd4bf', width: 1.5, data: out }];
+}
+
 function _repToggleIndicator(id) {
-  _repState.indicators[id] = !_repState.indicators[id];
-  document.querySelector(`#rep-indicators-popover .rep-popover-row[data-ind="${id}"]`)?.classList.toggle('on', _repState.indicators[id]);
-  if (!_repState.indicators[id] && _repState.indicatorSeries[id]) {
-    _repState.chart.removeSeries(_repState.indicatorSeries[id]);
+  const def = REP_IND_DEFS[id]; if (!def) return;
+  const turningOn = !_repState.indicators[id];
+
+  if (turningOn && def.type === 'oscillator') {
+    // Only one oscillator sub-pane at a time (see comment above REP_OSC_SCALE).
+    Object.keys(REP_IND_DEFS).forEach(otherId => {
+      if (otherId !== id && REP_IND_DEFS[otherId].type === 'oscillator' && _repState.indicators[otherId]) {
+        _repState.indicators[otherId] = false;
+        (_repState.indicatorSeries[otherId] || []).forEach(s => _repState.chart.removeSeries(s));
+        delete _repState.indicatorSeries[otherId];
+        document.querySelector(`#rep-indicators-popover .rep-popover-row[data-ind="${otherId}"]`)?.classList.remove('on');
+      }
+    });
+  }
+
+  _repState.indicators[id] = turningOn;
+  document.querySelector(`#rep-indicators-popover .rep-popover-row[data-ind="${id}"]`)?.classList.toggle('on', turningOn);
+  if (!turningOn && _repState.indicatorSeries[id]) {
+    _repState.indicatorSeries[id].forEach(s => _repState.chart.removeSeries(s));
     delete _repState.indicatorSeries[id];
   }
   _repApplyIndicators(_repState.candles.slice(0, _repState.index + 1));
   _repSaveState();
 }
+
 function _repApplyIndicators(slice) {
   if (!_repState || !_repState.chart) return;
   Object.keys(_repState.indicators).forEach(id => {
     if (!_repState.indicators[id]) return;
     const def = REP_IND_DEFS[id]; if (!def) return;
+    const parts = def.calc(slice);
     if (!_repState.indicatorSeries[id]) {
-      _repState.indicatorSeries[id] = _repState.chart.addLineSeries({ color: def.color, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+      _repState.indicatorSeries[id] = parts.map(p => {
+        const scaleOpts = def.type === 'oscillator' ? { priceScaleId: REP_OSC_SCALE } : {};
+        if (p.kind === 'histogram') return _repState.chart.addHistogramSeries({ priceLineVisible: false, lastValueVisible: false, ...scaleOpts });
+        return _repState.chart.addLineSeries({ color: p.color, lineWidth: p.width || 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, ...scaleOpts });
+      });
     }
-    _repState.indicatorSeries[id].setData(def.calc(slice));
+    parts.forEach((p, i) => _repState.indicatorSeries[id][i]?.setData(p.data));
   });
 }
 
