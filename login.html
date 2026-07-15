@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <meta name="theme-color" content="#07090f" id="themeColorMeta" />
   <title>NxTGen Trading Journal — Sign In</title>
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -491,10 +498,10 @@
 
   (async () => {
     const { data: { session } } = await sb.auth.getSession();
-    if (session) window.location.replace('./index.html');
+    if (session) window.location.replace('./');
   })();
   sb.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_IN' && session) window.location.replace('./index.html');
+    if (event === 'SIGNED_IN' && session) window.location.replace('./');
   });
 
   const savedTheme = localStorage.getItem('nxtgen-theme') || 'dark';
@@ -605,7 +612,7 @@
     if(pw.length<8){showAlert('regErr','Password must be at least 8 characters.');return;}
     if(pw!==pw2){showAlert('regErr','Passwords do not match.');return;}
     btn.disabled=true; btn.textContent='Creating account…';
-    const {error}=await sb.auth.signUp({email,password:pw,options:{data:{full_name:name},emailRedirectTo:BASE+'/index.html'}});
+    const {error}=await sb.auth.signUp({email,password:pw,options:{data:{full_name:name},emailRedirectTo:BASE+'/'}});
     if(error){
       showAlert('regErr',error.message==='User already registered'?'An account with this email already exists. Try signing in.':error.message);
       btn.disabled=false; btn.textContent='Create My Account';
@@ -622,7 +629,7 @@
     if(!lastSignupEmail)return;
     const btn=document.getElementById('resendBtn');
     btn.textContent='Sending…';
-    const{error}=await sb.auth.resend({type:'signup',email:lastSignupEmail,options:{emailRedirectTo:BASE+'/index.html'}});
+    const{error}=await sb.auth.resend({type:'signup',email:lastSignupEmail,options:{emailRedirectTo:BASE+'/'}});
     btn.textContent=error?'Failed — try again':'Sent! Check your inbox';
     setTimeout(()=>{btn.textContent='Resend email';},4000);
   }
@@ -638,7 +645,7 @@
 
   async function handleGoogle() {
     ['btnGoogleLogin','btnGoogleReg'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=true;});
-    const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:BASE+'/index.html'}});
+    const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:BASE+'/'}});
     if(error)['btnGoogleLogin','btnGoogleReg'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=false;});
   }
 
