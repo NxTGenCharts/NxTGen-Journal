@@ -9,7 +9,7 @@
 // ══════════════════════════════════════════════════════
 const SUPABASE_URL  = 'https://jlqgdwfbwdiieafhwisy.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_t_Bu9PTxcykClDo-_hvO5w_avgOKCDt';
-const BASE_URL      = 'https://nxtgencharts.github.io/NxTGen-Journal';
+const BASE_URL      = 'https://nxtgencharts.site';
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
@@ -15481,7 +15481,7 @@ function calExportImage() {
           footer.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:10px;padding-top:14px;opacity:.9;';
           footer.innerHTML =
             '<img src="' + brandLogo + '" style="height:24px;width:auto;display:block;">' +
-            '<span style="font-size:12px;color:' + dim + ';">nxtgencharts.github.io/NxTGen-Journal</span>';
+            '<span style="font-size:12px;color:' + dim + ';">nxtgencharts.site</span>';
 
           clonedScroll.insertBefore(header, clonedScroll.firstChild);
           clonedScroll.appendChild(footer);
