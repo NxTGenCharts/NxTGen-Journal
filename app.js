@@ -10356,20 +10356,29 @@ const REP_SOURCES = [
 ];
 function _repGetSource(id) { return REP_SOURCES.find(s => s.id === id) || REP_SOURCES[0]; }
 
+// Drawing tools shown in the left toolbar, top to bottom.
+// `group` clusters related tools for the toolbar dividers.
+// `icon` refers to an id in the icon sprite (index.html <defs>)
+// or one of the inline REP_TOOL_ICONS below for chart-specific glyphs.
 const REP_TOOLS = [
-  { id: 'trendline',        label: 'Trendline',         kind: 'line', color: '#fbbf24' },
-  { id: 'arrow',             label: 'Arrow',             kind: 'line', color: '#fbbf24', arrow: true },
-  { id: 'measure',           label: 'Measure',           kind: 'line', color: '#60a5fa', measure: true },
-  { id: 'hline',             label: 'H-Line',            kind: 'hline', color: '#a78bfa' },
-  { id: 'vline',             label: 'V-Line',            kind: 'vline', color: '#a78bfa' },
-  { id: 'rect',              label: 'Rectangle',         kind: 'rect', color: 'rgba(96,165,250,.16)', stroke: '#60a5fa' },
-  { id: 'fib',               label: 'Fibonacci',         kind: 'fib', color: '#2dd4bf' },
-  { id: 'text',              label: 'Text',              kind: 'text', color: '#e2e8f0' },
-  { id: 'killzone',          label: 'Session Box',       kind: 'rect', color: 'rgba(52,211,153,.10)', stroke: '#34d399', drawLabel: 'Killzone' },
-  { id: 'liquidity',         label: 'Liquidity',         kind: 'hline', color: '#f87171', dashed: true },
-  { id: 'fvg',               label: 'FVG',               kind: 'rect', color: 'rgba(167,139,250,.16)', stroke: '#a78bfa', drawLabel: 'FVG' },
-  { id: 'orderblock',        label: 'Order Block',       kind: 'rect', color: 'rgba(251,191,36,.14)', stroke: '#fbbf24', drawLabel: 'OB' },
-  { id: 'premiumdiscount',   label: 'Premium/Discount',  kind: 'rect', color: 'rgba(45,212,191,.10)', stroke: '#2dd4bf', drawLabel: 'PD' },
+  { id: 'select',            label: 'Selection Tool (V)', kind: 'select',  group: 'nav' },
+  { id: 'trendline',         label: 'Trend Line',        kind: 'line',   color: '#fbbf24', group: 'lines' },
+  { id: 'ray',               label: 'Ray',                kind: 'ray',    color: '#fbbf24', group: 'lines' },
+  { id: 'arrow',              label: 'Arrow',              kind: 'line',   color: '#fbbf24', arrow: true, group: 'lines' },
+  { id: 'hline',              label: 'Horizontal Line',    kind: 'hline',  color: '#a78bfa', group: 'lines' },
+  { id: 'vline',              label: 'Vertical Line',      kind: 'vline',  color: '#a78bfa', group: 'lines' },
+  { id: 'measure',            label: 'Measure',            kind: 'line',   color: '#60a5fa', measure: true, group: 'lines' },
+  { id: 'rect',               label: 'Rectangle',          kind: 'rect',   color: 'rgba(96,165,250,.16)', stroke: '#60a5fa', group: 'shapes' },
+  { id: 'circle',             label: 'Circle',             kind: 'circle', color: 'rgba(96,165,250,.16)', stroke: '#60a5fa', group: 'shapes' },
+  { id: 'brush',              label: 'Brush',              kind: 'brush',  color: '#f472b6', group: 'shapes' },
+  { id: 'text',               label: 'Text',               kind: 'text',   color: '#e2e8f0', group: 'shapes' },
+  { id: 'fib',                label: 'Fib Retracement',    kind: 'fib',    color: '#2dd4bf', group: 'fib' },
+  { id: 'fibext',             label: 'Fib Extension',      kind: 'fib',    color: '#fb923c', extension: true, group: 'fib' },
+  { id: 'killzone',           label: 'Session Box',        kind: 'rect',   color: 'rgba(52,211,153,.10)', stroke: '#34d399', drawLabel: 'Session', group: 'ict' },
+  { id: 'orderblock',         label: 'Order Block',        kind: 'rect',   color: 'rgba(251,191,36,.14)', stroke: '#fbbf24', drawLabel: 'OB', group: 'ict' },
+  { id: 'fvg',                label: 'Fair Value Gap',     kind: 'rect',   color: 'rgba(167,139,250,.16)', stroke: '#a78bfa', drawLabel: 'FVG', group: 'ict' },
+  { id: 'liquidity',          label: 'Liquidity Zone',     kind: 'hline',  color: '#f87171', dashed: true, group: 'ict' },
+  { id: 'premiumdiscount',    label: 'Premium / Discount', kind: 'rect',   color: 'rgba(45,212,191,.10)', stroke: '#2dd4bf', drawLabel: 'PD', group: 'ict' },
 ];
 
 function _repUid() { return 'rd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); }
@@ -10423,7 +10432,67 @@ async function _repFetchCandles(symbol, interval, outputsize = 500, source = 'tw
   return await response.json();
 }
 
-// ── Open / close the fullscreen replay view ─────────────
+// ── Inline icon glyphs for the drawing toolbar (kept local to this
+// module so we don't have to touch the shared sprite in index.html) ──
+const REP_ICON_PATHS = {
+  select:   '<path d="M5 3l5.6 15.4 2-6.6 6.6-2z"/>',
+  trendline:'<path d="M4 19L19 4"/><circle cx="4" cy="19" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="4" r="1.6" fill="currentColor" stroke="none"/>',
+  ray:      '<path d="M4 19L20 3"/><circle cx="4" cy="19" r="1.6" fill="currentColor" stroke="none"/>',
+  arrow:    '<path d="M4 19L18 5"/><path d="M9 5h9v9"/>',
+  hline:    '<path d="M3 12h18"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/>',
+  vline:    '<path d="M12 3v18"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/>',
+  measure:  '<path d="M4 17L17 4"/><path d="M4 17l2.2-2.2M7 14l2.2-2.2M10 11l2.2-2.2M13 8l2.2-2.2"/>',
+  rect:     '<rect x="4" y="6" width="16" height="12" rx="1.5"/>',
+  circle:   '<circle cx="12" cy="12" r="8"/>',
+  brush:    '<path d="M4 20c0-4 2-5 4-5s2 3 4 3 1-4 4-6 4 1 4-3"/>',
+  text:     '<path d="M5 6h14M12 6v13"/>',
+  fib:      '<path d="M3 6h18M3 10.5h18M3 15h18M3 19.5h18" stroke-dasharray="0"/><path d="M3 6h5M3 19.5h5" stroke-width="2.6"/>',
+  fibext:   '<path d="M3 5h18M3 10h18M3 15h18M3 20h18"/><path d="M16 5l3-2 3 2" stroke-width="1.3"/>',
+  session:  '<rect x="5" y="4" width="14" height="16" rx="1.5"/><path d="M5 9h14M5 15h14"/>',
+  orderblock:'<rect x="4" y="9" width="16" height="6" rx="1"/><path d="M4 5h16M4 19h16" opacity=".5"/>',
+  fvg:      '<path d="M4 8h16M4 16h16"/><rect x="4" y="8" width="16" height="8" fill="currentColor" opacity=".18" stroke="none"/>',
+  liquidity:'<path d="M3 8h18M3 16h18" stroke-dasharray="3 3"/>',
+  premiumdiscount:'<path d="M4 4h16v16H4z"/><path d="M4 12h16"/>',
+  magnet:   '<path d="M7 4v8a5 5 0 0010 0V4"/><path d="M7 4H4v4h3M17 4h3v4h-3"/>',
+  undo:     '<path d="M7 8H3V4"/><path d="M3 8a9 9 0 1 1 2 10"/>',
+  redo:     '<path d="M17 8h4V4"/><path d="M21 8a9 9 0 1 0-2 10"/>',
+  save:     '<path d="M5 4.5h11l3.5 3.5v11.5a1.5 1.5 0 01-1.5 1.5H6a1.5 1.5 0 01-1.5-1.5v-13A1.5 1.5 0 016 4.5z"/><path d="M8 4.5v5h7v-5M8 21v-6.5h8V21"/>',
+  load:     '<path d="M3.5 6.5A1.5 1.5 0 015 5h4l2 2h8a1.5 1.5 0 011.5 1.5v9A1.5 1.5 0 0119 19H5a1.5 1.5 0 01-1.5-1.5v-11z"/>',
+  fullscreen:'<path d="M4 9V5a1 1 0 011-1h4M20 9V5a1 1 0 00-1-1h-4M4 15v4a1 1 0 001 1h4M20 15v4a1 1 0 01-1 1h-4"/>',
+  indicators:'<path d="M4 19h16M4 19V9M9 19V5M14 19v-8M19 19v-4"/>',
+  reset:    '<path d="M4.5 12a7.5 7.5 0 0112.7-5.4M19.5 12a7.5 7.5 0 01-12.7 5.4M17 4.5v3.3h-3.3M7 19.5v-3.3h3.3"/>',
+  chevrondown:'<path d="M6 9l6 6 6-6"/>',
+  loop:     '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/>',
+  weekend:  '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17"/>',
+};
+function _repIcon(name, cls) {
+  const body = REP_ICON_PATHS[name] || '';
+  return `<svg class="${cls || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+}
+
+// ── History (undo/redo) — shallow snapshots of the drawings array ──
+function _repPushHistory() {
+  if (!_repState) return;
+  _repState.history.undo.push(JSON.stringify(_repState.drawings));
+  if (_repState.history.undo.length > 50) _repState.history.undo.shift();
+  _repState.history.redo = [];
+}
+function _repUndo() {
+  if (!_repState || !_repState.history.undo.length) return;
+  _repState.history.redo.push(JSON.stringify(_repState.drawings));
+  _repState.drawings = JSON.parse(_repState.history.undo.pop());
+  _repState.selectedId = null;
+  _repSaveState(); _repDrawOverlay();
+}
+function _repRedo() {
+  if (!_repState || !_repState.history.redo.length) return;
+  _repState.history.undo.push(JSON.stringify(_repState.drawings));
+  _repState.drawings = JSON.parse(_repState.history.redo.pop());
+  _repState.selectedId = null;
+  _repSaveState(); _repDrawOverlay();
+}
+
+// ── Open / close the fullscreen replay workstation ──────
 async function _repOpen(sessionId) {
   const session = _btGetSessionById(sessionId); if (!session) return;
   const saved = session.replayState || {};
@@ -10433,11 +10502,19 @@ async function _repOpen(sessionId) {
 
   _repState = {
     sessionId, symbol, interval, source,
-    candles: [], index: 0, viewEnd: 0,
-    candlesPerView: saved.candlesPerView || 120,
+    candles: [], index: 0,
+    candlesPerView: saved.candlesPerView || 100,
     drawings: saved.drawings ? JSON.parse(JSON.stringify(saved.drawings)) : [],
-    activeTool: null, drawDraft: null, panning: false, playing: false, speed: 1,
+    activeTool: null, drawDraft: null, selectedId: null, hoverId: null,
+    magnet: saved.magnet !== undefined ? saved.magnet : true,
+    loop: saved.loop || false,
+    skipWeekends: saved.skipWeekends !== undefined ? saved.skipWeekends : true,
+    playing: false, speed: saved.speed || 1,
+    indicators: saved.indicators || { ema9: false, ema21: false, sma50: false, vwap: false },
+    history: { undo: [], redo: [] },
+    indicatorSeries: {},
     _savedIndex: typeof saved.index === 'number' ? saved.index : null,
+    _panning: false, _dragging: null, _lastMouse: null,
   };
 
   _repRenderShell();
@@ -10447,6 +10524,8 @@ async function _repOpen(sessionId) {
 function _repClose() {
   _repPause();
   _repSaveState();
+  document.removeEventListener('keydown', _repKeyHandler);
+  try { _repState?.chart?.remove(); } catch (e) {}
   document.getElementById('rep-fullscreen-overlay')?.remove();
   _repState = null;
 }
@@ -10457,12 +10536,13 @@ async function _repSaveState() {
   session.replayState = {
     symbol: _repState.symbol, interval: _repState.interval, source: _repState.source,
     index: _repState.index, candlesPerView: _repState.candlesPerView,
-    drawings: _repState.drawings,
+    drawings: _repState.drawings, magnet: _repState.magnet, loop: _repState.loop,
+    skipWeekends: _repState.skipWeekends, speed: _repState.speed, indicators: _repState.indicators,
   };
   await _blSave();
 }
 
-// ── DOM shell ────────────────────────────────────────────
+// ── DOM shell — FXReplay-inspired workstation layout ────
 function _repRenderShell() {
   document.getElementById('rep-fullscreen-overlay')?.remove();
   const session = _btGetSessionById(_repState.sessionId);
@@ -10470,49 +10550,119 @@ function _repRenderShell() {
   overlay.id = 'rep-fullscreen-overlay';
   overlay.className = 'rep-fullscreen-overlay';
 
-  const toolButtons = REP_TOOLS.map(t => `<button class="rep-tool-btn" data-tool="${t.id}" onclick="_repSetTool('${t.id}')">${t.label}</button>`).join('');
+  const groups = {};
+  REP_TOOLS.forEach(t => { (groups[t.group] = groups[t.group] || []).push(t); });
+  const groupOrder = ['nav', 'lines', 'shapes', 'fib', 'ict'];
+  const toolButtons = groupOrder.map((g, gi) => {
+    const btns = (groups[g] || []).map(t => `
+      <button class="rep-tool-btn" data-tool="${t.id}" onclick="_repSetTool('${t.id}')">
+        ${_repIcon(t.id, 'icn')}<span class="rep-tooltip">${t.label}</span>
+      </button>`).join('');
+    return btns + (gi < groupOrder.length - 1 ? '<div class="rep-tool-sep"></div>' : '');
+  }).join('');
 
   overlay.innerHTML = `
     <div class="rep-topbar">
-      <div class="rep-topbar-title">📈 ${session?.name || 'Chart Replay'}</div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <div class="rep-topbar-group">
+        <div class="rep-topbar-title"><span class="rep-live-dot"></span><span class="rep-title-text">${session?.name || 'Chart Replay'}</span></div>
+        <div class="rep-topbar-divider"></div>
         <select id="rep-source-select" class="rep-select" onchange="_repSourceChanged()" title="Data source">
           ${REP_SOURCES.map(s => `<option value="${s.id}"${s.id === _repState.source ? ' selected' : ''}>${s.label}</option>`).join('')}
         </select>
-        <input type="text" id="rep-symbol-input" class="rep-select" style="width:90px" value="${_repState.symbol}" title="Symbol (e.g. ${_repGetSource(_repState.source).symbolPlaceholder})">
+        <input type="text" id="rep-symbol-input" class="rep-input" value="${_repState.symbol}" title="Symbol (e.g. ${_repGetSource(_repState.source).symbolPlaceholder})">
         <select id="rep-interval-select" class="rep-select">
           ${_repGetSource(_repState.source).intervals.map(iv => `<option value="${iv}"${iv === _repState.interval ? ' selected' : ''}>${iv}</option>`).join('')}
         </select>
-        <button class="rep-ctrl-btn" onclick="_repChangeSymbolInterval()">Load</button>
-        <button class="rep-ctrl-btn" onclick="_repClose()">✕ Close</button>
+        <button class="rep-icon-btn" onclick="_repChangeSymbolInterval()" title="Load"><svg class="icn" aria-hidden="true"><use href="#ic-refresh"></use></svg></button>
+      </div>
+      <div class="rep-topbar-group">
+        <button class="rep-icon-btn" onclick="_repUndo()" title="Undo (Ctrl+Z)">${_repIcon('undo', 'icn')}</button>
+        <button class="rep-icon-btn" onclick="_repRedo()" title="Redo (Ctrl+Y)">${_repIcon('redo', 'icn')}</button>
+        <div class="rep-topbar-divider"></div>
+        <button class="rep-icon-btn" id="rep-indicators-btn" onclick="_repToggleIndicatorsPopover()" title="Indicators">${_repIcon('indicators', 'icn')}</button>
+        <button class="rep-icon-btn" onclick="_repSaveLayout()" title="Save Layout">${_repIcon('save', 'icn')}</button>
+        <button class="rep-icon-btn" onclick="_repToggleLayoutsPopover()" title="Load Layout">${_repIcon('load', 'icn')}</button>
+        <button class="rep-icon-btn" onclick="_repClearDrawings()" title="Clear all drawings"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg></button>
+        <div class="rep-topbar-divider"></div>
+        <button class="rep-icon-btn" onclick="_repToggleFullscreen()" title="Fullscreen">${_repIcon('fullscreen', 'icn')}</button>
+        <button class="rep-close-btn" onclick="_repClose()" title="Close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
       </div>
     </div>
-    <div class="rep-toolbar">
-      <button class="rep-ctrl-btn" onclick="_repReset()">⏮ Reset</button>
-      <button class="rep-ctrl-btn" onclick="_repStep(-1)">⏪ Step Back</button>
-      <button class="rep-ctrl-btn" id="rep-play-btn" onclick="_repTogglePlay()">▶ Play</button>
-      <button class="rep-ctrl-btn" onclick="_repStep(1)">Step Forward ⏩</button>
-      <select id="rep-speed-select" class="rep-select" onchange="_repSetSpeed(this.value)">
-        <option value="0.5">0.5x</option><option value="1" selected>1x</option>
-        <option value="2">2x</option><option value="5">5x</option><option value="10">10x</option>
-      </select>
-      <input type="date" id="rep-jump-date" class="rep-select" onchange="_repJumpToDate(this.value)">
-      <button class="rep-ctrl-btn" onclick="_repZoom(-1)">－ Zoom</button>
-      <button class="rep-ctrl-btn" onclick="_repZoom(1)">＋ Zoom</button>
-      <button class="rep-ctrl-btn" onclick="_repClearDrawings()">🗑 Clear Drawings</button>
+
+    <div class="rep-workspace">
+      <div class="rep-left-toolbar">${toolButtons}
+        <div class="rep-tool-sep"></div>
+        <button class="rep-tool-btn ${_repState.magnet ? 'on' : ''}" id="rep-magnet-btn" onclick="_repToggleMagnet()">${_repIcon('magnet', 'icn')}<span class="rep-tooltip">Magnet / Snap to OHLC</span></button>
+      </div>
+      <div class="rep-chart-area">
+        <div class="rep-chart-wrap" id="rep-chart-wrap"></div>
+        <canvas class="rep-overlay-canvas" id="rep-overlay"></canvas>
+        <div class="rep-symbol-badge">${_repState.symbol} · ${_repState.interval}</div>
+        <div class="rep-ohlc-badge" id="rep-ohlc-badge" style="display:none"></div>
+        <div class="rep-loading" id="rep-status-msg"><div class="rep-spinner"></div>Loading candles…</div>
+
+        <div class="rep-popover" id="rep-indicators-popover">
+          <div class="rep-popover-title">Overlays</div>
+          <div class="rep-popover-row" data-ind="ema9" onclick="_repToggleIndicator('ema9')"><span><span class="dot" style="background:#fbbf24"></span>EMA 9</span><span class="rep-popover-check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg></span></div>
+          <div class="rep-popover-row" data-ind="ema21" onclick="_repToggleIndicator('ema21')"><span><span class="dot" style="background:#60a5fa"></span>EMA 21</span><span class="rep-popover-check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg></span></div>
+          <div class="rep-popover-row" data-ind="sma50" onclick="_repToggleIndicator('sma50')"><span><span class="dot" style="background:#a78bfa"></span>SMA 50</span><span class="rep-popover-check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg></span></div>
+          <div class="rep-popover-row" data-ind="vwap" onclick="_repToggleIndicator('vwap')"><span><span class="dot" style="background:#2dd4bf"></span>VWAP</span><span class="rep-popover-check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg></span></div>
+        </div>
+        <div class="rep-popover" id="rep-layouts-popover">
+          <div class="rep-popover-title">Saved Layouts</div>
+          <div id="rep-layouts-list" style="display:flex;flex-direction:column;gap:2px"></div>
+        </div>
+        <div class="rep-ctx-menu" id="rep-ctx-menu"></div>
+
+        <div class="rep-replay-pill" id="rep-replay-pill">
+          <span class="rep-drag-handle"><span></span><span></span><span></span><span></span><span></span><span></span></span>
+          <button class="rep-step-btn" onclick="_repReset()" title="Reset (Home)">${_repIcon('reset', 'icn')}</button>
+          <button class="rep-step-btn" onclick="_repStep(-1)" title="Step back (←)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 5L8 12l8 7"/></svg></button>
+          <button class="rep-play-btn" id="rep-play-btn" onclick="_repTogglePlay()" title="Play / Pause (Space)"><svg id="rep-play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5l12 7-12 7z"/></svg></button>
+          <button class="rep-step-btn" onclick="_repStep(1)" title="Step forward (→)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l8 7-8 7"/></svg></button>
+          <select id="rep-speed-select" class="rep-select" style="height:26px;padding:2px 6px" onchange="_repSetSpeed(this.value)">
+            <option value="0.5">0.5x</option><option value="1" selected>1x</option>
+            <option value="2">2x</option><option value="5">5x</option><option value="10">10x</option><option value="25">25x</option>
+          </select>
+          <div class="rep-progress-track" id="rep-progress-track">
+            <div class="rep-progress-fill" id="rep-progress-fill"></div>
+            <input type="range" id="rep-progress-slider" min="0" max="100" value="0" oninput="_repScrubProgress(this.value)">
+          </div>
+          <span class="rep-candle-counter" id="rep-candle-counter">0 / 0</span>
+          <input type="date" id="rep-jump-date" class="rep-select" style="height:26px;padding:2px 6px;width:120px" onchange="_repJumpToDate(this.value)" title="Go to date">
+          <button class="rep-pill-toggle ${_repState.skipWeekends ? 'active' : ''}" id="rep-weekend-btn" onclick="_repToggleSkipWeekends()" title="Skip weekends">${_repIcon('weekend', 'icn')}</button>
+          <button class="rep-pill-toggle ${_repState.loop ? 'active' : ''}" id="rep-loop-btn" onclick="_repToggleLoop()" title="Loop replay">${_repIcon('loop', 'icn')}</button>
+          <button class="rep-pill-toggle" onclick="_repZoom(1)" title="Zoom out (fewer candles)">－</button>
+          <button class="rep-pill-toggle" onclick="_repZoom(-1)" title="Zoom in (more candles)">＋</button>
+        </div>
+      </div>
     </div>
-    <div class="rep-tool-row">${toolButtons}</div>
-    <div class="rep-canvas-wrap" id="rep-canvas-wrap">
-      <div class="rep-loading">Loading candles…</div>
-    </div>
-    <div class="rep-exec-bar">
-      <button class="rep-exec-btn rep-exec-buy" onclick="_repExecuteTrade('buy')">▲ Buy</button>
-      <button class="rep-exec-btn rep-exec-sell" onclick="_repExecuteTrade('sell')">▼ Sell</button>
-    </div>
+
+    <div class="rep-bottom-dock" id="rep-bottom-dock"></div>
   `;
 
   document.body.appendChild(overlay);
   requestAnimationFrame(() => overlay.classList.add('open'));
+  document.addEventListener('keydown', _repKeyHandler);
+  _repUpdateToolbarActive();
+  _repRenderIndicatorPopoverState();
+  _repRenderLayoutsList();
+}
+
+// ── Keyboard shortcuts ───────────────────────────────────
+function _repKeyHandler(e) {
+  if (!_repState) return;
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  if (e.code === 'Space') { e.preventDefault(); _repTogglePlay(); }
+  else if (e.key === 'ArrowRight') { _repStep(1); }
+  else if (e.key === 'ArrowLeft') { _repStep(-1); }
+  else if (e.key === 'Home') { _repReset(); }
+  else if (e.key === 'Escape') { _repSetTool(null); _repHideContextMenu(); _repClosePopovers(); }
+  else if (e.key === 'Delete' || e.key === 'Backspace') { _repDeleteSelected(); }
+  else if (e.key === 'v' || e.key === 'V') { _repSetTool('select'); }
+  else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); _repUndo(); }
+  else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); _repRedo(); }
 }
 
 async function _repChangeSymbolInterval() {
@@ -10524,10 +10674,6 @@ async function _repChangeSymbolInterval() {
   await _repLoadCandles();
 }
 
-// Switching source re-maps the current symbol/interval into the
-// new vendor's format (e.g. EUR/USD -> EUR_USD for OANDA) rather
-// than clearing the fields, then re-renders the bar so the
-// interval dropdown shows that vendor's options.
 function _repSourceChanged() {
   if (!_repState) return;
   const newSourceId = document.getElementById('rep-source-select')?.value || _repState.source;
@@ -10541,308 +10687,442 @@ function _repSourceChanged() {
   _repLoadCandles();
 }
 
+// ── Load candles + boot the chart ───────────────────────
 async function _repLoadCandles() {
-  const wrap = document.getElementById('rep-canvas-wrap');
-  if (wrap) wrap.innerHTML = '<div class="rep-loading">Loading candles…</div>';
+  const status = document.getElementById('rep-status-msg');
+  if (status) status.innerHTML = '<div class="rep-spinner"></div>Loading candles…';
+  if (status) status.style.display = 'flex';
   try {
     const result = await _repFetchCandles(_repState.symbol, _repState.interval, 500, _repState.source);
     const candles = result.candles || [];
     if (!candles.length) throw new Error('No candle data returned for this symbol/interval');
 
-    // Server may have auto-fallen-back to a different source (e.g. no
-    // OANDA_API_KEY set yet) — sync state + the top-bar dropdowns to
-    // whatever actually loaded, and let the trader know.
     if (result.fallback && result.source !== _repState.source) {
       const from = _repGetSource(result.requestedSource || _repState.source).label;
       const to = _repGetSource(result.source).label;
       _repState.source = result.source;
       _repState.symbol = result.symbol || _repState.symbol;
       _repState.interval = result.interval || _repState.interval;
-      _repRenderShell(); // rebuild bar so source/interval dropdowns show the fallback source
+      _repRenderShell();
       if (typeof showToast === 'function') showToast(`${from} unavailable — showing ${to} data instead`, 'info');
     }
 
     _repState.candles = candles;
     const seed = Math.min(_repState.candlesPerView - 1, candles.length - 1);
     _repState.index = (_repState._savedIndex !== null && _repState._savedIndex < candles.length) ? _repState._savedIndex : seed;
-    _repState.viewEnd = _repState.index;
 
-    const wrapNow = document.getElementById('rep-canvas-wrap'); // may have been re-rendered above
-    if (wrapNow) wrapNow.innerHTML = '<canvas id="rep-canvas"></canvas><div id="rep-crosshair-box" class="rep-crosshair-box" style="display:none"></div>';
-    _repInitCanvas();
-    _repDrawChart();
+    if (!_repState.chart) _repInitChart();
+    _repSetChartData(true);
+    _repRenderBottomDock();
+    if (document.getElementById('rep-status-msg')) document.getElementById('rep-status-msg').style.display = 'none';
   } catch (err) {
     const isSetup = /404|not found|relay/i.test(err.message);
-    if (wrap) wrap.innerHTML = `<div class="rep-error">Couldn't load chart data: ${err.message}<br><small style="color:var(--text3)">${isSetup ? 'The market-data-proxy Edge Function may not be deployed yet, or TWELVE_DATA_API_KEY isn\'t set.' : 'Double-check the symbol format (e.g. EUR/USD) and try again.'}</small></div>`;
-  }
-}
-
-// ── Canvas setup ─────────────────────────────────────────
-function _repInitCanvas() {
-  const canvas = document.getElementById('rep-canvas'); if (!canvas) return;
-  const wrap = document.getElementById('rep-canvas-wrap');
-  const rect = wrap.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  canvas.style.width = rect.width + 'px';
-  canvas.style.height = rect.height + 'px';
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-
-  _repState.canvas = canvas; _repState.ctx = ctx;
-  _repState.cssWidth = rect.width; _repState.cssHeight = rect.height;
-
-  canvas.addEventListener('mousedown', _repCanvasMouseDown);
-  canvas.addEventListener('mousemove', _repCanvasMouseMove);
-  window.addEventListener('mouseup', _repCanvasMouseUp);
-  canvas.addEventListener('wheel', _repCanvasWheel, { passive: false });
-  canvas.addEventListener('mouseleave', () => {
-    const box = document.getElementById('rep-crosshair-box'); if (box) box.style.display = 'none';
-  });
-  window.addEventListener('resize', _repHandleResize);
-}
-
-function _repHandleResize() {
-  if (!_repState || !document.getElementById('rep-canvas')) return;
-  _repInitCanvas();
-  _repDrawChart();
-}
-
-// ── Geometry helpers ─────────────────────────────────────
-const REP_PAD = { top: 10, bottom: 24, right: 64 };
-
-function _repVisibleSlice() {
-  const total = _repState.candles.length;
-  const perView = _repState.candlesPerView;
-  const viewEnd = Math.min(_repState.viewEnd, total - 1);
-  const startIdx = Math.max(0, viewEnd - perView + 1);
-  return { startIdx, endIdx: viewEnd, list: _repState.candles.slice(startIdx, viewEnd + 1) };
-}
-function _repPriceRange(list) {
-  let min = Infinity, max = -Infinity;
-  list.forEach(c => { if (c.low < min) min = c.low; if (c.high > max) max = c.high; });
-  if (!isFinite(min)) { min = 0; max = 1; }
-  const pad = (max - min) * 0.08 || 0.0005;
-  return { min: min - pad, max: max + pad };
-}
-function _repIndexForTime(ms) {
-  const arr = _repState.candles;
-  let lo = 0, hi = arr.length - 1;
-  while (lo < hi) { const mid = (lo + hi) >> 1; if (arr[mid].time < ms) lo = mid + 1; else hi = mid; }
-  return lo;
-}
-function _repPointFromPixel(cssX, cssY) {
-  const { startIdx, list } = _repVisibleSlice();
-  const chartW = _repState.cssWidth - REP_PAD.right, chartH = _repState.cssHeight - REP_PAD.top - REP_PAD.bottom;
-  const candleW = chartW / Math.max(1, list.length);
-  let relIdx = Math.floor(cssX / candleW);
-  relIdx = Math.max(0, Math.min(relIdx, list.length - 1));
-  const idx = startIdx + relIdx;
-  const candle = _repState.candles[idx] || list[list.length - 1];
-  const { min, max } = _repPriceRange(list);
-  const price = max - ((cssY - REP_PAD.top) / chartH) * (max - min);
-  return { time: candle.time, price };
-}
-
-// ── Main render ──────────────────────────────────────────
-function _repDrawChart() {
-  if (!_repState || !_repState.ctx) return;
-  const ctx = _repState.ctx, W = _repState.cssWidth, H = _repState.cssHeight;
-  ctx.clearRect(0, 0, W, H);
-  const { startIdx, list } = _repVisibleSlice();
-  if (!list.length) return;
-  const { min, max } = _repPriceRange(list);
-  const chartW = W - REP_PAD.right, chartH = H - REP_PAD.top - REP_PAD.bottom;
-  const candleW = chartW / list.length;
-  const bodyW = Math.max(1, candleW * 0.6);
-  const yFor = p => REP_PAD.top + (max - p) / (max - min) * chartH;
-  const xFor = i => i * candleW + candleW / 2;
-
-  // grid + price axis
-  ctx.lineWidth = 1;
-  for (let g = 0; g <= 4; g++) {
-    const y = REP_PAD.top + (chartH / 4) * g;
-    ctx.strokeStyle = 'rgba(255,255,255,.05)';
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartW, y); ctx.stroke();
-    const price = max - (max - min) * (g / 4);
-    ctx.fillStyle = 'rgba(226,232,240,.45)'; ctx.font = '10px monospace';
-    ctx.fillText(price.toFixed(5), chartW + 6, y + 3);
-  }
-
-  // candles
-  list.forEach((c, i) => {
-    const x = xFor(i);
-    const up = c.close >= c.open;
-    ctx.strokeStyle = up ? '#34d399' : '#f87171';
-    ctx.fillStyle = up ? '#34d399' : '#f87171';
-    ctx.beginPath(); ctx.moveTo(x, yFor(c.high)); ctx.lineTo(x, yFor(c.low)); ctx.stroke();
-    const yO = yFor(c.open), yC = yFor(c.close);
-    const top = Math.min(yO, yC), h = Math.max(1, Math.abs(yC - yO));
-    ctx.fillRect(x - bodyW / 2, top, bodyW, h);
-  });
-
-  const geo = { startIdx, candleW, yFor, chartW, chartH };
-  _repRenderDrawingList(ctx, _repState.drawings, geo);
-
-  if (_repState.drawDraft && _repState.drawDraft.p1 && _repState.drawDraft.cur) {
-    const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
-    if (tool && !['hline', 'vline', 'text'].includes(tool.kind)) {
-      _repRenderDrawingList(ctx, [{
-        kind: tool.kind, color: tool.color, stroke: tool.stroke, dashed: tool.dashed,
-        arrow: tool.arrow, measure: tool.measure, label: tool.drawLabel,
-        p1: _repState.drawDraft.p1, p2: _repState.drawDraft.cur,
-      }], geo);
+    if (status) {
+      status.innerHTML = `<div>Couldn't load chart data: ${err.message}</div><small style="color:var(--text3)">${isSetup ? 'The market-data-proxy Edge Function may not be deployed yet, or TWELVE_DATA_API_KEY isn\'t set.' : 'Double-check the symbol format (e.g. EUR/USD) and try again.'}</small>`;
+      status.classList.add('rep-error'); status.style.display = 'flex';
     }
   }
-
-  // time axis
-  ctx.fillStyle = 'rgba(226,232,240,.4)'; ctx.font = '10px monospace';
-  const labelEvery = Math.max(1, Math.floor(list.length / 6));
-  list.forEach((c, i) => {
-    if (i % labelEvery !== 0) return;
-    const d = new Date(c.time);
-    const lbl = d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    ctx.fillText(lbl, xFor(i) - 20, H - 6);
-  });
 }
 
-function _repRenderDrawingList(ctx, list, geo) {
-  const { startIdx, candleW, yFor, chartW, chartH } = geo;
-  const xForTime = ms => (_repIndexForTime(ms) - startIdx) * candleW + candleW / 2;
-
-  (list || []).forEach(dw => {
-    ctx.save();
-    ctx.strokeStyle = dw.stroke || dw.color; ctx.fillStyle = dw.color; ctx.lineWidth = 1.5;
-    ctx.setLineDash(dw.dashed ? [5, 4] : []);
-
-    if (dw.kind === 'hline') {
-      const y = yFor(dw.p1.price);
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartW, y); ctx.stroke();
-      ctx.fillStyle = dw.color; ctx.font = '10px monospace';
-      ctx.fillText(dw.p1.price.toFixed(5), 4, y - 4);
-    } else if (dw.kind === 'vline') {
-      const x = xForTime(dw.p1.time);
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, chartH); ctx.stroke();
-    } else if (dw.kind === 'rect') {
-      const x1 = xForTime(dw.p1.time), x2 = xForTime(dw.p2.time);
-      const y1 = yFor(dw.p1.price), y2 = yFor(dw.p2.price);
-      const rx = Math.min(x1, x2), ry = Math.min(y1, y2), rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1);
-      ctx.setLineDash([]);
-      ctx.fillRect(rx, ry, rw, rh);
-      ctx.strokeRect(rx, ry, rw, rh);
-      if (dw.label) { ctx.fillStyle = dw.stroke || dw.color; ctx.font = '10px sans-serif'; ctx.fillText(dw.label, rx + 3, ry + 11); }
-    } else if (dw.kind === 'line') {
-      const x1 = xForTime(dw.p1.time), y1 = yFor(dw.p1.price);
-      const x2 = xForTime(dw.p2.time), y2 = yFor(dw.p2.price);
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-      if (dw.arrow) {
-        const angle = Math.atan2(y2 - y1, x2 - x1), len = 8;
-        ctx.beginPath();
-        ctx.moveTo(x2, y2); ctx.lineTo(x2 - len * Math.cos(angle - Math.PI / 6), y2 - len * Math.sin(angle - Math.PI / 6));
-        ctx.moveTo(x2, y2); ctx.lineTo(x2 - len * Math.cos(angle + Math.PI / 6), y2 - len * Math.sin(angle + Math.PI / 6));
-        ctx.stroke();
-      }
-      if (dw.measure) {
-        const dPrice = dw.p2.price - dw.p1.price;
-        const dMin = Math.round((dw.p2.time - dw.p1.time) / 60000);
-        ctx.setLineDash([]); ctx.fillStyle = dw.color; ctx.font = '11px monospace';
-        ctx.fillText(`Δ${dPrice.toFixed(5)} / ${dMin}m`, (x1 + x2) / 2, (y1 + y2) / 2 - 6);
-      }
-    } else if (dw.kind === 'fib') {
-      const levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
-      const x1 = xForTime(dw.p1.time), x2 = xForTime(dw.p2.time);
-      levels.forEach(l => {
-        const price = dw.p1.price + (dw.p2.price - dw.p1.price) * l;
-        const y = yFor(price);
-        ctx.beginPath(); ctx.moveTo(Math.min(x1, x2), y); ctx.lineTo(Math.max(x1, x2), y); ctx.stroke();
-        ctx.fillStyle = dw.color; ctx.font = '9px monospace';
-        ctx.fillText(`${l} (${price.toFixed(5)})`, Math.max(x1, x2) + 4, y + 3);
-      });
-    } else if (dw.kind === 'text') {
-      const x = xForTime(dw.p1.time), y = yFor(dw.p1.price);
-      ctx.setLineDash([]); ctx.fillStyle = dw.color; ctx.font = '12px sans-serif';
-      ctx.fillText(dw.text || '', x, y);
-    }
-    ctx.restore();
+// ── TradingView Lightweight Charts bootstrap ────────────
+function _repInitChart() {
+  const container = document.getElementById('rep-chart-wrap'); if (!container) return;
+  const chart = LightweightCharts.createChart(container, {
+    autoSize: true,
+    layout: { background: { type: 'solid', color: 'transparent' }, textColor: 'rgba(226,232,240,.62)', fontFamily: 'JetBrains Mono, monospace', fontSize: 11 },
+    grid: { vertLines: { color: 'rgba(255,255,255,.04)' }, horzLines: { color: 'rgba(255,255,255,.04)' } },
+    rightPriceScale: { borderColor: 'rgba(255,255,255,.08)', scaleMargins: { top: 0.08, bottom: 0.22 } },
+    timeScale: { borderColor: 'rgba(255,255,255,.08)', timeVisible: true, secondsVisible: false, rightOffset: 4 },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine: { color: 'rgba(226,232,240,.3)', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#1a2030' },
+      horzLine: { color: 'rgba(226,232,240,.3)', width: 1, style: LightweightCharts.LineStyle.Dashed, labelBackgroundColor: '#1a2030' },
+    },
+    handleScroll: true, handleScale: true,
   });
+  const candleSeries = chart.addCandlestickSeries({
+    upColor: '#34d399', downColor: '#f87171', borderVisible: false,
+    wickUpColor: '#34d399', wickDownColor: '#f87171',
+  });
+  const volumeSeries = chart.addHistogramSeries({
+    priceFormat: { type: 'volume' }, priceScaleId: 'rep-vol', color: 'rgba(96,165,250,.35)',
+  });
+  chart.priceScale('rep-vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+
+  _repState.chart = chart;
+  _repState.candleSeries = candleSeries;
+  _repState.volumeSeries = volumeSeries;
+
+  chart.timeScale().subscribeVisibleLogicalRangeChange(() => _repDrawOverlay());
+  chart.subscribeCrosshairMove(param => _repNativeCrosshairUpdate(param));
+
+  const overlay = document.getElementById('rep-overlay');
+  overlay.addEventListener('mousedown', _repOverlayMouseDown);
+  overlay.addEventListener('mousemove', _repOverlayMouseMove);
+  window.addEventListener('mouseup', _repOverlayMouseUp);
+  overlay.addEventListener('wheel', _repOverlayWheel, { passive: false });
+  overlay.addEventListener('contextmenu', _repOverlayContextMenu);
+  overlay.addEventListener('dblclick', _repOverlayDblClick);
+  overlay.addEventListener('mouseleave', () => { const b = document.getElementById('rep-ohlc-badge'); if (b && !_repState.activeTool) b.style.display = 'none'; });
+
+  new ResizeObserver(() => _repResizeOverlay()).observe(container);
+  _repResizeOverlay();
 }
 
-// ── Mouse interaction: pan + drawing tools ──────────────
-function _repCanvasMouseDown(e) {
+function _repResizeOverlay() {
   if (!_repState) return;
-  const rect = _repState.canvas.getBoundingClientRect();
-  const cssX = e.clientX - rect.left, cssY = e.clientY - rect.top;
-  const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
+  const container = document.getElementById('rep-chart-wrap');
+  const canvas = document.getElementById('rep-overlay');
+  if (!container || !canvas) return;
+  const rect = container.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + 'px'; canvas.style.height = rect.height + 'px';
+  const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  _repState.overlayCtx = ctx; _repState.overlayW = rect.width; _repState.overlayH = rect.height;
+  _repDrawOverlay();
+}
 
-  if (!tool) {
-    _repState.panning = true;
-    _repState.panStartX = cssX;
-    _repState.panStartViewEnd = _repState.viewEnd;
+// ── Feed the visible replay window into the chart ───────
+function _repSetChartData(recenter) {
+  if (!_repState || !_repState.chart) return;
+  const slice = _repState.candles.slice(0, _repState.index + 1);
+  const cs = slice.map(c => ({ time: Math.floor(c.time / 1000), open: c.open, high: c.high, low: c.low, close: c.close }));
+  const vs = slice.map(c => ({ time: Math.floor(c.time / 1000), value: c.volume || 0, color: c.close >= c.open ? 'rgba(52,211,153,.45)' : 'rgba(248,113,113,.45)' }));
+  _repState.candleSeries.setData(cs);
+  _repState.volumeSeries.setData(vs);
+  _repApplyIndicators(slice);
+
+  if (recenter) {
+    const total = cs.length;
+    const from = Math.max(0, total - _repState.candlesPerView);
+    _repState.chart.timeScale().setVisibleLogicalRange({ from, to: total - 1 + 3 });
+  }
+  _repUpdateReplayHud();
+  _repDrawOverlay();
+}
+
+function _repUpdateReplayHud() {
+  if (!_repState) return;
+  const total = _repState.candles.length;
+  const pct = total > 1 ? (_repState.index / (total - 1)) * 100 : 0;
+  const fill = document.getElementById('rep-progress-fill'); if (fill) fill.style.width = pct + '%';
+  const slider = document.getElementById('rep-progress-slider'); if (slider) slider.value = pct;
+  const counter = document.getElementById('rep-candle-counter'); if (counter) counter.textContent = `${_repState.index + 1} / ${total}`;
+  const dateInput = document.getElementById('rep-jump-date');
+  const c = _repState.candles[_repState.index];
+  if (dateInput && c) dateInput.value = new Date(c.time).toISOString().slice(0, 10);
+}
+
+// ══════════════════════════════════════════════════════
+// COORDINATE HELPERS — bridge chart pixel space ↔ time/price
+// ══════════════════════════════════════════════════════
+function _repTimeMsToX(ms) {
+  const x = _repState.chart.timeScale().timeToCoordinate(Math.floor(ms / 1000));
+  return x;
+}
+function _repPriceToY(price) { return _repState.candleSeries.priceToCoordinate(price); }
+function _repYToPrice(y) { return _repState.candleSeries.coordinateToPrice(y); }
+function _repXToTimeMs(x) {
+  const ts = _repState.chart.timeScale();
+  const t = ts.coordinateToTime(x);
+  if (t != null) return t * 1000;
+  // extrapolate into empty space to the right (or left) of loaded data
+  const logical = ts.coordinateToLogical(x);
+  const slice = _repState.candles.slice(0, _repState.index + 1);
+  if (logical == null || slice.length < 2) return null;
+  const barMs = slice[slice.length - 1].time - slice[slice.length - 2].time;
+  return slice[slice.length - 1].time + Math.round(logical - (slice.length - 1)) * barMs;
+}
+function _repSnapPoint(point) {
+  if (!_repState.magnet) return point;
+  const idx = _repIndexForTime(point.time);
+  const c = _repState.candles[idx];
+  if (!c) return point;
+  const candidates = [c.open, c.high, c.low, c.close];
+  let best = candidates[0], bestDist = Infinity;
+  candidates.forEach(v => { const d = Math.abs(v - point.price); if (d < bestDist) { bestDist = d; best = v; } });
+  return { time: c.time, price: best };
+}
+function _repPointFromPixel(x, y) {
+  const time = _repXToTimeMs(x);
+  const price = _repYToPrice(y);
+  if (time == null || price == null) return null;
+  return _repSnapPoint({ time, price });
+}
+
+// ══════════════════════════════════════════════════════
+// OVERLAY RENDERING — drawings live in chart-relative time/
+// price space and get re-projected to pixels every frame,
+// so they stay glued to their candles through pan/zoom.
+// ══════════════════════════════════════════════════════
+function _repDrawOverlay() {
+  if (!_repState || !_repState.overlayCtx) return;
+  const ctx = _repState.overlayCtx, W = _repState.overlayW, H = _repState.overlayH;
+  ctx.clearRect(0, 0, W, H);
+  (_repState.drawings || []).forEach((dw, i) => _repRenderOneDrawing(ctx, dw, i === _repState._hoverIdx, dw.id === _repState.selectedId));
+  if (_repState.drawDraft && _repState.drawDraft.p1) {
+    const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
+    if (tool && tool.kind === 'brush') {
+      _repRenderOneDrawing(ctx, { kind: 'brush', color: tool.color, points: _repState.drawDraft.points }, false, false);
+    } else if (tool && _repState.drawDraft.cur) {
+      _repRenderOneDrawing(ctx, {
+        kind: tool.kind, color: tool.color, stroke: tool.stroke, dashed: tool.dashed,
+        arrow: tool.arrow, measure: tool.measure, label: tool.drawLabel, extension: tool.extension,
+        p1: _repState.drawDraft.p1, p2: _repState.drawDraft.cur,
+      }, false, false);
+    }
+  }
+  if (_repState._manualCrosshair) _repRenderManualCrosshair(ctx);
+}
+
+function _repRenderManualCrosshair(ctx) {
+  const { x, y } = _repState._manualCrosshair;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(226,232,240,.28)'; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(_repState.overlayW, y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, _repState.overlayH); ctx.stroke();
+  ctx.restore();
+}
+
+function _repRenderOneDrawing(ctx, dw, hovered, selected) {
+  ctx.save();
+  ctx.strokeStyle = dw.stroke || dw.color; ctx.fillStyle = dw.color;
+  ctx.lineWidth = selected ? 2.25 : (hovered ? 2 : 1.5);
+  ctx.setLineDash(dw.dashed ? [5, 4] : []);
+
+  const handles = [];
+
+  if (dw.kind === 'hline') {
+    const y = _repPriceToY(dw.p1.price); if (y == null) { ctx.restore(); return; }
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(_repState.overlayW - 2, y); ctx.stroke();
+    ctx.setLineDash([]); ctx.fillStyle = dw.color; ctx.font = '10px JetBrains Mono, monospace';
+    ctx.fillText(dw.p1.price.toFixed(5), 6, y - 4);
+    handles.push({ x: 40, y, key: 'p1' });
+  } else if (dw.kind === 'vline') {
+    const x = _repTimeMsToX(dw.p1.time); if (x == null) { ctx.restore(); return; }
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, _repState.overlayH); ctx.stroke();
+    handles.push({ x, y: 30, key: 'p1' });
+  } else if (dw.kind === 'rect' || dw.kind === 'circle') {
+    const x1 = _repTimeMsToX(dw.p1.time), x2 = _repTimeMsToX(dw.p2.time);
+    const y1 = _repPriceToY(dw.p1.price), y2 = _repPriceToY(dw.p2.price);
+    if ([x1, x2, y1, y2].some(v => v == null)) { ctx.restore(); return; }
+    const rx = Math.min(x1, x2), ry = Math.min(y1, y2), rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1);
+    ctx.setLineDash(dw.dashed ? [5, 4] : []);
+    if (dw.kind === 'rect') { ctx.fillRect(rx, ry, rw, rh); ctx.strokeRect(rx, ry, rw, rh); }
+    else { ctx.beginPath(); ctx.ellipse(rx + rw / 2, ry + rh / 2, rw / 2, rh / 2, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    if (dw.label) { ctx.setLineDash([]); ctx.fillStyle = dw.stroke || dw.color; ctx.font = '10px Plus Jakarta Sans, sans-serif'; ctx.fillText(dw.label, rx + 4, ry + 12); }
+    handles.push({ x: x1, y: y1, key: 'p1' }, { x: x2, y: y2, key: 'p2' });
+  } else if (dw.kind === 'line' || dw.kind === 'ray') {
+    let x1 = _repTimeMsToX(dw.p1.time), y1 = _repPriceToY(dw.p1.price);
+    let x2 = _repTimeMsToX(dw.p2.time), y2 = _repPriceToY(dw.p2.price);
+    if ([x1, y1, x2, y2].some(v => v == null)) { ctx.restore(); return; }
+    if (dw.kind === 'ray' && x2 !== x1) {
+      const slope = (y2 - y1) / (x2 - x1);
+      const edgeX = _repState.overlayW;
+      const edgeY = y1 + slope * (edgeX - x1);
+      x2 = edgeX; y2 = edgeY;
+    }
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    if (dw.arrow) {
+      const angle = Math.atan2(y2 - y1, x2 - x1), len = 9;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(x2, y2); ctx.lineTo(x2 - len * Math.cos(angle - Math.PI / 6), y2 - len * Math.sin(angle - Math.PI / 6));
+      ctx.moveTo(x2, y2); ctx.lineTo(x2 - len * Math.cos(angle + Math.PI / 6), y2 - len * Math.sin(angle + Math.PI / 6));
+      ctx.stroke();
+    }
+    if (dw.measure) {
+      const dPrice = dw.p2.price - dw.p1.price;
+      const dMin = Math.round((dw.p2.time - dw.p1.time) / 60000);
+      const pips = Math.abs(dPrice) * (dw.p1.price < 20 ? 10000 : 100);
+      ctx.setLineDash([]); ctx.fillStyle = dw.color; ctx.font = '11px JetBrains Mono, monospace';
+      ctx.fillText(`${dPrice >= 0 ? '+' : ''}${dPrice.toFixed(5)}  (${pips.toFixed(1)}p)  ${dMin}m`, (x1 + x2) / 2 + 8, (y1 + y2) / 2 - 8);
+    }
+    const origX2 = _repTimeMsToX(dw.p2.time), origY2 = _repPriceToY(dw.p2.price);
+    handles.push({ x: x1, y: y1, key: 'p1' }, { x: origX2 ?? x2, y: origY2 ?? y2, key: 'p2' });
+  } else if (dw.kind === 'fib') {
+    const levels = dw.extension ? [0, 0.618, 1, 1.272, 1.618, 2, 2.618] : [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+    const x1 = _repTimeMsToX(dw.p1.time), x2 = _repTimeMsToX(dw.p2.time);
+    if (x1 == null || x2 == null) { ctx.restore(); return; }
+    levels.forEach(l => {
+      const price = dw.p1.price + (dw.p2.price - dw.p1.price) * l;
+      const y = _repPriceToY(price); if (y == null) return;
+      ctx.beginPath(); ctx.moveTo(Math.min(x1, x2), y); ctx.lineTo(Math.max(x1, x2), y); ctx.stroke();
+      ctx.setLineDash([]); ctx.fillStyle = dw.color; ctx.font = '9px JetBrains Mono, monospace';
+      ctx.fillText(`${l} (${price.toFixed(5)})`, Math.max(x1, x2) + 4, y + 3);
+      ctx.setLineDash(dw.dashed ? [5, 4] : []);
+    });
+    const y1 = _repPriceToY(dw.p1.price), y2 = _repPriceToY(dw.p2.price);
+    handles.push({ x: x1, y: y1, key: 'p1' }, { x: x2, y: y2, key: 'p2' });
+  } else if (dw.kind === 'text') {
+    const x = _repTimeMsToX(dw.p1.time), y = _repPriceToY(dw.p1.price);
+    if (x == null || y == null) { ctx.restore(); return; }
+    ctx.setLineDash([]); ctx.fillStyle = dw.color; ctx.font = '600 12px Plus Jakarta Sans, sans-serif';
+    ctx.fillText(dw.text || '', x, y);
+    handles.push({ x, y, key: 'p1' });
+  } else if (dw.kind === 'brush') {
+    const pts = (dw.points || []).map(p => ({ x: _repTimeMsToX(p.time), y: _repPriceToY(p.price) })).filter(p => p.x != null && p.y != null);
+    if (pts.length < 2) { ctx.restore(); return; }
+    ctx.setLineDash([]); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+  }
+
+  if (selected) {
+    ctx.setLineDash([]);
+    handles.forEach(h => {
+      if (h.x == null || h.y == null) return;
+      ctx.beginPath(); ctx.arc(h.x, h.y, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#0b0e14'; ctx.fill();
+      ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 2; ctx.stroke();
+    });
+  }
+  ctx.restore();
+  Object.defineProperty(dw, '_handles', { value: handles, writable: true, configurable: true, enumerable: false });
+}
+
+// ── Hit-testing for the selection tool ──────────────────
+function _repDistToSegment(px, py, x1, y1, x2, y2) {
+  const A = px - x1, B = py - y1, C = x2 - x1, D = y2 - y1;
+  const dot = A * C + B * D, lenSq = C * C + D * D;
+  let t = lenSq ? dot / lenSq : -1;
+  t = Math.max(0, Math.min(1, t));
+  const ex = x1 + t * C, ey = y1 + t * D;
+  return Math.hypot(px - ex, py - ey);
+}
+function _repHitTest(px, py) {
+  const list = _repState.drawings;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const dw = list[i];
+    const handles = dw._handles || [];
+    for (const h of handles) {
+      if (h.x == null || h.y == null) continue;
+      if (Math.hypot(px - h.x, py - h.y) <= 6) return { drawing: dw, index: i, handle: h.key };
+    }
+    if (dw.kind === 'hline') { const y = _repPriceToY(dw.p1.price); if (y != null && Math.abs(py - y) <= 5) return { drawing: dw, index: i, handle: 'body' }; }
+    else if (dw.kind === 'vline') { const x = _repTimeMsToX(dw.p1.time); if (x != null && Math.abs(px - x) <= 5) return { drawing: dw, index: i, handle: 'body' }; }
+    else if (dw.kind === 'line' || dw.kind === 'ray' || dw.kind === 'measure') {
+      const x1 = _repTimeMsToX(dw.p1.time), y1 = _repPriceToY(dw.p1.price), x2 = _repTimeMsToX(dw.p2.time), y2 = _repPriceToY(dw.p2.price);
+      if ([x1, y1, x2, y2].every(v => v != null) && _repDistToSegment(px, py, x1, y1, x2, y2) <= 6) return { drawing: dw, index: i, handle: 'body' };
+    } else if (dw.kind === 'rect' || dw.kind === 'circle' || dw.kind === 'fib') {
+      const x1 = _repTimeMsToX(dw.p1.time), x2 = _repTimeMsToX(dw.p2.time), y1 = _repPriceToY(dw.p1.price), y2 = _repPriceToY(dw.p2.price);
+      if ([x1, x2, y1, y2].every(v => v != null)) {
+        const rx = Math.min(x1, x2), ry = Math.min(y1, y2), rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1);
+        if (px >= rx && px <= rx + rw && py >= ry && py <= ry + rh) return { drawing: dw, index: i, handle: 'body' };
+      }
+    } else if (dw.kind === 'text') {
+      const x = _repTimeMsToX(dw.p1.time), y = _repPriceToY(dw.p1.price);
+      if (x != null && y != null && px >= x - 4 && px <= x + 90 && py >= y - 14 && py <= y + 6) return { drawing: dw, index: i, handle: 'body' };
+    }
+  }
+  return null;
+}
+
+// ══════════════════════════════════════════════════════
+// OVERLAY MOUSE / WHEEL / CONTEXT-MENU HANDLERS
+// ══════════════════════════════════════════════════════
+function _repOverlayLocalXY(e) {
+  const rect = document.getElementById('rep-overlay').getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function _repOverlayMouseDown(e) {
+  if (!_repState || !_repState.activeTool) return; // no tool → let native chart pan/zoom/crosshair run
+  const { x, y } = _repOverlayLocalXY(e);
+  const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
+  _repHideContextMenu();
+
+  if (_repState.activeTool === 'select') {
+    const hit = _repHitTest(x, y);
+    if (hit) {
+      _repState.selectedId = hit.drawing.id;
+      _repPushHistory();
+      _repState._dragging = { drawing: hit.drawing, handle: hit.handle, startX: x, startY: y, orig: JSON.parse(JSON.stringify(hit.drawing)) };
+    } else {
+      _repState.selectedId = null;
+      _repState._panning = { startX: x, startLogical: _repState.chart.timeScale().getVisibleLogicalRange() };
+    }
+    _repDrawOverlay();
     return;
   }
 
-  const point = _repPointFromPixel(cssX, cssY);
+  const point = _repPointFromPixel(x, y); if (!point) return;
 
-  if (tool.kind === 'hline') {
-    _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'hline', color: tool.color, dashed: tool.dashed, p1: { price: point.price } });
-    _repFinishToolPlacement(); return;
-  }
-  if (tool.kind === 'vline') {
-    _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'vline', color: tool.color, p1: { time: point.time } });
-    _repFinishToolPlacement(); return;
-  }
+  if (tool.kind === 'hline') { _repPushHistory(); _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'hline', color: tool.color, dashed: tool.dashed, p1: { price: point.price } }); _repFinishToolPlacement(); return; }
+  if (tool.kind === 'vline') { _repPushHistory(); _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'vline', color: tool.color, p1: { time: point.time } }); _repFinishToolPlacement(); return; }
   if (tool.kind === 'text') {
     const txt = prompt('Annotation text:');
-    if (txt) _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'text', color: tool.color, p1: point, text: txt });
+    if (txt) { _repPushHistory(); _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'text', color: tool.color, p1: point, text: txt }); }
     _repFinishToolPlacement(); return;
   }
-  // line / rect / fib — begin drag
+  if (tool.kind === 'brush') { _repState.drawDraft = { p1: point, points: [point] }; return; }
   _repState.drawDraft = { p1: point, cur: point };
 }
 
-function _repFinishToolPlacement() {
-  _repState.activeTool = null;
-  _repUpdateToolbarActive();
-  _repSaveState();
-  _repDrawChart();
-}
-
-function _repCanvasMouseMove(e) {
+function _repOverlayMouseMove(e) {
   if (!_repState) return;
-  const rect = _repState.canvas.getBoundingClientRect();
-  const cssX = e.clientX - rect.left, cssY = e.clientY - rect.top;
+  const { x, y } = _repOverlayLocalXY(e);
 
-  if (_repState.panning) {
-    const { list } = _repVisibleSlice();
-    const candleW = (_repState.cssWidth - REP_PAD.right) / Math.max(1, list.length);
-    const dx = cssX - _repState.panStartX;
-    const deltaCandles = Math.round(dx / candleW);
-    let newViewEnd = _repState.panStartViewEnd - deltaCandles;
-    newViewEnd = Math.max(_repState.candlesPerView - 1, Math.min(newViewEnd, _repState.index));
-    _repState.viewEnd = newViewEnd;
-    _repDrawChart();
+  if (_repState._panning) {
+    const dxPx = x - _repState._panning.startX;
+    const barW = _repState.overlayW / Math.max(1, _repState.candlesPerView);
+    const deltaBars = dxPx / barW;
+    const r = _repState._panning.startLogical;
+    if (r) _repState.chart.timeScale().setVisibleLogicalRange({ from: r.from - deltaBars, to: r.to - deltaBars });
     return;
   }
-
-  if (_repState.drawDraft) {
-    _repState.drawDraft.cur = _repPointFromPixel(cssX, cssY);
-    _repDrawChart();
+  if (_repState._dragging) {
+    const d = _repState._dragging;
+    const point = _repPointFromPixel(x, y); if (!point) return;
+    if (d.drawing.kind === 'hline') d.drawing.p1.price = point.price;
+    else if (d.drawing.kind === 'vline') d.drawing.p1.time = point.time;
+    else if (d.drawing.kind === 'text') d.drawing.p1 = point;
+    else if (d.handle === 'p1') d.drawing.p1 = point;
+    else if (d.handle === 'p2') d.drawing.p2 = point;
+    else if (d.handle === 'body') {
+      const startPoint = _repPointFromPixel(d.startX, d.startY);
+      if (startPoint && d.orig.p1) {
+        const dt = point.time - startPoint.time, dp = point.price - startPoint.price;
+        d.drawing.p1 = { time: d.orig.p1.time + dt, price: d.orig.p1.price + dp };
+        if (d.orig.p2) d.drawing.p2 = { time: d.orig.p2.time + dt, price: d.orig.p2.price + dp };
+      }
+    }
+    _repDrawOverlay();
     return;
   }
-
-  _repUpdateCrosshair(cssX, cssY);
-}
-
-function _repCanvasMouseUp() {
-  if (!_repState) return;
-  if (_repState.panning) { _repState.panning = false; return; }
   if (_repState.drawDraft) {
     const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
-    if (tool) {
+    const point = _repPointFromPixel(x, y); if (!point) return;
+    if (tool && tool.kind === 'brush') _repState.drawDraft.points.push(point);
+    else _repState.drawDraft.cur = point;
+    _repDrawOverlay();
+    return;
+  }
+  const hit = _repHitTest(x, y);
+  _repState._hoverIdx = hit ? hit.index : -1;
+  _repState._manualCrosshair = { x, y };
+  const point = _repPointFromPixel(x, y);
+  if (point) _repUpdateOhlcBadge(point.time);
+  _repDrawOverlay();
+}
+
+function _repOverlayMouseUp() {
+  if (!_repState) return;
+  if (_repState._panning) { _repState._panning = null; return; }
+  if (_repState._dragging) { _repState._dragging = null; _repSaveState(); return; }
+  if (_repState.drawDraft) {
+    const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
+    if (tool && tool.kind === 'brush') {
+      if (_repState.drawDraft.points.length > 1) { _repPushHistory(); _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'brush', color: tool.color, points: _repState.drawDraft.points }); }
+      _repState.drawDraft = null; _repFinishToolPlacement(); return;
+    }
+    if (tool && _repState.drawDraft.cur) {
+      _repPushHistory();
       _repState.drawings.push({
         id: _repUid(), type: tool.id, kind: tool.kind, color: tool.color, stroke: tool.stroke,
-        dashed: tool.dashed, arrow: tool.arrow, measure: tool.measure, label: tool.drawLabel,
+        dashed: tool.dashed, arrow: tool.arrow, measure: tool.measure, label: tool.drawLabel, extension: tool.extension,
         p1: _repState.drawDraft.p1, p2: _repState.drawDraft.cur,
       });
     }
@@ -10851,39 +11131,79 @@ function _repCanvasMouseUp() {
   }
 }
 
-function _repCanvasWheel(e) {
+function _repOverlayWheel(e) {
   e.preventDefault();
-  const dir = e.deltaY > 0 ? 1 : -1;
-  _repZoom(dir);
+  _repZoom(e.deltaY > 0 ? 1 : -1);
 }
 
-function _repUpdateCrosshair(cssX, cssY) {
-  const box = document.getElementById('rep-crosshair-box'); if (!box) return;
-  const point = _repPointFromPixel(cssX, cssY);
-  const idx = _repIndexForTime(point.time);
-  const c = _repState.candles[idx];
-  if (!c) { box.style.display = 'none'; return; }
-  _repDrawChart();
+function _repOverlayDblClick() {
+  if (_repState?.drawDraft?.points) { _repOverlayMouseUp(); }
+}
+
+function _repOverlayContextMenu(e) {
+  e.preventDefault();
+  if (!_repState) return;
+  const { x, y } = _repOverlayLocalXY(e);
+  const hit = _repHitTest(x, y);
+  if (!hit) { _repHideContextMenu(); return; }
+  _repState.selectedId = hit.drawing.id;
+  _repDrawOverlay();
+  _repShowContextMenu(e.clientX, e.clientY, hit.drawing, hit.index);
+}
+
+function _repFinishToolPlacement() {
+  _repState.activeTool = 'select';
+  _repUpdateToolbarActive();
+  _repSaveState();
+  _repDrawOverlay();
+}
+
+function _repUpdateOhlcBadge(timeMs) {
+  const idx = _repIndexForTime(timeMs);
+  const c = _repState.candles[Math.min(idx, _repState.index)];
+  const badge = document.getElementById('rep-ohlc-badge'); if (!badge || !c) return;
+  const up = c.close >= c.open;
   const d = new Date(c.time);
-  box.style.display = 'block';
-  box.innerHTML = `${d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} &nbsp; O ${c.open.toFixed(5)} H ${c.high.toFixed(5)} L ${c.low.toFixed(5)} C ${c.close.toFixed(5)}`;
-
-  const ctx = _repState.ctx;
-  ctx.save();
-  ctx.strokeStyle = 'rgba(226,232,240,.35)'; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, cssY); ctx.lineTo(_repState.cssWidth - REP_PAD.right, cssY); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(cssX, 0); ctx.lineTo(cssX, _repState.cssHeight - REP_PAD.bottom); ctx.stroke();
-  ctx.restore();
+  badge.style.display = 'flex';
+  badge.innerHTML = `<span>${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+    <span>O <b>${c.open.toFixed(5)}</b></span><span>H <b>${c.high.toFixed(5)}</b></span>
+    <span>L <b>${c.low.toFixed(5)}</b></span><span class="${up ? 'up' : 'dn'}">C <b>${c.close.toFixed(5)}</b></span>`;
 }
 
-// ── Toolbar / controls ───────────────────────────────────
+function _repNativeCrosshairUpdate(param) {
+  if (!_repState || _repState.activeTool) return;
+  if (!param || !param.time) { const b = document.getElementById('rep-ohlc-badge'); if (b) b.style.display = 'none'; return; }
+  _repUpdateOhlcBadge(param.time * 1000);
+}
+
+// ══════════════════════════════════════════════════════
+// TOOLBAR / TOGGLES
+// ══════════════════════════════════════════════════════
 function _repSetTool(id) {
   _repState.activeTool = (_repState.activeTool === id) ? null : id;
   _repState.drawDraft = null;
   _repUpdateToolbarActive();
 }
 function _repUpdateToolbarActive() {
-  document.querySelectorAll('.rep-tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === _repState.activeTool));
+  document.querySelectorAll('.rep-tool-btn[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === _repState.activeTool));
+  const overlay = document.getElementById('rep-overlay');
+  if (overlay) overlay.classList.toggle('drawing', !!_repState.activeTool);
+  if (!_repState.activeTool) { _repState._manualCrosshair = null; _repDrawOverlay?.(); }
+}
+function _repToggleMagnet() {
+  _repState.magnet = !_repState.magnet;
+  document.getElementById('rep-magnet-btn')?.classList.toggle('on', _repState.magnet);
+  _repSaveState();
+}
+function _repToggleLoop() {
+  _repState.loop = !_repState.loop;
+  document.getElementById('rep-loop-btn')?.classList.toggle('active', _repState.loop);
+  _repSaveState();
+}
+function _repToggleSkipWeekends() {
+  _repState.skipWeekends = !_repState.skipWeekends;
+  document.getElementById('rep-weekend-btn')?.classList.toggle('active', _repState.skipWeekends);
+  _repSaveState();
 }
 function _repClearDrawings() {
   openGlassModal({
@@ -10892,51 +11212,210 @@ function _repClearDrawings() {
     body: 'Every trendline, zone, and annotation on this chart will be removed. This cannot be undone.',
     confirmLabel: 'Clear Drawings',
     confirmClass: 'glass-btn-danger',
-    onConfirm: () => { _repState.drawings = []; _repSaveState(); _repDrawChart(); }
+    onConfirm: () => { _repPushHistory(); _repState.drawings = []; _repState.selectedId = null; _repSaveState(); _repDrawOverlay(); }
+  });
+}
+function _repDeleteSelected() {
+  if (!_repState || !_repState.selectedId) return;
+  _repPushHistory();
+  _repState.drawings = _repState.drawings.filter(d => d.id !== _repState.selectedId);
+  _repState.selectedId = null;
+  _repSaveState(); _repDrawOverlay(); _repHideContextMenu();
+}
+function _repDuplicateSelected() {
+  if (!_repState || !_repState.selectedId) return;
+  const orig = _repState.drawings.find(d => d.id === _repState.selectedId); if (!orig) return;
+  _repPushHistory();
+  const shiftMs = (_repState.candles[1]?.time - _repState.candles[0]?.time) * 6 || 0;
+  const copy = JSON.parse(JSON.stringify(orig));
+  copy.id = _repUid();
+  if (copy.p1?.time !== undefined) copy.p1.time += shiftMs;
+  if (copy.p2?.time !== undefined) copy.p2.time += shiftMs;
+  _repState.drawings.push(copy);
+  _repState.selectedId = copy.id;
+  _repSaveState(); _repDrawOverlay(); _repHideContextMenu();
+}
+function _repChangeLayer(dir) {
+  if (!_repState || !_repState.selectedId) return;
+  const list = _repState.drawings;
+  const i = list.findIndex(d => d.id === _repState.selectedId); if (i < 0) return;
+  const j = dir > 0 ? i + 1 : i - 1;
+  if (j < 0 || j >= list.length) return;
+  _repPushHistory();
+  [list[i], list[j]] = [list[j], list[i]];
+  _repSaveState(); _repDrawOverlay(); _repHideContextMenu();
+}
+function _repSetDrawingColor(color) {
+  if (!_repState || !_repState.selectedId) return;
+  const dw = _repState.drawings.find(d => d.id === _repState.selectedId); if (!dw) return;
+  _repPushHistory();
+  dw.color = color; if (dw.stroke) dw.stroke = color;
+  _repSaveState(); _repDrawOverlay(); _repHideContextMenu();
+}
+
+// ── Right-click context menu ─────────────────────────────
+const REP_CTX_COLORS = ['#fbbf24', '#60a5fa', '#34d399', '#f87171', '#a78bfa', '#f472b6', '#e2e8f0'];
+function _repShowContextMenu(clientX, clientY, drawing, index) {
+  const menu = document.getElementById('rep-ctx-menu'); if (!menu) return;
+  menu.innerHTML = `
+    <div class="rep-ctx-item" onclick="_repDuplicateSelected()">${_repIcon('save', 'icn')}Duplicate</div>
+    <div class="rep-ctx-item" onclick="_repChangeLayer(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 8l8-5 8 5-8 5z"/><path d="M4 16l8 5 8-5"/></svg>Bring Forward</div>
+    <div class="rep-ctx-item" onclick="_repChangeLayer(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 16l8-5 8 5-8 5z"/><path d="M4 8l8 5 8-5"/></svg>Send Backward</div>
+    <div class="rep-ctx-sep"></div>
+    <div class="rep-ctx-colors">${REP_CTX_COLORS.map(c => `<div class="rep-ctx-color" style="background:${c}" onclick="_repSetDrawingColor('${c}')"></div>`).join('')}</div>
+    <div class="rep-ctx-sep"></div>
+    <div class="rep-ctx-item danger" onclick="_repDeleteSelected()"><svg class="icn" viewBox="0 0 24 24"><use href="#ic-trash"></use></svg>Delete</div>
+  `;
+  menu.style.left = clientX + 'px'; menu.style.top = clientY + 'px';
+  menu.classList.add('open');
+  setTimeout(() => document.addEventListener('click', _repHideContextMenu, { once: true }), 0);
+}
+function _repHideContextMenu() { document.getElementById('rep-ctx-menu')?.classList.remove('open'); }
+
+// ── Indicators / layouts popovers ────────────────────────
+function _repClosePopovers() {
+  document.getElementById('rep-indicators-popover')?.classList.remove('open');
+  document.getElementById('rep-layouts-popover')?.classList.remove('open');
+}
+function _repToggleIndicatorsPopover() {
+  const p = document.getElementById('rep-indicators-popover'); if (!p) return;
+  document.getElementById('rep-layouts-popover')?.classList.remove('open');
+  p.classList.toggle('open');
+}
+function _repToggleLayoutsPopover() {
+  const p = document.getElementById('rep-layouts-popover'); if (!p) return;
+  document.getElementById('rep-indicators-popover')?.classList.remove('open');
+  p.classList.toggle('open');
+  _repRenderLayoutsList();
+}
+function _repRenderIndicatorPopoverState() {
+  document.querySelectorAll('#rep-indicators-popover .rep-popover-row').forEach(row => {
+    row.classList.toggle('on', !!_repState.indicators[row.dataset.ind]);
   });
 }
 
+
+// ══════════════════════════════════════════════════════
+// INDICATORS — computed client-side from the visible replay
+// window and rendered as extra Lightweight Charts line series.
+// Kept intentionally small (EMA/SMA/VWAP) as the first real
+// entries in what will become a full indicator manager.
+// ══════════════════════════════════════════════════════
+const REP_IND_DEFS = {
+  ema9:  { color: '#fbbf24', calc: c => _repEMA(c, 9) },
+  ema21: { color: '#60a5fa', calc: c => _repEMA(c, 21) },
+  sma50: { color: '#a78bfa', calc: c => _repSMA(c, 50) },
+  vwap:  { color: '#2dd4bf', calc: c => _repVWAP(c) },
+};
+function _repEMA(candles, period) {
+  const k = 2 / (period + 1);
+  let ema = null;
+  return candles.map((c, i) => {
+    if (i < period - 1) return null;
+    if (ema === null) { ema = candles.slice(0, period).reduce((a, x) => a + x.close, 0) / period; return { time: Math.floor(c.time / 1000), value: ema }; }
+    ema = c.close * k + ema * (1 - k);
+    return { time: Math.floor(c.time / 1000), value: ema };
+  }).filter(Boolean);
+}
+function _repSMA(candles, period) {
+  return candles.map((c, i) => {
+    if (i < period - 1) return null;
+    const slice = candles.slice(i - period + 1, i + 1);
+    const avg = slice.reduce((a, x) => a + x.close, 0) / period;
+    return { time: Math.floor(c.time / 1000), value: avg };
+  }).filter(Boolean);
+}
+function _repVWAP(candles) {
+  let cumPV = 0, cumV = 0;
+  return candles.map(c => {
+    const typical = (c.high + c.low + c.close) / 3;
+    const vol = c.volume || 1; // forex feeds often lack real volume — fall back to an even weight
+    cumPV += typical * vol; cumV += vol;
+    return { time: Math.floor(c.time / 1000), value: cumPV / cumV };
+  });
+}
+function _repToggleIndicator(id) {
+  _repState.indicators[id] = !_repState.indicators[id];
+  document.querySelector(`#rep-indicators-popover .rep-popover-row[data-ind="${id}"]`)?.classList.toggle('on', _repState.indicators[id]);
+  if (!_repState.indicators[id] && _repState.indicatorSeries[id]) {
+    _repState.chart.removeSeries(_repState.indicatorSeries[id]);
+    delete _repState.indicatorSeries[id];
+  }
+  _repApplyIndicators(_repState.candles.slice(0, _repState.index + 1));
+  _repSaveState();
+}
+function _repApplyIndicators(slice) {
+  if (!_repState || !_repState.chart) return;
+  Object.keys(_repState.indicators).forEach(id => {
+    if (!_repState.indicators[id]) return;
+    const def = REP_IND_DEFS[id]; if (!def) return;
+    if (!_repState.indicatorSeries[id]) {
+      _repState.indicatorSeries[id] = _repState.chart.addLineSeries({ color: def.color, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    }
+    _repState.indicatorSeries[id].setData(def.calc(slice));
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// PLAYBACK CONTROLS
+// ══════════════════════════════════════════════════════
+function _repIsWeekend(ms) { const d = new Date(ms).getUTCDay(); return d === 0 || d === 6; }
+function _repNextPlayableIndex(from, dir) {
+  let idx = from + dir;
+  if (_repState.skipWeekends) {
+    while (idx >= 0 && idx < _repState.candles.length && _repIsWeekend(_repState.candles[idx].time)) idx += dir;
+  }
+  return idx;
+}
 function _repTogglePlay() { _repState.playing ? _repPause() : _repPlay(); }
 function _repPlay() {
   if (!_repState || _repState.playing) return;
-  if (_repState.index >= _repState.candles.length - 1) return;
+  if (_repState.index >= _repState.candles.length - 1) {
+    if (_repState.loop) { _repState.index = Math.min(_repState.candlesPerView - 1, _repState.candles.length - 1); }
+    else return;
+  }
   _repState.playing = true;
-  const btn = document.getElementById('rep-play-btn'); if (btn) btn.textContent = '⏸ Pause';
-  const delay = 600 / _repState.speed;
+  document.getElementById('rep-play-icon').innerHTML = '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>';
+  const delay = Math.max(30, 500 / _repState.speed);
   _repState._timer = setInterval(() => {
-    if (_repState.index >= _repState.candles.length - 1) { _repPause(); return; }
-    _repState.index++; _repState.viewEnd = _repState.index;
-    _repDrawChart();
+    let next = _repNextPlayableIndex(_repState.index, 1);
+    if (next >= _repState.candles.length) {
+      if (_repState.loop) next = Math.min(_repState.candlesPerView - 1, _repState.candles.length - 1);
+      else { _repPause(); return; }
+    }
+    _repState.index = next;
+    _repSetChartData(true);
   }, delay);
 }
 function _repPause() {
   if (!_repState) return;
   _repState.playing = false;
   clearInterval(_repState._timer);
-  const btn = document.getElementById('rep-play-btn'); if (btn) btn.textContent = '▶ Play';
+  const icon = document.getElementById('rep-play-icon'); if (icon) icon.innerHTML = '<path d="M7 5l12 7-12 7z"/>';
   _repSaveState();
 }
 function _repStep(dir) {
   if (!_repState) return;
   _repPause();
-  _repState.index = Math.max(0, Math.min(_repState.candles.length - 1, _repState.index + dir));
-  _repState.viewEnd = _repState.index;
-  _repDrawChart();
+  const next = _repNextPlayableIndex(_repState.index, dir);
+  _repState.index = Math.max(0, Math.min(_repState.candles.length - 1, next));
+  _repSetChartData(true);
   _repSaveState();
 }
 function _repReset() {
   if (!_repState) return;
   _repPause();
   _repState.index = Math.min(_repState.candlesPerView - 1, _repState.candles.length - 1);
-  _repState.viewEnd = _repState.index;
-  _repDrawChart();
+  _repSetChartData(true);
   _repSaveState();
 }
-function _repSetSpeed(val) { if (_repState) { _repState.speed = parseFloat(val) || 1; if (_repState.playing) { _repPause(); _repPlay(); } } }
+function _repSetSpeed(val) { if (_repState) { _repState.speed = parseFloat(val) || 1; _repSaveState(); if (_repState.playing) { _repPause(); _repPlay(); } } }
 function _repZoom(dir) {
   if (!_repState) return;
   _repState.candlesPerView = Math.max(20, Math.min(400, _repState.candlesPerView + dir * 10));
-  _repDrawChart();
+  const total = Math.min(_repState.index + 1, _repState.candles.length);
+  _repState.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, total - _repState.candlesPerView), to: total - 1 + 3 });
+  _repSaveState();
 }
 function _repJumpToDate(dateStr) {
   if (!_repState || !dateStr) return;
@@ -10944,19 +11423,112 @@ function _repJumpToDate(dateStr) {
   const targetMs = new Date(dateStr).getTime();
   const idx = _repIndexForTime(targetMs);
   _repState.index = Math.max(0, Math.min(_repState.candles.length - 1, idx));
-  _repState.viewEnd = _repState.index;
-  _repDrawChart();
+  _repSetChartData(true);
   _repSaveState();
+}
+function _repScrubProgress(val) {
+  if (!_repState) return;
+  _repPause();
+  const total = _repState.candles.length;
+  _repState.index = Math.max(0, Math.min(total - 1, Math.round((val / 100) * (total - 1))));
+  _repSetChartData(true);
+  _repSaveState();
+}
+function _repToggleFullscreen() {
+  const el = document.getElementById('rep-fullscreen-overlay');
+  if (!document.fullscreenElement) el?.requestFullscreen?.().catch(() => {});
+  else document.exitFullscreen?.();
+}
+
+// ══════════════════════════════════════════════════════
+// SAVE / LOAD LAYOUTS — named drawing-set snapshots, kept
+// in localStorage per browser (fast, no schema migration
+// needed; promote to Supabase alongside the layout manager
+// in a later phase if traders want them synced across devices).
+// ══════════════════════════════════════════════════════
+function _repLayoutsStore() { try { return JSON.parse(localStorage.getItem('nxtgen_rep_layouts') || '{}'); } catch (e) { return {}; } }
+function _repSaveLayout() {
+  const name = prompt('Name this layout:', `${_repState.symbol} setup`);
+  if (!name) return;
+  const store = _repLayoutsStore();
+  store[name] = { drawings: _repState.drawings, indicators: _repState.indicators, savedAt: Date.now() };
+  localStorage.setItem('nxtgen_rep_layouts', JSON.stringify(store));
+  if (typeof showToast === 'function') showToast(`Layout "${name}" saved`, 'success');
+  _repRenderLayoutsList();
+}
+function _repRenderLayoutsList() {
+  const wrap = document.getElementById('rep-layouts-list'); if (!wrap) return;
+  const store = _repLayoutsStore();
+  const names = Object.keys(store);
+  wrap.innerHTML = names.length ? names.map(n => `
+    <div class="rep-popover-row" onclick="_repLoadLayout('${n.replace(/'/g, "\\'")}')">
+      <span>${n}</span>
+      <span onclick="event.stopPropagation();_repDeleteLayout('${n.replace(/'/g, "\\'")}')" style="opacity:.5;padding:2px"><svg class="icn" style="width:12px;height:12px" viewBox="0 0 24 24"><use href="#ic-trash"></use></svg></span>
+    </div>`).join('') : `<div style="padding:8px;font-size:11px;color:var(--text3)">No saved layouts yet</div>`;
+}
+function _repLoadLayout(name) {
+  const store = _repLayoutsStore(); const layout = store[name]; if (!layout) return;
+  _repPushHistory();
+  _repState.drawings = JSON.parse(JSON.stringify(layout.drawings || []));
+  _repState.indicators = layout.indicators || _repState.indicators;
+  Object.keys(_repState.indicatorSeries).forEach(id => { _repState.chart.removeSeries(_repState.indicatorSeries[id]); });
+  _repState.indicatorSeries = {};
+  _repApplyIndicators(_repState.candles.slice(0, _repState.index + 1));
+  _repRenderIndicatorPopoverState();
+  _repSaveState(); _repDrawOverlay(); _repClosePopovers();
+  if (typeof showToast === 'function') showToast(`Layout "${name}" loaded`, 'success');
+}
+function _repDeleteLayout(name) {
+  const store = _repLayoutsStore(); delete store[name];
+  localStorage.setItem('nxtgen_rep_layouts', JSON.stringify(store));
+  _repRenderLayoutsList();
+}
+
+// ══════════════════════════════════════════════════════
+// BOTTOM TRADING DOCK — real session/account numbers pulled
+// from the existing Backtesting Lab data layer (_btTradesForSession
+// + _btComputeStats), not placeholders.
+// ══════════════════════════════════════════════════════
+function _repRenderBottomDock() {
+  const dock = document.getElementById('rep-bottom-dock'); if (!dock) return;
+  const session = _btGetSessionById(_repState.sessionId);
+  const startingBalance = Number(session?.startingBalance) || 0;
+  const trades = _btTradesForSession(_repState.sessionId);
+  const stats = _btComputeStats(trades, startingBalance);
+  const equity = startingBalance + (stats.netReturn || 0);
+  const c = _repState.candles[_repState.index];
+  const dateStr = c ? new Date(c.time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
+  dock.innerHTML = `
+    <div class="rep-dock-stats">
+      <div class="rep-dock-stat"><span class="rep-dock-stat-label">Balance</span><span class="rep-dock-stat-value">$${startingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+      <div class="rep-dock-stat"><span class="rep-dock-stat-label">Equity</span><span class="rep-dock-stat-value">$${equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+      <div class="rep-dock-divider"></div>
+      <div class="rep-dock-stat"><span class="rep-dock-stat-label">Realized PnL</span><span class="rep-dock-stat-value ${(stats.netReturn || 0) >= 0 ? 'up' : 'dn'}">${(stats.netReturn || 0) >= 0 ? '+' : ''}$${(stats.netReturn || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+      <div class="rep-dock-stat"><span class="rep-dock-stat-label">Avg RR</span><span class="rep-dock-stat-value">${stats.avgRR ?? '—'}</span></div>
+      <div class="rep-dock-stat"><span class="rep-dock-stat-label">Win Rate</span><span class="rep-dock-stat-value">${stats.winRate != null ? stats.winRate + '%' : '—'}</span></div>
+      <div class="rep-dock-divider"></div>
+      <div class="rep-dock-stat"><span class="rep-dock-stat-label">Trades</span><span class="rep-dock-stat-value">${stats.totalTests}</span></div>
+      <div class="rep-dock-stat"><span class="rep-dock-stat-label">Replay Time</span><span class="rep-dock-stat-value" style="font-size:11px">${dateStr}</span></div>
+    </div>
+    <div class="rep-dock-actions">
+      <input type="number" class="rep-qty-input" id="rep-qty-input" placeholder="Lots" step="0.01" value="1.00">
+      <button class="rep-exec-btn rep-exec-buy" onclick="_repExecuteTrade('buy')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Buy</button>
+      <button class="rep-exec-btn rep-exec-sell" onclick="_repExecuteTrade('sell')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Sell</button>
+    </div>
+  `;
 }
 
 // ── Trade execution bridge (Chart Replay → Trade Simulator) ──
 function _repExecuteTrade(direction) {
   if (!_repState) return;
-  const candle = _repState.candles[_repState.viewEnd];
+  const candle = _repState.candles[_repState.index];
   if (!candle) { showToast('No candle to execute against', 'danger'); return; }
   const sessionId = _repState.sessionId;
   _repSaveState();
   document.getElementById('rep-fullscreen-overlay')?.remove();
+  document.removeEventListener('keydown', _repKeyHandler);
+  try { _repState.chart?.remove(); } catch (e) {}
   _repState = null;
   _openTradeEntryModal(sessionId, null, {
     direction,
