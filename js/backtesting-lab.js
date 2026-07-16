@@ -471,7 +471,7 @@ async function _repOpen(sessionId) {
     candlesPerView: saved.candlesPerView || 100,
     drawings: saved.drawings ? JSON.parse(JSON.stringify(saved.drawings)) : [],
     activeTool: null, drawDraft: null, selectedId: null, hoverId: null,
-    magnet: saved.magnet !== undefined ? saved.magnet : true,
+    magnet: saved.magnet !== undefined ? saved.magnet : false,
     loop: saved.loop || false,
     skipWeekends: saved.skipWeekends !== undefined ? saved.skipWeekends : true,
     playing: false, speed: saved.speed || 1,
@@ -1381,7 +1381,6 @@ function _repOverlayContextMenu(e) {
 }
 
 function _repFinishToolPlacement() {
-  _repState.activeTool = 'select';
   _repUpdateToolbarActive();
   _repSaveState();
   _repDrawOverlay();
