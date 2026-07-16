@@ -552,17 +552,17 @@ tr.bl-compare-best td { border-color:rgba(251,191,36,.2); }
   position:absolute; left:calc(100% + 8px); top:50%; transform:translateY(-50%) translateX(-4px);
   background:rgba(10,12,18,.96); border:1px solid var(--glass-border); color:var(--text);
   padding:5px 9px; border-radius:var(--r-sm); font-size:11px; font-weight:600; white-space:nowrap;
-  pointer-events:none; opacity:0; transition:var(--t-fast); box-shadow:var(--shadow-md); z-index:60;
+  pointer-events:none; opacity:0; transition:opacity .1s ease, transform .1s ease; box-shadow:var(--shadow-md); z-index:60;
 }
-.rep-tool-btn:hover .rep-tooltip { opacity:1; transform:translateY(-50%) translateX(0); }
+.rep-tool-btn:hover .rep-tooltip { opacity:1; transform:translateY(-50%) translateX(0); transition-delay:.4s; }
 
 .rep-chart-area { flex:1; min-width:0; position:relative; }
 .rep-chart-wrap { position:absolute; inset:0; }
-/* rep-overlay-canvas: legacy hand-rolled drawing surface. No longer
-   wired to mouse events now that the real TradingView chart owns
-   drawing/crosshair/zoom — left in place (inert) rather than ripped
-   out, so the #rep-overlay element some other code still references
-   doesn't disappear. Safe to delete once you're fully migrated. */
+/* rep-overlay-canvas: the drawing surface. Sits above the Lightweight
+   Charts candle chart; pointer-events toggle to "auto" only while a
+   drawing tool is active (class .drawing, set by
+   _repUpdateToolbarActive) so the native chart's own pan/zoom/
+   crosshair still works the rest of the time. */
 .rep-overlay-canvas { position:absolute; inset:0; z-index:5; cursor:default; pointer-events:none; }
 .rep-overlay-canvas.drawing { cursor:crosshair; pointer-events:auto; }
 .rep-overlay-canvas.dragging { cursor:grabbing; }

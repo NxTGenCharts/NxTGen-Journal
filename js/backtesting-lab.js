@@ -266,50 +266,6 @@ const REP_SOURCES = [
 ];
 function _repGetSource(id) { return REP_SOURCES.find(s => s.id === id) || REP_SOURCES[0]; }
 
-// Maps our existing REP_TOOLS ids to the real TradingView LineTool*
-// identifiers used by chart.selectLineTool(). These are the
-// library's documented built-in tool names — verify the exact
-// strings against your installed library version's docs (Drawings
-// API reference) if any tool doesn't arm correctly; naming has
-// shifted slightly across major versions.
-const TV_LINE_TOOL_MAP = {
-  select: 'cursor',
-  trendline: 'LineToolTrendLine',
-  ray: 'LineToolRay',
-  arrow: 'LineToolArrow',
-  hline: 'LineToolHorzLine',
-  vline: 'LineToolVertLine',
-  measure: 'LineToolCircle', // TODO: swap for the measure tool's exact id once confirmed for your version
-  rect: 'LineToolRectangle',
-  circle: 'LineToolCircle',
-  brush: 'LineToolBrush',
-  text: 'LineToolText',
-  fib: 'LineToolFibRetracement',
-  fibext: 'LineToolFibExtension',
-  killzone: 'LineToolRectangle',
-  orderblock: 'LineToolRectangle',
-  fvg: 'LineToolRectangle',
-  liquidity: 'LineToolHorzLine',
-  premiumdiscount: 'LineToolRectangle',
-};
-
-// TradingView's built-in study names + default inputs for the
-// indicators your popover already lists — real studies now render
-// natively on the chart instead of the old hand-rolled line series.
-const REP_TV_STUDY_MAP = {
-  ema9: { name: 'Moving Average Exponential', inputs: { length: 9 } },
-  ema21: { name: 'Moving Average Exponential', inputs: { length: 21 } },
-  ema50: { name: 'Moving Average Exponential', inputs: { length: 50 } },
-  sma50: { name: 'Moving Average', inputs: { length: 50 } },
-  sma200: { name: 'Moving Average', inputs: { length: 200 } },
-  vwap: { name: 'Volume Weighted Average Price', inputs: {} },
-  bb: { name: 'Bollinger Bands', inputs: { length: 20, mult: 2 } },
-  rsi: { name: 'Relative Strength Index', inputs: { length: 14 } },
-  macd: { name: 'MACD', inputs: { fastLength: 12, slowLength: 26, signalLength: 9 } },
-  stoch: { name: 'Stochastic', inputs: { k: 14, d: 3, smooth: 3 } },
-  atr: { name: 'Average True Range', inputs: { length: 14 } },
-};
-
 // Drawing tools shown in the left toolbar, top to bottom.
 // `group` clusters related tools for the toolbar dividers.
 // `icon` refers to an id in the icon sprite (index.html <defs>)
@@ -480,6 +436,8 @@ function _repClose() {
   _repPause();
   _repSaveState();
   document.removeEventListener('keydown', _repKeyHandler);
+  window.removeEventListener('mouseup', _repOverlayMouseUp);
+  if (_repState?._overlayResizeObs) { try { _repState._overlayResizeObs.disconnect(); } catch (e) {} }
   try { _repState?.chart?.remove(); } catch (e) {}
   document.getElementById('rep-fullscreen-overlay')?.remove();
   _repState = null;
@@ -499,6 +457,18 @@ async function _repSaveState() {
 
 // ── DOM shell — FXReplay-inspired workstation layout ────
 function _repRenderShell() {
+  // Rebuilding the DOM destroys the chart's container — dispose the
+  // old chart/series first so _repLoadCandles knows to init a fresh
+  // one against the new container, instead of holding a stale
+  // reference to a chart bound to a now-detached element.
+  if (_repState._overlayResizeObs) { try { _repState._overlayResizeObs.disconnect(); } catch (e) {} }
+  if (_repState.chart) { try { _repState.chart.remove(); } catch (e) {} }
+  _repState.chart = null;
+  _repState.candleSeries = null;
+  _repState.volumeSeries = null;
+  _repState.indicatorSeries = {};
+  window.removeEventListener('mouseup', _repOverlayMouseUp);
+
   document.getElementById('rep-fullscreen-overlay')?.remove();
   const session = _btGetSessionById(_repState.sessionId);
   const overlay = document.createElement('div');
@@ -757,20 +727,8 @@ async function _repSymbolSearchSelect(symbol) {
   _repState.symbol = symbol;
   _repState._savedIndex = null;
 
-  const chart = _repState.tvChart;
-  if (chart && chart.setSymbol) {
-    // Real chart already exists — swap its symbol in place instead
-    // of tearing down and rebuilding the whole widget.
-    const tvInterval = tvIntervalFromSourceInterval(_repState.interval, _repState.source);
-    chart.setSymbol(symbol, tvInterval, () => {
-      if (window.TVReplay) { TVReplay.bars = []; TVReplay.cursor = -1; } // force re-seed on next getBars
-      _repRenderShell();
-      _repLoadCandles(); // keeps _repState.candles/index/HUD in sync exactly as before
-    });
-  } else {
-    _repRenderShell();
-    await _repLoadCandles();
-  }
+  _repRenderShell();
+  await _repLoadCandles();
 }
 
 async function _repChangeSymbolInterval() {
@@ -824,10 +782,10 @@ async function _repLoadCandles() {
       if (status) status.style.display = 'none';
     }
     // Keep the counter/progress bar/date field in sync with the
-    // loaded candles regardless of whether the chart itself could
-    // render (e.g. charting_library/ not added yet) — this used to
-    // get stuck at 0 / 0 because _repSetChartData bails out early
-    // when there's no chart, and the HUD update lived inside it.
+    // loaded candles even if the chart itself failed to init (e.g.
+    // the CDN script didn't load) — this used to get stuck at 0 / 0
+    // because _repSetChartData bails out early with no chart, and
+    // the HUD update lived inside it.
     _repUpdateReplayHud();
     _repRenderBottomDock();
   } catch (err) {
@@ -839,65 +797,102 @@ async function _repLoadCandles() {
   }
 }
 
-// ── TradingView Advanced Charting Library bootstrap ─────
-// Requires charting_library/ (from TradingView's private repo,
-// see TRADINGVIEW_INTEGRATION_GUIDE.md) and tv-datafeed.js to be
-// loaded first. Until that folder is added, `TradingView.widget`
-// won't exist and this will throw — the catch below falls back
-// to a clear status message instead of a silent blank chart.
+// ── Lightweight Charts bootstrap ─────────────────────────
+// Free, open-source (Apache 2.0) — no license needed. The rest of
+// this file (drawings, indicators, theme) already targets this
+// library's API (chart.addLineSeries, candleSeries.priceToCoordinate,
+// etc.) — this function just has to actually create that chart.
 function _repInitChart() {
   const container = document.getElementById('rep-chart-wrap'); if (!container) return false;
-  if (typeof TradingView === 'undefined' || !TradingView.widget) {
+  if (typeof LightweightCharts === 'undefined') {
     const status = document.getElementById('rep-status-msg');
     if (status) {
-      status.innerHTML = `<div>TradingView charting library not found.</div><small style="color:var(--text3)">Add charting_library/ (see TRADINGVIEW_INTEGRATION_GUIDE.md) and reload.</small>`;
+      status.innerHTML = `<div>Charting library failed to load.</div><small style="color:var(--text3)">Check your connection and reload the page.</small>`;
       status.classList.add('rep-error'); status.style.display = 'flex';
     }
     return false;
   }
 
-  const tvInterval = tvIntervalFromSourceInterval(_repState.interval, _repState.source);
-  const widget = new TradingView.widget({
-    container,
-    library_path: 'charting_library/',
-    datafeed: TVDatafeed,
-    symbol: _repState.symbol,
-    interval: tvInterval,
-    fullscreen: false,
-    autosize: true,
-    theme: 'Dark',
-    overrides: {
-      'paneProperties.background': '#080b12',
-      'paneProperties.backgroundType': 'solid',
-      'paneProperties.vertGridProperties.color': 'rgba(255,255,255,.04)',
-      'paneProperties.horzGridProperties.color': 'rgba(255,255,255,.04)',
-      'mainSeriesProperties.candleStyle.upColor': '#34d399',
-      'mainSeriesProperties.candleStyle.downColor': '#f87171',
-      'mainSeriesProperties.candleStyle.wickUpColor': '#34d399',
-      'mainSeriesProperties.candleStyle.wickDownColor': '#f87171',
-      'mainSeriesProperties.candleStyle.borderVisible': false,
-      'scalesProperties.textColor': 'rgba(226,232,240,.62)',
+  const chart = LightweightCharts.createChart(container, {
+    autoSize: true,
+    layout: { background: { type: 'solid', color: '#080b12' }, textColor: 'rgba(226,232,240,.62)' },
+    grid: {
+      vertLines: { color: 'rgba(255,255,255,.04)', visible: _repState.theme.grid },
+      horzLines: { color: 'rgba(255,255,255,.04)', visible: _repState.theme.grid },
     },
-    disabled_features: ['header_symbol_search', 'header_compare'],
-    enabled_features: ['study_templates', 'use_localstorage_for_settings'],
-    client_id: 'nxtgen-journal',
-    user_id: (window._currentUserId || 'guest'),
-    load_last_chart: true,
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: 'rgba(255,255,255,.08)' },
+    timeScale: { borderColor: 'rgba(255,255,255,.08)', timeVisible: true, secondsVisible: false },
+    handleScroll: true, handleScale: true,
   });
 
-  widget.onChartReady(() => {
-    _repState.tvChart = widget.activeChart();
-    _repApplyTheme();
-    _repUpdateReplayHud();
+  const candleSeries = chart.addCandlestickSeries({
+    upColor: _repState.theme.upColor, downColor: _repState.theme.downColor,
+    wickUpColor: _repState.theme.upColor, wickDownColor: _repState.theme.downColor,
+    borderVisible: false,
   });
 
-  _repState.chart = widget;
+  _repState.chart = chart;
+  _repState.candleSeries = candleSeries;
+
+  chart.subscribeCrosshairMove(_repNativeCrosshairUpdate);
+  // Drawings are stored in time/price space and re-projected to pixels
+  // every render — so when the user pans/zooms the native chart (no
+  // drawing tool active, overlay is pointer-events:none and lets the
+  // gesture through), the overlay still needs to redraw to stay glued.
+  chart.timeScale().subscribeVisibleLogicalRangeChange(() => _repDrawOverlay());
+
+  _repInitOverlayCanvas();
   return true;
 }
 
-// Kept as a no-op call target — the real chart autosizes itself.
-// This used to resize the canvas overlay the old hand-rolled
-// drawing engine painted into.
+// Sizes the drawing-overlay canvas to match the chart, keeps it in
+// sync on resize (devicePixelRatio-aware so lines stay crisp on
+// retina displays), and — this is the important part — actually
+// attaches the mouse/wheel/dblclick/contextmenu handlers that this
+// file already defines (_repOverlayMouseDown etc.) but that were
+// never wired to the DOM, so drawing/selecting/dragging did nothing.
+function _repInitOverlayCanvas() {
+  const canvas = document.getElementById('rep-overlay');
+  const wrap = document.getElementById('rep-chart-wrap');
+  if (!canvas || !wrap || !_repState) return;
+
+  const resize = () => {
+    if (!_repState) return;
+    const rect = wrap.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, rect.width * dpr);
+    canvas.height = Math.max(1, rect.height * dpr);
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    _repState.overlayCtx = ctx;
+    _repState.overlayW = rect.width;
+    _repState.overlayH = rect.height;
+    _repDrawOverlay();
+  };
+
+  if (_repState._overlayResizeObs) { try { _repState._overlayResizeObs.disconnect(); } catch (e) {} }
+  const ro = new ResizeObserver(resize);
+  ro.observe(wrap);
+  _repState._overlayResizeObs = ro;
+  resize();
+
+  canvas.onmousedown = _repOverlayMouseDown;
+  canvas.onmousemove = _repOverlayMouseMove;
+  canvas.onwheel = _repOverlayWheel;
+  canvas.ondblclick = _repOverlayDblClick;
+  canvas.oncontextmenu = _repOverlayContextMenu;
+  canvas.onmouseleave = () => { if (_repState) { _repState._manualCrosshair = null; _repDrawOverlay(); } };
+  // mouseup on window, not just the canvas, so a drag that ends
+  // outside the canvas (fast mouse movement) still releases cleanly
+  window.removeEventListener('mouseup', _repOverlayMouseUp);
+  window.addEventListener('mouseup', _repOverlayMouseUp);
+}
+
+// Kept as a no-op call target for any older call sites — sizing is
+// now handled by the ResizeObserver set up in _repInitOverlayCanvas.
 function _repResizeOverlay() {}
 
 // TV resolution string ("1","5","15","30","60","240","1D","1W")
@@ -911,34 +906,34 @@ function tvIntervalFromSourceInterval(interval, sourceId) {
   return (table[sourceId] && table[sourceId][interval]) || '60';
 }
 
-// ── Feed the visible replay window into the real chart ──
+// ── Feed the visible replay window into the chart ────────
 // _repState.index stays the single source of truth (every existing
 // play/step/scrub/jump-to-date function only ever touches that
 // number, unchanged) — this function's job is just to make the
-// real TradingView chart agree with it.
-//
-// The library's realtime API (subscribeBars) is built for a live
-// feed appending new bars in order, not for arbitrary rewinding —
-// so a plain +1 step is pushed as a tick (cheap, matches how the
-// library expects updates), while any backward step, scrub, or
-// date-jump forces the datafeed's getBars to be re-queried against
-// the new cursor via resetCache()/resetData().
+// chart agree with it. Lightweight Charts has no concept of
+// "replay" — we just re-set the series data to the slice of candles
+// up to the current index on every step/scrub.
 function _repSetChartData(recenter) {
-  if (!_repState || !_repState.chart) return;
-  if (!window.TVReplay || !TVReplay.bars.length) { _repUpdateReplayHud(); return; }
-
-  const delta = _repState.index - TVReplay.cursor;
-  if (delta === 1) {
-    TVReplay.step(1);
-  } else if (delta !== 0) {
-    TVReplay.cursor = _repState.index;
-    const chart = _repState.tvChart;
-    if (chart && chart.resetCache && chart.resetData) {
-      chart.resetCache();
-      chart.resetData();
-    }
+  if (!_repState || !_repState.candleSeries) return;
+  const slice = _repState.candles.slice(0, _repState.index + 1);
+  if (!slice.length) return;
+  const bars = slice.map(c => ({
+    time: Math.floor(c.time / 1000), open: c.open, high: c.high, low: c.low, close: c.close,
+  }));
+  _repState.candleSeries.setData(bars);
+  if (_repState.volumeSeries) {
+    _repState.volumeSeries.setData(slice.map(c => ({
+      time: Math.floor(c.time / 1000), value: c.volume || 0,
+      color: c.close >= c.open ? 'rgba(52,211,153,.5)' : 'rgba(248,113,113,.5)',
+    })));
+  }
+  _repApplyIndicators(slice);
+  if (recenter) {
+    const from = Math.max(0, slice.length - _repState.candlesPerView);
+    _repState.chart.timeScale().setVisibleLogicalRange({ from, to: slice.length - 1 + 2 });
   }
   _repUpdateReplayHud();
+  _repDrawOverlay();
 }
 
 function _repUpdateReplayHud() {
@@ -1322,9 +1317,6 @@ function _repSetTool(id) {
   _repState.activeTool = (_repState.activeTool === id) ? null : id;
   _repState.drawDraft = null;
   _repUpdateToolbarActive();
-  const chart = _repState.tvChart; if (!chart) return;
-  const toolName = TV_LINE_TOOL_MAP[_repState.activeTool];
-  chart.selectLineTool((_repState.activeTool && toolName && toolName !== 'cursor') ? toolName : 'cursor');
 }
 function _repUpdateToolbarActive() {
   document.querySelectorAll('.rep-tool-btn[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === _repState.activeTool));
@@ -1354,27 +1346,36 @@ function _repClearDrawings() {
     body: 'Every trendline, zone, and annotation on this chart will be removed. This cannot be undone.',
     confirmLabel: 'Clear Drawings',
     confirmClass: 'glass-btn-danger',
-    onConfirm: () => { _repState.tvChart?.removeAllShapes(); }
+    onConfirm: () => {
+      if (!_repState) return;
+      _repPushHistory();
+      _repState.drawings = [];
+      _repState.selectedId = null;
+      _repSaveState(); _repDrawOverlay();
+    }
   });
 }
 function _repDeleteSelected() {
-  const chart = _repState?.tvChart; if (!chart) return;
-  chart.selection().allSources().forEach(id => chart.removeEntity(id));
-  chart.selection().clear();
-  _repHideContextMenu();
+  if (!_repState || !_repState.selectedId) { _repHideContextMenu(); return; }
+  _repPushHistory();
+  _repState.drawings = _repState.drawings.filter(d => d.id !== _repState.selectedId);
+  _repState.selectedId = null;
+  _repSaveState(); _repDrawOverlay(); _repHideContextMenu();
 }
 function _repDuplicateSelected() {
-  const chart = _repState?.tvChart; if (!chart) return;
-  const [id] = chart.selection().allSources(); if (!id) return;
-  const shape = chart.getShapeById(id); if (!shape) return;
-  const shiftSec = ((_repState.candles[1]?.time - _repState.candles[0]?.time) / 1000 * 6) || 0;
-  const points = shape.getPoints().map(p => ({ ...p, time: p.time + shiftSec }));
-  const props = shape.getProperties();
-  chart.createMultipointShape(points, { shape: props.linetool || props.shape, overrides: props }).then(newId => {
-    chart.selection().clear();
-    chart.selection().add(newId);
-  });
-  _repHideContextMenu();
+  if (!_repState || !_repState.selectedId) { _repHideContextMenu(); return; }
+  const dw = _repState.drawings.find(d => d.id === _repState.selectedId); if (!dw) return;
+  const barMs = ((_repState.candles[1]?.time - _repState.candles[0]?.time) || 3600000) * 6;
+  const shift = pt => pt && pt.time != null ? { ...pt, time: pt.time + barMs } : pt;
+  const clone = JSON.parse(JSON.stringify(dw));
+  clone.id = _repUid();
+  if (clone.p1) clone.p1 = shift(clone.p1);
+  if (clone.p2) clone.p2 = shift(clone.p2);
+  if (clone.points) clone.points = clone.points.map(shift);
+  _repPushHistory();
+  _repState.drawings.push(clone);
+  _repState.selectedId = clone.id;
+  _repSaveState(); _repDrawOverlay(); _repHideContextMenu();
 }
 function _repChangeLayer(dir) {
   if (!_repState || !_repState.selectedId) return;
@@ -1663,20 +1664,18 @@ function _repATR(candles, period) {
   return [{ kind: 'line', color: '#2dd4bf', width: 1.5, data: out }];
 }
 
-// Indicators now render as real TradingView studies (multi-pane,
-// draggable, resizable — for free) instead of the old hand-rolled
-// line series, so this only has to track which study id backs
-// which of your existing popover toggles.
+// Indicators render as Lightweight Charts line/histogram series,
+// recomputed client-side from the visible replay window on every
+// step (see _repApplyIndicators below).
 function _repToggleIndicator(id) {
-  const def = REP_IND_DEFS[id]; const study = REP_TV_STUDY_MAP[id];
-  const chart = _repState?.tvChart;
-  if (!def || !study || !chart) return;
+  const def = REP_IND_DEFS[id];
+  if (!def || !_repState || !_repState.chart) return;
   const turningOn = !_repState.indicators[id];
 
   if (turningOn && def.type === 'oscillator') {
-    // No longer a hard limit — real panes stack cleanly — but we
-    // keep "one oscillator at a time" as the default UX unless you
-    // want to open this up now that multi-pane is free.
+    // Only one oscillator strip at a time — Lightweight Charts v4
+    // doesn't have true stacked panes, so a second oscillator would
+    // overlap the first on the shared bottom price scale.
     Object.keys(REP_IND_DEFS).forEach(otherId => {
       if (otherId !== id && REP_IND_DEFS[otherId].type === 'oscillator' && _repState.indicators[otherId]) {
         _repRemoveIndicatorStudy(otherId);
@@ -1688,20 +1687,17 @@ function _repToggleIndicator(id) {
   document.querySelector(`#rep-indicators-popover .rep-popover-row[data-ind="${id}"]`)?.classList.toggle('on', turningOn);
 
   if (turningOn) {
-    chart.createStudy(study.name, false, false, study.inputs).then(studyId => {
-      _repState.indicatorStudyIds = _repState.indicatorStudyIds || {};
-      _repState.indicatorStudyIds[id] = studyId;
-    });
+    _repApplyIndicators(_repState.candles.slice(0, _repState.index + 1));
   } else {
     _repRemoveIndicatorStudy(id);
   }
   _repSaveState();
 }
 function _repRemoveIndicatorStudy(id) {
-  const chart = _repState?.tvChart;
-  const studyId = _repState?.indicatorStudyIds?.[id];
-  if (chart && studyId) chart.removeEntity(studyId);
-  if (_repState?.indicatorStudyIds) delete _repState.indicatorStudyIds[id];
+  const chart = _repState?.chart;
+  const series = _repState?.indicatorSeries?.[id];
+  if (chart && series) series.forEach(s => { try { chart.removeSeries(s); } catch (e) {} });
+  if (_repState?.indicatorSeries) delete _repState.indicatorSeries[id];
   _repState.indicators[id] = false;
   document.querySelector(`#rep-indicators-popover .rep-popover-row[data-ind="${id}"]`)?.classList.remove('on');
 }
@@ -1780,11 +1776,7 @@ function _repSetSpeed(val) { if (_repState) { _repState.speed = parseFloat(val) 
 function _repZoom(dir) {
   if (!_repState) return;
   _repState.candlesPerView = Math.max(20, Math.min(400, _repState.candlesPerView + dir * 10));
-  // Native mouse-wheel/pinch/trackpad zoom is built into the real
-  // chart now, so the toolbar buttons just proxy to it — this
-  // action id name should be confirmed against your library
-  // version's docs (IChartWidgetApi action ids).
-  try { _repState.tvChart?.executeActionById(dir > 0 ? 'zoomIn' : 'zoomOut'); } catch (e) {}
+  _repSetChartData(true);
   _repSaveState();
 }
 function _repJumpToDate(dateStr) {
@@ -1841,7 +1833,9 @@ function _repLoadLayout(name) {
   _repPushHistory();
   _repState.drawings = JSON.parse(JSON.stringify(layout.drawings || []));
   _repState.indicators = layout.indicators || _repState.indicators;
-  Object.keys(_repState.indicatorSeries).forEach(id => { _repState.chart.removeSeries(_repState.indicatorSeries[id]); });
+  Object.keys(_repState.indicatorSeries).forEach(id => {
+    (_repState.indicatorSeries[id] || []).forEach(s => { try { _repState.chart.removeSeries(s); } catch (e) {} });
+  });
   _repState.indicatorSeries = {};
   _repApplyIndicators(_repState.candles.slice(0, _repState.index + 1));
   _repRenderIndicatorPopoverState();
