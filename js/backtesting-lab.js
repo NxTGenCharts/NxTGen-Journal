@@ -402,6 +402,61 @@ function _repRedo() {
   _repSaveState(); _repDrawOverlay();
 }
 
+// ── Chart Theme / Settings defaults (TradingView-style Settings
+// modal — Symbol tab: candle body/border/wick colors, precision,
+// timezone. Canvas tab: background, grid, crosshair, watermark,
+// scale text/lines, nav visibility) ─────────────────────
+const REP_THEME_DEFAULTS = {
+  // Symbol → Candles
+  colorBarsPrevClose: false,
+  bodyVisible: true, bodyUpColor: '#34d399', bodyDownColor: '#f87171',
+  borderVisible: true, borderUpColor: '#34d399', borderDownColor: '#f87171',
+  wickVisible: true, wickUpColor: '#34d399', wickDownColor: '#f87171',
+  // Symbol → Data modification
+  precision: 'default', // 'default' or 0-8
+  timezone: 0, // hours offset from UTC, applied to crosshair/label time text
+  // Canvas → Chart basic styles
+  bgColor: '#080b12',
+  vertGrid: true, vertGridColor: 'rgba(255,255,255,.04)',
+  horzGrid: true, horzGridColor: 'rgba(255,255,255,.04)',
+  crosshairColor: '#8b98ac',
+  watermark: true, watermarkColor: 'rgba(226,232,240,.5)',
+  // Canvas → Scales
+  scaleTextColor: 'rgba(226,232,240,.62)', scaleFontSize: 11,
+  scaleLineColor: 'rgba(255,255,255,.08)',
+  // Canvas → Buttons
+  navVisibility: 'always', // 'always' | 'hidden'
+  // Other (kept from the old popover)
+  volume: true,
+};
+const REP_TIMEZONE_OPTIONS = [
+  { v: -12, l: '(UTC-12) Baker Island' }, { v: -8, l: '(UTC-8) Los Angeles' },
+  { v: -7, l: '(UTC-7) Denver' }, { v: -6, l: '(UTC-6) Chicago' },
+  { v: -5, l: '(UTC-5) New York' }, { v: -4, l: '(UTC-4) New York (DST)' },
+  { v: -3, l: '(UTC-3) São Paulo' }, { v: 0, l: '(UTC+0) London' },
+  { v: 1, l: '(UTC+1) Berlin / Paris' }, { v: 2, l: '(UTC+2) Athens / Cairo' },
+  { v: 3, l: '(UTC+3) Moscow' }, { v: 4, l: '(UTC+4) Dubai' },
+  { v: 5.5, l: '(UTC+5:30) Mumbai' }, { v: 8, l: '(UTC+8) Singapore / Shanghai' },
+  { v: 9, l: '(UTC+9) Tokyo' }, { v: 10, l: '(UTC+10) Sydney' },
+];
+// Merges a saved theme onto the current defaults. Handles the
+// pre-Settings-modal shape (just upColor/downColor/grid/volume/
+// watermark) by mapping those old keys onto the new body/border/
+// wick fields so existing saved layouts don't lose their colors.
+function _repMergeTheme(saved) {
+  const merged = Object.assign({}, REP_THEME_DEFAULTS);
+  if (saved && (saved.upColor || saved.downColor)) {
+    const up = saved.upColor || merged.bodyUpColor, down = saved.downColor || merged.bodyDownColor;
+    Object.assign(merged, {
+      bodyUpColor: up, bodyDownColor: down,
+      borderUpColor: up, borderDownColor: down,
+      wickUpColor: up, wickDownColor: down,
+    });
+  }
+  if (saved && saved.grid !== undefined) merged.vertGrid = merged.horzGrid = !!saved.grid;
+  return Object.assign(merged, saved || {});
+}
+
 // ── Open / close the fullscreen replay workstation ──────
 async function _repOpen(sessionId) {
   const session = _btGetSessionById(sessionId); if (!session) return;
@@ -421,7 +476,7 @@ async function _repOpen(sessionId) {
     skipWeekends: saved.skipWeekends !== undefined ? saved.skipWeekends : true,
     playing: false, speed: saved.speed || 1,
     indicators: saved.indicators || { ema9: false, ema21: false, sma50: false, vwap: false },
-    theme: Object.assign({ upColor: '#34d399', downColor: '#f87171', grid: true, volume: true, watermark: true }, saved.theme || {}),
+    theme: _repMergeTheme(saved.theme),
     history: { undo: [], redo: [] },
     indicatorSeries: {},
     _savedIndex: typeof saved.index === 'number' ? saved.index : null,
@@ -511,7 +566,7 @@ function _repRenderShell() {
         <button class="rep-icon-btn" onclick="_repSaveLayout()" title="Save Layout">${_repIcon('save', 'icn')}</button>
         <button class="rep-icon-btn" onclick="_repToggleLayoutsPopover()" title="Load Layout">${_repIcon('load', 'icn')}</button>
         <button class="rep-icon-btn" onclick="_repClearDrawings()" title="Clear all drawings"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg></button>
-        <button class="rep-icon-btn" id="rep-settings-btn" onclick="_repToggleSettingsPopover()" title="Chart settings & theme"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.2a1.7 1.7 0 013.4 0 1.7 1.7 0 002.5 1.5 1.7 1.7 0 012.4 2.4A1.7 1.7 0 0020.1 10a1.7 1.7 0 010 3.4 1.7 1.7 0 00-1.5 2.5 1.7 1.7 0 01-2.4 2.4A1.7 1.7 0 0013.7 20a1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.5-1.5 1.7 1.7 0 01-2.4-2.4A1.7 1.7 0 003.9 13.4a1.7 1.7 0 010-3.4 1.7 1.7 0 001.5-2.5 1.7 1.7 0 012.4-2.4A1.7 1.7 0 0010.3 3.2z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
+        <button class="rep-icon-btn" id="rep-settings-btn" onclick="_repOpenSettingsModal()" title="Chart settings & theme"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.2a1.7 1.7 0 013.4 0 1.7 1.7 0 002.5 1.5 1.7 1.7 0 012.4 2.4A1.7 1.7 0 0020.1 10a1.7 1.7 0 010 3.4 1.7 1.7 0 00-1.5 2.5 1.7 1.7 0 01-2.4 2.4A1.7 1.7 0 0013.7 20a1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.5-1.5 1.7 1.7 0 01-2.4-2.4A1.7 1.7 0 003.9 13.4a1.7 1.7 0 010-3.4 1.7 1.7 0 001.5-2.5 1.7 1.7 0 012.4-2.4A1.7 1.7 0 0010.3 3.2z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
         <div class="rep-topbar-divider"></div>
         <button class="rep-icon-btn" onclick="_repToggleFullscreen()" title="Fullscreen">${_repIcon('fullscreen', 'icn')}</button>
         <button class="rep-close-btn" onclick="_repClose()" title="Close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
@@ -519,7 +574,7 @@ function _repRenderShell() {
     </div>
 
     <div class="rep-workspace">
-      <div class="rep-left-toolbar">${toolButtons}
+      <div class="rep-left-toolbar" id="rep-left-toolbar" style="${_repState.theme.navVisibility === 'hidden' ? 'display:none' : ''}">${toolButtons}
         <div class="rep-tool-sep"></div>
         <button class="rep-tool-btn ${_repState.magnet ? 'on' : ''}" id="rep-magnet-btn" onclick="_repToggleMagnet()">${_repIcon('magnet', 'icn')}<span class="rep-tooltip">Magnet / Snap to OHLC</span></button>
       </div>
@@ -537,22 +592,6 @@ function _repRenderShell() {
           <div class="rep-popover-title">Saved Layouts</div>
           <div id="rep-layouts-list" style="display:flex;flex-direction:column;gap:2px"></div>
         </div>
-        <div class="rep-popover" id="rep-settings-popover" style="width:230px">
-          <div class="rep-popover-title">Chart Theme</div>
-          <div style="display:flex;gap:8px;padding:4px 6px 8px">
-            <label style="flex:1;display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text2)">Bull candle
-              <input type="color" id="rep-theme-up" value="${_repState.theme.upColor}" oninput="_repSetTheme('upColor', this.value)" style="width:100%;height:28px;border:1px solid var(--glass-border);border-radius:6px;background:none;cursor:pointer">
-            </label>
-            <label style="flex:1;display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text2)">Bear candle
-              <input type="color" id="rep-theme-down" value="${_repState.theme.downColor}" oninput="_repSetTheme('downColor', this.value)" style="width:100%;height:28px;border:1px solid var(--glass-border);border-radius:6px;background:none;cursor:pointer">
-            </label>
-          </div>
-          <div class="rep-popover-row ${_repState.theme.grid ? 'on' : ''}" data-theme-toggle="grid" onclick="_repToggleThemeFlag('grid')"><span>Grid lines</span><span class="rep-popover-check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg></span></div>
-          <div class="rep-popover-row ${_repState.theme.volume ? 'on' : ''}" data-theme-toggle="volume" onclick="_repToggleThemeFlag('volume')"><span>Volume panel</span><span class="rep-popover-check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg></span></div>
-          <div class="rep-popover-row ${_repState.theme.watermark ? 'on' : ''}" data-theme-toggle="watermark" onclick="_repToggleThemeFlag('watermark')"><span>Symbol watermark</span><span class="rep-popover-check"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/></svg></span></div>
-          <div class="rep-popover-sep" style="height:1px;background:var(--glass-border);margin:6px 2px"></div>
-          <div class="rep-popover-row" onclick="_repResetTheme()"><span>Reset to default</span></div>
-        </div>
         <div class="rep-ctx-menu" id="rep-ctx-menu"></div>
 
         <div class="rep-symbol-search-backdrop" id="rep-symbol-search-backdrop" onclick="if(event.target===this)_repCloseSymbolSearch()">
@@ -568,7 +607,7 @@ function _repRenderShell() {
         </div>
 
 
-        <div class="rep-replay-pill" id="rep-replay-pill">
+        <div class="rep-replay-pill" id="rep-replay-pill" style="${_repState.theme.navVisibility === 'hidden' ? 'display:none' : ''}">
           <span class="rep-drag-handle"><span></span><span></span><span></span><span></span><span></span><span></span></span>
           <button class="rep-step-btn" onclick="_repReset()" title="Reset (Home)">${_repIcon('reset', 'icn')}</button>
           <button class="rep-step-btn" onclick="_repStep(-1)" title="Step back (←)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 5L8 12l8 7"/></svg></button>
@@ -814,23 +853,33 @@ function _repInitChart() {
     return false;
   }
 
+  const t = _repState.theme;
+  const precision = (t.precision === 'default' || t.precision == null || t.precision === '') ? 2 : Number(t.precision);
   const chart = LightweightCharts.createChart(container, {
     autoSize: true,
-    layout: { background: { type: 'solid', color: '#080b12' }, textColor: 'rgba(226,232,240,.62)' },
+    layout: { background: { type: 'solid', color: t.bgColor }, textColor: t.scaleTextColor, fontSize: t.scaleFontSize },
     grid: {
-      vertLines: { color: 'rgba(255,255,255,.04)', visible: _repState.theme.grid },
-      horzLines: { color: 'rgba(255,255,255,.04)', visible: _repState.theme.grid },
+      vertLines: { color: t.vertGridColor, visible: t.vertGrid },
+      horzLines: { color: t.horzGridColor, visible: t.horzGrid },
     },
-    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-    rightPriceScale: { borderColor: 'rgba(255,255,255,.08)' },
-    timeScale: { borderColor: 'rgba(255,255,255,.08)', timeVisible: true, secondsVisible: false },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine: { color: t.crosshairColor }, horzLine: { color: t.crosshairColor },
+    },
+    rightPriceScale: { borderColor: t.scaleLineColor },
+    timeScale: { borderColor: t.scaleLineColor, timeVisible: true, secondsVisible: false },
+    localization: {
+      timeFormatter: time => new Date((time + (Number(t.timezone) || 0) * 3600) * 1000).toUTCString().slice(0, 22),
+    },
     handleScroll: true, handleScale: true,
   });
 
   const candleSeries = chart.addCandlestickSeries({
-    upColor: _repState.theme.upColor, downColor: _repState.theme.downColor,
-    wickUpColor: _repState.theme.upColor, wickDownColor: _repState.theme.downColor,
-    borderVisible: false,
+    upColor: t.bodyUpColor, downColor: t.bodyDownColor,
+    wickUpColor: t.wickUpColor, wickDownColor: t.wickDownColor,
+    borderUpColor: t.borderUpColor, borderDownColor: t.borderDownColor,
+    borderVisible: true, wickVisible: true,
+    priceFormat: { type: 'price', precision, minMove: 1 / Math.pow(10, precision) },
   });
 
   _repState.chart = chart;
@@ -926,13 +975,23 @@ function _repSetChartData(recenter) {
   const seen = new Set();
   const bars = [];
   let malformed = 0;
+  const th = _repState.theme;
+  const TRANSPARENT = 'rgba(0,0,0,0)';
+  let prevClose = null;
   slice.forEach(c => {
     const time = Math.floor(c.time / 1000);
     const open = Number(c.open), high = Number(c.high), low = Number(c.low), close = Number(c.close);
     if (!Number.isFinite(time) || !Number.isFinite(open) || !Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) { malformed++; return; }
     if (seen.has(time)) { malformed++; return; } // duplicate bucket after ms→sec rounding
     seen.add(time);
-    bars.push({ time, open, high, low, close });
+    const up = (th && th.colorBarsPrevClose && prevClose !== null) ? close >= prevClose : close >= open;
+    prevClose = close;
+    bars.push({
+      time, open, high, low, close,
+      color: th && !th.bodyVisible ? TRANSPARENT : (up ? th?.bodyUpColor : th?.bodyDownColor),
+      borderColor: th && !th.borderVisible ? TRANSPARENT : (up ? th?.borderUpColor : th?.borderDownColor),
+      wickColor: th && !th.wickVisible ? TRANSPARENT : (up ? th?.wickUpColor : th?.wickDownColor),
+    });
   });
   bars.sort((a, b) => a.time - b.time);
   if (malformed) console.warn(`[Backtesting Lab] dropped ${malformed} malformed/duplicate candle(s) before rendering`);
@@ -1436,14 +1495,168 @@ function _repHideContextMenu() { document.getElementById('rep-ctx-menu')?.classL
 function _repClosePopovers() {
   document.getElementById('rep-indicators-popover')?.classList.remove('open');
   document.getElementById('rep-layouts-popover')?.classList.remove('open');
-  document.getElementById('rep-settings-popover')?.classList.remove('open');
 }
-function _repToggleSettingsPopover() {
-  const p = document.getElementById('rep-settings-popover'); if (!p) return;
-  document.getElementById('rep-indicators-popover')?.classList.remove('open');
-  document.getElementById('rep-layouts-popover')?.classList.remove('open');
-  p.classList.toggle('open');
+// ── Settings modal (TradingView-style: sidebar tabs + Symbol/
+// Canvas panes) ──────────────────────────────────────────
+let _repSettingsTab = 'symbol';
+let _repSettingsSnapshot = null;
+
+function _repOpenSettingsModal() {
+  if (!_repState) return;
+  _repClosePopovers();
+  document.getElementById('rep-settings-modal-overlay')?.remove();
+  _repSettingsSnapshot = JSON.parse(JSON.stringify(_repState.theme));
+  _repSettingsTab = 'symbol';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'rep-settings-modal-overlay';
+  overlay.className = 'acc-manager-overlay';
+  overlay.style.zIndex = '1200';
+  overlay.onclick = e => { if (e.target === overlay) _repCloseSettingsModal(true); };
+
+  overlay.innerHTML = `
+  <div class="acc-manager-modal" style="max-width:620px;max-height:88vh">
+    <div class="acc-manager-header">
+      <span>Settings</span>
+      <button onclick="_repCloseSettingsModal(true)" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
+    </div>
+    <div style="display:flex;min-height:420px;max-height:calc(88vh - 110px)">
+      <div id="rep-settings-tabs" style="width:170px;flex-shrink:0;border-right:1px solid var(--glass-border);padding:10px;display:flex;flex-direction:column;gap:2px">
+        ${_repSettingsTabButtons()}
+      </div>
+      <div id="rep-settings-body" style="flex:1;overflow-y:auto;padding:16px">
+        ${_repSettingsTabContent(_repSettingsTab)}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;padding:12px 16px;border-top:1px solid var(--glass-border)">
+      <button onclick="_repResetTheme()" class="acc-mgr-btn" style="padding:6px 14px">Reset to default</button>
+      <div style="display:flex;gap:8px">
+        <button onclick="_repCloseSettingsModal(false)" class="acc-mgr-btn" style="padding:6px 14px">Cancel</button>
+        <button onclick="_repCloseSettingsModal(true)" class="acc-mgr-add-btn" style="padding:6px 18px">Ok</button>
+      </div>
+    </div>
+  </div>`;
+
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
 }
+
+function _repCloseSettingsModal(commit) {
+  if (!commit && _repSettingsSnapshot && _repState) {
+    _repState.theme = _repSettingsSnapshot;
+    _repApplyTheme();
+  }
+  _repSaveState();
+  _repSettingsSnapshot = null;
+  document.getElementById('rep-settings-modal-overlay')?.remove();
+}
+
+function _repSettingsTabButtons() {
+  const tabs = [
+    { id: 'symbol', label: 'Symbol' },
+    { id: 'canvas', label: 'Canvas' },
+  ];
+  return tabs.map(tb => `<button type="button" onclick="_repSettingsSwitchTab('${tb.id}')" class="wl-week-btn${_repSettingsTab === tb.id ? ' restore' : ''}" style="text-align:left;justify-content:flex-start;width:100%">${tb.label}</button>`).join('');
+}
+
+function _repSettingsSwitchTab(tab) {
+  _repSettingsTab = tab;
+  document.getElementById('rep-settings-tabs').innerHTML = _repSettingsTabButtons();
+  document.getElementById('rep-settings-body').innerHTML = _repSettingsTabContent(tab);
+}
+
+function _repSettingsTabContent(tab) {
+  return tab === 'canvas' ? _repSettingsCanvasTab() : _repSettingsSymbolTab();
+}
+
+// Small helpers shared by both tabs
+function _repSetColor(key, value) { _repSetTheme(key, value); }
+function _repColorInput(id, key) {
+  return `<input type="color" id="${id}" value="${_repState.theme[key]}" oninput="_repSetColor('${key}', this.value)" style="width:36px;height:26px;border:1px solid var(--glass-border);border-radius:4px;background:none;cursor:pointer;padding:0">`;
+}
+function _repCheckboxRow(labelHtml, key, extraHtml) {
+  return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0">
+    <input type="checkbox" ${_repState.theme[key] ? 'checked' : ''} onchange="_repToggleThemeFlag('${key}')" style="width:15px;height:15px;accent-color:var(--accent,#34d399);cursor:pointer">
+    <span style="flex:1;font-size:13px">${labelHtml}</span>
+    ${extraHtml || ''}
+  </div>`;
+}
+function _repSectionTitle(t) { return `<div style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text3);margin:14px 0 6px;font-weight:600">${t}</div>`; }
+
+function _repSettingsSymbolTab() {
+  const t = _repState.theme;
+  const precisionOpts = ['default', 0, 1, 2, 3, 4, 5, 6, 8].map(p =>
+    `<option value="${p}"${String(t.precision) === String(p) ? ' selected' : ''}>${p === 'default' ? 'Default' : p + ' digit' + (p === 1 ? '' : 's')}</option>`).join('');
+  const tzOpts = REP_TIMEZONE_OPTIONS.map(o =>
+    `<option value="${o.v}"${Number(t.timezone) === o.v ? ' selected' : ''}>${o.l}</option>`).join('');
+
+  return `
+    ${_repSectionTitle('Candles')}
+    ${_repCheckboxRow('Color bars based on previous close', 'colorBarsPrevClose')}
+    ${_repCheckboxRow('Body', 'bodyVisible', `<div style="display:flex;gap:6px">${_repColorInput('rep-t-body-up', 'bodyUpColor')}${_repColorInput('rep-t-body-down', 'bodyDownColor')}</div>`)}
+    ${_repCheckboxRow('Borders', 'borderVisible', `<div style="display:flex;gap:6px">${_repColorInput('rep-t-border-up', 'borderUpColor')}${_repColorInput('rep-t-border-down', 'borderDownColor')}</div>`)}
+    ${_repCheckboxRow('Wick', 'wickVisible', `<div style="display:flex;gap:6px">${_repColorInput('rep-t-wick-up', 'wickUpColor')}${_repColorInput('rep-t-wick-down', 'wickDownColor')}</div>`)}
+
+    ${_repSectionTitle('Data modification')}
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+      <span style="flex:1;font-size:13px">Precision</span>
+      <select class="rep-select" style="width:150px" onchange="_repSetTheme('precision', this.value)">${precisionOpts}</select>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+      <span style="flex:1;font-size:13px">Timezone</span>
+      <select class="rep-select" style="width:150px" onchange="_repSetTheme('timezone', parseFloat(this.value))">${tzOpts}</select>
+    </div>`;
+}
+
+function _repSettingsCanvasTab() {
+  const t = _repState.theme;
+  return `
+    ${_repSectionTitle('Chart basic styles')}
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+      <span style="flex:1;font-size:13px">Background</span>
+      ${_repColorInput('rep-t-bg', 'bgColor')}
+    </div>
+    ${_repCheckboxRow('Vertical grid', 'vertGrid', _repColorInput('rep-t-vgrid', 'vertGridColor'))}
+    ${_repCheckboxRow('Horizontal grid', 'horzGrid', _repColorInput('rep-t-hgrid', 'horzGridColor'))}
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+      <span style="flex:1;font-size:13px">Crosshair</span>
+      ${_repColorInput('rep-t-crosshair', 'crosshairColor')}
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+      <span style="flex:1;font-size:13px">Watermark</span>
+      <select class="rep-select" style="width:110px" onchange="_repSetTheme('watermark', this.value === 'visible')">
+        <option value="visible"${t.watermark ? ' selected' : ''}>Visible</option>
+        <option value="hidden"${!t.watermark ? ' selected' : ''}>Hidden</option>
+      </select>
+      ${_repColorInput('rep-t-watermark', 'watermarkColor')}
+    </div>
+
+    ${_repSectionTitle('Scales')}
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+      <span style="flex:1;font-size:13px">Text</span>
+      ${_repColorInput('rep-t-scaletext', 'scaleTextColor')}
+      <select class="rep-select" style="width:60px" onchange="_repSetTheme('scaleFontSize', parseInt(this.value, 10))">
+        ${[8, 9, 10, 11, 12, 14].map(n => `<option value="${n}"${t.scaleFontSize === n ? ' selected' : ''}>${n}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+      <span style="flex:1;font-size:13px">Lines</span>
+      ${_repColorInput('rep-t-scaleline', 'scaleLineColor')}
+    </div>
+
+    ${_repSectionTitle('Buttons')}
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+      <span style="flex:1;font-size:13px">Navigation</span>
+      <select class="rep-select" style="width:150px" onchange="_repSetTheme('navVisibility', this.value)">
+        <option value="always"${t.navVisibility === 'always' ? ' selected' : ''}>Always visible</option>
+        <option value="hidden"${t.navVisibility === 'hidden' ? ' selected' : ''}>Hidden</option>
+      </select>
+    </div>
+
+    ${_repSectionTitle('Other')}
+    ${_repCheckboxRow('Volume panel', 'volume')}`;
+}
+
 function _repSetTheme(key, value) {
   if (!_repState) return;
   _repState.theme[key] = value;
@@ -1453,42 +1666,78 @@ function _repSetTheme(key, value) {
 function _repToggleThemeFlag(key) {
   if (!_repState) return;
   _repState.theme[key] = !_repState.theme[key];
-  document.querySelector(`#rep-settings-popover .rep-popover-row[data-theme-toggle="${key}"]`)?.classList.toggle('on', _repState.theme[key]);
   _repApplyTheme();
   _repSaveState();
 }
 function _repResetTheme() {
   if (!_repState) return;
-  _repState.theme = { upColor: '#34d399', downColor: '#f87171', grid: true, volume: true, watermark: true };
-  const up = document.getElementById('rep-theme-up'); if (up) up.value = _repState.theme.upColor;
-  const down = document.getElementById('rep-theme-down'); if (down) down.value = _repState.theme.downColor;
-  document.querySelectorAll('#rep-settings-popover .rep-popover-row[data-theme-toggle]').forEach(row => row.classList.add('on'));
+  _repState.theme = Object.assign({}, REP_THEME_DEFAULTS);
   _repApplyTheme();
   _repSaveState();
+  if (document.getElementById('rep-settings-modal-overlay')) _repSettingsSwitchTab(_repSettingsTab);
 }
+
+// Applies the full theme object to the live chart: layout/background,
+// grid, crosshair, price-scale border + text, watermark badge, volume
+// visibility, and candle precision. Per-candle body/border/wick
+// colors (including "color bars based on previous close") are applied
+// in _repSetChartData since Lightweight Charts needs those set per
+// data point, not as a single series-wide option.
 function _repApplyTheme() {
   if (!_repState || !_repState.chart) return;
   const t = _repState.theme;
-  _repState.candleSeries.applyOptions({ upColor: t.upColor, downColor: t.downColor, wickUpColor: t.upColor, wickDownColor: t.downColor });
+
   _repState.chart.applyOptions({
+    layout: {
+      background: { type: 'solid', color: t.bgColor },
+      textColor: t.scaleTextColor,
+      fontSize: t.scaleFontSize,
+    },
     grid: {
-      vertLines: { color: 'rgba(255,255,255,.04)', visible: t.grid },
-      horzLines: { color: 'rgba(255,255,255,.04)', visible: t.grid },
+      vertLines: { color: t.vertGridColor, visible: t.vertGrid },
+      horzLines: { color: t.horzGridColor, visible: t.horzGrid },
+    },
+    crosshair: {
+      vertLine: { color: t.crosshairColor },
+      horzLine: { color: t.crosshairColor },
+    },
+    rightPriceScale: { borderColor: t.scaleLineColor },
+    timeScale: { borderColor: t.scaleLineColor },
+    localization: {
+      timeFormatter: time => new Date((time + (Number(t.timezone) || 0) * 3600) * 1000).toUTCString().slice(0, 22),
     },
   });
+
+  const precision = (t.precision === 'default' || t.precision == null || t.precision === '') ? 2 : Number(t.precision);
+  _repState.candleSeries.applyOptions({
+    borderVisible: true, wickVisible: true,
+    priceFormat: { type: 'price', precision, minMove: 1 / Math.pow(10, precision) },
+  });
+
   if (_repState.volumeSeries) _repState.volumeSeries.applyOptions({ visible: t.volume });
-  const badge = document.querySelector('.rep-symbol-badge'); if (badge) badge.style.display = t.watermark ? 'block' : 'none';
+
+  const badge = document.querySelector('.rep-symbol-badge');
+  if (badge) { badge.style.display = t.watermark ? 'block' : 'none'; badge.style.color = t.watermarkColor; }
+
+  const leftToolbar = document.getElementById('rep-left-toolbar');
+  if (leftToolbar) leftToolbar.style.display = t.navVisibility === 'hidden' ? 'none' : '';
+  const pill = document.getElementById('rep-replay-pill');
+  if (pill) pill.style.display = t.navVisibility === 'hidden' ? 'none' : '';
+
+  // Re-run candle coloring (body/border/wick + prev-close mode) and
+  // re-apply indicator colors without recentering the visible range.
+  _repSetChartData(false);
 }
 function _repToggleIndicatorsPopover() {
   const p = document.getElementById('rep-indicators-popover'); if (!p) return;
   document.getElementById('rep-layouts-popover')?.classList.remove('open');
-  document.getElementById('rep-settings-popover')?.classList.remove('open');
+  document.getElementById('rep-settings-modal-overlay')?.remove();
   p.classList.toggle('open');
 }
 function _repToggleLayoutsPopover() {
   const p = document.getElementById('rep-layouts-popover'); if (!p) return;
   document.getElementById('rep-indicators-popover')?.classList.remove('open');
-  document.getElementById('rep-settings-popover')?.classList.remove('open');
+  document.getElementById('rep-settings-modal-overlay')?.remove();
   p.classList.toggle('open');
   _repRenderLayoutsList();
 }
