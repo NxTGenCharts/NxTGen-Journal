@@ -1511,7 +1511,7 @@ function _repOpenSettingsModal() {
   const overlay = document.createElement('div');
   overlay.id = 'rep-settings-modal-overlay';
   overlay.className = 'acc-manager-overlay';
-  overlay.style.zIndex = '1200';
+  overlay.style.zIndex = '2600';
   overlay.onclick = e => { if (e.target === overlay) _repCloseSettingsModal(true); };
 
   overlay.innerHTML = `
