@@ -892,6 +892,23 @@ function _repInitChart() {
   // gesture through), the overlay still needs to redraw to stay glued.
   chart.timeScale().subscribeVisibleLogicalRangeChange(() => _repDrawOverlay());
 
+  // Double-click (desktop) / double-tap (mobile) on the candles opens
+  // Settings. Bound on the wrapper rather than relying on a library
+  // dblclick event so it works the same on touch. Skipped while a
+  // drawing tool/draft is active so it doesn't steal the tap from
+  // finishing a multi-point drawing.
+  let repLastTapAt = 0;
+  const repMaybeOpenSettings = () => {
+    if (!_repState || _repState.activeTool || _repState.drawDraft) return;
+    _repOpenSettingsModal();
+  };
+  container.addEventListener('dblclick', repMaybeOpenSettings);
+  container.addEventListener('touchend', () => {
+    const now = Date.now();
+    if (now - repLastTapAt < 320) repMaybeOpenSettings();
+    repLastTapAt = now;
+  }, { passive: true });
+
   _repInitOverlayCanvas();
   return true;
 }
@@ -1570,9 +1587,44 @@ function _repSettingsTabContent(tab) {
 }
 
 // Small helpers shared by both tabs
-function _repSetColor(key, value) { _repSetTheme(key, value); }
+// Normalizes any CSS color the theme might hold (hex, rgba(...), etc.)
+// down to a 6-digit hex string — needed because <input type="color">
+// and a plain hex text field can only display #rrggbb, while several
+// theme defaults (grid lines, scale border, watermark) are stored as
+// rgba() so they can carry an alpha value.
+function _repToHex6(c) {
+  if (!c) return '#000000';
+  c = String(c).trim();
+  if (c[0] === '#') {
+    if (c.length === 4) return '#' + [c[1], c[2], c[3]].map(x => x + x).join('');
+    return c.slice(0, 7);
+  }
+  const m = c.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (m) return '#' + [1, 2, 3].map(i => (+m[i]).toString(16).padStart(2, '0')).join('');
+  return '#000000';
+}
+function _repSetColor(key, value, hexFieldId) {
+  _repSetTheme(key, value);
+  const hexField = hexFieldId && document.getElementById(hexFieldId);
+  if (hexField) hexField.value = value;
+}
+// Applies a typed hex value once it's a complete #rrggbb — lets the
+// person keep typing without every partial keystroke being rejected.
+function _repHexInputChanged(swatchId, key, value) {
+  let v = value.trim();
+  if (v && v[0] !== '#') v = '#' + v;
+  if (!/^#[0-9a-fA-F]{6}$/.test(v)) return;
+  const swatch = document.getElementById(swatchId);
+  if (swatch) swatch.value = v;
+  _repSetTheme(key, v);
+}
 function _repColorInput(id, key) {
-  return `<input type="color" id="${id}" value="${_repState.theme[key]}" oninput="_repSetColor('${key}', this.value)" style="width:36px;height:26px;border:1px solid var(--glass-border);border-radius:4px;background:none;cursor:pointer;padding:0">`;
+  const hex = _repToHex6(_repState.theme[key]);
+  const hexId = id + '-hex';
+  return `<span style="display:inline-flex;align-items:center;gap:5px">
+    <input type="color" id="${id}" value="${hex}" oninput="_repSetColor('${key}', this.value, '${hexId}')" style="width:30px;height:26px;border:1px solid var(--glass-border);border-radius:4px;background:none;cursor:pointer;padding:0">
+    <input type="text" id="${hexId}" value="${hex}" maxlength="7" spellcheck="false" autocapitalize="off" oninput="_repHexInputChanged('${id}', '${key}', this.value)" placeholder="#000000" style="width:72px;height:26px;font-size:11px;font-family:var(--font-mono);text-transform:uppercase;background:var(--glass-1,#10141d);border:1px solid var(--glass-border);border-radius:4px;color:var(--text);padding:0 6px">
+  </span>`;
 }
 function _repCheckboxRow(labelHtml, key, extraHtml) {
   return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0">
@@ -1582,6 +1634,7 @@ function _repCheckboxRow(labelHtml, key, extraHtml) {
   </div>`;
 }
 function _repSectionTitle(t) { return `<div style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text3);margin:14px 0 6px;font-weight:600">${t}</div>`; }
+
 
 function _repSettingsSymbolTab() {
   const t = _repState.theme;
