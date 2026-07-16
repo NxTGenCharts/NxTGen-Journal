@@ -439,12 +439,30 @@ const REP_TIMEZONE_OPTIONS = [
   { v: 5.5, l: '(UTC+5:30) Mumbai' }, { v: 8, l: '(UTC+8) Singapore / Shanghai' },
   { v: 9, l: '(UTC+9) Tokyo' }, { v: 10, l: '(UTC+10) Sydney' },
 ];
+// Returns REP_THEME_DEFAULTS, swapped for a light-canvas palette when
+// the app itself is currently in light mode. Only used to seed a
+// session that has no saved theme yet — once a user tweaks/saves
+// theme settings for a session, those saved values always win, so
+// this never overrides an explicit choice.
+function _repDefaultTheme() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  if (!isLight) return Object.assign({}, REP_THEME_DEFAULTS);
+  return Object.assign({}, REP_THEME_DEFAULTS, {
+    bgColor: '#eef1f8',
+    vertGridColor: 'rgba(15,23,42,.07)',
+    horzGridColor: 'rgba(15,23,42,.07)',
+    crosshairColor: '#64748b',
+    watermarkColor: 'rgba(15,23,42,.14)',
+    scaleTextColor: 'rgba(15,23,42,.65)',
+    scaleLineColor: 'rgba(15,23,42,.12)',
+  });
+}
 // Merges a saved theme onto the current defaults. Handles the
 // pre-Settings-modal shape (just upColor/downColor/grid/volume/
 // watermark) by mapping those old keys onto the new body/border/
 // wick fields so existing saved layouts don't lose their colors.
 function _repMergeTheme(saved) {
-  const merged = Object.assign({}, REP_THEME_DEFAULTS);
+  const merged = _repDefaultTheme();
   if (saved && (saved.upColor || saved.downColor)) {
     const up = saved.upColor || merged.bodyUpColor, down = saved.downColor || merged.bodyDownColor;
     Object.assign(merged, {
@@ -1749,7 +1767,7 @@ function _repToggleThemeFlag(key) {
 }
 function _repResetTheme() {
   if (!_repState) return;
-  _repState.theme = Object.assign({}, REP_THEME_DEFAULTS);
+  _repState.theme = _repDefaultTheme();
   _repApplyTheme();
   _repSaveState();
   if (document.getElementById('rep-settings-modal-overlay')) _repSettingsSwitchTab(_repSettingsTab);
