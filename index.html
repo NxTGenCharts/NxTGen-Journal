@@ -1692,13 +1692,14 @@
 <!-- ══ Supabase SDK ══ -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- ══ TradingView Advanced Charting Library ══
-     Not on a public CDN — requires library access (see
-     TRADINGVIEW_INTEGRATION_GUIDE.md). Drop the charting_library/
-     folder you receive into the project root; these two tags will
-     404 until then, and _repInitChart() shows a status message
-     instead of a blank chart in the meantime. -->
-<script src="charting_library/charting_library.standalone.js"></script>
+<!-- ══ Lightweight Charts (TradingView's free, open-source charting library) ══
+     Powers the Backtesting Lab replay chart while access to the
+     Advanced Charting Library (TRADINGVIEW_INTEGRATION_GUIDE.md) is
+     pending approval. app.js's replay engine (_repInitChart etc.)
+     targets this exact chart/series API — once Advanced access is
+     granted, swap this tag for charting_library/ + tv-datafeed.js's
+     Datafeed again and only _repInitChart/_repSetChartData need to change. -->
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <script src="tv-datafeed.js"></script>
 
 <!-- ══ Mobile sidebar toggle ══ -->
