@@ -535,8 +535,8 @@ function _repRenderShell() {
   const groupOrder = ['nav', 'lines', 'shapes', 'fib', 'ict'];
   const toolButtons = groupOrder.map((g, gi) => {
     const btns = (groups[g] || []).map(t => `
-      <button class="rep-tool-btn" data-tool="${t.id}" onclick="_repSetTool('${t.id}')">
-        ${_repIcon(t.id, 'icn')}<span class="rep-tooltip">${t.label}</span>
+      <button class="rep-tool-btn" data-tool="${t.id}" data-tip="${t.label}" onclick="_repSetTool('${t.id}')" onmouseenter="_repShowTip(event)" onmouseleave="_repHideTip()">
+        ${_repIcon(t.id, 'icn')}
       </button>`).join('');
     return btns + (gi < groupOrder.length - 1 ? '<div class="rep-tool-sep"></div>' : '');
   }).join('');
@@ -576,7 +576,7 @@ function _repRenderShell() {
     <div class="rep-workspace">
       <div class="rep-left-toolbar" id="rep-left-toolbar" style="${_repState.theme.navVisibility === 'hidden' ? 'display:none' : ''}">${toolButtons}
         <div class="rep-tool-sep"></div>
-        <button class="rep-tool-btn ${_repState.magnet ? 'on' : ''}" id="rep-magnet-btn" onclick="_repToggleMagnet()">${_repIcon('magnet', 'icn')}<span class="rep-tooltip">Magnet / Snap to OHLC</span></button>
+        <button class="rep-tool-btn ${_repState.magnet ? 'on' : ''}" id="rep-magnet-btn" data-tip="Magnet / Snap to OHLC" onclick="_repToggleMagnet()" onmouseenter="_repShowTip(event)" onmouseleave="_repHideTip()">${_repIcon('magnet', 'icn')}</button>
       </div>
       <div class="rep-chart-area">
         <div class="rep-chart-wrap" id="rep-chart-wrap"></div>
@@ -632,6 +632,7 @@ function _repRenderShell() {
     </div>
 
     <div class="rep-bottom-dock" id="rep-bottom-dock"></div>
+    <div class="rep-floating-tooltip" id="rep-floating-tooltip"></div>
   `;
 
   document.body.appendChild(overlay);
@@ -1418,6 +1419,31 @@ function _repUpdateToolbarActive() {
   if (overlay) overlay.classList.toggle('drawing', !!_repState.activeTool);
   if (!_repState.activeTool) { _repState._manualCrosshair = null; _repDrawOverlay?.(); }
 }
+// ── Toolbar hover tooltips ───────────────────────────────
+// The left toolbar scrolls vertically (overflow-y:auto) and clips
+// horizontally (overflow-x:hidden) so a tool button's tooltip can't
+// just be an absolutely-positioned child of the button — it'd be cut
+// off at the toolbar's right edge. Instead we drive a single shared
+// tooltip element (position:fixed, rendered at the overlay's top
+// level) and reposition it next to whichever button is hovered.
+let _repTipTimer = null;
+function _repShowTip(e) {
+  const btn = e.currentTarget;
+  const label = btn.dataset.tip;
+  const tip = document.getElementById('rep-floating-tooltip');
+  if (!label || !tip) return;
+  const rect = btn.getBoundingClientRect();
+  tip.textContent = label;
+  tip.style.left = `${rect.right + 8}px`;
+  tip.style.top = `${rect.top + rect.height / 2}px`;
+  clearTimeout(_repTipTimer);
+  _repTipTimer = setTimeout(() => tip.classList.add('show'), 400);
+}
+function _repHideTip() {
+  clearTimeout(_repTipTimer);
+  document.getElementById('rep-floating-tooltip')?.classList.remove('show');
+}
+
 function _repToggleMagnet() {
   _repState.magnet = !_repState.magnet;
   document.getElementById('rep-magnet-btn')?.classList.toggle('on', _repState.magnet);
