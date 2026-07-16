@@ -804,6 +804,7 @@ async function _repLoadCandles() {
 // etc.) — this function just has to actually create that chart.
 function _repInitChart() {
   const container = document.getElementById('rep-chart-wrap'); if (!container) return false;
+  if (_repState.chart) { console.warn('[Backtesting Lab] _repInitChart called with a chart already present — skipping to avoid a duplicate overlapping chart.'); return true; }
   if (typeof LightweightCharts === 'undefined') {
     const status = document.getElementById('rep-status-msg');
     if (status) {
@@ -917,9 +918,26 @@ function _repSetChartData(recenter) {
   if (!_repState || !_repState.candleSeries) return;
   const slice = _repState.candles.slice(0, _repState.index + 1);
   if (!slice.length) return;
-  const bars = slice.map(c => ({
-    time: Math.floor(c.time / 1000), open: c.open, high: c.high, low: c.low, close: c.close,
-  }));
+
+  // Lightweight Charts renders a candle as a collapsed thin line
+  // (not a proper body) if any bar in the series has a NaN field, a
+  // duplicate timestamp, or an out-of-order timestamp — sanitize
+  // defensively here rather than trust every upstream data source.
+  const seen = new Set();
+  const bars = [];
+  let malformed = 0;
+  slice.forEach(c => {
+    const time = Math.floor(c.time / 1000);
+    const open = Number(c.open), high = Number(c.high), low = Number(c.low), close = Number(c.close);
+    if (!Number.isFinite(time) || !Number.isFinite(open) || !Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) { malformed++; return; }
+    if (seen.has(time)) { malformed++; return; } // duplicate bucket after ms→sec rounding
+    seen.add(time);
+    bars.push({ time, open, high, low, close });
+  });
+  bars.sort((a, b) => a.time - b.time);
+  if (malformed) console.warn(`[Backtesting Lab] dropped ${malformed} malformed/duplicate candle(s) before rendering`);
+  if (!bars.length) return;
+
   _repState.candleSeries.setData(bars);
   if (_repState.volumeSeries) {
     _repState.volumeSeries.setData(slice.map(c => ({
@@ -929,8 +947,8 @@ function _repSetChartData(recenter) {
   }
   _repApplyIndicators(slice);
   if (recenter) {
-    const from = Math.max(0, slice.length - _repState.candlesPerView);
-    _repState.chart.timeScale().setVisibleLogicalRange({ from, to: slice.length - 1 + 2 });
+    const from = Math.max(0, bars.length - _repState.candlesPerView);
+    _repState.chart.timeScale().setVisibleLogicalRange({ from, to: bars.length - 1 + 2 });
   }
   _repUpdateReplayHud();
   _repDrawOverlay();
