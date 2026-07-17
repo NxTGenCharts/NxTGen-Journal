@@ -1069,7 +1069,8 @@ function _repInitOverlayCanvas() {
   canvas.ontouchend = (e) => {
     e.preventDefault();
     const now = Date.now();
-    if (now - repLastTapAt < 320) _repOverlayDblClick();
+    const fake = repTouchAsMouse(e);
+    if (now - repLastTapAt < 320 && fake) _repOverlayDblClick(fake);
     repLastTapAt = now;
     _repOverlayMouseUp();
   };
