@@ -281,9 +281,16 @@ const REP_TOOLS = [
   { id: 'rect',               label: 'Rectangle',          kind: 'rect',   color: 'rgba(96,165,250,.16)', stroke: '#60a5fa', group: 'shapes' },
   { id: 'circle',             label: 'Circle',             kind: 'circle', color: 'rgba(96,165,250,.16)', stroke: '#60a5fa', group: 'shapes' },
   { id: 'brush',              label: 'Brush',              kind: 'brush',  color: '#f472b6', group: 'shapes' },
+  { id: 'path',               label: 'Path',               kind: 'path',   color: '#38bdf8', group: 'shapes' },
   { id: 'text',               label: 'Text',               kind: 'text',   color: '#e2e8f0', group: 'text' },
+  { id: 'callout',            label: 'Callout',            kind: 'callout',color: '#e2e8f0', group: 'text' },
   { id: 'fib',                label: 'Fib Retracement',    kind: 'fib',    color: '#2dd4bf', group: 'fib' },
   { id: 'fibext',             label: 'Fib Extension',      kind: 'fib',    color: '#fb923c', extension: true, group: 'fib' },
+  { id: 'gannbox',            label: 'Gann Box',           kind: 'gannbox',color: 'rgba(167,139,250,.10)', stroke: '#a78bfa', group: 'fib' },
+  { id: 'pricerange',         label: 'Price Range',        kind: 'pricerange', color: '#facc15', group: 'forecast' },
+  { id: 'longposition',       label: 'Long Position',      kind: 'longposition', color: 'rgba(52,211,153,.18)', stroke: '#34d399', group: 'forecast' },
+  { id: 'shortposition',      label: 'Short Position',     kind: 'shortposition', color: 'rgba(248,113,113,.18)', stroke: '#f87171', group: 'forecast' },
+  { id: 'fixedrangevp',       label: 'Fixed Range Volume Profile', kind: 'fixedrangevp', color: '#60a5fa', group: 'forecast' },
   { id: 'killzone',           label: 'Session Box',        kind: 'rect',   color: 'rgba(52,211,153,.10)', stroke: '#34d399', drawLabel: 'Session', icon: 'session', group: 'ict' },
   { id: 'orderblock',         label: 'Order Block',        kind: 'rect',   color: 'rgba(251,191,36,.14)', stroke: '#fbbf24', drawLabel: 'OB', group: 'ict' },
   { id: 'fvg',                label: 'Fair Value Gap',     kind: 'rect',   color: 'rgba(167,139,250,.16)', stroke: '#a78bfa', drawLabel: 'FVG', group: 'ict' },
@@ -376,6 +383,13 @@ const REP_ICON_PATHS = {
   fvg:      '<path d="M4 8h16M4 16h16"/><rect x="4" y="8" width="16" height="8" fill="currentColor" opacity=".18" stroke="none"/>',
   liquidity:'<path d="M3 8h18M3 16h18" stroke-dasharray="3 3"/>',
   premiumdiscount:'<path d="M4 4h16v16H4z"/><path d="M4 12h16"/>',
+  path:     '<path d="M4 18l5-9 4 5 4-11 3 7"/><circle cx="4" cy="18" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="9" r="1.4" fill="currentColor" stroke="none"/><circle cx="13" cy="14" r="1.4" fill="currentColor" stroke="none"/><circle cx="17" cy="3" r="1.4" fill="currentColor" stroke="none"/><circle cx="20" cy="10" r="1.4" fill="currentColor" stroke="none"/>',
+  callout:  '<path d="M4 5h16v10H11l-4 4v-4H4z"/>',
+  gannbox:  '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 4l16 16M4 20l16-16M4 12h16M12 4v16"/>',
+  pricerange:'<path d="M12 3v18M8 5l4-2 4 2M8 19l4 2 4-2"/><path d="M4 8h4M4 16h4M16 8h4M16 16h4"/>',
+  longposition:'<rect x="4" y="4" width="16" height="5" fill="currentColor" opacity=".35" stroke="none"/><rect x="4" y="15" width="16" height="5" fill="currentColor" opacity=".2" stroke="none"/><path d="M4 9.5h16M4 14.5h16"/>',
+  shortposition:'<rect x="4" y="4" width="16" height="5" fill="currentColor" opacity=".2" stroke="none"/><rect x="4" y="15" width="16" height="5" fill="currentColor" opacity=".35" stroke="none"/><path d="M4 9.5h16M4 14.5h16"/>',
+  fixedrangevp:'<path d="M4 4v16"/><rect x="5" y="5" width="6" height="2" fill="currentColor" stroke="none"/><rect x="5" y="8" width="10" height="2" fill="currentColor" stroke="none"/><rect x="5" y="11" width="14" height="2" fill="currentColor" stroke="none"/><rect x="5" y="14" width="8" height="2" fill="currentColor" stroke="none"/><rect x="5" y="17" width="4" height="2" fill="currentColor" stroke="none"/>',
   magnet:   '<path d="M7 4v8a5 5 0 0010 0V4"/><path d="M7 4H4v4h3M17 4h3v4h-3"/>',
   undo:     '<path d="M7 8H3V4"/><path d="M3 8a9 9 0 1 1 2 10"/>',
   redo:     '<path d="M17 8h4V4"/><path d="M21 8a9 9 0 1 0-2 10"/>',
@@ -578,6 +592,7 @@ function _repRenderShell() {
     { id: 'lines',  label: 'Lines' },
     { id: 'fib',    label: 'Fibonacci' },
     { id: 'shapes', label: 'Shapes' },
+    { id: 'forecast', label: 'Forecasting' },
     { id: 'text',   label: null },
     { id: 'ict',    label: 'Smart Money' },
   ];
@@ -1196,12 +1211,16 @@ function _repDrawOverlay() {
   const ctx = _repState.overlayCtx, W = _repState.overlayW, H = _repState.overlayH;
   ctx.clearRect(0, 0, W, H);
   if (!_repState.drawingsHidden) {
-    (_repState.drawings || []).forEach((dw, i) => _repRenderOneDrawing(ctx, dw, i === _repState._hoverIdx, dw.id === _repState.selectedId));
+    (_repState.drawings || []).forEach((dw, i) => { if (!dw.hidden) _repRenderOneDrawing(ctx, dw, i === _repState._hoverIdx, dw.id === _repState.selectedId); });
   }
-  if (_repState.drawDraft && _repState.drawDraft.p1) {
+  if (_repState.drawDraft && (_repState.drawDraft.p1 || _repState.drawDraft.points)) {
     const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
     if (tool && tool.kind === 'brush') {
       _repRenderOneDrawing(ctx, { kind: 'brush', color: tool.color, points: _repState.drawDraft.points }, false, false);
+    } else if (tool && tool.kind === 'path') {
+      const pts = _repState.drawDraft.points.slice();
+      if (_repState.drawDraft.cur) pts.push(_repState.drawDraft.cur);
+      _repRenderOneDrawing(ctx, { kind: 'path', color: tool.color, dashed: true, points: pts }, false, false);
     } else if (tool && _repState.drawDraft.cur) {
       _repRenderOneDrawing(ctx, {
         kind: tool.kind, color: tool.color, stroke: tool.stroke, dashed: tool.dashed,
@@ -1225,7 +1244,8 @@ function _repRenderManualCrosshair(ctx) {
 function _repRenderOneDrawing(ctx, dw, hovered, selected) {
   ctx.save();
   ctx.strokeStyle = dw.stroke || dw.color; ctx.fillStyle = dw.color;
-  ctx.lineWidth = selected ? 2.25 : (hovered ? 2 : 1.5);
+  const _baseW = dw.width || 1.5;
+  ctx.lineWidth = selected ? _baseW + 0.75 : (hovered ? _baseW + 0.5 : _baseW);
   ctx.setLineDash(dw.dashed ? [5, 4] : []);
 
   const handles = [];
@@ -1254,11 +1274,17 @@ function _repRenderOneDrawing(ctx, dw, hovered, selected) {
     let x1 = _repTimeMsToX(dw.p1.time), y1 = _repPriceToY(dw.p1.price);
     let x2 = _repTimeMsToX(dw.p2.time), y2 = _repPriceToY(dw.p2.price);
     if ([x1, y1, x2, y2].some(v => v == null)) { ctx.restore(); return; }
-    if (dw.kind === 'ray' && x2 !== x1) {
-      const slope = (y2 - y1) / (x2 - x1);
+    const origX1 = x1, origY1 = y1;
+    const slope = (x2 !== x1) ? (y2 - y1) / (x2 - x1) : null;
+    if ((dw.kind === 'ray' || dw.extendRight) && slope != null) {
       const edgeX = _repState.overlayW;
       const edgeY = y1 + slope * (edgeX - x1);
       x2 = edgeX; y2 = edgeY;
+    }
+    if (dw.kind === 'line' && dw.extendLeft && slope != null) {
+      const edgeX = 0;
+      const edgeY = y1 + slope * (edgeX - x1);
+      x1 = edgeX; y1 = edgeY;
     }
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
     if (dw.arrow) {
@@ -1277,7 +1303,7 @@ function _repRenderOneDrawing(ctx, dw, hovered, selected) {
       ctx.fillText(`${dPrice >= 0 ? '+' : ''}${dPrice.toFixed(5)}  (${pips.toFixed(1)}p)  ${dMin}m`, (x1 + x2) / 2 + 8, (y1 + y2) / 2 - 8);
     }
     const origX2 = _repTimeMsToX(dw.p2.time), origY2 = _repPriceToY(dw.p2.price);
-    handles.push({ x: x1, y: y1, key: 'p1' }, { x: origX2 ?? x2, y: origY2 ?? y2, key: 'p2' });
+    handles.push({ x: origX1, y: origY1, key: 'p1' }, { x: origX2 ?? x2, y: origY2 ?? y2, key: 'p2' });
   } else if (dw.kind === 'fib') {
     const levels = dw.extension ? [0, 0.618, 1, 1.272, 1.618, 2, 2.618] : [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
     const x1 = _repTimeMsToX(dw.p1.time), x2 = _repTimeMsToX(dw.p2.time);
@@ -1305,6 +1331,119 @@ function _repRenderOneDrawing(ctx, dw, hovered, selected) {
     ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
     pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
     ctx.stroke();
+  } else if (dw.kind === 'path') {
+    const raw = (dw.points || []).map(p => ({ tp: p, x: _repTimeMsToX(p.time), y: _repPriceToY(p.price) }));
+    const pts = raw.filter(p => p.x != null && p.y != null);
+    if (pts.length < 2) { ctx.restore(); return; }
+    ctx.setLineDash(dw.dashed ? [5, 4] : []); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+    raw.forEach((p, idx) => { if (p.x != null && p.y != null) handles.push({ x: p.x, y: p.y, key: 'pt' + idx }); });
+  } else if (dw.kind === 'callout') {
+    const x1 = _repTimeMsToX(dw.p1.time), y1 = _repPriceToY(dw.p1.price);
+    const x2 = _repTimeMsToX(dw.p2.time), y2 = _repPriceToY(dw.p2.price);
+    if ([x1, y1, x2, y2].some(v => v == null)) { ctx.restore(); return; }
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x1, y1, 2.5, 0, Math.PI * 2); ctx.fillStyle = dw.color; ctx.fill();
+    const text = dw.text || 'Note';
+    ctx.font = '600 11px Plus Jakarta Sans, sans-serif';
+    const tw = ctx.measureText(text).width;
+    const bx = x2 < x1 ? x2 - tw - 10 : x2, by = y2 - 20;
+    ctx.fillStyle = 'rgba(15,23,41,.85)';
+    ctx.fillRect(bx - 6, by - 2, tw + 12, 22);
+    ctx.strokeRect(bx - 6, by - 2, tw + 12, 22);
+    ctx.fillStyle = dw.color;
+    ctx.fillText(text, bx, by + 14);
+    handles.push({ x: x1, y: y1, key: 'p1' }, { x: x2, y: y2, key: 'p2' });
+  } else if (dw.kind === 'gannbox') {
+    const x1 = _repTimeMsToX(dw.p1.time), x2 = _repTimeMsToX(dw.p2.time);
+    const y1 = _repPriceToY(dw.p1.price), y2 = _repPriceToY(dw.p2.price);
+    if ([x1, x2, y1, y2].some(v => v == null)) { ctx.restore(); return; }
+    const rx = Math.min(x1, x2), ry = Math.min(y1, y2), rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1);
+    ctx.setLineDash([]);
+    if (dw.color && dw.color !== 'transparent') { ctx.fillStyle = dw.color; ctx.fillRect(rx, ry, rw, rh); }
+    ctx.strokeRect(rx, ry, rw, rh);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y2); ctx.lineTo(x2, y1); ctx.stroke();
+    ctx.setLineDash([4, 3]);
+    [0.25, 0.5, 0.75].forEach(f => {
+      ctx.beginPath(); ctx.moveTo(rx, ry + rh * f); ctx.lineTo(rx + rw, ry + rh * f); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(rx + rw * f, ry); ctx.lineTo(rx + rw * f, ry + rh); ctx.stroke();
+    });
+    handles.push({ x: x1, y: y1, key: 'p1' }, { x: x2, y: y2, key: 'p2' });
+  } else if (dw.kind === 'pricerange') {
+    const x1 = _repTimeMsToX(dw.p1.time), x2 = _repTimeMsToX(dw.p2.time);
+    const y1 = _repPriceToY(dw.p1.price), y2 = _repPriceToY(dw.p2.price);
+    if ([x1, x2, y1, y2].some(v => v == null)) { ctx.restore(); return; }
+    const rx = Math.min(x1, x2), rw = Math.abs(x2 - x1) || 1;
+    ctx.setLineDash([]);
+    ctx.strokeRect(rx, Math.min(y1, y2), rw, Math.abs(y2 - y1));
+    ctx.beginPath(); ctx.moveTo(rx, y1); ctx.lineTo(rx + rw, y1); ctx.moveTo(rx, y2); ctx.lineTo(rx + rw, y2); ctx.stroke();
+    const diff = dw.p2.price - dw.p1.price;
+    const pct = dw.p1.price ? (diff / dw.p1.price * 100) : 0;
+    ctx.fillStyle = diff >= 0 ? '#34d399' : '#f87171'; ctx.font = '10px JetBrains Mono, monospace';
+    ctx.fillText(`${diff >= 0 ? '+' : ''}${diff.toFixed(5)}  (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)`, rx + rw + 6, (y1 + y2) / 2);
+    handles.push({ x: x1, y: y1, key: 'p1' }, { x: x2, y: y2, key: 'p2' });
+  } else if (dw.kind === 'longposition' || dw.kind === 'shortposition') {
+    const isLong = dw.kind === 'longposition';
+    const x1 = _repTimeMsToX(dw.p1.time), x2 = _repTimeMsToX(dw.p2.time);
+    const yEntry = _repPriceToY(dw.p1.price), yTarget = _repPriceToY(dw.p2.price);
+    if ([x1, x2, yEntry, yTarget].some(v => v == null)) { ctx.restore(); return; }
+    const rx = Math.min(x1, x2), rw = Math.abs(x2 - x1) || 60;
+    const profitDist = dw.p2.price - dw.p1.price;
+    const stopRatio = dw.stopRatio ?? 0.5;
+    const stopPrice = dw.p1.price - profitDist * stopRatio;
+    const yStop = _repPriceToY(stopPrice);
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(52,211,153,.22)';
+    ctx.fillRect(rx, Math.min(yEntry, yTarget), rw, Math.abs(yTarget - yEntry));
+    if (yStop != null) { ctx.fillStyle = 'rgba(248,113,113,.22)'; ctx.fillRect(rx, Math.min(yEntry, yStop), rw, Math.abs(yStop - yEntry)); }
+    ctx.strokeStyle = dw.stroke || dw.color;
+    ctx.beginPath(); ctx.moveTo(rx, yEntry); ctx.lineTo(rx + rw, yEntry); ctx.stroke();
+    const pct = dw.p1.price ? (profitDist / dw.p1.price * 100) : 0;
+    const rr = stopRatio > 0 ? (1 / stopRatio) : 0;
+    ctx.setLineDash([]); ctx.fillStyle = '#e2e8f0'; ctx.font = '10px JetBrains Mono, monospace';
+    ctx.fillText(`${isLong ? 'Long' : 'Short'}  R:R ${rr.toFixed(2)}  Target ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`, rx + 4, Math.min(yEntry, yTarget) - 4);
+    handles.push({ x: x1, y: yEntry, key: 'p1' }, { x: x2, y: yTarget, key: 'p2' });
+  } else if (dw.kind === 'fixedrangevp') {
+    const t1 = Math.min(dw.p1.time, dw.p2.time), t2 = Math.max(dw.p1.time, dw.p2.time);
+    const x1 = _repTimeMsToX(dw.p1.time), x2 = _repTimeMsToX(dw.p2.time);
+    if (x1 == null || x2 == null) { ctx.restore(); return; }
+    const candles = (_repState.candles || []).filter(c => c.time >= t1 && c.time <= t2);
+    if (candles.length) {
+      const rows = dw.rows || 24;
+      const lo = Math.min(...candles.map(c => c.low)), hi = Math.max(...candles.map(c => c.high));
+      if (hi > lo) {
+        const bins = new Array(rows).fill(0).map(() => ({ up: 0, down: 0 }));
+        candles.forEach(c => {
+          const mid = (c.high + c.low) / 2;
+          let idx = Math.floor((mid - lo) / (hi - lo) * rows);
+          idx = Math.max(0, Math.min(rows - 1, idx));
+          if (c.close >= c.open) bins[idx].up += (c.volume || 1); else bins[idx].down += (c.volume || 1);
+        });
+        const maxVol = Math.max(...bins.map(b => b.up + b.down), 1);
+        const rightX = Math.max(x1, x2);
+        const maxBarW = Math.abs(x2 - x1) || 80;
+        ctx.setLineDash([]);
+        for (let r = 0; r < rows; r++) {
+          const priceLo = lo + (hi - lo) * r / rows, priceHi = lo + (hi - lo) * (r + 1) / rows;
+          const yTop = _repPriceToY(priceHi), yBot = _repPriceToY(priceLo);
+          if (yTop == null || yBot == null) continue;
+          const h = Math.max(1, yBot - yTop) - 1;
+          const total = bins[r].up + bins[r].down;
+          const w = (total / maxVol) * maxBarW;
+          const upW = total ? w * (bins[r].up / total) : 0;
+          ctx.fillStyle = 'rgba(248,113,113,.5)'; ctx.fillRect(rightX - w, yTop, w - upW, h);
+          ctx.fillStyle = 'rgba(52,211,153,.5)'; ctx.fillRect(rightX - upW, yTop, upW, h);
+        }
+      }
+    }
+    ctx.strokeStyle = dw.stroke || dw.color; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(x1, 0); ctx.lineTo(x1, _repState.overlayH); ctx.moveTo(x2, 0); ctx.lineTo(x2, _repState.overlayH); ctx.stroke();
+    const yHi = _repPriceToY(dw.p2.price), yLo = _repPriceToY(dw.p1.price);
+    handles.push({ x: x1, y: yLo, key: 'p1' }, { x: x2, y: yHi, key: 'p2' });
   }
 
   if (selected) {
@@ -1340,10 +1479,16 @@ function _repHitTest(px, py) {
     }
     if (dw.kind === 'hline') { const y = _repPriceToY(dw.p1.price); if (y != null && Math.abs(py - y) <= 5) return { drawing: dw, index: i, handle: 'body' }; }
     else if (dw.kind === 'vline') { const x = _repTimeMsToX(dw.p1.time); if (x != null && Math.abs(px - x) <= 5) return { drawing: dw, index: i, handle: 'body' }; }
-    else if (dw.kind === 'line' || dw.kind === 'ray' || dw.kind === 'measure') {
+    else if (dw.kind === 'line' || dw.kind === 'ray' || dw.kind === 'measure' || dw.kind === 'callout') {
       const x1 = _repTimeMsToX(dw.p1.time), y1 = _repPriceToY(dw.p1.price), x2 = _repTimeMsToX(dw.p2.time), y2 = _repPriceToY(dw.p2.price);
       if ([x1, y1, x2, y2].every(v => v != null) && _repDistToSegment(px, py, x1, y1, x2, y2) <= 6) return { drawing: dw, index: i, handle: 'body' };
-    } else if (dw.kind === 'rect' || dw.kind === 'circle' || dw.kind === 'fib') {
+    } else if (dw.kind === 'path') {
+      const pts = (dw.points || []).map(p => ({ x: _repTimeMsToX(p.time), y: _repPriceToY(p.price) }));
+      for (let k = 0; k < pts.length - 1; k++) {
+        const a = pts[k], b = pts[k + 1];
+        if (a.x != null && a.y != null && b.x != null && b.y != null && _repDistToSegment(px, py, a.x, a.y, b.x, b.y) <= 6) return { drawing: dw, index: i, handle: 'body' };
+      }
+    } else if (dw.kind === 'rect' || dw.kind === 'circle' || dw.kind === 'fib' || dw.kind === 'gannbox' || dw.kind === 'pricerange' || dw.kind === 'longposition' || dw.kind === 'shortposition' || dw.kind === 'fixedrangevp') {
       const x1 = _repTimeMsToX(dw.p1.time), x2 = _repTimeMsToX(dw.p2.time), y1 = _repPriceToY(dw.p1.price), y2 = _repPriceToY(dw.p2.price);
       if ([x1, x2, y1, y2].every(v => v != null)) {
         const rx = Math.min(x1, x2), ry = Math.min(y1, y2), rw = Math.abs(x2 - x1), rh = Math.abs(y2 - y1);
@@ -1406,6 +1551,12 @@ function _repOverlayMouseDown(e) {
     _repFinishToolPlacement(); return;
   }
   if (tool.kind === 'brush') { _repState.drawDraft = { p1: point, points: [point] }; return; }
+  if (tool.kind === 'path') {
+    if (_repState.drawDraft && _repState.drawDraft.points) { _repState.drawDraft.points.push(point); }
+    else { _repState.drawDraft = { points: [point] }; }
+    _repDrawOverlay();
+    return;
+  }
   _repState.drawDraft = { p1: point, cur: point };
 }
 
@@ -1429,12 +1580,19 @@ function _repOverlayMouseMove(e) {
     else if (d.drawing.kind === 'text') d.drawing.p1 = point;
     else if (d.handle === 'p1') d.drawing.p1 = point;
     else if (d.handle === 'p2') d.drawing.p2 = point;
+    else if (typeof d.handle === 'string' && d.handle.indexOf('pt') === 0 && d.drawing.points) {
+      const idx = parseInt(d.handle.slice(2), 10);
+      if (!isNaN(idx) && d.drawing.points[idx]) d.drawing.points[idx] = point;
+    }
     else if (d.handle === 'body') {
       const startPoint = _repPointFromPixel(d.startX, d.startY);
       if (startPoint && d.orig.p1) {
         const dt = point.time - startPoint.time, dp = point.price - startPoint.price;
         d.drawing.p1 = { time: d.orig.p1.time + dt, price: d.orig.p1.price + dp };
         if (d.orig.p2) d.drawing.p2 = { time: d.orig.p2.time + dt, price: d.orig.p2.price + dp };
+      } else if (startPoint && d.orig.points) {
+        const dt = point.time - startPoint.time, dp = point.price - startPoint.price;
+        d.drawing.points = d.orig.points.map(pt => ({ time: pt.time + dt, price: pt.price + dp }));
       }
     }
     _repDrawOverlay();
@@ -1472,6 +1630,15 @@ function _repOverlayMouseUp() {
       if (_repState.drawDraft.points.length > 1) { _repPushHistory(); _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'brush', color: tool.color, points: _repState.drawDraft.points }); }
       _repState.drawDraft = null; _repFinishToolPlacement(); return;
     }
+    if (tool && tool.kind === 'path') { return; } // multi-click tool — finished via double-click (see _repFinishPathDraft)
+    if (tool && tool.kind === 'callout' && _repState.drawDraft.cur) {
+      const txt = prompt('Callout text:');
+      if (txt) {
+        _repPushHistory();
+        _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'callout', color: tool.color, text: txt, p1: _repState.drawDraft.p1, p2: _repState.drawDraft.cur });
+      }
+      _repState.drawDraft = null; _repFinishToolPlacement(); return;
+    }
     if (tool && _repState.drawDraft.cur) {
       _repPushHistory();
       _repState.drawings.push({
@@ -1485,14 +1652,39 @@ function _repOverlayMouseUp() {
   }
 }
 
+// Path is a multi-click polyline tool: each click (handled in
+// _repOverlayMouseDown) appends a point to the in-progress draft and
+// mouseup deliberately leaves it open (see above). Double-clicking —
+// or calling this directly — commits the accumulated points as one
+// drawing and clears the draft.
+function _repFinishPathDraft() {
+  if (!_repState || !_repState.drawDraft || !_repState.drawDraft.points) return;
+  const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
+  if (_repState.drawDraft.points.length > 1) {
+    _repPushHistory();
+    _repState.drawings.push({ id: _repUid(), type: (tool && tool.id) || 'path', kind: 'path', color: (tool && tool.color) || '#38bdf8', points: _repState.drawDraft.points });
+  }
+  _repState.drawDraft = null;
+  _repFinishToolPlacement();
+}
+
 function _repOverlayWheel(e) {
   e.preventDefault();
   _repZoom(e.deltaY > 0 ? 1 : -1);
 }
 
-function _repOverlayDblClick() {
-  if (_repState?.drawDraft?.points) { _repOverlayMouseUp(); return; }
+function _repOverlayDblClick(e) {
+  if (_repState?.drawDraft?.points) {
+    const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
+    if (tool && tool.kind === 'path') { _repFinishPathDraft(); return; }
+    _repOverlayMouseUp(); return;
+  }
   if (!_repState || _repState.activeTool || _repState.drawDraft) return;
+  if (e) {
+    const { x, y } = _repOverlayLocalXY(e);
+    const hit = _repHitTest(x, y);
+    if (hit) { _repOpenDrawingSettingsModal(hit.drawing.id); return; }
+  }
   _repOpenSettingsModal();
 }
 
@@ -1538,7 +1730,7 @@ function _repNativeCrosshairUpdate(param) {
 // ── Tool-group flyouts (Lines / Fibonacci / Shapes / Smart Money) ──
 // TradingView collapses related tools behind one button + a small
 // corner caret; clicking the caret pops this panel out next to it.
-const REP_TOOL_GROUP_LABELS = { lines: 'Lines', fib: 'Fibonacci', shapes: 'Shapes', ict: 'Smart Money' };
+const REP_TOOL_GROUP_LABELS = { lines: 'Lines', fib: 'Fibonacci', shapes: 'Shapes', forecast: 'Forecasting', ict: 'Smart Money', text: 'Text' };
 function _repToggleToolFlyout(e, groupId) {
   e.stopPropagation();
   const flyout = document.getElementById('rep-tool-flyout');
@@ -1718,6 +1910,8 @@ const REP_CTX_COLORS = ['#fbbf24', '#60a5fa', '#34d399', '#f87171', '#a78bfa', '
 function _repShowContextMenu(clientX, clientY, drawing, index) {
   const menu = document.getElementById('rep-ctx-menu'); if (!menu) return;
   menu.innerHTML = `
+    <div class="rep-ctx-item" onclick="_repOpenDrawingSettingsModal('${drawing.id}')"><svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.2a1.7 1.7 0 013.4 0 1.7 1.7 0 002.5 1.5 1.7 1.7 0 012.4 2.4A1.7 1.7 0 0020.1 10a1.7 1.7 0 010 3.4 1.7 1.7 0 00-1.5 2.5 1.7 1.7 0 01-2.4 2.4A1.7 1.7 0 0013.7 20a1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.5-1.5 1.7 1.7 0 01-2.4-2.4A1.7 1.7 0 003.9 13.4a1.7 1.7 0 010-3.4 1.7 1.7 0 001.5-2.5 1.7 1.7 0 012.4-2.4A1.7 1.7 0 0010.3 3.2z"/><circle cx="12" cy="12" r="3.2"/></svg>Settings…</div>
+    <div class="rep-ctx-sep"></div>
     <div class="rep-ctx-item" onclick="_repDuplicateSelected()">${_repIcon('save', 'icn')}Duplicate</div>
     <div class="rep-ctx-item" onclick="_repChangeLayer(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 8l8-5 8 5-8 5z"/><path d="M4 16l8 5 8-5"/></svg>Bring Forward</div>
     <div class="rep-ctx-item" onclick="_repChangeLayer(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 16l8-5 8 5-8 5z"/><path d="M4 8l8 5 8-5"/></svg>Send Backward</div>
@@ -1731,6 +1925,216 @@ function _repShowContextMenu(clientX, clientY, drawing, index) {
   setTimeout(() => document.addEventListener('click', _repHideContextMenu, { once: true }), 0);
 }
 function _repHideContextMenu() { document.getElementById('rep-ctx-menu')?.classList.remove('open'); }
+
+// ── Per-drawing Settings dialog ──────────────────────────
+// Every drawing tool (Trend Line, Rectangle, Fib, the new
+// Path/Callout/Gann Box/Price Range/Long-Short Position/Fixed
+// Range Volume Profile, etc.) opens the same tabbed dialog —
+// Style / Coordinates / Visibility — mirroring TradingView's
+// per-object properties dialog. Opened via the context-menu
+// gear item or by double-clicking the drawing itself.
+let _repDrawSettingsId = null;
+let _repDrawSettingsTab = 'style';
+
+function _repOpenDrawingSettingsModal(id) {
+  if (!_repState) return;
+  const dw = _repState.drawings.find(d => d.id === id); if (!dw) return;
+  _repHideContextMenu();
+  document.getElementById('rep-draw-settings-overlay')?.remove();
+  _repDrawSettingsId = id;
+  _repDrawSettingsTab = 'style';
+  _repState.selectedId = id;
+
+  const tool = REP_TOOLS.find(t => t.id === dw.type);
+  const overlay = document.createElement('div');
+  overlay.id = 'rep-draw-settings-overlay';
+  overlay.className = 'acc-manager-overlay';
+  overlay.style.zIndex = '2650';
+  overlay.onclick = e => { if (e.target === overlay) _repCloseDrawSettingsModal(); };
+
+  overlay.innerHTML = `
+  <div class="acc-manager-modal" style="max-width:460px;max-height:82vh">
+    <div class="acc-manager-header">
+      <span>${(tool ? tool.label : 'Drawing')} Settings</span>
+      <button onclick="_repCloseDrawSettingsModal()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
+    </div>
+    <div style="display:flex;min-height:260px;max-height:calc(82vh - 110px)">
+      <div id="rep-draw-settings-tabs" style="width:120px;flex-shrink:0;border-right:1px solid var(--glass-border);padding:10px;display:flex;flex-direction:column;gap:2px">
+        ${_repDrawSettingsTabButtons()}
+      </div>
+      <div id="rep-draw-settings-body" style="flex:1;overflow-y:auto;padding:16px">
+        ${_repDrawSettingsTabContent(dw, _repDrawSettingsTab)}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--glass-border)">
+      <button onclick="_repCloseDrawSettingsModal()" class="acc-mgr-add-btn" style="padding:6px 18px">Done</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  _repDrawOverlay();
+}
+
+function _repDrawSettingsTabButtons() {
+  const tabs = [{ id: 'style', label: 'Style' }, { id: 'coords', label: 'Coordinates' }, { id: 'visibility', label: 'Visibility' }];
+  return tabs.map(tb => `<button type="button" onclick="_repDrawSettingsSwitchTab('${tb.id}')" class="wl-week-btn${_repDrawSettingsTab === tb.id ? ' restore' : ''}" style="text-align:left;justify-content:flex-start;width:100%">${tb.label}</button>`).join('');
+}
+function _repDrawSettingsSwitchTab(tab) {
+  const dw = _repState.drawings.find(d => d.id === _repDrawSettingsId); if (!dw) return;
+  _repDrawSettingsTab = tab;
+  document.getElementById('rep-draw-settings-tabs').innerHTML = _repDrawSettingsTabButtons();
+  document.getElementById('rep-draw-settings-body').innerHTML = _repDrawSettingsTabContent(dw, tab);
+}
+function _repCloseDrawSettingsModal() {
+  document.getElementById('rep-draw-settings-overlay')?.remove();
+  _repDrawSettingsId = null;
+  _repSaveState(); _repDrawOverlay();
+}
+function _repRefreshDrawSettingsBody() {
+  const dw = _repState.drawings.find(d => d.id === _repDrawSettingsId); if (!dw) return;
+  const body = document.getElementById('rep-draw-settings-body');
+  if (body) body.innerHTML = _repDrawSettingsTabContent(dw, _repDrawSettingsTab);
+}
+
+function _repDrawSettingsTabContent(dw, tab) {
+  if (tab === 'coords') return _repDrawSettingsCoordsTab(dw);
+  if (tab === 'visibility') return _repDrawSettingsVisibilityTab(dw);
+  return _repDrawSettingsStyleTab(dw);
+}
+
+function _repDrawSettingsStyleTab(dw) {
+  const widthOpts = [1, 1.5, 2, 3, 4].map(w => `<option value="${w}"${(dw.width || 1.5) == w ? ' selected' : ''}>${w}px</option>`).join('');
+  let extra = '';
+  if (dw.kind === 'longposition' || dw.kind === 'shortposition') {
+    extra += `
+      ${_repSectionTitle('Risk / Reward')}
+      <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+        <span style="flex:1;font-size:13px">Stop distance ratio</span>
+        <input type="number" step="0.1" min="0.1" value="${dw.stopRatio ?? 0.5}" oninput="_repSetDrawProp('${dw.id}','stopRatio', parseFloat(this.value)||0.5)" class="acc-mgr-input" style="width:80px">
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+        <span style="flex:1;font-size:13px">Quantity</span>
+        <input type="number" step="1" min="1" value="${dw.qty ?? 1}" oninput="_repSetDrawProp('${dw.id}','qty', parseFloat(this.value)||1)" class="acc-mgr-input" style="width:80px">
+      </div>`;
+  }
+  if (dw.kind === 'line') {
+    extra += `
+      ${_repSectionTitle('Extend')}
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
+        <input type="checkbox" ${dw.extendLeft ? 'checked' : ''} onchange="_repToggleDrawProp('${dw.id}','extendLeft')" style="width:15px;height:15px;accent-color:var(--accent,#34d399);cursor:pointer">
+        <span style="font-size:13px">Extend left</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
+        <input type="checkbox" ${dw.extendRight ? 'checked' : ''} onchange="_repToggleDrawProp('${dw.id}','extendRight')" style="width:15px;height:15px;accent-color:var(--accent,#34d399);cursor:pointer">
+        <span style="font-size:13px">Extend right</span>
+      </div>`;
+  }
+  if (dw.kind === 'text' || dw.kind === 'callout') {
+    extra += `
+      ${_repSectionTitle('Text')}
+      <div><textarea class="acc-mgr-input" style="width:100%;min-height:60px;box-sizing:border-box;resize:vertical" oninput="_repSetDrawProp('${dw.id}','text', this.value)">${dw.text || ''}</textarea></div>`;
+  }
+  if (dw.kind === 'fixedrangevp') {
+    extra += `
+      ${_repSectionTitle('Profile')}
+      <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+        <span style="flex:1;font-size:13px">Row count</span>
+        <input type="number" min="5" max="60" value="${dw.rows ?? 24}" oninput="_repSetDrawProp('${dw.id}','rows', parseInt(this.value,10)||24)" class="acc-mgr-input" style="width:80px">
+      </div>`;
+  }
+  const showLineStyle = dw.kind !== 'text';
+  return `
+    ${_repSectionTitle('Line')}
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+      <span style="flex:1;font-size:13px">Color</span>
+      ${_repDrawColorInput(dw)}
+    </div>
+    ${showLineStyle ? `
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+      <span style="flex:1;font-size:13px">Width</span>
+      <select class="rep-select" style="width:90px" onchange="_repSetDrawProp('${dw.id}','width', parseFloat(this.value))">${widthOpts}</select>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
+      <input type="checkbox" ${dw.dashed ? 'checked' : ''} onchange="_repToggleDrawProp('${dw.id}','dashed')" style="width:15px;height:15px;accent-color:var(--accent,#34d399);cursor:pointer">
+      <span style="font-size:13px">Dashed</span>
+    </div>` : ''}
+    ${extra}`;
+}
+
+function _repDrawColorInput(dw) {
+  const hex = _repToHex6(dw.color);
+  const id = 'rep-dw-color-' + dw.id, hexId = id + '-hex';
+  return `<span style="display:inline-flex;align-items:center;gap:5px">
+    <input type="color" id="${id}" value="${hex}" oninput="_repSetDrawColorLive('${dw.id}', this.value, '${hexId}')" style="width:30px;height:26px;border:1px solid var(--glass-border);border-radius:4px;background:none;cursor:pointer;padding:0">
+    <input type="text" id="${hexId}" value="${hex}" maxlength="7" spellcheck="false" autocapitalize="off" oninput="_repDrawHexChanged('${dw.id}','${id}', this.value)" placeholder="#000000" style="width:72px;height:26px;font-size:11px;font-family:var(--font-mono);text-transform:uppercase;background:var(--glass-1,#10141d);border:1px solid var(--glass-border);border-radius:4px;color:var(--text);padding:0 6px">
+  </span>`;
+}
+function _repSetDrawColorLive(id, value, hexFieldId) {
+  _repSetDrawProp(id, 'color', value);
+  const dw = _repState.drawings.find(d => d.id === id);
+  if (dw && dw.stroke) _repSetDrawProp(id, 'stroke', value);
+  const hexField = hexFieldId && document.getElementById(hexFieldId);
+  if (hexField) hexField.value = value;
+}
+function _repDrawHexChanged(id, swatchId, value) {
+  let v = value.trim(); if (v && v[0] !== '#') v = '#' + v;
+  if (!/^#[0-9a-fA-F]{6}$/.test(v)) return;
+  const swatch = document.getElementById(swatchId); if (swatch) swatch.value = v;
+  _repSetDrawColorLive(id, v, null);
+}
+function _repSetDrawProp(id, key, value) {
+  const dw = _repState.drawings.find(d => d.id === id); if (!dw) return;
+  dw[key] = value; _repDrawOverlay();
+}
+function _repToggleDrawProp(id, key) {
+  const dw = _repState.drawings.find(d => d.id === id); if (!dw) return;
+  dw[key] = !dw[key];
+  _repDrawOverlay();
+  _repRefreshDrawSettingsBody();
+}
+
+function _repDrawSettingsCoordsTab(dw) {
+  const fmtTime = t => t != null ? new Date(t).toISOString().slice(0, 16) : '';
+  const row = (label, field, val, onchange) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
+      <span style="flex:1;font-size:13px">${label}</span>
+      <input type="${field === 'time' ? 'datetime-local' : 'number'}" step="any" value="${val}" class="acc-mgr-input" style="width:170px" onchange="${onchange}">
+    </div>`;
+  let html = '';
+  if (dw.p1) {
+    if (dw.p1.time != null) html += row('Point 1 — Time', 'time', fmtTime(dw.p1.time), `_repSetCoordTime('${dw.id}','p1', this.value)`);
+    if (dw.p1.price != null) html += row('Point 1 — Price', 'price', dw.p1.price, `_repSetCoordPrice('${dw.id}','p1', this.value)`);
+  }
+  if (dw.p2) {
+    if (dw.p2.time != null) html += row('Point 2 — Time', 'time', fmtTime(dw.p2.time), `_repSetCoordTime('${dw.id}','p2', this.value)`);
+    if (dw.p2.price != null) html += row('Point 2 — Price', 'price', dw.p2.price, `_repSetCoordPrice('${dw.id}','p2', this.value)`);
+  }
+  if (dw.points && dw.points.length) {
+    html += _repSectionTitle(`Points (${dw.points.length})`);
+    html += `<div style="font-size:12px;color:var(--text3)">Multi-point objects are edited by dragging their vertex handles directly on the chart.</div>`;
+  }
+  if (!html) html = '<div style="font-size:13px;color:var(--text3)">No editable coordinates for this object.</div>';
+  return html;
+}
+function _repSetCoordTime(id, pKey, value) {
+  const dw = _repState.drawings.find(d => d.id === id); if (!dw || !dw[pKey]) return;
+  const t = new Date(value).getTime(); if (isNaN(t)) return;
+  dw[pKey].time = t; _repDrawOverlay();
+}
+function _repSetCoordPrice(id, pKey, value) {
+  const dw = _repState.drawings.find(d => d.id === id); if (!dw || !dw[pKey]) return;
+  const p = parseFloat(value); if (isNaN(p)) return;
+  dw[pKey].price = p; _repDrawOverlay();
+}
+
+function _repDrawSettingsVisibilityTab(dw) {
+  return `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
+      <input type="checkbox" ${dw.hidden ? 'checked' : ''} onchange="_repToggleDrawProp('${dw.id}','hidden')" style="width:15px;height:15px;accent-color:var(--accent,#34d399);cursor:pointer">
+      <span style="font-size:13px">Hide this object</span>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-top:8px">Hidden objects stay saved with the chart but won't render or highlight until shown again.</div>`;
+}
 
 // ── Indicators / layouts popovers ────────────────────────
 function _repClosePopovers() {
