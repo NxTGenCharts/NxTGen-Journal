@@ -281,10 +281,10 @@ const REP_TOOLS = [
   { id: 'rect',               label: 'Rectangle',          kind: 'rect',   color: 'rgba(96,165,250,.16)', stroke: '#60a5fa', group: 'shapes' },
   { id: 'circle',             label: 'Circle',             kind: 'circle', color: 'rgba(96,165,250,.16)', stroke: '#60a5fa', group: 'shapes' },
   { id: 'brush',              label: 'Brush',              kind: 'brush',  color: '#f472b6', group: 'shapes' },
-  { id: 'text',               label: 'Text',               kind: 'text',   color: '#e2e8f0', group: 'shapes' },
+  { id: 'text',               label: 'Text',               kind: 'text',   color: '#e2e8f0', group: 'text' },
   { id: 'fib',                label: 'Fib Retracement',    kind: 'fib',    color: '#2dd4bf', group: 'fib' },
   { id: 'fibext',             label: 'Fib Extension',      kind: 'fib',    color: '#fb923c', extension: true, group: 'fib' },
-  { id: 'killzone',           label: 'Session Box',        kind: 'rect',   color: 'rgba(52,211,153,.10)', stroke: '#34d399', drawLabel: 'Session', group: 'ict' },
+  { id: 'killzone',           label: 'Session Box',        kind: 'rect',   color: 'rgba(52,211,153,.10)', stroke: '#34d399', drawLabel: 'Session', icon: 'session', group: 'ict' },
   { id: 'orderblock',         label: 'Order Block',        kind: 'rect',   color: 'rgba(251,191,36,.14)', stroke: '#fbbf24', drawLabel: 'OB', group: 'ict' },
   { id: 'fvg',                label: 'Fair Value Gap',     kind: 'rect',   color: 'rgba(167,139,250,.16)', stroke: '#a78bfa', drawLabel: 'FVG', group: 'ict' },
   { id: 'liquidity',          label: 'Liquidity Zone',     kind: 'hline',  color: '#f87171', dashed: true, group: 'ict' },
@@ -504,7 +504,7 @@ async function _repOpen(sessionId) {
     candles: [], index: 0,
     candlesPerView: saved.candlesPerView || 100,
     drawings: saved.drawings ? JSON.parse(JSON.stringify(saved.drawings)) : [],
-    activeTool: null, drawDraft: null, selectedId: null, hoverId: null,
+    activeTool: null, drawDraft: null, selectedId: null, hoverId: null, toolGroupChoice: {},
     magnet: saved.magnet !== undefined ? saved.magnet : false,
     drawingsLocked: saved.drawingsLocked || false,
     drawingsHidden: saved.drawingsHidden || false,
@@ -569,13 +569,38 @@ function _repRenderShell() {
 
   const groups = {};
   REP_TOOLS.forEach(t => { (groups[t.group] = groups[t.group] || []).push(t); });
-  const groupOrder = ['nav', 'lines', 'shapes', 'fib', 'ict'];
+  // TradingView's real toolbox groups related tools behind a single
+  // flyout button (Line Tools, Fib Tools, Shapes, …) rather than
+  // listing all ~19 tools flat in one column — reproduce that here.
+  // Cursor and Text are the two TV keeps standalone.
+  const groupOrder = [
+    { id: 'nav',    label: null },
+    { id: 'lines',  label: 'Lines' },
+    { id: 'fib',    label: 'Fibonacci' },
+    { id: 'shapes', label: 'Shapes' },
+    { id: 'text',   label: null },
+    { id: 'ict',    label: 'Smart Money' },
+  ];
   const toolButtons = groupOrder.map((g, gi) => {
-    const btns = (groups[g] || []).map(t => `
+    const tools = groups[g.id] || [];
+    if (!tools.length) return '';
+    const sep = gi < groupOrder.length - 1 ? '<div class="rep-tool-sep"></div>' : '';
+    if (tools.length === 1) {
+      const t = tools[0];
+      return `
       <button class="rep-tool-btn" data-tool="${t.id}" data-tip="${t.label}" onclick="_repSetTool('${t.id}')" onmouseenter="_repShowTip(event)" onmouseleave="_repHideTip()">
-        ${_repIcon(t.id, 'icn')}
-      </button>`).join('');
-    return btns + (gi < groupOrder.length - 1 ? '<div class="rep-tool-sep"></div>' : '');
+        ${_repIcon(t.icon || t.id, 'icn')}
+      </button>` + sep;
+    }
+    const chosenId = (_repState.toolGroupChoice && _repState.toolGroupChoice[g.id]) || tools[0].id;
+    const chosen = tools.find(t => t.id === chosenId) || tools[0];
+    return `
+      <div class="rep-tool-group" data-group="${g.id}">
+        <button class="rep-tool-btn rep-tool-group-main" data-tool="${chosen.id}" data-tip="${chosen.label}" onclick="_repSetTool('${chosen.id}')" onmouseenter="_repShowTip(event)" onmouseleave="_repHideTip()">
+          ${_repIcon(chosen.icon || chosen.id, 'icn')}
+        </button>
+        <button class="rep-tool-group-caret" data-tip="More ${g.label} tools" onclick="_repToggleToolFlyout(event,'${g.id}')" onmouseenter="_repShowTip(event)" onmouseleave="_repHideTip()" aria-label="More ${g.label} tools"></button>
+      </div>` + sep;
   }).join('');
 
   overlay.innerHTML = `
@@ -677,6 +702,7 @@ function _repRenderShell() {
 
     <div class="rep-bottom-dock" id="rep-bottom-dock"></div>
     <div class="rep-floating-tooltip" id="rep-floating-tooltip"></div>
+    <div class="rep-tool-flyout" id="rep-tool-flyout"></div>
   `;
 
   document.body.appendChild(overlay);
@@ -1000,15 +1026,39 @@ function _repInitOverlayCanvas() {
   canvas.ondblclick = _repOverlayDblClick;
   canvas.oncontextmenu = _repOverlayContextMenu;
   canvas.onmouseleave = () => { if (_repState) { _repState._manualCrosshair = null; _repDrawOverlay(); } };
-  // Double-tap (mobile) — dblclick doesn't fire reliably from touch,
-  // so detect it manually the same way the old chart-wrap listener
-  // did, just now on the element that actually receives the taps.
+
+  // ── Touch (mobile) ────────────────────────────────────
+  // touchstart/touchmove were never wired up before — only touchend
+  // (for double-tap) — so on a phone nothing ever actually called the
+  // drawing logic; taps and drags did nothing. Each touch is turned
+  // into the same {clientX,clientY,currentTarget} shape the mouse
+  // handlers already expect, so all the drag/select/draw logic above
+  // is reused as-is instead of duplicated. preventDefault stops the
+  // page from scrolling/pinch-zooming under the gesture.
+  const repTouchAsMouse = (e) => {
+    const t = e.touches[0] || e.changedTouches[0];
+    return t ? { clientX: t.clientX, clientY: t.clientY, currentTarget: e.currentTarget } : null;
+  };
   let repLastTapAt = 0;
-  canvas.ontouchend = () => {
+  canvas.ontouchstart = (e) => {
+    e.preventDefault();
+    const fake = repTouchAsMouse(e);
+    if (fake) _repOverlayMouseDown(fake);
+  };
+  canvas.ontouchmove = (e) => {
+    e.preventDefault();
+    const fake = repTouchAsMouse(e);
+    if (fake) _repOverlayMouseMove(fake);
+  };
+  canvas.ontouchend = (e) => {
+    e.preventDefault();
     const now = Date.now();
     if (now - repLastTapAt < 320) _repOverlayDblClick();
     repLastTapAt = now;
+    _repOverlayMouseUp();
   };
+  canvas.ontouchcancel = () => _repOverlayMouseUp();
+
   // mouseup on window, not just the canvas, so a drag that ends
   // outside the canvas (fast mouse movement) still releases cleanly
   window.removeEventListener('mouseup', _repOverlayMouseUp);
@@ -1485,6 +1535,54 @@ function _repNativeCrosshairUpdate(param) {
 // ══════════════════════════════════════════════════════
 // TOOLBAR / TOGGLES
 // ══════════════════════════════════════════════════════
+// ── Tool-group flyouts (Lines / Fibonacci / Shapes / Smart Money) ──
+// TradingView collapses related tools behind one button + a small
+// corner caret; clicking the caret pops this panel out next to it.
+const REP_TOOL_GROUP_LABELS = { lines: 'Lines', fib: 'Fibonacci', shapes: 'Shapes', ict: 'Smart Money' };
+function _repToggleToolFlyout(e, groupId) {
+  e.stopPropagation();
+  const flyout = document.getElementById('rep-tool-flyout');
+  const groupEl = document.querySelector(`.rep-tool-group[data-group="${groupId}"]`);
+  if (!flyout || !groupEl || !_repState) return;
+
+  // Clicking the same group's caret again closes it.
+  if (flyout.classList.contains('open') && flyout.dataset.group === groupId) {
+    _repCloseToolFlyout();
+    return;
+  }
+  _repClosePopovers();
+  const tools = REP_TOOLS.filter(t => t.group === groupId);
+  const chosenId = (_repState.toolGroupChoice && _repState.toolGroupChoice[groupId]) || tools[0]?.id;
+  flyout.innerHTML = `<div class="rep-popover-title">${REP_TOOL_GROUP_LABELS[groupId] || ''}</div>` + tools.map(t => `
+    <button class="rep-flyout-item${t.id === chosenId ? ' active' : ''}" onclick="_repPickGroupTool('${groupId}','${t.id}')">
+      ${_repIcon(t.icon || t.id, 'icn')}<span>${t.label}</span>
+    </button>`).join('');
+  flyout.dataset.group = groupId;
+  const rect = groupEl.getBoundingClientRect();
+  flyout.style.top = rect.top + 'px';
+  flyout.style.left = (rect.right + 8) + 'px';
+  flyout.classList.add('open');
+  setTimeout(() => document.addEventListener('click', _repCloseToolFlyout, { once: true }), 0);
+}
+function _repCloseToolFlyout() { document.getElementById('rep-tool-flyout')?.classList.remove('open'); }
+function _repPickGroupTool(groupId, toolId) {
+  if (!_repState) return;
+  _repState.toolGroupChoice = _repState.toolGroupChoice || {};
+  _repState.toolGroupChoice[groupId] = toolId;
+  _repCloseToolFlyout();
+  _repSetTool(toolId);
+  // Refresh just this group's main button so its icon/tooltip match
+  // the newly-picked tool, without re-rendering the whole toolbar.
+  const groupEl = document.querySelector(`.rep-tool-group[data-group="${groupId}"] .rep-tool-group-main`);
+  const tool = REP_TOOLS.find(t => t.id === toolId);
+  if (groupEl && tool) {
+    groupEl.innerHTML = _repIcon(tool.icon || tool.id, 'icn');
+    groupEl.dataset.tool = tool.id;
+    groupEl.dataset.tip = tool.label;
+    groupEl.classList.toggle('active', _repState.activeTool === tool.id);
+  }
+}
+
 function _repSetTool(id) {
   _repState.activeTool = (_repState.activeTool === id) ? null : id;
   _repState.drawDraft = null;
@@ -1638,6 +1736,7 @@ function _repHideContextMenu() { document.getElementById('rep-ctx-menu')?.classL
 function _repClosePopovers() {
   document.getElementById('rep-indicators-popover')?.classList.remove('open');
   document.getElementById('rep-layouts-popover')?.classList.remove('open');
+  _repCloseToolFlyout();
 }
 // ── Settings modal (TradingView-style: sidebar tabs + Symbol/
 // Canvas panes) ──────────────────────────────────────────
