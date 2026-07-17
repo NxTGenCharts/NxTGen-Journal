@@ -519,6 +519,7 @@ async function _repOpen(sessionId) {
     candlesPerView: saved.candlesPerView || 100,
     drawings: saved.drawings ? JSON.parse(JSON.stringify(saved.drawings)) : [],
     activeTool: null, drawDraft: null, selectedId: null, hoverId: null, toolGroupChoice: {},
+    toolDefaults: saved.toolDefaults ? JSON.parse(JSON.stringify(saved.toolDefaults)) : {},
     magnet: saved.magnet !== undefined ? saved.magnet : false,
     drawingsLocked: saved.drawingsLocked || false,
     drawingsHidden: saved.drawingsHidden || false,
@@ -556,7 +557,7 @@ async function _repSaveState() {
     index: _repState.index, candlesPerView: _repState.candlesPerView,
     drawings: _repState.drawings, magnet: _repState.magnet, loop: _repState.loop,
     skipWeekends: _repState.skipWeekends, speed: _repState.speed, indicators: _repState.indicators, theme: _repState.theme,
-    drawingsLocked: _repState.drawingsLocked, drawingsHidden: _repState.drawingsHidden,
+    drawingsLocked: _repState.drawingsLocked, drawingsHidden: _repState.drawingsHidden, toolDefaults: _repState.toolDefaults,
   };
   await _blSave();
 }
@@ -603,7 +604,7 @@ function _repRenderShell() {
     if (tools.length === 1) {
       const t = tools[0];
       return `
-      <button class="rep-tool-btn" data-tool="${t.id}" data-tip="${t.label}" onclick="_repSetTool('${t.id}')" onmouseenter="_repShowTip(event)" onmouseleave="_repHideTip()">
+      <button class="rep-tool-btn" data-tool="${t.id}" data-tip="${t.label}" onclick="_repSetTool('${t.id}')" ondblclick="_repToolBtnDblClick(event,'${t.id}')" onmouseenter="_repShowTip(event)" onmouseleave="_repHideTip()">
         ${_repIcon(t.icon || t.id, 'icn')}
       </button>` + sep;
     }
@@ -611,7 +612,7 @@ function _repRenderShell() {
     const chosen = tools.find(t => t.id === chosenId) || tools[0];
     return `
       <div class="rep-tool-group" data-group="${g.id}">
-        <button class="rep-tool-btn rep-tool-group-main" data-tool="${chosen.id}" data-tip="${chosen.label}" onclick="_repSetTool('${chosen.id}')" onmouseenter="_repShowTip(event)" onmouseleave="_repHideTip()">
+        <button class="rep-tool-btn rep-tool-group-main" data-tool="${chosen.id}" data-tip="${chosen.label}" onclick="_repSetTool('${chosen.id}')" ondblclick="_repToolBtnDblClick(event,'${chosen.id}')" onmouseenter="_repShowTip(event)" onmouseleave="_repHideTip()">
           ${_repIcon(chosen.icon || chosen.id, 'icn')}
         </button>
         <button class="rep-tool-group-caret" data-tip="More ${g.label} tools" onclick="_repToggleToolFlyout(event,'${g.id}')" onmouseenter="_repShowTip(event)" onmouseleave="_repHideTip()" aria-label="More ${g.label} tools"></button>
@@ -1215,16 +1216,18 @@ function _repDrawOverlay() {
   }
   if (_repState.drawDraft && (_repState.drawDraft.p1 || _repState.drawDraft.points)) {
     const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
+    const dp = tool ? _repToolDefaultProps(tool) : null;
     if (tool && tool.kind === 'brush') {
-      _repRenderOneDrawing(ctx, { kind: 'brush', color: tool.color, points: _repState.drawDraft.points }, false, false);
+      _repRenderOneDrawing(ctx, { kind: 'brush', color: dp.color, points: _repState.drawDraft.points }, false, false);
     } else if (tool && tool.kind === 'path') {
       const pts = _repState.drawDraft.points.slice();
       if (_repState.drawDraft.cur) pts.push(_repState.drawDraft.cur);
-      _repRenderOneDrawing(ctx, { kind: 'path', color: tool.color, dashed: true, points: pts }, false, false);
+      _repRenderOneDrawing(ctx, { kind: 'path', color: dp.color, dashed: true, width: dp.width, points: pts }, false, false);
     } else if (tool && _repState.drawDraft.cur) {
       _repRenderOneDrawing(ctx, {
-        kind: tool.kind, color: tool.color, stroke: tool.stroke, dashed: tool.dashed,
+        kind: tool.kind, color: dp.color, stroke: dp.stroke, dashed: dp.dashed, width: dp.width,
         arrow: tool.arrow, measure: tool.measure, label: tool.drawLabel, extension: tool.extension,
+        extendLeft: dp.extendLeft, extendRight: dp.extendRight,
         p1: _repState.drawDraft.p1, p2: _repState.drawDraft.cur,
       }, false, false);
     }
@@ -1510,6 +1513,24 @@ function _repOverlayLocalXY(e) {
   return { x: e.clientX - rect.left, y: e.clientY - rect.top };
 }
 
+// Merges a tool's saved defaults (set via its Settings dialog) with
+// its built-in base style, for use whenever a NEW drawing of that
+// tool is placed.
+function _repToolDefaultProps(tool) {
+  const d = (_repState.toolDefaults && _repState.toolDefaults[tool.id]) || {};
+  return {
+    color: d.color ?? tool.color,
+    stroke: d.stroke ?? tool.stroke,
+    dashed: d.dashed ?? tool.dashed ?? false,
+    width: d.width ?? 1.5,
+    extendLeft: d.extendLeft ?? false,
+    extendRight: d.extendRight ?? false,
+    stopRatio: d.stopRatio ?? 0.5,
+    qty: d.qty ?? 1,
+    rows: d.rows ?? 24,
+  };
+}
+
 function _repOverlayMouseDown(e) {
   if (!_repState) return;
   const { x, y } = _repOverlayLocalXY(e);
@@ -1542,12 +1563,13 @@ function _repOverlayMouseDown(e) {
 
   const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
   const point = _repPointFromPixel(x, y); if (!point) return;
+  const dp = _repToolDefaultProps(tool);
 
-  if (tool.kind === 'hline') { _repPushHistory(); _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'hline', color: tool.color, dashed: tool.dashed, p1: { price: point.price } }); _repFinishToolPlacement(); return; }
-  if (tool.kind === 'vline') { _repPushHistory(); _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'vline', color: tool.color, p1: { time: point.time } }); _repFinishToolPlacement(); return; }
+  if (tool.kind === 'hline') { _repPushHistory(); _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'hline', color: dp.color, dashed: dp.dashed, width: dp.width, p1: { price: point.price } }); _repFinishToolPlacement(); return; }
+  if (tool.kind === 'vline') { _repPushHistory(); _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'vline', color: dp.color, dashed: dp.dashed, width: dp.width, p1: { time: point.time } }); _repFinishToolPlacement(); return; }
   if (tool.kind === 'text') {
     const txt = prompt('Annotation text:');
-    if (txt) { _repPushHistory(); _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'text', color: tool.color, p1: point, text: txt }); }
+    if (txt) { _repPushHistory(); _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'text', color: dp.color, p1: point, text: txt }); }
     _repFinishToolPlacement(); return;
   }
   if (tool.kind === 'brush') { _repState.drawDraft = { p1: point, points: [point] }; return; }
@@ -1626,8 +1648,9 @@ function _repOverlayMouseUp() {
   if (_repState._dragging) { _repState._dragging = null; _repSaveState(); return; }
   if (_repState.drawDraft) {
     const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
+    const dp = tool ? _repToolDefaultProps(tool) : null;
     if (tool && tool.kind === 'brush') {
-      if (_repState.drawDraft.points.length > 1) { _repPushHistory(); _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'brush', color: tool.color, points: _repState.drawDraft.points }); }
+      if (_repState.drawDraft.points.length > 1) { _repPushHistory(); _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'brush', color: dp.color, dashed: dp.dashed, points: _repState.drawDraft.points }); }
       _repState.drawDraft = null; _repFinishToolPlacement(); return;
     }
     if (tool && tool.kind === 'path') { return; } // multi-click tool — finished via double-click (see _repFinishPathDraft)
@@ -1635,15 +1658,18 @@ function _repOverlayMouseUp() {
       const txt = prompt('Callout text:');
       if (txt) {
         _repPushHistory();
-        _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'callout', color: tool.color, text: txt, p1: _repState.drawDraft.p1, p2: _repState.drawDraft.cur });
+        _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'callout', color: dp.color, width: dp.width, text: txt, p1: _repState.drawDraft.p1, p2: _repState.drawDraft.cur });
       }
       _repState.drawDraft = null; _repFinishToolPlacement(); return;
     }
     if (tool && _repState.drawDraft.cur) {
       _repPushHistory();
       _repState.drawings.push({
-        id: _repUid(), type: tool.id, kind: tool.kind, color: tool.color, stroke: tool.stroke,
-        dashed: tool.dashed, arrow: tool.arrow, measure: tool.measure, label: tool.drawLabel, extension: tool.extension,
+        id: _repUid(), type: tool.id, kind: tool.kind, color: dp.color, stroke: dp.stroke,
+        dashed: dp.dashed, width: dp.width, arrow: tool.arrow, measure: tool.measure, label: tool.drawLabel, extension: tool.extension,
+        extendLeft: dp.extendLeft, extendRight: dp.extendRight,
+        ...((tool.kind === 'longposition' || tool.kind === 'shortposition') ? { stopRatio: dp.stopRatio, qty: dp.qty } : {}),
+        ...(tool.kind === 'fixedrangevp' ? { rows: dp.rows } : {}),
         p1: _repState.drawDraft.p1, p2: _repState.drawDraft.cur,
       });
     }
@@ -1660,9 +1686,10 @@ function _repOverlayMouseUp() {
 function _repFinishPathDraft() {
   if (!_repState || !_repState.drawDraft || !_repState.drawDraft.points) return;
   const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
+  const dp = tool ? _repToolDefaultProps(tool) : null;
   if (_repState.drawDraft.points.length > 1) {
     _repPushHistory();
-    _repState.drawings.push({ id: _repUid(), type: (tool && tool.id) || 'path', kind: 'path', color: (tool && tool.color) || '#38bdf8', points: _repState.drawDraft.points });
+    _repState.drawings.push({ id: _repUid(), type: (tool && tool.id) || 'path', kind: 'path', color: (dp && dp.color) || '#38bdf8', dashed: dp && dp.dashed, width: dp && dp.width, points: _repState.drawDraft.points });
   }
   _repState.drawDraft = null;
   _repFinishToolPlacement();
@@ -1679,12 +1706,13 @@ function _repOverlayDblClick(e) {
     if (tool && tool.kind === 'path') { _repFinishPathDraft(); return; }
     _repOverlayMouseUp(); return;
   }
-  if (!_repState || _repState.activeTool || _repState.drawDraft) return;
+  if (!_repState || _repState.drawDraft) return;
   if (e) {
     const { x, y } = _repOverlayLocalXY(e);
     const hit = _repHitTest(x, y);
     if (hit) { _repOpenDrawingSettingsModal(hit.drawing.id); return; }
   }
+  if (_repState.activeTool) return;
   _repOpenSettingsModal();
 }
 
@@ -1746,8 +1774,11 @@ function _repToggleToolFlyout(e, groupId) {
   const tools = REP_TOOLS.filter(t => t.group === groupId);
   const chosenId = (_repState.toolGroupChoice && _repState.toolGroupChoice[groupId]) || tools[0]?.id;
   flyout.innerHTML = `<div class="rep-popover-title">${REP_TOOL_GROUP_LABELS[groupId] || ''}</div>` + tools.map(t => `
-    <button class="rep-flyout-item${t.id === chosenId ? ' active' : ''}" onclick="_repPickGroupTool('${groupId}','${t.id}')">
-      ${_repIcon(t.icon || t.id, 'icn')}<span>${t.label}</span>
+    <button class="rep-flyout-item${t.id === chosenId ? ' active' : ''}" style="display:flex;align-items:center;gap:8px" onclick="_repPickGroupTool('${groupId}','${t.id}')">
+      ${_repIcon(t.icon || t.id, 'icn')}<span style="flex:1;text-align:left">${t.label}</span>
+      <span onclick="event.stopPropagation();_repCloseToolFlyout();_repOpenToolSettingsModal('${t.id}')" title="${t.label} settings" style="display:inline-flex;padding:3px;border-radius:4px;opacity:.6;cursor:pointer" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=.6">
+        <svg class="icn" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.2a1.7 1.7 0 013.4 0 1.7 1.7 0 002.5 1.5 1.7 1.7 0 012.4 2.4A1.7 1.7 0 0020.1 10a1.7 1.7 0 010 3.4 1.7 1.7 0 00-1.5 2.5 1.7 1.7 0 01-2.4 2.4A1.7 1.7 0 0013.7 20a1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.5-1.5 1.7 1.7 0 01-2.4-2.4A1.7 1.7 0 003.9 13.4a1.7 1.7 0 010-3.4 1.7 1.7 0 001.5-2.5 1.7 1.7 0 012.4-2.4A1.7 1.7 0 0010.3 3.2z"/><circle cx="12" cy="12" r="3.2"/></svg>
+      </span>
     </button>`).join('');
   flyout.dataset.group = groupId;
   const rect = groupEl.getBoundingClientRect();
@@ -1936,16 +1967,36 @@ function _repHideContextMenu() { document.getElementById('rep-ctx-menu')?.classL
 let _repDrawSettingsId = null;
 let _repDrawSettingsTab = 'style';
 
+// Resolves a settings-dialog id to the object it should read/write.
+// Plain ids ("drw_123") point at an actual placed drawing. Ids
+// prefixed "tool:" (e.g. "tool:trendline") point at that tool's
+// saved defaults — used when the tool itself is armed/selected but
+// nothing has been drawn yet — creating them on first access.
+function _repResolveSettingsTarget(id) {
+  if (typeof id === 'string' && id.indexOf('tool:') === 0) {
+    const toolId = id.slice(5);
+    const tool = REP_TOOLS.find(t => t.id === toolId);
+    if (!tool) return null;
+    _repState.toolDefaults = _repState.toolDefaults || {};
+    if (!_repState.toolDefaults[toolId]) {
+      _repState.toolDefaults[toolId] = { color: tool.color, stroke: tool.stroke, dashed: !!tool.dashed, width: 1.5, extendLeft: false, extendRight: false, stopRatio: 0.5, qty: 1, rows: 24 };
+    }
+    return { id, obj: _repState.toolDefaults[toolId], kind: tool.kind, tool, isTool: true };
+  }
+  const dw = _repState.drawings.find(d => d.id === id);
+  if (!dw) return null;
+  return { id, obj: dw, kind: dw.kind, tool: REP_TOOLS.find(t => t.id === dw.type), isTool: false };
+}
+
 function _repOpenDrawingSettingsModal(id) {
   if (!_repState) return;
-  const dw = _repState.drawings.find(d => d.id === id); if (!dw) return;
+  const target = _repResolveSettingsTarget(id); if (!target) return;
   _repHideContextMenu();
   document.getElementById('rep-draw-settings-overlay')?.remove();
   _repDrawSettingsId = id;
   _repDrawSettingsTab = 'style';
-  _repState.selectedId = id;
+  if (!target.isTool) _repState.selectedId = id;
 
-  const tool = REP_TOOLS.find(t => t.id === dw.type);
   const overlay = document.createElement('div');
   overlay.id = 'rep-draw-settings-overlay';
   overlay.className = 'acc-manager-overlay';
@@ -1955,18 +2006,19 @@ function _repOpenDrawingSettingsModal(id) {
   overlay.innerHTML = `
   <div class="acc-manager-modal" style="max-width:460px;max-height:82vh">
     <div class="acc-manager-header">
-      <span>${(tool ? tool.label : 'Drawing')} Settings</span>
+      <span>${(target.tool ? target.tool.label : 'Drawing')} ${target.isTool ? 'Default Settings' : 'Settings'}</span>
       <button onclick="_repCloseDrawSettingsModal()" class="acc-mgr-close"><svg class="icn" aria-hidden="true"><use href="#ic-close"></use></svg></button>
     </div>
     <div style="display:flex;min-height:260px;max-height:calc(82vh - 110px)">
       <div id="rep-draw-settings-tabs" style="width:120px;flex-shrink:0;border-right:1px solid var(--glass-border);padding:10px;display:flex;flex-direction:column;gap:2px">
-        ${_repDrawSettingsTabButtons()}
+        ${_repDrawSettingsTabButtons(target)}
       </div>
       <div id="rep-draw-settings-body" style="flex:1;overflow-y:auto;padding:16px">
-        ${_repDrawSettingsTabContent(dw, _repDrawSettingsTab)}
+        ${_repDrawSettingsTabContent(target, _repDrawSettingsTab)}
       </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--glass-border)">
+      ${target.isTool ? `<span style="flex:1;font-size:11px;color:var(--text3);align-self:center">Applies to new ${target.tool.label} drawings</span>` : ''}
       <button onclick="_repCloseDrawSettingsModal()" class="acc-mgr-add-btn" style="padding:6px 18px">Done</button>
     </div>
   </div>`;
@@ -1975,15 +2027,16 @@ function _repOpenDrawingSettingsModal(id) {
   _repDrawOverlay();
 }
 
-function _repDrawSettingsTabButtons() {
-  const tabs = [{ id: 'style', label: 'Style' }, { id: 'coords', label: 'Coordinates' }, { id: 'visibility', label: 'Visibility' }];
+function _repDrawSettingsTabButtons(target) {
+  const tabs = [{ id: 'style', label: 'Style' }];
+  if (!target.isTool) { tabs.push({ id: 'coords', label: 'Coordinates' }, { id: 'visibility', label: 'Visibility' }); }
   return tabs.map(tb => `<button type="button" onclick="_repDrawSettingsSwitchTab('${tb.id}')" class="wl-week-btn${_repDrawSettingsTab === tb.id ? ' restore' : ''}" style="text-align:left;justify-content:flex-start;width:100%">${tb.label}</button>`).join('');
 }
 function _repDrawSettingsSwitchTab(tab) {
-  const dw = _repState.drawings.find(d => d.id === _repDrawSettingsId); if (!dw) return;
+  const target = _repResolveSettingsTarget(_repDrawSettingsId); if (!target) return;
   _repDrawSettingsTab = tab;
-  document.getElementById('rep-draw-settings-tabs').innerHTML = _repDrawSettingsTabButtons();
-  document.getElementById('rep-draw-settings-body').innerHTML = _repDrawSettingsTabContent(dw, tab);
+  document.getElementById('rep-draw-settings-tabs').innerHTML = _repDrawSettingsTabButtons(target);
+  document.getElementById('rep-draw-settings-body').innerHTML = _repDrawSettingsTabContent(target, tab);
 }
 function _repCloseDrawSettingsModal() {
   document.getElementById('rep-draw-settings-overlay')?.remove();
@@ -1991,88 +2044,91 @@ function _repCloseDrawSettingsModal() {
   _repSaveState(); _repDrawOverlay();
 }
 function _repRefreshDrawSettingsBody() {
-  const dw = _repState.drawings.find(d => d.id === _repDrawSettingsId); if (!dw) return;
+  const target = _repResolveSettingsTarget(_repDrawSettingsId); if (!target) return;
   const body = document.getElementById('rep-draw-settings-body');
-  if (body) body.innerHTML = _repDrawSettingsTabContent(dw, _repDrawSettingsTab);
+  if (body) body.innerHTML = _repDrawSettingsTabContent(target, _repDrawSettingsTab);
 }
 
-function _repDrawSettingsTabContent(dw, tab) {
-  if (tab === 'coords') return _repDrawSettingsCoordsTab(dw);
-  if (tab === 'visibility') return _repDrawSettingsVisibilityTab(dw);
-  return _repDrawSettingsStyleTab(dw);
+function _repDrawSettingsTabContent(target, tab) {
+  if (tab === 'coords' && !target.isTool) return _repDrawSettingsCoordsTab(target);
+  if (tab === 'visibility' && !target.isTool) return _repDrawSettingsVisibilityTab(target);
+  return _repDrawSettingsStyleTab(target);
 }
 
-function _repDrawSettingsStyleTab(dw) {
+function _repDrawSettingsStyleTab(target) {
+  const dw = target.obj, kind = target.kind, isTool = target.isTool;
   const widthOpts = [1, 1.5, 2, 3, 4].map(w => `<option value="${w}"${(dw.width || 1.5) == w ? ' selected' : ''}>${w}px</option>`).join('');
   let extra = '';
-  if (dw.kind === 'longposition' || dw.kind === 'shortposition') {
+  if (kind === 'longposition' || kind === 'shortposition') {
     extra += `
       ${_repSectionTitle('Risk / Reward')}
       <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
         <span style="flex:1;font-size:13px">Stop distance ratio</span>
-        <input type="number" step="0.1" min="0.1" value="${dw.stopRatio ?? 0.5}" oninput="_repSetDrawProp('${dw.id}','stopRatio', parseFloat(this.value)||0.5)" class="acc-mgr-input" style="width:80px">
+        <input type="number" step="0.1" min="0.1" value="${dw.stopRatio ?? 0.5}" oninput="_repSetDrawProp('${target.id}','stopRatio', parseFloat(this.value)||0.5)" class="acc-mgr-input" style="width:80px">
       </div>
       <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
         <span style="flex:1;font-size:13px">Quantity</span>
-        <input type="number" step="1" min="1" value="${dw.qty ?? 1}" oninput="_repSetDrawProp('${dw.id}','qty', parseFloat(this.value)||1)" class="acc-mgr-input" style="width:80px">
+        <input type="number" step="1" min="1" value="${dw.qty ?? 1}" oninput="_repSetDrawProp('${target.id}','qty', parseFloat(this.value)||1)" class="acc-mgr-input" style="width:80px">
       </div>`;
   }
-  if (dw.kind === 'line') {
+  if (kind === 'line') {
     extra += `
       ${_repSectionTitle('Extend')}
       <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
-        <input type="checkbox" ${dw.extendLeft ? 'checked' : ''} onchange="_repToggleDrawProp('${dw.id}','extendLeft')" style="width:15px;height:15px;accent-color:var(--accent,#34d399);cursor:pointer">
+        <input type="checkbox" ${dw.extendLeft ? 'checked' : ''} onchange="_repToggleDrawProp('${target.id}','extendLeft')" style="width:15px;height:15px;accent-color:var(--accent,#34d399);cursor:pointer">
         <span style="font-size:13px">Extend left</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
-        <input type="checkbox" ${dw.extendRight ? 'checked' : ''} onchange="_repToggleDrawProp('${dw.id}','extendRight')" style="width:15px;height:15px;accent-color:var(--accent,#34d399);cursor:pointer">
+        <input type="checkbox" ${dw.extendRight ? 'checked' : ''} onchange="_repToggleDrawProp('${target.id}','extendRight')" style="width:15px;height:15px;accent-color:var(--accent,#34d399);cursor:pointer">
         <span style="font-size:13px">Extend right</span>
       </div>`;
   }
-  if (dw.kind === 'text' || dw.kind === 'callout') {
+  if ((kind === 'text' || kind === 'callout') && !isTool) {
     extra += `
       ${_repSectionTitle('Text')}
-      <div><textarea class="acc-mgr-input" style="width:100%;min-height:60px;box-sizing:border-box;resize:vertical" oninput="_repSetDrawProp('${dw.id}','text', this.value)">${dw.text || ''}</textarea></div>`;
+      <div><textarea class="acc-mgr-input" style="width:100%;min-height:60px;box-sizing:border-box;resize:vertical" oninput="_repSetDrawProp('${target.id}','text', this.value)">${dw.text || ''}</textarea></div>`;
   }
-  if (dw.kind === 'fixedrangevp') {
+  if (kind === 'fixedrangevp') {
     extra += `
       ${_repSectionTitle('Profile')}
       <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
         <span style="flex:1;font-size:13px">Row count</span>
-        <input type="number" min="5" max="60" value="${dw.rows ?? 24}" oninput="_repSetDrawProp('${dw.id}','rows', parseInt(this.value,10)||24)" class="acc-mgr-input" style="width:80px">
+        <input type="number" min="5" max="60" value="${dw.rows ?? 24}" oninput="_repSetDrawProp('${target.id}','rows', parseInt(this.value,10)||24)" class="acc-mgr-input" style="width:80px">
       </div>`;
   }
-  const showLineStyle = dw.kind !== 'text';
+  const showLineStyle = kind !== 'text';
   return `
     ${_repSectionTitle('Line')}
     <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
       <span style="flex:1;font-size:13px">Color</span>
-      ${_repDrawColorInput(dw)}
+      ${_repDrawColorInput(target)}
     </div>
     ${showLineStyle ? `
     <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
       <span style="flex:1;font-size:13px">Width</span>
-      <select class="rep-select" style="width:90px" onchange="_repSetDrawProp('${dw.id}','width', parseFloat(this.value))">${widthOpts}</select>
+      <select class="rep-select" style="width:90px" onchange="_repSetDrawProp('${target.id}','width', parseFloat(this.value))">${widthOpts}</select>
     </div>
     <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
-      <input type="checkbox" ${dw.dashed ? 'checked' : ''} onchange="_repToggleDrawProp('${dw.id}','dashed')" style="width:15px;height:15px;accent-color:var(--accent,#34d399);cursor:pointer">
+      <input type="checkbox" ${dw.dashed ? 'checked' : ''} onchange="_repToggleDrawProp('${target.id}','dashed')" style="width:15px;height:15px;accent-color:var(--accent,#34d399);cursor:pointer">
       <span style="font-size:13px">Dashed</span>
     </div>` : ''}
     ${extra}`;
 }
 
-function _repDrawColorInput(dw) {
+function _repDrawColorInput(target) {
+  const dw = target.obj;
   const hex = _repToHex6(dw.color);
-  const id = 'rep-dw-color-' + dw.id, hexId = id + '-hex';
+  const safeId = target.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const id = 'rep-dw-color-' + safeId, hexId = id + '-hex';
   return `<span style="display:inline-flex;align-items:center;gap:5px">
-    <input type="color" id="${id}" value="${hex}" oninput="_repSetDrawColorLive('${dw.id}', this.value, '${hexId}')" style="width:30px;height:26px;border:1px solid var(--glass-border);border-radius:4px;background:none;cursor:pointer;padding:0">
-    <input type="text" id="${hexId}" value="${hex}" maxlength="7" spellcheck="false" autocapitalize="off" oninput="_repDrawHexChanged('${dw.id}','${id}', this.value)" placeholder="#000000" style="width:72px;height:26px;font-size:11px;font-family:var(--font-mono);text-transform:uppercase;background:var(--glass-1,#10141d);border:1px solid var(--glass-border);border-radius:4px;color:var(--text);padding:0 6px">
+    <input type="color" id="${id}" value="${hex}" oninput="_repSetDrawColorLive('${target.id}', this.value, '${hexId}')" style="width:30px;height:26px;border:1px solid var(--glass-border);border-radius:4px;background:none;cursor:pointer;padding:0">
+    <input type="text" id="${hexId}" value="${hex}" maxlength="7" spellcheck="false" autocapitalize="off" oninput="_repDrawHexChanged('${target.id}','${id}', this.value)" placeholder="#000000" style="width:72px;height:26px;font-size:11px;font-family:var(--font-mono);text-transform:uppercase;background:var(--glass-1,#10141d);border:1px solid var(--glass-border);border-radius:4px;color:var(--text);padding:0 6px">
   </span>`;
 }
 function _repSetDrawColorLive(id, value, hexFieldId) {
   _repSetDrawProp(id, 'color', value);
-  const dw = _repState.drawings.find(d => d.id === id);
-  if (dw && dw.stroke) _repSetDrawProp(id, 'stroke', value);
+  const target = _repResolveSettingsTarget(id);
+  if (target && target.obj.stroke) _repSetDrawProp(id, 'stroke', value);
   const hexField = hexFieldId && document.getElementById(hexFieldId);
   if (hexField) hexField.value = value;
 }
@@ -2083,17 +2139,19 @@ function _repDrawHexChanged(id, swatchId, value) {
   _repSetDrawColorLive(id, v, null);
 }
 function _repSetDrawProp(id, key, value) {
-  const dw = _repState.drawings.find(d => d.id === id); if (!dw) return;
-  dw[key] = value; _repDrawOverlay();
+  const target = _repResolveSettingsTarget(id); if (!target) return;
+  target.obj[key] = value;
+  _repDrawOverlay();
 }
 function _repToggleDrawProp(id, key) {
-  const dw = _repState.drawings.find(d => d.id === id); if (!dw) return;
-  dw[key] = !dw[key];
+  const target = _repResolveSettingsTarget(id); if (!target) return;
+  target.obj[key] = !target.obj[key];
   _repDrawOverlay();
   _repRefreshDrawSettingsBody();
 }
 
-function _repDrawSettingsCoordsTab(dw) {
+function _repDrawSettingsCoordsTab(target) {
+  const dw = target.obj;
   const fmtTime = t => t != null ? new Date(t).toISOString().slice(0, 16) : '';
   const row = (label, field, val, onchange) => `
     <div style="display:flex;align-items:center;gap:10px;padding:5px 0">
@@ -2102,12 +2160,12 @@ function _repDrawSettingsCoordsTab(dw) {
     </div>`;
   let html = '';
   if (dw.p1) {
-    if (dw.p1.time != null) html += row('Point 1 — Time', 'time', fmtTime(dw.p1.time), `_repSetCoordTime('${dw.id}','p1', this.value)`);
-    if (dw.p1.price != null) html += row('Point 1 — Price', 'price', dw.p1.price, `_repSetCoordPrice('${dw.id}','p1', this.value)`);
+    if (dw.p1.time != null) html += row('Point 1 — Time', 'time', fmtTime(dw.p1.time), `_repSetCoordTime('${target.id}','p1', this.value)`);
+    if (dw.p1.price != null) html += row('Point 1 — Price', 'price', dw.p1.price, `_repSetCoordPrice('${target.id}','p1', this.value)`);
   }
   if (dw.p2) {
-    if (dw.p2.time != null) html += row('Point 2 — Time', 'time', fmtTime(dw.p2.time), `_repSetCoordTime('${dw.id}','p2', this.value)`);
-    if (dw.p2.price != null) html += row('Point 2 — Price', 'price', dw.p2.price, `_repSetCoordPrice('${dw.id}','p2', this.value)`);
+    if (dw.p2.time != null) html += row('Point 2 — Time', 'time', fmtTime(dw.p2.time), `_repSetCoordTime('${target.id}','p2', this.value)`);
+    if (dw.p2.price != null) html += row('Point 2 — Price', 'price', dw.p2.price, `_repSetCoordPrice('${target.id}','p2', this.value)`);
   }
   if (dw.points && dw.points.length) {
     html += _repSectionTitle(`Points (${dw.points.length})`);
@@ -2117,24 +2175,39 @@ function _repDrawSettingsCoordsTab(dw) {
   return html;
 }
 function _repSetCoordTime(id, pKey, value) {
-  const dw = _repState.drawings.find(d => d.id === id); if (!dw || !dw[pKey]) return;
+  const target = _repResolveSettingsTarget(id); if (!target || !target.obj[pKey]) return;
   const t = new Date(value).getTime(); if (isNaN(t)) return;
-  dw[pKey].time = t; _repDrawOverlay();
+  target.obj[pKey].time = t; _repDrawOverlay();
 }
 function _repSetCoordPrice(id, pKey, value) {
-  const dw = _repState.drawings.find(d => d.id === id); if (!dw || !dw[pKey]) return;
+  const target = _repResolveSettingsTarget(id); if (!target || !target.obj[pKey]) return;
   const p = parseFloat(value); if (isNaN(p)) return;
-  dw[pKey].price = p; _repDrawOverlay();
+  target.obj[pKey].price = p; _repDrawOverlay();
 }
 
-function _repDrawSettingsVisibilityTab(dw) {
+function _repDrawSettingsVisibilityTab(target) {
+  const dw = target.obj;
   return `
     <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
-      <input type="checkbox" ${dw.hidden ? 'checked' : ''} onchange="_repToggleDrawProp('${dw.id}','hidden')" style="width:15px;height:15px;accent-color:var(--accent,#34d399);cursor:pointer">
+      <input type="checkbox" ${dw.hidden ? 'checked' : ''} onchange="_repToggleDrawProp('${target.id}','hidden')" style="width:15px;height:15px;accent-color:var(--accent,#34d399);cursor:pointer">
       <span style="font-size:13px">Hide this object</span>
     </div>
     <div style="font-size:12px;color:var(--text3);margin-top:8px">Hidden objects stay saved with the chart but won't render or highlight until shown again.</div>`;
 }
+
+// Toolbar-level access to a tool's default settings: the small gear
+// on each flyout row, or double-clicking the tool's own button while
+// it's armed/selected.
+function _repOpenToolSettingsModal(toolId) {
+  const tool = REP_TOOLS.find(t => t.id === toolId);
+  if (!tool || tool.kind === 'select') return;
+  _repOpenDrawingSettingsModal('tool:' + toolId);
+}
+function _repToolBtnDblClick(e, toolId) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  _repOpenToolSettingsModal(toolId);
+}
+
 
 // ── Indicators / layouts popovers ────────────────────────
 function _repClosePopovers() {
