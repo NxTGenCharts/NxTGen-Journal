@@ -557,6 +557,40 @@ tr.bl-compare-best td { border-color:rgba(251,191,36,.2); }
 .rep-tool-btn.active { background:rgba(251,191,36,.18); color:var(--gold); box-shadow:inset 0 0 0 1px rgba(251,191,36,.4); }
 .rep-tool-btn.on { background:rgba(96,165,250,.18); color:var(--blue); box-shadow:inset 0 0 0 1px rgba(96,165,250,.4); }
 .rep-tool-sep { width:30px; height:1px; background:var(--glass-border); margin:7px 0; flex-shrink:0; }
+
+/* Grouped tool buttons (Lines / Fibonacci / Shapes / Smart Money) —
+   a main icon plus a small corner caret that opens .rep-tool-flyout
+   with the rest of that group's tools, TradingView-style. */
+.rep-tool-group { position:relative; flex-shrink:0; }
+.rep-tool-group-caret {
+  position:absolute; right:1px; bottom:1px; width:0; height:0; padding:0; margin:0; border:none;
+  background:transparent; cursor:pointer;
+  border-style:solid; border-width:0 0 6px 6px; border-color:transparent transparent var(--text3) transparent;
+  transition:var(--t-fast);
+}
+.rep-tool-group:hover .rep-tool-group-caret,
+.rep-tool-group-caret:hover { border-bottom-color:var(--gold); }
+/* generous invisible hit area around the tiny triangle so it's easy
+   to tap accurately on a phone despite the small visual footprint */
+.rep-tool-group-caret::after { content:''; position:absolute; right:-6px; bottom:-6px; width:16px; height:16px; }
+
+.rep-tool-flyout {
+  position:fixed; z-index:2200; display:none; flex-direction:column; gap:2px; min-width:168px; max-width:80vw;
+  background:rgba(13,16,24,.96); backdrop-filter:var(--blur-lg); border:1px solid var(--glass-border-h);
+  border-radius:var(--r-lg); box-shadow:var(--shadow-xl); padding:8px;
+}
+.rep-tool-flyout.open { display:flex; }
+.rep-flyout-item {
+  display:flex; align-items:center; gap:10px; background:transparent; border:1px solid transparent;
+  color:rgba(226,232,240,.82); font-size:12.5px; font-family:var(--font-body); font-weight:600;
+  padding:8px 9px; border-radius:var(--r-sm); cursor:pointer; transition:var(--t-fast); text-align:left;
+}
+.rep-flyout-item svg { width:16px; height:16px; flex-shrink:0; }
+.rep-flyout-item:hover { background:rgba(255,255,255,.07); color:#f8fafc; }
+.rep-flyout-item.active { background:rgba(251,191,36,.16); color:var(--gold); border-color:rgba(251,191,36,.35); }
+[data-theme="light"] .rep-tool-flyout { background:rgba(255,255,255,.98); border-color:rgba(30,41,59,.14); box-shadow:0 10px 34px rgba(0,0,0,.16); }
+[data-theme="light"] .rep-flyout-item { color:rgba(15,23,41,.82); }
+[data-theme="light"] .rep-flyout-item:hover { background:rgba(15,23,41,.06); color:#0f1729; }
 /* Shared floating tooltip for the left toolbar. Rendered at the
    overlay's top level (not nested inside .rep-left-toolbar) and
    positioned with `fixed` from JS (see _repShowTip), so it isn't
@@ -577,7 +611,7 @@ tr.bl-compare-best td { border-color:rgba(251,191,36,.2); }
    drawing tool is active (class .drawing, set by
    _repUpdateToolbarActive) so the native chart's own pan/zoom/
    crosshair still works the rest of the time. */
-.rep-overlay-canvas { position:absolute; inset:0; z-index:5; cursor:default; pointer-events:auto; }
+.rep-overlay-canvas { position:absolute; inset:0; z-index:5; cursor:default; pointer-events:auto; touch-action:none; }
 .rep-overlay-canvas.drawing { cursor:crosshair; }
 .rep-overlay-canvas.dragging { cursor:grabbing; }
 
