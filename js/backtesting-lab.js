@@ -293,6 +293,19 @@ const REP_TOOLS = [
 
 function _repUid() { return 'rd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); }
 
+// Zoom-preset pills shown under the chart, TradingView-range-bar
+// style — since this is a replay chart (not a live "load N years of
+// history" view), these map to how many candles are visible on
+// screen at once rather than to a calendar range.
+const REP_RANGE_PRESETS = [
+  { n: 50,  label: '50' },
+  { n: 100, label: '100' },
+  { n: 150, label: '150' },
+  { n: 200, label: '200' },
+  { n: 300, label: '300' },
+  { n: 400, label: 'All' },
+];
+
 // ── Symbol / interval mapping ───────────────────────────
 // Kept as thin wrappers around REP_SOURCES so any old call
 // sites (or saved replayState from before multi-source
@@ -374,6 +387,9 @@ const REP_ICON_PATHS = {
   chevrondown:'<path d="M6 9l6 6 6-6"/>',
   loop:     '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/>',
   weekend:  '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17"/>',
+  lock:     '<rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/>',
+  eye:      '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff:   '<path d="M3 3l18 18"/><path d="M10.6 5.2A10.8 10.8 0 0112 5c6.4 0 10 7 10 7a15.8 15.8 0 01-3.4 4.3M6.6 6.6C4 8.3 2 12 2 12s3.6 7 10 7a10.4 10.4 0 004.2-.9"/><path d="M9.9 9.9a3 3 0 004.2 4.2"/>',
 };
 function _repIcon(name, cls) {
   const body = REP_ICON_PATHS[name] || '';
@@ -490,6 +506,8 @@ async function _repOpen(sessionId) {
     drawings: saved.drawings ? JSON.parse(JSON.stringify(saved.drawings)) : [],
     activeTool: null, drawDraft: null, selectedId: null, hoverId: null,
     magnet: saved.magnet !== undefined ? saved.magnet : false,
+    drawingsLocked: saved.drawingsLocked || false,
+    drawingsHidden: saved.drawingsHidden || false,
     loop: saved.loop || false,
     skipWeekends: saved.skipWeekends !== undefined ? saved.skipWeekends : true,
     playing: false, speed: saved.speed || 1,
@@ -524,6 +542,7 @@ async function _repSaveState() {
     index: _repState.index, candlesPerView: _repState.candlesPerView,
     drawings: _repState.drawings, magnet: _repState.magnet, loop: _repState.loop,
     skipWeekends: _repState.skipWeekends, speed: _repState.speed, indicators: _repState.indicators, theme: _repState.theme,
+    drawingsLocked: _repState.drawingsLocked, drawingsHidden: _repState.drawingsHidden,
   };
   await _blSave();
 }
@@ -571,10 +590,10 @@ function _repRenderShell() {
           <span>${_repState.symbol}</span>
           <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         </button>
-        <select id="rep-interval-select" class="rep-select" onchange="_repChangeSymbolInterval()" title="Timeframe">
-          ${_repGetSource(_repState.source).intervals.map(iv => `<option value="${iv}"${iv === _repState.interval ? ' selected' : ''}>${iv}</option>`).join('')}
-        </select>
-        <button class="rep-icon-btn" onclick="_repChangeSymbolInterval()" title="Load"><svg class="icn" aria-hidden="true"><use href="#ic-refresh"></use></svg></button>
+        <div class="rep-tf-pills" id="rep-tf-pills">
+          ${_repGetSource(_repState.source).intervals.map(iv => `<button class="rep-tf-pill${iv === _repState.interval ? ' active' : ''}" data-iv="${iv}" onclick="_repSetInterval('${iv}')">${_repIntervalLabel(iv)}</button>`).join('')}
+        </div>
+        <button class="rep-icon-btn" onclick="_repChangeSymbolInterval()" title="Reload"><svg class="icn" aria-hidden="true"><use href="#ic-refresh"></use></svg></button>
       </div>
       <div class="rep-topbar-group">
         <button class="rep-icon-btn" onclick="_repUndo()" title="Undo (Ctrl+Z)">${_repIcon('undo', 'icn')}</button>
@@ -595,6 +614,9 @@ function _repRenderShell() {
       <div class="rep-left-toolbar" id="rep-left-toolbar" style="${_repState.theme.navVisibility === 'hidden' ? 'display:none' : ''}">${toolButtons}
         <div class="rep-tool-sep"></div>
         <button class="rep-tool-btn ${_repState.magnet ? 'on' : ''}" id="rep-magnet-btn" data-tip="Magnet / Snap to OHLC" onclick="_repToggleMagnet()" onmouseenter="_repShowTip(event)" onmouseleave="_repHideTip()">${_repIcon('magnet', 'icn')}</button>
+        <button class="rep-tool-btn ${_repState.drawingsLocked ? 'on' : ''}" id="rep-lock-btn" data-tip="Lock all drawings" onclick="_repToggleDrawingsLocked()" onmouseenter="_repShowTip(event)" onmouseleave="_repHideTip()">${_repIcon('lock', 'icn')}</button>
+        <button class="rep-tool-btn ${_repState.drawingsHidden ? 'on' : ''}" id="rep-hide-btn" data-tip="Hide all drawings" onclick="_repToggleDrawingsHidden()" onmouseenter="_repShowTip(event)" onmouseleave="_repHideTip()">${_repIcon(_repState.drawingsHidden ? 'eyeOff' : 'eye', 'icn')}</button>
+        <button class="rep-tool-btn" data-tip="Remove all drawings" onclick="_repClearDrawings()" onmouseenter="_repShowTip(event)" onmouseleave="_repHideTip()"><svg class="icn" aria-hidden="true"><use href="#ic-trash"></use></svg></button>
       </div>
       <div class="rep-chart-area">
         <div class="rep-chart-wrap" id="rep-chart-wrap"></div>
@@ -602,6 +624,10 @@ function _repRenderShell() {
         <div class="rep-symbol-badge">${_repState.symbol} · ${_repState.interval}</div>
         <div class="rep-ohlc-badge" id="rep-ohlc-badge" style="display:none"></div>
         <div class="rep-loading" id="rep-status-msg"><div class="rep-spinner"></div>Loading candles…</div>
+
+        <div class="rep-range-pills" id="rep-range-pills">
+          ${REP_RANGE_PRESETS.map(p => `<button class="rep-range-btn${_repState.candlesPerView === p.n ? ' active' : ''}" data-n="${p.n}" onclick="_repSetRange(${p.n})">${p.label}</button>`).join('')}
+        </div>
 
         <div class="rep-popover" id="rep-indicators-popover" style="width:250px;max-height:70vh;overflow-y:auto">
           ${_repIndicatorPopoverHtml()}
@@ -792,9 +818,29 @@ async function _repSymbolSearchSelect(symbol) {
 async function _repChangeSymbolInterval() {
   if (!_repState) return;
   _repPause();
-  _repState.interval = document.getElementById('rep-interval-select')?.value || _repState.interval;
   _repState._savedIndex = null;
   await _repLoadCandles();
+}
+// Called by the TradingView-style timeframe pills — switches straight
+// to the clicked interval (unlike the refresh button above, which
+// just reloads whatever interval is already active).
+async function _repSetInterval(iv) {
+  if (!_repState || iv === _repState.interval) return;
+  _repState.interval = iv;
+  document.querySelectorAll('.rep-tf-pill').forEach(b => b.classList.toggle('active', b.dataset.iv === iv));
+  await _repChangeSymbolInterval();
+}
+// Short TradingView-style label for any source's interval string
+// ('1min'/'m1'/'M1' → '1m', '1h'/'h1'/'H1' → '1H', '1day'/'d1'/'D' → '1D', …).
+function _repIntervalLabel(iv) {
+  const s = String(iv), lower = s.toLowerCase();
+  if (/^\d+min$/.test(lower)) return lower.replace('min', 'm');
+  if (/^m\d+$/.test(lower)) return lower.slice(1) + 'm';
+  if (/^\d+h$/.test(lower)) return s.toUpperCase();
+  if (/^h\d+$/.test(lower)) return lower.slice(1) + 'H';
+  if (lower === '1day' || lower === 'd1' || lower === 'd') return '1D';
+  if (lower === '1week' || lower === 'w1' || lower === 'w') return '1W';
+  return s;
 }
 
 function _repSourceChanged() {
@@ -890,7 +936,7 @@ function _repInitChart() {
     localization: {
       timeFormatter: time => new Date((time + (Number(t.timezone) || 0) * 3600) * 1000).toUTCString().slice(0, 22),
     },
-    handleScroll: true, handleScale: true,
+    handleScroll: false, handleScale: false,
   });
 
   const candleSeries = chart.addCandlestickSeries({
@@ -910,23 +956,6 @@ function _repInitChart() {
   // drawing tool active, overlay is pointer-events:none and lets the
   // gesture through), the overlay still needs to redraw to stay glued.
   chart.timeScale().subscribeVisibleLogicalRangeChange(() => _repDrawOverlay());
-
-  // Double-click (desktop) / double-tap (mobile) on the candles opens
-  // Settings. Bound on the wrapper rather than relying on a library
-  // dblclick event so it works the same on touch. Skipped while a
-  // drawing tool/draft is active so it doesn't steal the tap from
-  // finishing a multi-point drawing.
-  let repLastTapAt = 0;
-  const repMaybeOpenSettings = () => {
-    if (!_repState || _repState.activeTool || _repState.drawDraft) return;
-    _repOpenSettingsModal();
-  };
-  container.addEventListener('dblclick', repMaybeOpenSettings);
-  container.addEventListener('touchend', () => {
-    const now = Date.now();
-    if (now - repLastTapAt < 320) repMaybeOpenSettings();
-    repLastTapAt = now;
-  }, { passive: true });
 
   _repInitOverlayCanvas();
   return true;
@@ -971,6 +1000,15 @@ function _repInitOverlayCanvas() {
   canvas.ondblclick = _repOverlayDblClick;
   canvas.oncontextmenu = _repOverlayContextMenu;
   canvas.onmouseleave = () => { if (_repState) { _repState._manualCrosshair = null; _repDrawOverlay(); } };
+  // Double-tap (mobile) — dblclick doesn't fire reliably from touch,
+  // so detect it manually the same way the old chart-wrap listener
+  // did, just now on the element that actually receives the taps.
+  let repLastTapAt = 0;
+  canvas.ontouchend = () => {
+    const now = Date.now();
+    if (now - repLastTapAt < 320) _repOverlayDblClick();
+    repLastTapAt = now;
+  };
   // mouseup on window, not just the canvas, so a drag that ends
   // outside the canvas (fast mouse movement) still releases cleanly
   window.removeEventListener('mouseup', _repOverlayMouseUp);
@@ -1107,7 +1145,9 @@ function _repDrawOverlay() {
   if (!_repState || !_repState.overlayCtx) return;
   const ctx = _repState.overlayCtx, W = _repState.overlayW, H = _repState.overlayH;
   ctx.clearRect(0, 0, W, H);
-  (_repState.drawings || []).forEach((dw, i) => _repRenderOneDrawing(ctx, dw, i === _repState._hoverIdx, dw.id === _repState.selectedId));
+  if (!_repState.drawingsHidden) {
+    (_repState.drawings || []).forEach((dw, i) => _repRenderOneDrawing(ctx, dw, i === _repState._hoverIdx, dw.id === _repState.selectedId));
+  }
   if (_repState.drawDraft && _repState.drawDraft.p1) {
     const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
     if (tool && tool.kind === 'brush') {
@@ -1276,25 +1316,36 @@ function _repOverlayLocalXY(e) {
 }
 
 function _repOverlayMouseDown(e) {
-  if (!_repState || !_repState.activeTool) return; // no tool → let native chart pan/zoom/crosshair run
+  if (!_repState) return;
   const { x, y } = _repOverlayLocalXY(e);
-  const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
   _repHideContextMenu();
 
-  if (_repState.activeTool === 'select') {
+  // Cursor mode = no drawing tool picked, or the arrow/select tool
+  // explicitly picked. Both behave identically — click a drawing to
+  // select/drag it, click empty space to pan — exactly like
+  // TradingView's default "Cross"/arrow cursor, which is always live
+  // rather than something you have to switch to first.
+  const cursorMode = !_repState.activeTool || _repState.activeTool === 'select';
+  if (cursorMode) {
     const hit = _repHitTest(x, y);
+    const overlayEl = document.getElementById('rep-overlay');
     if (hit) {
       _repState.selectedId = hit.drawing.id;
-      _repPushHistory();
-      _repState._dragging = { drawing: hit.drawing, handle: hit.handle, startX: x, startY: y, orig: JSON.parse(JSON.stringify(hit.drawing)) };
+      if (!_repState.drawingsLocked) {
+        _repPushHistory();
+        _repState._dragging = { drawing: hit.drawing, handle: hit.handle, startX: x, startY: y, orig: JSON.parse(JSON.stringify(hit.drawing)) };
+        overlayEl?.classList.add('dragging');
+      }
     } else {
       _repState.selectedId = null;
       _repState._panning = { startX: x, startLogical: _repState.chart.timeScale().getVisibleLogicalRange() };
+      overlayEl?.classList.add('dragging');
     }
     _repDrawOverlay();
     return;
   }
 
+  const tool = REP_TOOLS.find(t => t.id === _repState.activeTool);
   const point = _repPointFromPixel(x, y); if (!point) return;
 
   if (tool.kind === 'hline') { _repPushHistory(); _repState.drawings.push({ id: _repUid(), type: tool.id, kind: 'hline', color: tool.color, dashed: tool.dashed, p1: { price: point.price } }); _repFinishToolPlacement(); return; }
@@ -1349,6 +1400,11 @@ function _repOverlayMouseMove(e) {
   }
   const hit = _repHitTest(x, y);
   _repState._hoverIdx = hit ? hit.index : -1;
+  if (!_repState.activeTool || _repState.activeTool === 'select') {
+    e.currentTarget.style.cursor = hit ? 'pointer' : 'default';
+  } else if (e.currentTarget.style.cursor) {
+    e.currentTarget.style.cursor = '';
+  }
   _repState._manualCrosshair = { x, y };
   const point = _repPointFromPixel(x, y);
   if (point) _repUpdateOhlcBadge(point.time);
@@ -1357,6 +1413,7 @@ function _repOverlayMouseMove(e) {
 
 function _repOverlayMouseUp() {
   if (!_repState) return;
+  document.getElementById('rep-overlay')?.classList.remove('dragging');
   if (_repState._panning) { _repState._panning = null; return; }
   if (_repState._dragging) { _repState._dragging = null; _repSaveState(); return; }
   if (_repState.drawDraft) {
@@ -1384,7 +1441,9 @@ function _repOverlayWheel(e) {
 }
 
 function _repOverlayDblClick() {
-  if (_repState?.drawDraft?.points) { _repOverlayMouseUp(); }
+  if (_repState?.drawDraft?.points) { _repOverlayMouseUp(); return; }
+  if (!_repState || _repState.activeTool || _repState.drawDraft) return;
+  _repOpenSettingsModal();
 }
 
 function _repOverlayContextMenu(e) {
@@ -1399,6 +1458,7 @@ function _repOverlayContextMenu(e) {
 }
 
 function _repFinishToolPlacement() {
+  if (_repState.activeTool && _repState.activeTool !== 'select') _repState.activeTool = null;
   _repUpdateToolbarActive();
   _repSaveState();
   _repDrawOverlay();
@@ -1433,7 +1493,10 @@ function _repSetTool(id) {
 function _repUpdateToolbarActive() {
   document.querySelectorAll('.rep-tool-btn[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === _repState.activeTool));
   const overlay = document.getElementById('rep-overlay');
-  if (overlay) overlay.classList.toggle('drawing', !!_repState.activeTool);
+  if (overlay) {
+    overlay.classList.toggle('drawing', !!_repState.activeTool && _repState.activeTool !== 'select');
+    overlay.style.cursor = '';
+  }
   if (!_repState.activeTool) { _repState._manualCrosshair = null; _repDrawOverlay?.(); }
 }
 // ── Toolbar hover tooltips ───────────────────────────────
@@ -1464,6 +1527,26 @@ function _repHideTip() {
 function _repToggleMagnet() {
   _repState.magnet = !_repState.magnet;
   document.getElementById('rep-magnet-btn')?.classList.toggle('on', _repState.magnet);
+  _repSaveState();
+}
+// Locking freezes every existing drawing in place — the select tool
+// can still click one to open its context menu (e.g. to unlock just
+// that one), but drag handles stop responding. New drawings can still
+// be placed; they just aren't affected by the lock.
+function _repToggleDrawingsLocked() {
+  if (!_repState) return;
+  _repState.drawingsLocked = !_repState.drawingsLocked;
+  document.getElementById('rep-lock-btn')?.classList.toggle('on', _repState.drawingsLocked);
+  _repSaveState();
+}
+// Hides every drawing from the canvas without deleting them —
+// toggle again to bring them all back exactly as they were.
+function _repToggleDrawingsHidden() {
+  if (!_repState) return;
+  _repState.drawingsHidden = !_repState.drawingsHidden;
+  const btn = document.getElementById('rep-hide-btn');
+  if (btn) { btn.classList.toggle('on', _repState.drawingsHidden); btn.innerHTML = _repIcon(_repState.drawingsHidden ? 'eyeOff' : 'eye', 'icn'); }
+  _repDrawOverlay();
   _repSaveState();
 }
 function _repToggleLoop() {
@@ -2141,6 +2224,15 @@ function _repZoom(dir) {
   _repState.candlesPerView = Math.max(20, Math.min(400, _repState.candlesPerView + dir * 10));
   _repSetChartData(true);
   _repSaveState();
+}
+// Jumps straight to a preset zoom level (the "1D / 5D / 1M …"-style
+// range pills under the chart) instead of nudging by 10 like _repZoom.
+function _repSetRange(n) {
+  if (!_repState) return;
+  _repState.candlesPerView = Math.max(20, Math.min(400, n));
+  _repSetChartData(true);
+  _repSaveState();
+  document.querySelectorAll('.rep-range-btn').forEach(b => b.classList.toggle('active', Number(b.dataset.n) === _repState.candlesPerView));
 }
 function _repJumpToDate(dateStr) {
   if (!_repState || !dateStr) return;
