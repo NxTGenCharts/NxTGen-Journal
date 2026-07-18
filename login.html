@@ -490,7 +490,7 @@
   // to it after signing in instead of always landing on the dashboard.
   function _postLoginDestination() {
     const next = new URLSearchParams(window.location.search).get('next');
-    return (next && next.startsWith('/') && !next.startsWith('//')) ? next : './';
+    return (next && next.startsWith('/') && !next.startsWith('//')) ? next : './app.html';
   }
 
 
@@ -556,6 +556,9 @@
     clearAlerts();
     if (t==='register') { document.getElementById('confirmScreen').classList.remove('show'); document.getElementById('registerForm').style.display=''; }
   }
+  // Deep-link support: login.html#register opens straight to the Create Account tab
+  // (used by the "Start Journaling Free" CTA on the marketing landing page)
+  if (location.hash === '#register') switchTab('register');
 
   function clearAlerts() {
     ['loginErr','loginOk','regErr'].forEach(id => { document.getElementById(id).classList.remove('show'); });
@@ -619,7 +622,7 @@
     if(pw.length<8){showAlert('regErr','Password must be at least 8 characters.');return;}
     if(pw!==pw2){showAlert('regErr','Passwords do not match.');return;}
     btn.disabled=true; btn.textContent='Creating account…';
-    const {error}=await sb.auth.signUp({email,password:pw,options:{data:{full_name:name},emailRedirectTo:BASE+'/'}});
+    const {error}=await sb.auth.signUp({email,password:pw,options:{data:{full_name:name},emailRedirectTo:BASE+'/app.html'}});
     if(error){
       showAlert('regErr',error.message==='User already registered'?'An account with this email already exists. Try signing in.':error.message);
       btn.disabled=false; btn.textContent='Create My Account';
@@ -636,7 +639,7 @@
     if(!lastSignupEmail)return;
     const btn=document.getElementById('resendBtn');
     btn.textContent='Sending…';
-    const{error}=await sb.auth.resend({type:'signup',email:lastSignupEmail,options:{emailRedirectTo:BASE+'/'}});
+    const{error}=await sb.auth.resend({type:'signup',email:lastSignupEmail,options:{emailRedirectTo:BASE+'/app.html'}});
     btn.textContent=error?'Failed — try again':'Sent! Check your inbox';
     setTimeout(()=>{btn.textContent='Resend email';},4000);
   }
@@ -652,7 +655,7 @@
 
   async function handleGoogle() {
     ['btnGoogleLogin','btnGoogleReg'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=true;});
-    const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:BASE+'/'}});
+    const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:BASE+'/app.html'}});
     if(error)['btnGoogleLogin','btnGoogleReg'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=false;});
   }
 
