@@ -110,8 +110,8 @@ nav.topnav.scrolled .topnav-inner{
   border-color:var(--glass-border-h);
   box-shadow:var(--shadow-lg);
 }
-.brand-logo{height:31px;filter:contrast(1.15) saturate(1.05)}
-[data-theme="light"] .brand-logo{filter:invert(1) hue-rotate(180deg) brightness(.4) contrast(1.15)}
+.brand-logo{height:31px;filter:none}
+[data-theme="light"] .brand-logo{filter:invert(1) brightness(.92)}
 .nav-links{display:flex;align-items:center;gap:22px;font-size:14px;color:var(--text2);flex:1}
 .nav-links a{padding:6px 2px;position:relative}
 .nav-links a:hover{color:var(--text)}
@@ -151,6 +151,10 @@ nav.topnav.scrolled .topnav-inner{
 .btn-primary:hover{transform:translateY(-1px);box-shadow:0 10px 28px var(--teal-glow)}
 .btn-lg{padding:13px 24px;font-size:15px}
 .mob-menu-btn{display:none;width:36px;height:36px;border-radius:var(--r-md);border:1px solid var(--glass-border);background:var(--glass-1);align-items:center;justify-content:center;cursor:pointer;color:var(--text)}
+.mob-menu-btn .icn-close{display:none}
+.mob-menu-btn.open .icn-burger{display:none}
+.mob-menu-btn.open .icn-close{display:block}
+.mob-menu-panel{display:none}
 
 /* ── Hero ── */
 .hero{position:relative;z-index:1;padding:76px 0 60px}
@@ -271,13 +275,24 @@ footer{border-top:1px solid var(--border);padding:40px 0}
 .foot-links{display:flex;gap:22px;font-size:13px;color:var(--text3)}
 .foot-links a:hover{color:var(--text2)}
 .foot-brand{display:flex;align-items:center;gap:10px}
-.foot-brand img{height:20px}
-[data-theme="light"] .foot-brand img{filter:invert(1) hue-rotate(180deg) brightness(.4)}
+.foot-brand img{height:20px;filter:none}
+[data-theme="light"] .foot-brand img{filter:invert(1) brightness(.92)}
 .foot-copy{font-size:12px;color:var(--text3);font-family:var(--font-mono)}
 
 @media (max-width:860px){
   .nav-links{display:none}
   .mob-menu-btn{display:flex}
+  .mob-menu-panel{display:block;max-width:1280px;margin:0 auto;padding:0 20px;
+    max-height:0;overflow:hidden;transition:max-height .35s var(--ease);}
+  .mob-menu-panel.open{max-height:440px}
+  .mob-menu-sheet{margin-top:10px;background:var(--bg2);border:1px solid var(--glass-border-h);
+    border-radius:var(--r-xl);box-shadow:var(--shadow-lg);padding:14px;
+    backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:flex;flex-direction:column;gap:2px;}
+  .mob-menu-sheet a{padding:12px 10px;border-radius:var(--r-md);font-size:15px;font-weight:600;color:var(--text)}
+  .mob-menu-sheet a:active,.mob-menu-sheet a:hover{background:var(--glass-1)}
+  .mob-menu-divider{height:1px;background:var(--border);margin:8px 6px}
+  .mob-menu-ctas{display:flex;flex-direction:column;gap:10px;padding:10px 6px 2px}
+  .mob-menu-ctas .btn{justify-content:center;width:100%}
   .hero-grid{grid-template-columns:1fr;gap:40px}
   .mock-float-badge{display:none}
   .bento{grid-template-columns:repeat(2,1fr);grid-auto-rows:auto}
@@ -286,6 +301,20 @@ footer{border-top:1px solid var(--border);padding:40px 0}
   .price-grid{grid-template-columns:1fr}
   .cta-inner{padding:36px 22px}
   .foot-row{flex-direction:column;align-items:flex-start}
+}
+@media (max-width:480px){
+  nav.topnav{padding:10px 12px}
+  .topnav-inner{padding:10px 16px;gap:14px}
+  .brand-logo{height:26px}
+  .nav-right{gap:6px}
+  .btn{padding:8px 14px;font-size:13px}
+  .theme-btn{width:32px;height:32px}
+  .mob-menu-btn{width:32px;height:32px}
+  .hero{padding:56px 0 40px}
+  .hero p.sub{font-size:15.5px}
+  .mock-card{padding:16px}
+  .mock-kpis{gap:7px}
+  .mock-kpi{padding:9px}
 }
 </style>
 </head>
@@ -337,7 +366,22 @@ footer{border-top:1px solid var(--border);padding:40px 0}
       </button>
       <a class="btn btn-ghost" href="https://app.nxtgencharts.site/login.html">Sign In</a>
       <a class="btn btn-primary" href="https://app.nxtgencharts.site/login.html#register">Get Started</a>
-      <button class="mob-menu-btn" aria-label="Menu"><svg class="icn" viewBox="0 0 24 24"><path d="M3.5 6.5h17M3.5 12h17M3.5 17.5h17" stroke-linecap="round"/></svg></button>
+      <button class="mob-menu-btn" id="mobMenuBtn" aria-label="Menu" aria-expanded="false" aria-controls="mobMenu">
+        <svg class="icn icn-burger" viewBox="0 0 24 24"><path d="M3.5 6.5h17M3.5 12h17M3.5 17.5h17" stroke-linecap="round"/></svg>
+        <svg class="icn icn-close" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="mob-menu-panel" id="mobMenu">
+    <div class="mob-menu-sheet">
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#stats">Results</a>
+      <div class="mob-menu-divider"></div>
+      <div class="mob-menu-ctas">
+        <a class="btn btn-ghost" href="https://app.nxtgencharts.site/login.html">Sign In</a>
+        <a class="btn btn-primary" href="https://app.nxtgencharts.site/login.html#register">Get Started</a>
+      </div>
     </div>
   </div>
 </nav>
@@ -576,6 +620,28 @@ function toggleTheme(){
   const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 24);
   onScroll();
   window.addEventListener('scroll', onScroll, { passive: true });
+})();
+
+// ── Mobile menu ──
+(function initMobileMenu(){
+  const btn = document.getElementById('mobMenuBtn');
+  const panel = document.getElementById('mobMenu');
+  if (!btn || !panel) return;
+  function setOpen(open){
+    panel.classList.toggle('open', open);
+    btn.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setOpen(!panel.classList.contains('open'));
+  });
+  panel.querySelectorAll('a').forEach(a => a.addEventListener('click', () => setOpen(false)));
+  document.addEventListener('click', (e) => {
+    if (panel.classList.contains('open') && !panel.contains(e.target) && e.target !== btn) setOpen(false);
+  });
+  window.addEventListener('resize', () => { if (window.innerWidth > 860) setOpen(false); });
 })();
 
 // ── Feature dropdown ──
