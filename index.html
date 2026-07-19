@@ -254,11 +254,23 @@ section{position:relative;z-index:1}
 .price-pop-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--teal);color:#04120e;
   font-size:11px;font-weight:700;padding:4px 12px;border-radius:99px;font-family:var(--font-mono)}
 .price-name{font-size:13px;color:var(--text3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em}
+.price-row{display:flex;align-items:center;flex-wrap:wrap;gap:0 8px}
 .price-val{font-size:36px;font-weight:800;margin:8px 0 18px}
 .price-val span{font-size:14px;font-weight:500;color:var(--text3)}
 .price-list{list-style:none;margin-bottom:22px}
 .price-list li{display:flex;gap:9px;align-items:flex-start;font-size:13.5px;color:var(--text2);padding:6px 0}
 .price-list li .icn{width:15px;height:15px;color:var(--green);margin-top:2px;flex-shrink:0}
+.price-val.is-soon{position:relative;color:var(--text3)}
+.price-val.is-soon::after{content:'';position:absolute;left:-2px;right:-2px;top:52%;height:2px;background:var(--text3);
+  transform:rotate(-4deg);border-radius:2px}
+.price-soon-tag{display:inline-block;font-size:10.5px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em;
+  color:var(--text3);background:var(--glass-1);border:1px solid var(--glass-border);border-radius:99px;
+  padding:2px 9px;margin-left:8px;vertical-align:middle;text-transform:uppercase}
+.btn.is-soon{position:relative;color:var(--text3);pointer-events:none;background:var(--glass-0);
+  border-color:var(--glass-border);box-shadow:none}
+.btn.is-soon>span{position:relative}
+.btn.is-soon>span::after{content:'';position:absolute;left:-3px;right:-3px;top:48%;height:1.5px;background:var(--text3);
+  transform:rotate(-3deg)}
 
 /* ── CTA banner ── */
 .cta-banner{padding:0 0 96px}
@@ -559,25 +571,25 @@ footer{border-top:1px solid var(--border);padding:40px 0}
       <div class="price-card pop">
         <div class="price-pop-badge">Most popular</div>
         <div class="price-name">Pro</div>
-        <div class="price-val">$12 <span>/mo</span></div>
+        <div class="price-row"><div class="price-val is-soon">$12 <span>/mo</span></div><span class="price-soon-tag">Coming soon</span></div>
         <ul class="price-list">
           <li><svg class="icn" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg> Everything in Free</li>
           <li><svg class="icn" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg> Unlimited AI Coach</li>
           <li><svg class="icn" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg> Advanced pattern analysis</li>
           <li><svg class="icn" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg> Priority support</li>
         </ul>
-        <a class="btn btn-primary" style="width:100%;justify-content:center" href="https://app.nxtgencharts.site/login.html#register">Start Pro Trial</a>
+        <a class="btn btn-primary is-soon" style="width:100%;justify-content:center" href="#pricing" aria-disabled="true" title="Not available yet — everything is free during early access"><span>Start Pro Trial</span></a>
       </div>
       <div class="price-card">
         <div class="price-name">Elite</div>
-        <div class="price-val">$29 <span>/mo</span></div>
+        <div class="price-row"><div class="price-val is-soon">$29 <span>/mo</span></div><span class="price-soon-tag">Coming soon</span></div>
         <ul class="price-list">
           <li><svg class="icn" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg> Everything in Pro</li>
           <li><svg class="icn" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg> Multi-account tracking</li>
           <li><svg class="icn" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg> Team / prop firm access</li>
           <li><svg class="icn" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6"/></svg> 1-on-1 coaching session</li>
         </ul>
-        <a class="btn btn-ghost" style="width:100%;justify-content:center" href="https://app.nxtgencharts.site/login.html#register">Get Started</a>
+        <a class="btn btn-ghost is-soon" style="width:100%;justify-content:center" href="#pricing" aria-disabled="true" title="Not available yet — everything is free during early access"><span>Get Started</span></a>
       </div>
     </div>
   </div>
