@@ -293,6 +293,7 @@ footer{border-top:1px solid var(--border);padding:40px 0}
 
 @media (max-width:900px){
   .nav-links{display:none}
+  .topnav-inner{justify-content:space-between}
   .mob-menu-btn{display:flex}
   .mob-menu-panel{display:block;position:absolute;top:100%;left:0;right:0;margin-top:10px;
     padding:0 20px;z-index:40;
@@ -305,9 +306,6 @@ footer{border-top:1px solid var(--border);padding:40px 0}
     backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:flex;flex-direction:column;gap:2px;}
   .mob-menu-sheet a{padding:12px 10px;border-radius:var(--r-md);font-size:15px;font-weight:600;color:var(--text)}
   .mob-menu-sheet a:active,.mob-menu-sheet a:hover{background:var(--glass-1)}
-  .mob-menu-divider{height:1px;background:var(--border);margin:8px 6px}
-  .mob-menu-ctas{display:flex;flex-direction:column;gap:10px;padding:10px 6px 2px}
-  .mob-menu-ctas .btn{justify-content:center;width:100%}
   .hero-grid{grid-template-columns:1fr;gap:40px}
   .mock-float-badge{display:none}
   .mock-card{animation:none}
@@ -408,11 +406,6 @@ footer{border-top:1px solid var(--border);padding:40px 0}
       <a href="#features">Features</a>
       <a href="#pricing">Pricing</a>
       <a href="#stats">Results</a>
-      <div class="mob-menu-divider"></div>
-      <div class="mob-menu-ctas">
-        <a class="btn btn-ghost" href="https://app.nxtgencharts.site/login.html">Sign In</a>
-        <a class="btn btn-primary" href="https://app.nxtgencharts.site/login.html#register">Get Started</a>
-      </div>
     </div>
   </div>
 </nav>
