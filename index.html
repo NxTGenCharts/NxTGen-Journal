@@ -6,10 +6,16 @@
   // Apply the saved (or system) theme to <html> immediately, before any CSS
   // loads or paints, so there is no flash of the wrong theme — and so the
   // theme carries seamlessly from here into login.html and the dashboard.
-  // Shared 'nxtgen_theme' key across all three.
+  // nxtgencharts.site and app.nxtgencharts.site are DIFFERENT ORIGINS, so
+  // localStorage can't cross that boundary — a 'domain=.nxtgencharts.site'
+  // cookie is the shared source of truth; localStorage is just a same-origin
+  // cache on top of it.
   (function () {
     try {
-      var t = localStorage.getItem('nxtgen_theme');
+      var t = null;
+      var m = document.cookie.match(/(?:^|;\s*)nxtgen_theme=([^;]+)/);
+      if (m) t = decodeURIComponent(m[1]);
+      if (t !== 'light' && t !== 'dark') t = localStorage.getItem('nxtgen_theme');
       if (t !== 'light' && t !== 'dark') {
         t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
       }
@@ -18,6 +24,18 @@
   })();
 </script>
 <meta name="description" content="NxTGen Journal — the trading journal that pairs real execution analytics with an AI coach, a backtesting lab, and a playbook, so every trade sharpens your edge.">
+<script>
+  // Persists the theme in BOTH the cross-subdomain cookie and localStorage.
+  // Call this instead of localStorage.setItem('nxtgen_theme', ...) directly.
+  function _nxtgenSaveTheme(v) {
+    try { localStorage.setItem('nxtgen_theme', v); } catch (e) {}
+    try {
+      var domainAttr = location.hostname.endsWith('nxtgencharts.site') ? '; domain=.nxtgencharts.site' : '';
+      var secureAttr = location.protocol === 'https:' ? '; secure' : '';
+      document.cookie = 'nxtgen_theme=' + v + '; path=/; max-age=31536000; samesite=lax' + domainAttr + secureAttr;
+    } catch (e) {}
+  }
+</script>
 <meta name="theme-color" content="#080b12" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#e3e8f3" media="(prefers-color-scheme: light)">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -631,8 +649,9 @@ footer{border-top:1px solid var(--border);padding:20px 0}
 </footer>
 
 <script>
-// ── Theme toggle — shares the app's 'nxtgen_theme' key, so a preference
-//    set here carries straight into the dashboard after sign-in.
+// ── Theme toggle — shares the app's 'nxtgen_theme' cookie/key across
+//    nxtgencharts.site and app.nxtgencharts.site, so a preference set
+//    here carries straight into login and the dashboard after sign-in.
 function applyTheme(t){
   document.documentElement.setAttribute('data-theme', t);
   document.getElementById('themeIcon').innerHTML = t === 'light'
@@ -642,12 +661,17 @@ function applyTheme(t){
 function toggleTheme(){
   const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
   const next = cur === 'light' ? 'dark' : 'light';
-  try{ localStorage.setItem('nxtgen_theme', next); }catch(e){}
+  _nxtgenSaveTheme(next);
   applyTheme(next);
 }
 (function initTheme(){
-  let t = 'dark';
-  try{ t = localStorage.getItem('nxtgen_theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); }catch(e){}
+  let t = null;
+  try{
+    const m = document.cookie.match(/(?:^|;\s*)nxtgen_theme=([^;]+)/);
+    if (m) t = decodeURIComponent(m[1]);
+    if (t !== 'light' && t !== 'dark') t = localStorage.getItem('nxtgen_theme');
+    if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  }catch(e){ t = 'dark'; }
   applyTheme(t);
 })();
 
