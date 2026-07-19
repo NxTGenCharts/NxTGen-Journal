@@ -2,6 +2,21 @@
 <html lang="en" data-theme="">
 <head>
 <meta charset="UTF-8">
+<script>
+  // Apply the saved (or system) theme to <html> immediately, before any CSS
+  // loads or paints, so there is no flash of the wrong theme — and so the
+  // theme carries seamlessly from here into login.html and the dashboard.
+  // Shared 'nxtgen_theme' key across all three.
+  (function () {
+    try {
+      var t = localStorage.getItem('nxtgen_theme');
+      if (t !== 'light' && t !== 'dark') {
+        t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      }
+      document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : '');
+    } catch (e) {}
+  })();
+</script>
 <meta name="description" content="NxTGen Journal — the trading journal that pairs real execution analytics with an AI coach, a backtesting lab, and a playbook, so every trade sharpens your edge.">
 <meta name="theme-color" content="#080b12" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#e3e8f3" media="(prefers-color-scheme: light)">
