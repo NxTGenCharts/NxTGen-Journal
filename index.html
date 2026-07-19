@@ -279,13 +279,16 @@ footer{border-top:1px solid var(--border);padding:40px 0}
 [data-theme="light"] .foot-brand img{filter:invert(1) brightness(.92)}
 .foot-copy{font-size:12px;color:var(--text3);font-family:var(--font-mono)}
 
-@media (max-width:860px){
+@media (max-width:900px){
   .nav-links{display:none}
   .mob-menu-btn{display:flex}
-  .mob-menu-panel{display:block;max-width:1280px;margin:0 auto;padding:0 20px;
-    max-height:0;overflow:hidden;transition:max-height .35s var(--ease);}
-  .mob-menu-panel.open{max-height:440px}
-  .mob-menu-sheet{margin-top:10px;background:var(--bg2);border:1px solid var(--glass-border-h);
+  .mob-menu-panel{display:block;position:absolute;top:100%;left:0;right:0;margin-top:10px;
+    padding:0 20px;z-index:40;
+    opacity:0;transform:translateY(-8px);pointer-events:none;visibility:hidden;
+    transition:opacity .25s var(--ease),transform .25s var(--ease),visibility 0s linear .25s;}
+  .mob-menu-panel.open{opacity:1;transform:translateY(0);pointer-events:auto;visibility:visible;
+    transition:opacity .25s var(--ease),transform .25s var(--ease);}
+  .mob-menu-sheet{max-width:1280px;margin:0 auto;background:var(--bg2);border:1px solid var(--glass-border-h);
     border-radius:var(--r-xl);box-shadow:var(--shadow-lg);padding:14px;
     backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:flex;flex-direction:column;gap:2px;}
   .mob-menu-sheet a{padding:12px 10px;border-radius:var(--r-md);font-size:15px;font-weight:600;color:var(--text)}
@@ -295,6 +298,7 @@ footer{border-top:1px solid var(--border);padding:40px 0}
   .mob-menu-ctas .btn{justify-content:center;width:100%}
   .hero-grid{grid-template-columns:1fr;gap:40px}
   .mock-float-badge{display:none}
+  .mock-card{animation:none}
   .bento{grid-template-columns:repeat(2,1fr);grid-auto-rows:auto}
   .bento-card{grid-column:span 2 !important;grid-row:span 1 !important;min-height:150px}
   .stats-strip{grid-template-columns:repeat(2,1fr)}
@@ -641,7 +645,7 @@ function toggleTheme(){
   document.addEventListener('click', (e) => {
     if (panel.classList.contains('open') && !panel.contains(e.target) && e.target !== btn) setOpen(false);
   });
-  window.addEventListener('resize', () => { if (window.innerWidth > 860) setOpen(false); });
+  window.addEventListener('resize', () => { if (window.innerWidth > 900) setOpen(false); });
 })();
 
 // ── Feature dropdown ──
