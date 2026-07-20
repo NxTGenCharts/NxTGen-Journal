@@ -263,6 +263,9 @@ section{position:relative;z-index:1}
 .bento-4{grid-column:span 2;grid-row:span 2}
 .bento-5{grid-column:span 2;grid-row:span 2}
 .bento-6{grid-column:span 2;grid-row:span 2}
+.bento-7{grid-column:span 6;grid-row:span 1;flex-direction:row;align-items:center;gap:20px}
+.bento-7 .b-ico{margin-bottom:0;flex-shrink:0}
+.bento-7 p{max-width:560px}
 .bento-1 .b-bg{position:absolute;inset:0;opacity:.5;background:
   radial-gradient(ellipse 300px 200px at 90% 10%,var(--teal-glow),transparent 70%);pointer-events:none}
 .bento-mini-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:14px;max-width:220px}
@@ -342,6 +345,7 @@ footer{border-top:1px solid var(--border);padding:20px 0}
   .hero-grid{grid-template-columns:1fr;gap:40px}
   .bento{grid-template-columns:repeat(2,1fr);grid-auto-rows:auto}
   .bento-card{grid-column:span 2 !important;grid-row:span 1 !important;min-height:150px}
+  .bento-7{flex-direction:column;align-items:flex-start}
   .stats-strip{grid-template-columns:repeat(2,1fr)}
   .price-grid{grid-template-columns:1fr}
   .cta-inner{padding:36px 22px}
@@ -415,6 +419,10 @@ footer{border-top:1px solid var(--border);padding:20px 0}
           <a class="nav-drop-item" href="#features">
             <span class="ico" style="background:rgba(167,139,250,.16);color:#a78bfa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg></span>
             <div><div class="t">Calendar &amp; Watchlist</div><div class="d">Visual streaks, daily P&amp;L and weekly market prep</div></div>
+          </a>
+          <a class="nav-drop-item" href="#features">
+            <span class="ico" style="background:rgba(251,146,60,.16);color:#fb923c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M8.5 8.5a5 5 0 000 7M15.5 8.5a5 5 0 010 7M5.3 5.3a9 9 0 000 13.4M18.7 5.3a9 9 0 010 13.4"/></svg></span>
+            <div><div class="t">Signals</div><div class="d">Publish and track live trading signals with real-time accuracy</div></div>
           </a>
         </div>
       </div>
@@ -553,6 +561,11 @@ footer{border-top:1px solid var(--border);padding:20px 0}
         <div class="b-ico" style="background:rgba(248,113,113,.14);color:var(--red)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="8.5" stroke-width="1.6"/><circle cx="12" cy="12" r="5" stroke-width="1.6"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg></div>
         <h3>Account Tracker</h3>
         <p>Drawdown, targets and payouts across every funded and paper account, side by side.</p>
+      </div>
+      <div class="bento-card bento-7 reveal">
+        <div class="b-ico" style="background:rgba(251,146,60,.16);color:#fb923c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M8.5 8.5a5 5 0 000 7M15.5 8.5a5 5 0 010 7M5.3 5.3a9 9 0 000 13.4M18.7 5.3a9 9 0 010 13.4"/></svg></div>
+        <h3>Signals</h3>
+        <p>Publish and manage your own trading signals — win rate, average R:R, hold time and pips update live, filterable by market, session and confidence.</p>
       </div>
     </div>
   </div>
