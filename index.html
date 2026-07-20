@@ -548,8 +548,10 @@ footer{padding:56px 0 22px}
 .foot-grid{display:grid;grid-template-columns:1.4fr repeat(4,1fr);gap:32px;padding-bottom:36px;
   border-bottom:1px solid var(--border)}
 .foot-col h4{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:14px;font-family:var(--font-mono)}
-.foot-col a{display:block;font-size:13.5px;color:var(--text2);padding:5px 0}
+.foot-col a{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--text2);padding:5px 0}
 .foot-col a:hover{color:var(--text)}
+.foot-ico{width:15px;height:15px;flex-shrink:0;color:var(--text3);transition:color .15s}
+.foot-col a:hover .foot-ico{color:var(--teal)}
 .foot-newsletter{display:flex;gap:8px;margin-top:12px}
 .foot-newsletter input{flex:1;min-width:0;background:var(--glass-0);border:1px solid var(--glass-border);
   border-radius:var(--r-md);padding:9px 12px;font:inherit;font-size:13px;color:var(--text)}
@@ -566,7 +568,8 @@ footer{padding:56px 0 22px}
   .foot-grid{grid-template-columns:1fr 1fr;gap:22px 16px}
   .foot-col:first-child{grid-column:1/-1}
   .foot-col h4{font-size:10.5px;margin-bottom:10px}
-  .foot-col a{font-size:12.5px;padding:4px 0}
+  .foot-col a{font-size:12.5px;padding:4px 0;gap:7px}
+  .foot-ico{width:13px;height:13px}
   .foot-bottom{flex-direction:column;align-items:center;text-align:center;gap:10px}
   .foot-meta{justify-content:center}
 }
@@ -947,27 +950,27 @@ footer{padding:56px 0 22px}
       </div>
       <div class="foot-col">
         <h4>Product</h4>
-        <a href="#features">Features</a>
-        <a href="#pricing">Pricing</a>
-        <a href="#stats">Results</a>
-        <a href="https://app.nxtgencharts.site/login.html">Sign In</a>
+        <a href="#features"><svg class="foot-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="1.5"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="13" width="7.5" height="7.5" rx="1.5"/></svg>Features</a>
+        <a href="#pricing"><svg class="foot-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 3.5H19a1.5 1.5 0 011.5 1.5v6.5a1.5 1.5 0 01-.44 1.06l-8 8a1.5 1.5 0 01-2.12 0l-6.5-6.5a1.5 1.5 0 010-2.12l8-8A1.5 1.5 0 0112.5 3.5z"/><circle cx="16.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg>Pricing</a>
+        <a href="#stats"><svg class="foot-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V11M12 20V4M20 20v-7"/></svg>Results</a>
+        <a href="https://app.nxtgencharts.site/login.html"><svg class="foot-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 20.5h-5a1.5 1.5 0 01-1.5-1.5V5a1.5 1.5 0 011.5-1.5h5"/><path d="M15.5 16l4.5-4-4.5-4M19.5 12h-11"/></svg>Sign In</a>
       </div>
       <div class="foot-col">
         <h4>Resources</h4>
-        <a href="#" onclick="return false">Documentation</a>
-        <a href="#" onclick="return false">Roadmap</a>
-        <a href="#" onclick="return false">Changelog</a>
+        <a href="#" onclick="return false"><svg class="foot-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h7l4.5 4.5V19a1.5 1.5 0 01-1.5 1.5H7A1.5 1.5 0 015.5 19V5A1.5 1.5 0 017 3.5z"/><path d="M14 3.5V8h4.5M8.5 13h7M8.5 16.5h4.5"/></svg>Documentation</a>
+        <a href="#" onclick="return false"><svg class="foot-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L4 6v14l5-2 6 2 5-2V4l-5 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>Roadmap</a>
+        <a href="#" onclick="return false"><svg class="foot-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg>Changelog</a>
       </div>
       <div class="foot-col">
         <h4>Community</h4>
-        <a href="#" onclick="return false">Discord</a>
-        <a href="#" onclick="return false">X / Twitter</a>
-        <a href="#" onclick="return false">Support</a>
+        <a href="#" onclick="return false"><svg class="foot-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18.5V7a2 2 0 012-2h10a2 2 0 012 2v11.5l-3.5-2.5h-7z"/><circle cx="9.5" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="14.5" cy="11.5" r="1" fill="currentColor" stroke="none"/></svg>Discord</a>
+        <a href="#" onclick="return false"><svg class="foot-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l16 16M20 4L4 20"/></svg>X / Twitter</a>
+        <a href="#" onclick="return false"><svg class="foot-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 15.5v.01M12 8v4.5"/></svg>Support</a>
       </div>
       <div class="foot-col">
         <h4>Legal</h4>
-        <a href="#" onclick="return false">Terms</a>
-        <a href="#" onclick="return false">Privacy</a>
+        <a href="#" onclick="return false"><svg class="foot-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h11a1.5 1.5 0 011.5 1.5v14a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 015 19V5a1.5 1.5 0 011.5-1.5z"/><path d="M8.5 8h7M8.5 11.5h7M8.5 15h4.5"/></svg>Terms</a>
+        <a href="#" onclick="return false"><svg class="foot-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l7 3v5.5c0 4.5-3 7.5-7 8.5-4-1-7-4-7-8.5V6.5l7-3z"/></svg>Privacy</a>
       </div>
     </div>
     <div class="foot-bottom">
